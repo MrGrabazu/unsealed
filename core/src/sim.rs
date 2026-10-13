@@ -47,6 +47,20 @@ impl SimReport {
 /// Cards of color-balanced sheets are left out: balancing changes their per-card
 /// frequencies by design (see `draw`), so they are checked by invariant instead.
 pub fn expected_rates(cfg: &BoosterConfig) -> BTreeMap<(String, bool), f64> {
+    rates(cfg, false)
+}
+
+/// Expected value of one booster: the sum over cards of (expected copies x price).
+/// `price_of(uuid, foil)` gives a card's price in any unit; unpriced cards count for 0.
+/// Unlike `expected_rates`, color-balanced sheets are included (first-order estimate).
+pub fn expected_value_cents<F: Fn(&str, bool) -> Option<u32>>(cfg: &BoosterConfig, price_of: F) -> f64 {
+    rates(cfg, true)
+        .iter()
+        .map(|((uuid, foil), rate)| rate * f64::from(price_of(uuid, *foil).unwrap_or(0)))
+        .sum()
+}
+
+fn rates(cfg: &BoosterConfig, include_balanced: bool) -> BTreeMap<(String, bool), f64> {
     let mut out = BTreeMap::new();
     for pack in &cfg.boosters {
         let p = pack.weight as f64 / cfg.boosters_total_weight as f64;
@@ -62,7 +76,7 @@ pub fn expected_rates(cfg: &BoosterConfig) -> BTreeMap<(String, bool), f64> {
             }
         }
     }
-    for sheet in cfg.sheets.values().filter(|s| s.balance_colors) {
+    for sheet in cfg.sheets.values().filter(|s| s.balance_colors && !include_balanced) {
         for uuid in sheet.cards.keys() {
             out.remove(&(uuid.clone(), sheet.foil));
         }

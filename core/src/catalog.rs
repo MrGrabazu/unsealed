@@ -62,6 +62,17 @@ pub struct PriceFile {
     pub updated_at: String,
     /// MTGJSON card uuid -> prices (the key used everywhere in the client).
     pub cards: BTreeMap<String, PriceSet>,
+    /// "SET/kind" -> expected market value of one booster, computed from today's card
+    /// prices. The client derives the booster price from it, so prices move with the market.
+    #[serde(default)]
+    pub boosters: BTreeMap<String, BoosterValue>,
+}
+
+/// Expected market value of a booster, in cents, per currency.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BoosterValue {
+    pub usd: u32,
+    pub eur: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -127,6 +127,39 @@ fn balanced_sheets_are_excluded_from_rate_comparison() {
     assert!(report.expected.is_empty());
 }
 
+/// Price of the fixture cards, in cents.
+fn fixture_price(uuid: &str, _foil: bool) -> Option<u32> {
+    match uuid {
+        "c1" => Some(100),
+        "c2" => Some(200),
+        "c3" => Some(300),
+        "r1" => Some(500),
+        "m1" => Some(5_000),
+        _ => None,
+    }
+}
+
+#[test]
+fn expected_value_matches_the_simulated_average() {
+    use unsealed_core::sim::expected_value_cents;
+    let c = cfg();
+    let expected = expected_value_cents(&c, fixture_price);
+
+    let mut rng = ChaCha8Rng::seed_from_u64(11);
+    let n = 100_000u64;
+    let total: u64 = (0..n)
+        .map(|_| {
+            open_booster(&c, &no_colors(), &mut rng)
+                .unwrap()
+                .iter()
+                .map(|d| u64::from(fixture_price(&d.uuid, d.foil).unwrap()))
+                .sum::<u64>()
+        })
+        .sum();
+    let simulated = total as f64 / n as f64;
+    assert!((simulated - expected).abs() / expected < 0.02, "simulated {simulated} vs expected {expected}");
+}
+
 #[test]
 fn observed_rates_match_expected_over_100k_boosters() {
     let c = cfg();

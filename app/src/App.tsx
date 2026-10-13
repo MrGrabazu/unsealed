@@ -6,7 +6,9 @@ import {
   getWallet,
   listSets,
   openBooster,
+  sellBoosters,
   type OpenedCard,
+  type SealedStack,
   type SetSummary,
   type ShopItem,
   type WalletView,
@@ -33,7 +35,37 @@ function WalletBar({ wallet }: { wallet: WalletView }) {
   );
 }
 
+function SealedRow(props: { stack: SealedStack; busy: boolean; onOpen: () => void; onSell: () => void }) {
+  const money = useMoney();
+  const { stack: s, busy } = props;
+  // Profit if the whole stack were sold back today.
+  const pnl = s.quantity * s.sellValueCents - s.costCents;
+  return (
+    <div className="inventory-row">
+      <span>
+        {s.setName} · {s.kind} booster
+        <span className="hint">
+          {" "}
+          paid {money(s.costCents)} · worth {money(s.quantity * s.sellValueCents)} if sold ·{" "}
+          <span className={pnl >= 0 ? "gain" : "loss"}>
+            {pnl >= 0 ? "+" : "−"}
+            {money(Math.abs(pnl))}
+          </span>
+        </span>
+      </span>
+      <strong>×{s.quantity}</strong>
+      <button disabled={busy} onClick={props.onSell}>
+        Sell one ({money(s.sellValueCents)})
+      </button>
+      <button className="primary" disabled={busy} onClick={props.onOpen}>
+        Open one
+      </button>
+    </div>
+  );
+}
+
 export function App() {
+  const [notice, setNotice] = useState<string | null>(null);
   const [sets, setSets] = useState<SetSummary[]>([]);
   const [shop, setShop] = useState<ShopItem[]>([]);
   const [wallet, setWallet] = useState<WalletView | null>(null);
@@ -43,6 +75,10 @@ export function App() {
   const [tab, setTab] = useState<Tab>("boosterium");
   // Bumped after each opening so the collection view reloads.
   const [openings, setOpenings] = useState(0);
+
+  // This component renders the currency provider, so it cannot use `useMoney` itself.
+  const symbol = wallet?.currency.symbol ?? "$";
+  const money = (cents: number) => `${symbol}${(cents / 100).toFixed(2)}`;
 
   const refreshWallet = useCallback(async () => {
     try {
@@ -91,7 +127,7 @@ export function App() {
     });
 
   return (
-    <CurrencyContext.Provider value={wallet?.currency.symbol ?? "$"}>
+    <CurrencyContext.Provider value={symbol}>
       <div className="app">
         <header>
           <h1>Unsealed</h1>
@@ -111,6 +147,7 @@ export function App() {
         </nav>
 
         {error && <p className="error">{error}</p>}
+        {notice && <p className="notice">{notice}</p>}
         {!error && sets.length === 0 && (
           <p className="hint">
             No data found. Run <code>cargo run --release -p data-builder -- --sets BLB,DSK,FDN</code> first.
@@ -133,15 +170,22 @@ export function App() {
             <div className="inventory">
               {wallet.sealed.length === 0 && <p className="hint">No sealed booster. Buy some in the Boosterium.</p>}
               {wallet.sealed.map((s) => (
-                <div key={`${s.setCode}/${s.kind}`} className="inventory-row">
-                  <span>
-                    {s.setName} · {s.kind} booster
-                  </span>
-                  <strong>×{s.quantity}</strong>
-                  <button className="primary" disabled={busy} onClick={() => run(() => open(s.setCode, s.kind))}>
-                    Open one
-                  </button>
-                </div>
+                <SealedRow
+                  key={`${s.setCode}/${s.kind}`}
+                  stack={s}
+                  busy={busy}
+                  onOpen={() => run(() => open(s.setCode, s.kind))}
+                  onSell={() =>
+                    run(async () => {
+                      const sale = await sellBoosters(s.setCode, s.kind, 1);
+                      setNotice(
+                        `Sold 1 ${s.setCode} booster for ${money(sale.totalCents)} (${
+                          sale.profitCents >= 0 ? "profit" : "loss"
+                        } ${money(Math.abs(sale.profitCents))}).`,
+                      );
+                    })
+                  }
+                />
               ))}
             </div>
             {cards && <BoosterOpening cards={cards} />}

@@ -55,6 +55,19 @@ export interface SealedStack {
   setName: string;
   kind: string;
   quantity: number;
+  /** What the player paid for the whole stack (0 for free boosters). */
+  costCents: number;
+  /** Current price of one booster. */
+  priceCents: number;
+  /** What the Boosterium pays today for one booster. */
+  sellValueCents: number;
+}
+
+export interface BoosterSaleResult {
+  quantity: number;
+  totalCents: number;
+  /** Proceeds minus the cost of the sold boosters. */
+  profitCents: number;
 }
 
 export interface WalletView {
@@ -69,6 +82,8 @@ export interface ShopItem {
   setName: string;
   kind: string;
   priceCents: number;
+  /** What the Boosterium would pay today for such a booster. */
+  sellBackCents: number;
 }
 
 export interface SaleRequest {
@@ -87,6 +102,8 @@ export const getWallet = () => invoke<WalletView>("get_wallet");
 export const getShop = () => invoke<ShopItem[]>("get_shop");
 export const buyBoosters = (setCode: string, kind: string, quantity: number) =>
   invoke<void>("buy_boosters", { setCode, kind, quantity });
+export const sellBoosters = (setCode: string, kind: string, quantity: number) =>
+  invoke<BoosterSaleResult>("sell_boosters", { setCode, kind, quantity });
 export const openBooster = (setCode: string, kind: string) =>
   invoke<OpenedCard[]>("open_booster", { setCode, kind });
 export const getCollection = (setCode: string) =>

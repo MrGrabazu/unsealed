@@ -16,7 +16,8 @@ use std::fs::{self, File};
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
-use unsealed_core::catalog::{Manifest, ManifestSet, PriceFile};
+use unsealed_core::catalog::{BoosterValue, Manifest, ManifestSet, PriceFile, PriceSet};
+use unsealed_core::sim::expected_value_cents;
 use unsealed_core::import::{prices_by_uuid, prices_from_scryfall_jsonl, set_from_mtgjson, source_set_codes};
 use unsealed_core::{simulate, ColorIndex};
 
@@ -121,6 +122,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut manifest_sets = BTreeMap::new();
     let mut wanted = HashSet::new();
     let mut all_cards = Vec::new();
+    let mut built_boosters = Vec::new();
 
     for code in &opts.sets {
         let json = read_mtgjson_set(&opts.cache, code)?;
@@ -134,6 +136,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         let colors = ColorIndex::from_cards(&set.cards);
         for (kind, cfg) in &set.boosters {
+            built_boosters.push((format!("{code}/{kind}"), cfg.clone()));
             let report = simulate(cfg, &colors, opts.sim_boosters, &mut ChaCha8Rng::seed_from_u64(1))?;
             let z = report.max_abs_z();
             if z > MAX_Z {
@@ -177,7 +180,23 @@ fn main() -> Result<(), Box<dyn Error>> {
     let priced = cards.values().filter(|p| p.usd.is_some() || p.usd_foil.is_some()).count();
     println!("prices: {} Scryfall ids matched out of {}", by_scryfall_id.len(), wanted.len());
     println!("prices: {} cards by uuid, {priced} with a USD price", cards.len());
-    let size = write_json(&opts.out.join("prices.json"), &PriceFile { updated_at: bulk.updated_at.clone(), cards })?;
+    // Expected market value of each booster: the client prices boosters from it.
+    let mut boosters = BTreeMap::new();
+    for (key, cfg) in &built_boosters {
+        let value = |pick: fn(&PriceSet, bool) -> Option<u32>| {
+            expected_value_cents(cfg, |uuid, foil| cards.get(uuid).and_then(|p| pick(p, foil))).round() as u32
+        };
+        let ev = BoosterValue {
+            usd: value(|p, foil| if foil { p.usd_foil } else { p.usd }),
+            eur: value(|p, foil| if foil { p.eur_foil } else { p.eur }),
+        };
+        println!("{key}: expected value ${:.2} / EUR {:.2}", f64::from(ev.usd) / 100.0, f64::from(ev.eur) / 100.0);
+        boosters.insert(key.clone(), ev);
+    }
+    let size = write_json(
+        &opts.out.join("prices.json"),
+        &PriceFile { updated_at: bulk.updated_at.clone(), cards, boosters },
+    )?;
     println!("prices.json: {} KB", size / 1024);
 
     let generated_at = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().to_string();

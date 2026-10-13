@@ -12,18 +12,32 @@ fn config() -> EconomyConfig {
 fn shipped_config_matches_the_agreed_rules() {
     let c = config();
     assert_eq!(c.starting_balance_cents, 10_000);
-    assert_eq!(c.booster_price_cents("BLB", "play"), 400);
+    assert_eq!(c.booster_price_cents("BLB", "play", None), 750);
     assert_eq!(c.sell_rate_percent, 80);
     assert_eq!((c.charity.amount_cents, c.charity.max_claims_per_day), (2_000, 1));
 }
 
 #[test]
-fn booster_price_uses_overrides_then_default() {
+fn booster_price_uses_overrides_then_market_value_then_default() {
     let mut c = config();
     c.booster_prices.overrides.insert("BLB".into(), [("collector".to_string(), 2_500)].into());
-    assert_eq!(c.booster_price_cents("BLB", "collector"), 2_500);
-    assert_eq!(c.booster_price_cents("BLB", "play"), 400);
-    assert_eq!(c.booster_price_cents("DSK", "collector"), 400);
+    // A fixed override ignores the market.
+    assert_eq!(c.booster_price_cents("BLB", "collector", Some(9_000)), 2_500);
+    // Otherwise the price follows the expected market value (100% by default).
+    assert_eq!(c.booster_price_cents("BLB", "play", Some(743)), 743);
+    c.booster_prices.ev_markup_percent = 120;
+    assert_eq!(c.booster_price_cents("DSK", "play", Some(1_000)), 1_200);
+    // Never below the minimum price.
+    assert_eq!(c.booster_price_cents("DSK", "play", Some(10)), 100);
+    // Unknown market value: default price.
+    assert_eq!(c.booster_price_cents("DSK", "play", None), 750);
+}
+
+#[test]
+fn sealed_boosters_sell_back_at_the_configured_rate() {
+    let c = config();
+    assert_eq!(c.booster_sell_value_cents(1_000), 800);
+    assert_eq!(c.booster_sell_value_cents(743), 594);
 }
 
 #[test]
@@ -49,7 +63,8 @@ fn rejects_invalid_configs() {
     let bad = |from: &str, to: &str| EconomyConfig::from_json(&CONFIG.replace(from, to)).is_err();
     assert!(bad(r#""USD""#, r#""GBP""#));
     assert!(bad(r#""sellRatePercent": 80"#, r#""sellRatePercent": 120"#));
-    assert!(bad(r#""defaultCents": 400"#, r#""defaultCents": 0"#));
+    assert!(bad(r#""defaultCents": 750"#, r#""defaultCents": 0"#));
+    assert!(bad(r#""boosterSellRatePercent": 80"#, r#""boosterSellRatePercent": 101"#));
 }
 
 #[test]

@@ -4,7 +4,9 @@
 mod game;
 mod store;
 
-use game::{CollectionView, Game, OpenedCard, SaleRequest, SaleResult, SetSummary, ShopItem, WalletView};
+use game::{
+    BoosterSaleResult, CollectionView, Game, OpenedCard, SaleRequest, SaleResult, SetSummary, ShopItem, WalletView,
+};
 use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -36,6 +38,16 @@ fn get_wallet(state: State<'_, GameState>) -> Result<WalletView, String> {
 #[tauri::command]
 fn get_shop(state: State<'_, GameState>) -> Result<Vec<ShopItem>, String> {
     locked(&state)?.shop()
+}
+
+#[tauri::command]
+fn sell_boosters(
+    state: State<'_, GameState>,
+    set_code: String,
+    kind: String,
+    quantity: u32,
+) -> Result<BoosterSaleResult, String> {
+    locked(&state)?.sell_boosters(&set_code, &kind, quantity)
 }
 
 #[tauri::command]
@@ -123,6 +135,7 @@ pub fn run() {
             list_sets,
             get_wallet,
             get_shop,
+            sell_boosters,
             buy_boosters,
             open_booster,
             get_collection,

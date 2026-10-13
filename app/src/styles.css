@@ -155,3 +155,6 @@ h2 { margin: 24px 0 4px; }
 .sell-row { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
 button.sell { padding: 3px 8px; font-size: 12px; }
 button.sell.confirm { background: #7a1d1d; border-color: #c24040; color: #fff; }
+
+.gain { color: #6fcf7f; }
+.loss { color: #ff7a7a; }

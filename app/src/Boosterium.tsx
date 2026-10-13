@@ -30,17 +30,22 @@ export function Boosterium({ shop, wallet, onBuy, onBuyAndOpen, onClaimCharity, 
       )}
 
       <h2>Boosterium</h2>
-      <p className="hint">Buy sealed boosters, then open them. Sell cards from your collection to fund the next ones.</p>
+      <p className="hint">
+        Buy sealed boosters, then open them. Prices follow the market value of the cards, so unopened boosters can
+        gain or lose value: sell them back, or open them. Sell cards from your collection to fund the next ones.
+      </p>
       <div className="shop">
         {shop.map((item) => (
           <div key={`${item.setCode}/${item.kind}`} className="shop-row">
             <div>
               <div className="shop-name">{item.setName}</div>
               <div className="hint">
-                {item.setCode} · {item.kind} booster
+                {item.setCode} · {item.kind} booster · sells back for {money(item.sellBackCents)}
               </div>
             </div>
-            <div className="shop-price">{money(item.priceCents)}</div>
+            <div className="shop-price" title="Follows the market value of the cards">
+              {money(item.priceCents)}
+            </div>
             <div className="shop-actions">
               <button onClick={() => onBuy(item, 1)} disabled={busy || !canAfford(item, 1)}>
                 Buy 1

@@ -2,8 +2,11 @@
   "currency": { "code": "USD", "symbol": "$" },
   "startingBalanceCents": 10000,
   "sellRatePercent": 80,
+  "boosterSellRatePercent": 80,
   "boosterPrices": {
-    "defaultCents": 400,
+    "defaultCents": 750,
+    "evMarkupPercent": 100,
+    "minCents": 100,
     "overrides": {}
   },
   "charity": {

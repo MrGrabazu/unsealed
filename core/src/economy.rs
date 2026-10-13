@@ -13,6 +13,8 @@ pub struct EconomyConfig {
     pub starting_balance_cents: u32,
     /// Share of the market price paid when selling a card (0-100).
     pub sell_rate_percent: u32,
+    /// Share of the current booster price paid when selling a sealed booster back (0-100).
+    pub booster_sell_rate_percent: u32,
     pub booster_prices: BoosterPrices,
     pub charity: Charity,
 }
@@ -27,10 +29,21 @@ pub struct Currency {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BoosterPrices {
+    /// Price when the market value of the booster is unknown.
     pub default_cents: u32,
-    /// set code -> booster kind -> price
+    /// Price as a percentage of the booster's expected market value (100 = fair price).
+    #[serde(default = "hundred")]
+    pub ev_markup_percent: u32,
+    /// The price never goes below this.
+    #[serde(default)]
+    pub min_cents: u32,
+    /// Fixed prices that ignore the market: set code -> booster kind -> price.
     #[serde(default)]
     pub overrides: BTreeMap<String, BTreeMap<String, u32>>,
+}
+
+fn hundred() -> u32 {
+    100
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -57,19 +70,33 @@ impl EconomyConfig {
         if self.sell_rate_percent > 100 {
             return Err(ConfigError::Invalid("sellRatePercent must be between 0 and 100".into()));
         }
-        if self.booster_prices.default_cents == 0 {
-            return Err(ConfigError::Invalid("boosterPrices.defaultCents must be positive".into()));
+        if self.booster_sell_rate_percent > 100 {
+            return Err(ConfigError::Invalid("boosterSellRatePercent must be between 0 and 100".into()));
+        }
+        if self.booster_prices.default_cents == 0 || self.booster_prices.ev_markup_percent == 0 {
+            return Err(ConfigError::Invalid(
+                "boosterPrices.defaultCents and evMarkupPercent must be positive".into(),
+            ));
         }
         Ok(())
     }
 
-    pub fn booster_price_cents(&self, set_code: &str, kind: &str) -> u32 {
-        self.booster_prices
-            .overrides
-            .get(set_code)
-            .and_then(|kinds| kinds.get(kind))
-            .copied()
-            .unwrap_or(self.booster_prices.default_cents)
+    /// Price of a sealed booster. A configured override wins; otherwise the price follows
+    /// the booster's expected market value (`ev_cents`) when known, else the default.
+    pub fn booster_price_cents(&self, set_code: &str, kind: &str, ev_cents: Option<u32>) -> u32 {
+        let prices = &self.booster_prices;
+        if let Some(fixed) = prices.overrides.get(set_code).and_then(|kinds| kinds.get(kind)) {
+            return *fixed;
+        }
+        match ev_cents {
+            Some(ev) => ((u64::from(ev) * u64::from(prices.ev_markup_percent) / 100) as u32).max(prices.min_cents),
+            None => prices.default_cents,
+        }
+    }
+
+    /// What the Boosterium pays for a sealed booster currently priced `price_cents`.
+    pub fn booster_sell_value_cents(&self, price_cents: u32) -> u32 {
+        (u64::from(price_cents) * u64::from(self.booster_sell_rate_percent) / 100) as u32
     }
 
     /// Market price of a card in the configured currency. A foil card without a foil

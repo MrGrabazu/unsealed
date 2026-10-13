@@ -52,6 +52,8 @@ const MIGRATIONS: &[&str] = &[
         quantity INTEGER NOT NULL CHECK (quantity >= 0),
         PRIMARY KEY (set_code, kind)
     ) WITHOUT ROWID;",
+    // 3: cost basis of sealed boosters, to measure the profit or loss of speculation
+    "ALTER TABLE sealed ADD COLUMN cost_cents INTEGER NOT NULL DEFAULT 0;",
 ];
 
 #[derive(Debug, thiserror::Error)]
@@ -87,6 +89,33 @@ pub struct Sale<'a> {
     pub foil: bool,
     pub quantity: u32,
     pub unit_cents: u32,
+}
+
+/// A stack of sealed boosters. `cost_cents` is what the player paid for the whole stack
+/// (0 for free boosters such as rewards).
+#[derive(Debug, PartialEq, Eq)]
+pub struct SealedRow {
+    pub set_code: String,
+    pub kind: String,
+    pub quantity: u32,
+    pub cost_cents: i64,
+}
+
+/// Result of opening a sealed booster.
+#[derive(Debug)]
+pub struct OpenOutcome {
+    /// For each card, whether it is a new discovery.
+    pub is_new: Vec<bool>,
+    /// Cost basis of the opened booster.
+    pub cost_cents: i64,
+}
+
+/// Result of selling sealed boosters back.
+#[derive(Debug)]
+pub struct BoosterSale {
+    pub total_cents: i64,
+    /// Cost basis of the sold boosters.
+    pub cost_cents: i64,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -165,20 +194,41 @@ impl Store {
         }
         add_ledger(&tx, now, "booster_purchase", -total, Some(&format!("{set_code}/{kind} x{quantity}")))?;
         tx.execute(
-            "INSERT INTO sealed (set_code, kind, quantity) VALUES (?1, ?2, ?3)
-             ON CONFLICT (set_code, kind) DO UPDATE SET quantity = quantity + excluded.quantity",
-            params![set_code, kind, quantity],
+            "INSERT INTO sealed (set_code, kind, quantity, cost_cents) VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT (set_code, kind) DO UPDATE SET
+                quantity = quantity + excluded.quantity,
+                cost_cents = cost_cents + excluded.cost_cents",
+            params![set_code, kind, quantity, total],
         )?;
         tx.commit()?;
         Ok(balance - total)
     }
 
-    /// Sealed boosters owned, as (set code, kind, quantity).
-    pub fn sealed_stacks(&self) -> StoreResult<Vec<(String, String, u32)>> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT set_code, kind, quantity FROM sealed WHERE quantity > 0 ORDER BY set_code, kind")?;
-        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
+    /// Sells sealed boosters back at `unit_cents` each.
+    pub fn sell_boosters(
+        &mut self,
+        set_code: &str,
+        kind: &str,
+        quantity: u32,
+        unit_cents: u32,
+        now: i64,
+    ) -> StoreResult<BoosterSale> {
+        let tx = self.conn.transaction()?;
+        let cost_cents = take_sealed(&tx, set_code, kind, quantity)?;
+        let total_cents = i64::from(unit_cents) * i64::from(quantity);
+        add_ledger(&tx, now, "booster_sale", total_cents, Some(&format!("{set_code}/{kind} x{quantity}")))?;
+        tx.commit()?;
+        Ok(BoosterSale { total_cents, cost_cents })
+    }
+
+    /// Sealed boosters owned.
+    pub fn sealed_stacks(&self) -> StoreResult<Vec<SealedRow>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT set_code, kind, quantity, cost_cents FROM sealed WHERE quantity > 0 ORDER BY set_code, kind",
+        )?;
+        let rows = stmt.query_map([], |r| {
+            Ok(SealedRow { set_code: r.get(0)?, kind: r.get(1)?, quantity: r.get(2)?, cost_cents: r.get(3)? })
+        })?;
         Ok(rows.collect::<Result<_, _>>()?)
     }
 
@@ -194,15 +244,9 @@ impl Store {
         booster_kind: &str,
         cards: &[OpeningCard<'_>],
         now: i64,
-    ) -> StoreResult<Vec<bool>> {
+    ) -> StoreResult<OpenOutcome> {
         let tx = self.conn.transaction()?;
-        let consumed = tx.execute(
-            "UPDATE sealed SET quantity = quantity - 1 WHERE set_code = ?1 AND kind = ?2 AND quantity > 0",
-            params![set_code, booster_kind],
-        )?;
-        if consumed == 0 {
-            return Err(StoreError::NoSealedBooster);
-        }
+        let cost_cents = take_sealed(&tx, set_code, booster_kind, 1)?;
         let value: i64 = cards.iter().map(|c| i64::from(c.price_cents.unwrap_or(0))).sum();
         tx.execute(
             "INSERT INTO openings (opened_at, set_code, booster_kind, value_cents) VALUES (?1, ?2, ?3, ?4)",
@@ -229,7 +273,7 @@ impl Store {
             )?;
         }
         tx.commit()?;
-        Ok(is_new)
+        Ok(OpenOutcome { is_new, cost_cents })
     }
 
     /// Owned quantities of the cards belonging to a set, by card uuid.
@@ -295,6 +339,28 @@ impl Store {
     }
 }
 
+/// Removes `count` boosters from a stack and returns the cost basis they carried
+/// (proportional share of the stack's cost; the last booster takes the remainder).
+fn take_sealed(tx: &Transaction<'_>, set_code: &str, kind: &str, count: u32) -> StoreResult<i64> {
+    let row: Option<(u32, i64)> = tx
+        .query_row(
+            "SELECT quantity, cost_cents FROM sealed WHERE set_code = ?1 AND kind = ?2",
+            params![set_code, kind],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .optional()?;
+    let (quantity, cost) = match row {
+        Some((quantity, cost)) if count > 0 && quantity >= count => (quantity, cost),
+        _ => return Err(StoreError::NoSealedBooster),
+    };
+    let taken = if count == quantity { cost } else { cost * i64::from(count) / i64::from(quantity) };
+    tx.execute(
+        "UPDATE sealed SET quantity = quantity - ?3, cost_cents = cost_cents - ?4 WHERE set_code = ?1 AND kind = ?2",
+        params![set_code, kind, count, taken],
+    )?;
+    Ok(taken)
+}
+
 fn balance_of(conn: &Connection) -> rusqlite::Result<i64> {
     conn.query_row("SELECT COALESCE(SUM(amount_cents), 0) FROM ledger", [], |r| r.get(0))
 }
@@ -341,11 +407,13 @@ mod tests {
         let mut store = store_with(2);
         let flags = store
             .open_sealed("TST", "play", &[card("a", false, None), card("a", false, None), card("b", false, None)], 1)
-            .unwrap();
+            .unwrap()
+            .is_new;
         assert_eq!(flags, [true, false, true]);
 
         // A foil copy of an owned card is not a new discovery.
-        let flags = store.open_sealed("TST", "play", &[card("a", true, None), card("c", true, None)], 2).unwrap();
+        let flags =
+            store.open_sealed("TST", "play", &[card("a", true, None), card("c", true, None)], 2).unwrap().is_new;
         assert_eq!(flags, [false, true]);
     }
 
@@ -389,7 +457,39 @@ mod tests {
         assert_eq!(store.buy_boosters("TST", "play", 3, 400, 1).unwrap(), 8_800);
         store.buy_boosters("TST", "play", 2, 400, 2).unwrap();
         assert_eq!(store.balance().unwrap(), 8_000);
-        assert_eq!(store.sealed_stacks().unwrap(), [("TST".to_string(), "play".to_string(), 5)]);
+        assert_eq!(
+            store.sealed_stacks().unwrap(),
+            [SealedRow { set_code: "TST".into(), kind: "play".into(), quantity: 5, cost_cents: 2_000 }]
+        );
+    }
+
+    #[test]
+    fn sealed_boosters_keep_a_cost_basis_that_follows_opening_and_selling() {
+        let mut store = store_with(0);
+        store.buy_boosters("TST", "play", 4, 500, 1).unwrap(); // cost 2000
+        store.buy_boosters("TST", "play", 1, 1_000, 2).unwrap(); // cost 3000 for 5: 600 each
+        let opened = store.open_sealed("TST", "play", &[card("a", false, None)], 3).unwrap();
+        assert_eq!(opened.cost_cents, 600);
+
+        // 4 left for 2400: selling 2 takes half of the cost.
+        let sale = store.sell_boosters("TST", "play", 2, 900, 4).unwrap();
+        assert_eq!((sale.total_cents, sale.cost_cents), (1_800, 1_200));
+        let rows = store.sealed_stacks().unwrap();
+        assert_eq!((rows[0].quantity, rows[0].cost_cents), (2, 1_200));
+        assert_eq!(store.balance().unwrap(), 10_000 - 3_000 + 1_800);
+
+        // Selling the last ones takes the whole remaining cost.
+        store.sell_boosters("TST", "play", 2, 0, 5).unwrap();
+        assert!(store.sealed_stacks().unwrap().is_empty());
+    }
+
+    #[test]
+    fn cannot_sell_boosters_you_do_not_have() {
+        let mut store = store_with(1);
+        assert!(matches!(store.sell_boosters("TST", "play", 2, 100, 1), Err(StoreError::NoSealedBooster)));
+        assert!(matches!(store.sell_boosters("TST", "play", 0, 100, 1), Err(StoreError::NoSealedBooster)));
+        assert!(matches!(store.sell_boosters("TST", "collector", 1, 100, 1), Err(StoreError::NoSealedBooster)));
+        assert_eq!(store.sealed_stacks().unwrap().len(), 1);
     }
 
     #[test]

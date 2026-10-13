@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
+use std::time::SystemTime;
 use unsealed_core::catalog::{Manifest, PriceFile, SetFile};
 use unsealed_core::economy::{charity_available, EconomyConfig};
 use unsealed_core::{open_booster, ColorIndex};
@@ -92,6 +93,21 @@ pub struct SealedStack {
     pub set_name: String,
     pub kind: String,
     pub quantity: u32,
+    /// What the player paid for the whole stack (0 for free boosters).
+    pub cost_cents: i64,
+    /// Current price of one booster.
+    pub price_cents: u32,
+    /// What the Boosterium pays today for one booster of this stack.
+    pub sell_value_cents: u32,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BoosterSaleResult {
+    pub quantity: u32,
+    pub total_cents: i64,
+    /// Proceeds minus the cost basis of the sold boosters.
+    pub profit_cents: i64,
 }
 
 #[derive(Debug, Serialize)]
@@ -110,6 +126,8 @@ pub struct ShopItem {
     pub set_name: String,
     pub kind: String,
     pub price_cents: u32,
+    /// What the Boosterium would pay today for such a booster.
+    pub sell_back_cents: u32,
 }
 
 #[derive(Debug, Deserialize)]
@@ -154,6 +172,8 @@ pub struct Game {
     economy: EconomyConfig,
     sets: HashMap<String, LoadedSet>,
     prices: Option<PriceFile>,
+    /// Modification time of the prices file that `prices` was loaded from.
+    prices_stamp: Option<SystemTime>,
     rng: ChaCha8Rng,
     clock: ClockFn,
 }
@@ -175,7 +195,7 @@ impl Game {
         clock: ClockFn,
     ) -> Result<Self, String> {
         store.ensure_starting_balance(economy.starting_balance_cents, clock().now).map_err(err)?;
-        Ok(Self { data_dir, store, economy, sets: HashMap::new(), prices: None, rng, clock })
+        Ok(Self { data_dir, store, economy, sets: HashMap::new(), prices: None, prices_stamp: None, rng, clock })
     }
 
     pub fn list_sets(&self) -> Result<Vec<SetSummary>, String> {
@@ -197,12 +217,15 @@ impl Game {
 
     // ---- Boosterium: wallet, shop, charity -------------------------------------
 
-    pub fn shop(&self) -> Result<Vec<ShopItem>, String> {
+    pub fn shop(&mut self) -> Result<Vec<ShopItem>, String> {
+        self.ensure_prices();
         let mut items = Vec::new();
         for set in self.list_sets()? {
             for kind in &set.boosters {
+                let price_cents = self.booster_price(&set.code, kind);
                 items.push(ShopItem {
-                    price_cents: self.economy.booster_price_cents(&set.code, kind),
+                    price_cents,
+                    sell_back_cents: self.economy.booster_sell_value_cents(price_cents),
                     set_code: set.code.clone(),
                     set_name: set.name.clone(),
                     kind: kind.clone(),
@@ -213,6 +236,7 @@ impl Game {
     }
 
     pub fn wallet(&mut self) -> Result<WalletView, String> {
+        self.ensure_prices();
         let balance = self.store.balance().map_err(err)?;
         let charity_open = self.charity_open(balance)?;
         let names: HashMap<String, String> = self
@@ -224,9 +248,17 @@ impl Game {
             .sealed_stacks()
             .map_err(err)?
             .into_iter()
-            .map(|(set_code, kind, quantity)| {
-                let set_name = names.get(&set_code).cloned().unwrap_or_else(|| set_code.clone());
-                SealedStack { set_code, set_name, kind, quantity }
+            .map(|row| {
+                let price_cents = self.booster_price(&row.set_code, &row.kind);
+                SealedStack {
+                    set_name: names.get(&row.set_code).cloned().unwrap_or_else(|| row.set_code.clone()),
+                    set_code: row.set_code,
+                    kind: row.kind,
+                    quantity: row.quantity,
+                    cost_cents: row.cost_cents,
+                    price_cents,
+                    sell_value_cents: self.economy.booster_sell_value_cents(price_cents),
+                }
             })
             .collect();
         Ok(WalletView {
@@ -248,9 +280,37 @@ impl Game {
         if !self.sets[set_code].file.boosters.contains_key(kind) {
             return Err(format!("set {set_code} has no `{kind}` booster"));
         }
-        let price = self.economy.booster_price_cents(set_code, kind);
+        self.ensure_prices();
+        let price = self.booster_price(set_code, kind);
         let now = (self.clock)().now;
         self.store.buy_boosters(set_code, kind, quantity, price, now).map(|_| ()).map_err(err)
+    }
+
+    /// Sells sealed boosters back at today's price minus the Boosterium's margin. As the
+    /// price follows the market, this is how a player can speculate on boosters.
+    pub fn sell_boosters(&mut self, set_code: &str, kind: &str, quantity: u32) -> Result<BoosterSaleResult, String> {
+        if !(1..=MAX_PURCHASE).contains(&quantity) {
+            return Err(format!("quantity must be between 1 and {MAX_PURCHASE}"));
+        }
+        self.ensure_prices();
+        let unit = self.economy.booster_sell_value_cents(self.booster_price(set_code, kind));
+        let now = (self.clock)().now;
+        let sale = self.store.sell_boosters(set_code, kind, quantity, unit, now).map_err(err)?;
+        Ok(BoosterSaleResult {
+            quantity,
+            total_cents: sale.total_cents,
+            profit_cents: sale.total_cents - sale.cost_cents,
+        })
+    }
+
+    /// Current price of a sealed booster (follows the market unless overridden in the config).
+    fn booster_price(&self, set_code: &str, kind: &str) -> u32 {
+        let ev = self
+            .prices
+            .as_ref()
+            .and_then(|p| p.boosters.get(&format!("{set_code}/{kind}")))
+            .map(|v| if self.economy.currency.code == "EUR" { v.eur } else { v.usd });
+        self.economy.booster_price_cents(set_code, kind, ev)
     }
 
     /// Daily help for a player who is truly stranded.
@@ -329,7 +389,7 @@ impl Game {
                     price_cents: c.price_cents,
                 })
                 .collect();
-            store.open_sealed(set_code, kind, &records, clock().now).map_err(err)?
+            store.open_sealed(set_code, kind, &records, clock().now).map_err(err)?.is_new
         };
         for (card, is_new) in cards.iter_mut().zip(flags) {
             card.is_new = is_new;
@@ -452,11 +512,17 @@ impl Game {
         Ok(())
     }
 
+    /// Loads the prices, and reloads them whenever the file changes (a daily update, or
+    /// a manual `data-builder` run), so market moves reach the game while it is open.
     /// Prices are optional: the game stays playable without them.
     fn ensure_prices(&mut self) {
-        if self.prices.is_none() {
-            self.prices = read_json(&self.data_dir.join("prices.json")).ok();
+        let path = self.data_dir.join("prices.json");
+        let stamp = fs::metadata(&path).and_then(|m| m.modified()).ok();
+        if self.prices.is_some() && stamp == self.prices_stamp {
+            return;
         }
+        self.prices = read_json(&path).ok();
+        self.prices_stamp = stamp;
     }
 }
 
@@ -542,6 +608,14 @@ mod tests {
     const PRICES: &str = r#"{ "updatedAt": "d", "cards": { "c1": { "usd": 100 }, "m1": { "usd": 1000 } } }"#;
     const NO_PRICES: &str = r#"{ "updatedAt": "d", "cards": {} }"#;
 
+    /// The shipped economy, with a $4.00 fallback booster price so that the tests that do
+    /// not care about market pricing keep simple numbers.
+    fn test_economy() -> EconomyConfig {
+        let mut economy = EconomyConfig::from_json(ECONOMY).unwrap();
+        economy.booster_prices.default_cents = 400;
+        economy
+    }
+
     fn data_dir(name: &str, prices: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("unsealed-test-{}-{name}", std::process::id()));
         fs::create_dir_all(dir.join("sets")).unwrap();
@@ -562,7 +636,7 @@ mod tests {
         let game = Game::with_parts(
             data_dir(name, prices),
             Store::open_in_memory().unwrap(),
-            EconomyConfig::from_json(ECONOMY).unwrap(),
+            test_economy(),
             ChaCha8Rng::seed_from_u64(1),
             clock,
         )
@@ -587,12 +661,18 @@ mod tests {
 
     #[test]
     fn lists_sets_and_shop_prices() {
-        let g = game("list");
+        let mut g = game("list");
         let sets = g.list_sets().unwrap();
         assert_eq!((sets.len(), sets[0].code.as_str(), sets[0].boosters.as_slice()), (1, "TST", ["play".to_string()].as_slice()));
         assert_eq!(
             g.shop().unwrap(),
-            [ShopItem { set_code: "TST".into(), set_name: "Test Set".into(), kind: "play".into(), price_cents: 400 }]
+            [ShopItem {
+                set_code: "TST".into(),
+                set_name: "Test Set".into(),
+                kind: "play".into(),
+                price_cents: 400,
+                sell_back_cents: 320,
+            }]
         );
     }
 
@@ -611,9 +691,61 @@ mod tests {
         g.buy_boosters("TST", "play", 2).unwrap();
         let w = g.wallet().unwrap();
         assert_eq!(w.balance_cents, 9_200);
-        assert_eq!(w.sealed, [SealedStack { set_code: "TST".into(), set_name: "Test Set".into(), kind: "play".into(), quantity: 2 }]);
+        assert_eq!(
+            w.sealed,
+            [SealedStack {
+                set_code: "TST".into(),
+                set_name: "Test Set".into(),
+                kind: "play".into(),
+                quantity: 2,
+                cost_cents: 800,
+                price_cents: 400,
+                sell_value_cents: 320,
+            }]
+        );
 
         g.open_booster("TST", "play").unwrap();
+        let stack = &g.wallet().unwrap().sealed[0];
+        assert_eq!((stack.quantity, stack.cost_cents), (1, 400));
+    }
+
+    /// Prices where a TST booster is worth $10.00 on the market.
+    fn market_prices(usd: u32) -> String {
+        format!(
+            r#"{{ "updatedAt": "d", "cards": {{}}, "boosters": {{ "TST/play": {{ "usd": {usd}, "eur": 0 }} }} }}"#
+        )
+    }
+
+    #[test]
+    fn booster_price_follows_the_market_and_can_be_speculated_on() {
+        let (mut g, _) = game_with("market", &market_prices(1_000));
+        let item = g.shop().unwrap().remove(0);
+        assert_eq!((item.price_cents, item.sell_back_cents), (1_000, 800));
+
+        // Buy 2 at $10.00 and sell them back right away: the margin makes a loss.
+        g.buy_boosters("TST", "play", 2).unwrap();
+        assert_eq!(balance(&mut g), 8_000);
+        let stack = g.wallet().unwrap().sealed.remove(0);
+        assert_eq!((stack.cost_cents, stack.sell_value_cents), (2_000, 800));
+
+        // The market goes up 50%: the same boosters now sell above their cost.
+        std::thread::sleep(std::time::Duration::from_millis(30));
+        fs::write(g.data_dir.join("prices.json"), market_prices(1_500)).unwrap();
+        let stack = g.wallet().unwrap().sealed.remove(0);
+        assert_eq!((stack.price_cents, stack.sell_value_cents), (1_500, 1_200));
+
+        let sale = g.sell_boosters("TST", "play", 2).unwrap();
+        assert_eq!(sale, BoosterSaleResult { quantity: 2, total_cents: 2_400, profit_cents: 400 });
+        assert_eq!(balance(&mut g), 8_000 + 2_400);
+        assert!(g.wallet().unwrap().sealed.is_empty());
+    }
+
+    #[test]
+    fn cannot_sell_boosters_that_are_not_owned() {
+        let mut g = game_with_booster("sell-none");
+        assert!(g.sell_boosters("TST", "play", 2).is_err());
+        assert!(g.sell_boosters("TST", "play", 0).is_err());
+        assert!(g.sell_boosters("TST", "collector", 1).is_err());
         assert_eq!(g.wallet().unwrap().sealed[0].quantity, 1);
     }
 
@@ -791,9 +923,9 @@ mod tests {
         let sets = g.list_sets().unwrap();
         assert!(!sets.is_empty());
         for s in &sets {
-            g.buy_boosters(&s.code, "play", 8).unwrap();
+            g.buy_boosters(&s.code, "play", 3).unwrap();
             let mut new_cards = 0;
-            for _ in 0..8 {
+            for _ in 0..3 {
                 let cards = g.open_booster(&s.code, "play").unwrap();
                 assert!(cards.len() >= 12);
                 assert!(cards.iter().all(|c| c.image_url.starts_with("https://cards.scryfall.io/")));
@@ -803,7 +935,7 @@ mod tests {
             let view = g.collection(&s.code).unwrap();
             let sold = g.sell_duplicates(&s.code).unwrap();
             println!(
-                "{}: {}/{} cards ({:.1}%), {new_cards} discoveries over 8 boosters, duplicates sold for {} cents",
+                "{}: {}/{} cards ({:.1}%), {new_cards} discoveries over 3 boosters, duplicates sold for {} cents",
                 s.code, view.owned_count, view.total_count, view.completion_percent, sold.total_cents
             );
             assert_eq!(view.owned_count, new_cards);
