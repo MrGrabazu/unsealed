@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
-import { formatUsd, type OpenedCard } from "./api";
+import type { OpenedCard } from "./api";
+import { useMoney } from "./money";
 
 interface Props {
   card: OpenedCard;
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export function Card({ card, faceUp, clickable, onReveal }: Props) {
+  const money = useMoney();
   return (
     <div className="card-slot">
       <motion.div
@@ -30,7 +32,7 @@ export function Card({ card, faceUp, clickable, onReveal }: Props) {
       </motion.div>
       <div className={`card-caption ${faceUp ? "visible" : ""}`}>
         <span className="name">{card.name}</span>
-        <span className="price">{card.priceCents == null ? "—" : formatUsd(card.priceCents)}</span>
+        <span className="price">{card.priceCents == null ? "—" : money(card.priceCents)}</span>
       </div>
     </div>
   );

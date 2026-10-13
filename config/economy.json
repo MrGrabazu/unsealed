@@ -1,0 +1,13 @@
+{
+  "currency": { "code": "USD", "symbol": "$" },
+  "startingBalanceCents": 10000,
+  "sellRatePercent": 80,
+  "boosterPrices": {
+    "defaultCents": 400,
+    "overrides": {}
+  },
+  "charity": {
+    "amountCents": 2000,
+    "maxClaimsPerDay": 1
+  }
+}

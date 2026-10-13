@@ -144,6 +144,7 @@ Le client ne doit **jamais** télécharger directement les fichiers bruts de MTG
 |---|---|
 | `core/` | Crate `unsealed-core` : parsing MTGJSON, tirage à seed, simulation, import, plan de mise à jour |
 | `data-builder/` | Produit `dist/` (sets compacts, `prices.json`, `manifest.json`) ; chaque config de booster doit passer la simulation |
+| `config/` | `economy.json` : devise, capital de départ, prix des boosters (défaut + surcharges par set/type), taux de revente, aide quotidienne. Embarqué dans l'app ; un `economy.json` dans le dossier de données le remplace |
 | `app/` | Frontend React/Vite ; `app/src-tauri/` = shell Tauri 2 (logique de jeu dans `game.rs`, testable sans Tauri) |
 
 - Données : `cargo run --release -p data-builder -- --sets BLB,DSK,FDN` (écrit `dist/`, cache dans `.cache/`)

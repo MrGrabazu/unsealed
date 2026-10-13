@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { formatUsd, type OpenedCard } from "./api";
+import type { OpenedCard } from "./api";
 import { Card } from "./Card";
+import { useMoney } from "./money";
 
 /** Reveals the cards of an opened booster one by one. */
 export function BoosterOpening({ cards }: { cards: OpenedCard[] }) {
+  const money = useMoney();
   const [revealed, setRevealed] = useState(0);
 
   // A new booster starts face down.
@@ -19,7 +21,7 @@ export function BoosterOpening({ cards }: { cards: OpenedCard[] }) {
           {revealed} / {cards.length} revealed
         </span>
         {!done && <button onClick={() => setRevealed(cards.length)}>Reveal all</button>}
-        {done && <strong className="total">Booster value: {formatUsd(total)}</strong>}
+        {done && <strong className="total">Booster value: {money(total)}</strong>}
       </div>
       <div className="cards">
         {cards.map((card, i) => (

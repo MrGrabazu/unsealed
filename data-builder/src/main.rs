@@ -17,7 +17,7 @@ use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 use unsealed_core::catalog::{Manifest, ManifestSet, PriceFile};
-use unsealed_core::import::{prices_from_scryfall_jsonl, set_from_mtgjson, source_set_codes};
+use unsealed_core::import::{prices_by_uuid, prices_from_scryfall_jsonl, set_from_mtgjson, source_set_codes};
 use unsealed_core::{simulate, ColorIndex};
 
 const USER_AGENT: &str = "Unsealed-data-builder/0.1";
@@ -120,6 +120,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let kinds: Vec<&str> = opts.boosters.iter().map(String::as_str).collect();
     let mut manifest_sets = BTreeMap::new();
     let mut wanted = HashSet::new();
+    let mut all_cards = Vec::new();
 
     for code in &opts.sets {
         let json = read_mtgjson_set(&opts.cache, code)?;
@@ -142,6 +143,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
 
         wanted.extend(set.cards.iter().map(|c| c.scryfall_id.clone()));
+        all_cards.extend(set.cards.iter().cloned());
         let size = write_json(&sets_dir.join(format!("{code}.json")), &set)?;
         println!("{code}: {} cards, {} KB", set.cards.len(), size / 1024);
         manifest_sets.insert(
@@ -170,9 +172,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         download(&bulk.jsonl_download_uri, &bulk_path)?;
     }
     let reader = BufReader::new(GzDecoder::new(BufReader::new(File::open(&bulk_path)?)));
-    let cards = prices_from_scryfall_jsonl(reader, &wanted)?;
+    let by_scryfall_id = prices_from_scryfall_jsonl(reader, &wanted)?;
+    let cards = prices_by_uuid(&by_scryfall_id, &all_cards);
     let priced = cards.values().filter(|p| p.usd.is_some() || p.usd_foil.is_some()).count();
-    println!("prices: {} cards matched out of {}, {priced} with a USD price", cards.len(), wanted.len());
+    println!("prices: {} Scryfall ids matched out of {}", by_scryfall_id.len(), wanted.len());
+    println!("prices: {} cards by uuid, {priced} with a USD price", cards.len());
     let size = write_json(&opts.out.join("prices.json"), &PriceFile { updated_at: bulk.updated_at.clone(), cards })?;
     println!("prices.json: {} KB", size / 1024);
 

@@ -15,6 +15,8 @@ tauri = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rusqlite = { version = "0.40", features = ["bundled"] }
+thiserror = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 rand = "0.8"
 rand_chacha = "0.3"
 unsealed-core = { path = "../../core" }

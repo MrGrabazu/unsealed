@@ -164,6 +164,18 @@ pub fn parse_cents(s: &str) -> Option<u32> {
     whole.checked_mul(100)?.checked_add(frac_cents)
 }
 
+/// Re-keys prices by MTGJSON uuid, the key the client uses everywhere. A Scryfall id can
+/// match several uuids (the faces of a double-faced card): each one gets the same prices.
+pub fn prices_by_uuid(
+    by_scryfall_id: &BTreeMap<String, PriceSet>,
+    cards: &[CardEntry],
+) -> BTreeMap<String, PriceSet> {
+    cards
+        .iter()
+        .filter_map(|c| by_scryfall_id.get(&c.scryfall_id).map(|p| (c.uuid.clone(), *p)))
+        .collect()
+}
+
 #[derive(Deserialize)]
 struct ScryfallCard {
     id: String,

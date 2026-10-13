@@ -60,7 +60,7 @@ pub struct PriceSet {
 pub struct PriceFile {
     /// `updated_at` of the Scryfall bulk file the prices come from.
     pub updated_at: String,
-    /// Scryfall card id -> prices.
+    /// MTGJSON card uuid -> prices (the key used everywhere in the client).
     pub cards: BTreeMap<String, PriceSet>,
 }
 
