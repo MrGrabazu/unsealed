@@ -24,6 +24,22 @@ impl SimReport {
     }
 }
 
+impl SimReport {
+    /// Largest |z-score| of (observed - expected) over all cards, ignoring cards
+    /// too rare to be statistically meaningful at this sample size.
+    pub fn max_abs_z(&self) -> f64 {
+        let n = self.boosters as f64;
+        self.expected
+            .iter()
+            .filter(|&(_, &e)| e * n >= 30.0)
+            .map(|(k, &e)| {
+                let o = self.observed.get(k).copied().unwrap_or(0.0);
+                ((o - e) / (e / n).sqrt()).abs()
+            })
+            .fold(0.0, f64::max)
+    }
+}
+
 /// Theoretical expected number of copies of each card per booster.
 /// Exact for sheets that allow duplicates; first-order approximation otherwise
 /// (later draws from the same sheet are slightly conditioned).

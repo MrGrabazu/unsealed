@@ -1,39 +1,41 @@
 //! MTGJSON `BoosterConfig` schema (v5.2.2+), checked against
 //! https://mtgjson.com/data-models/booster/booster-config/ (+ booster-pack, booster-sheet).
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
     #[error("invalid JSON: {0}")]
     Json(#[from] serde_json::Error),
+    #[error("I/O error: {0}")]
+    Io(#[from] std::io::Error),
     #[error("booster `{0}` not found in the set file")]
     UnknownBooster(String),
     #[error("{0}")]
     Invalid(String),
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BoosterConfig {
     pub boosters: Vec<BoosterPack>,
     pub boosters_total_weight: u64,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     pub sheets: BTreeMap<String, BoosterSheet>,
     #[serde(default)]
     pub source_set_codes: Vec<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BoosterPack {
     /// slot (sheet name) -> number of cards drawn from that sheet
     pub contents: BTreeMap<String, u32>,
     pub weight: u64,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BoosterSheet {
     #[serde(default)]
