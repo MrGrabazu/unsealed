@@ -70,6 +70,7 @@ impl Game {
 
     /// Undoes a sale or a purchase at today's terms; returns the money moved (signed).
     pub fn undo_transaction(&mut self, id: i64) -> Result<i64, String> {
+        self.flush_reveal();
         let record = self.store.transaction(id).map_err(err)?.ok_or("unknown transaction")?;
         let balance = self.store.balance().map_err(err)?;
         let offer = self.undo_offer(&record, balance).ok_or("this transaction can no longer be undone")?;

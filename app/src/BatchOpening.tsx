@@ -28,13 +28,18 @@ const RARITY_COUNTS: Record<string, "rarity.common" | "rarity.uncommon" | "rarit
 };
 
 /** Plays an accelerated opening of many boosters, then shows a summary of the haul. */
-export function BatchOpening({ boosters }: { boosters: OpenedCard[][] }) {
+export function BatchOpening({ boosters, onFinished }: { boosters: OpenedCard[][]; onFinished: () => void }) {
   const money = useMoney();
   const { t, tx, plural } = useI18n();
   const [index, setIndex] = useState(0);
   const [faceUp, setFaceUp] = useState(false);
   const [skipped, setSkipped] = useState(false);
   const playing = !skipped && index < boosters.length;
+
+  // The summary is on screen: the achievements unlocked by the batch can show up.
+  useEffect(() => {
+    if (!playing) onFinished();
+  }, [playing, onFinished]);
 
   // A new batch starts from the beginning.
   useEffect(() => {

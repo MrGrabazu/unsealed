@@ -94,11 +94,17 @@ code { background: var(--panel); padding: 2px 6px; border-radius: 4px; }
   pointer-events: none;
   mix-blend-mode: color-dodge;
   opacity: 0.45;
-  background: linear-gradient(115deg, transparent 20%, #ff7bd0 35%, #7bd0ff 50%, #b6ff7b 65%, transparent 80%);
-  background-size: 250% 250%;
-  animation: sheen 3.5s linear infinite;
+  /* A narrow band in a wide, non-repeating image: it crosses the card and leaves it entirely,
+     so restarting the loop happens off-card and never shows. */
+  background: linear-gradient(115deg, transparent 43%, #ff7bd0 46.5%, #7bd0ff 50%, #b6ff7b 53.5%, transparent 57%) no-repeat;
+  background-size: 600% 100%;
+  animation: sheen-sweep 3.5s ease-in-out infinite;
 }
-@keyframes sheen { from { background-position: 0% 50%; } to { background-position: 250% 50%; } }
+/* The band enters on the left and leaves on the right, then rests off-card. */
+@keyframes sheen-sweep {
+  0% { background-position: 100% 0; }
+  65%, 100% { background-position: 0% 0; }
+}
 
 .card-caption { display: flex; justify-content: space-between; width: 100%; font-size: 13px; opacity: 0; transition: opacity 0.4s 0.3s; }
 .card-caption.visible { opacity: 1; }
@@ -219,6 +225,48 @@ button.sell.confirm { background: #7a1d1d; border-color: #c24040; color: #fff; }
 .trend svg { color: var(--muted); }
 .trend .gain { color: #6fcf7f; }
 .trend .loss { color: #ff7a7a; }
+
+/* The sealed pack: an original metallic wrapper (hue per set) with the set's art in a window */
+.pack-stage { display: flex; flex-direction: column; align-items: center; gap: 10px; margin: 24px 0 8px; }
+.pack { position: relative; width: 250px; height: 430px; padding: 0; border: none; border-radius: 4px; background: none; cursor: pointer; filter: drop-shadow(0 18px 30px #000c); }
+.pack:disabled { opacity: 1; cursor: default; }
+.pack-strip { position: absolute; left: 0; right: 0; height: 30px; z-index: 3;
+  background: repeating-linear-gradient(90deg, hsl(var(--pack-hue) 35% 62%) 0 3px, hsl(var(--pack-hue) 40% 38%) 3px 6px); }
+.pack-strip { top: 0; }
+.pack-strip-bottom { top: auto; bottom: 0; }
+.pack-body { position: absolute; inset: 26px 0; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px 14px; overflow: hidden;
+  background: linear-gradient(160deg, hsl(var(--pack-hue) 45% 30%), hsl(var(--pack-hue) 55% 14%) 60%, hsl(var(--pack-hue) 40% 24%)); }
+/* The foil sheen plays on the wrapper only, under the art window. */
+.pack-foil { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: screen; opacity: 0.55;
+  background: linear-gradient(115deg, transparent 44%, #ffffff55 48%, hsl(calc(var(--pack-hue) + 60) 90% 70% / 0.35) 51%, transparent 56%) no-repeat;
+  background-size: 600% 100%; animation: sheen-sweep 4.5s ease-in-out infinite; }
+.pack-header { position: relative; z-index: 1; display: flex; align-items: center; gap: 8px; max-width: 100%; color: #fff; font-weight: 700; font-size: 15px; text-align: center; text-shadow: 0 1px 3px #000; }
+.pack-set { overflow: hidden; text-overflow: ellipsis; }
+.pack-window { position: relative; z-index: 1; width: 100%; flex: 1; border-radius: 6px; overflow: hidden; border: 3px solid hsl(var(--pack-hue) 50% 70%); box-shadow: inset 0 0 0 1px #0008; background: #000; }
+.pack-window img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pack-window-empty { display: block; width: 100%; height: 100%; background: radial-gradient(circle, hsl(var(--pack-hue) 60% 40%), #000); }
+.pack-kind { position: relative; z-index: 1; color: #fff; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; font-size: 13px; background: #0007; padding: 4px 12px; border-radius: 999px; }
+.pack-brand { position: relative; z-index: 1; color: hsl(var(--pack-hue) 70% 85%); font-size: 20px; font-weight: 800; letter-spacing: 0.12em; text-shadow: 0 2px 4px #000; }
+.pack-hint { margin: 0; }
+
+/* Opening: the pile, revealed one by one, then the row of revealed cards */
+.pack-opening { margin-top: 12px; }
+.pile-area { display: flex; flex-direction: column; align-items: center; gap: 12px; margin: 10px 0 24px; }
+.pile { position: relative; width: 250px; aspect-ratio: 63 / 88; cursor: pointer; perspective: 1400px; }
+.pile:focus-visible { outline: 2px solid var(--accent); outline-offset: 6px; border-radius: 12px; }
+.pile-card { position: absolute; inset: 0; }
+.pile-card .card, .revealed-card .card { width: 100%; }
+.pile-card.face-up .front { box-shadow: 0 0 24px #fff3; }
+.hit-rare .front { box-shadow: 0 0 28px var(--rare), 0 0 60px #e0c15a55 !important; }
+.hit-mythic .front { box-shadow: 0 0 34px var(--mythic), 0 0 80px #e2682c88 !important; }
+.hit-foil .front { box-shadow: 0 0 24px #7bd0ff88 !important; }
+.pile-card.face-up.hit-mythic { animation: hit-shake 0.5s 0.45s; }
+@keyframes hit-shake {
+  0%, 100% { translate: 0 0; } 20% { translate: -4px 0; } 40% { translate: 4px 0; } 60% { translate: -3px 0; } 80% { translate: 2px 0; }
+}
+.revealed-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 14px 10px; perspective: 1400px; }
+.revealed-card { display: flex; flex-direction: column; gap: 6px; cursor: pointer; }
+.revealed-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 8px; }
 
 /* History */
 .history-table td { vertical-align: top; }

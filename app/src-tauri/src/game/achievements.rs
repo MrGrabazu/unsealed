@@ -167,19 +167,33 @@ impl Game {
         Some(Event::new("BalanceChanged").with("balanceCents", balance))
     }
 
-    /// Events of an opened booster: the booster itself, each card, and the set progress.
+    /// Events of an opened booster: one `CardAcquired` per card (in reveal order), and those
+    /// about the whole booster (the booster itself, set and year progress, balance), which
+    /// are only known once every card is seen.
     pub(super) fn opening_events(
-        &self,
+        &mut self,
         set_code: &str,
         kind: &str,
         cards: &[OpenedCard],
         paid_cents: i64,
-    ) -> Vec<Event> {
+    ) -> OpeningEvents {
         let value: i64 = cards.iter().map(|c| i64::from(c.price_cents.unwrap_or(0))).sum();
         let net_sale: i64 = cards.iter().map(|c| i64::from(self.sale_value(&c.uuid, c.foil))).sum();
         let count = |keep: &dyn Fn(&OpenedCard) -> bool| cards.iter().filter(|c| keep(c)).count() as i64;
 
-        let mut events = vec![Event::new("BoosterOpened")
+        let per_card = cards
+            .iter()
+            .map(|c| {
+                Event::new("CardAcquired")
+                    .with("uuid", c.uuid.as_str())
+                    .with("setCode", c.set_code.as_str())
+                    .with("rarity", c.rarity.as_str())
+                    .with("foil", c.foil)
+                    .with("priceCents", i64::from(c.price_cents.unwrap_or(0)))
+                    .with("isNew", c.is_new)
+            })
+            .collect();
+        let mut booster = vec![Event::new("BoosterOpened")
             .with("setCode", set_code)
             .with("kind", kind)
             .with("valueCents", value)
@@ -192,21 +206,47 @@ impl Game {
             .with("foilCount", count(&|c| c.foil))
             .with("foilMythicCount", count(&|c| c.foil && c.rarity == "mythic"))
             .with("topCardValueCents", cards.iter().map(|c| i64::from(c.price_cents.unwrap_or(0))).max().unwrap_or(0))];
-        for c in cards {
-            events.push(
-                Event::new("CardAcquired")
-                    .with("uuid", c.uuid.as_str())
-                    .with("setCode", c.set_code.as_str())
-                    .with("rarity", c.rarity.as_str())
-                    .with("foil", c.foil)
-                    .with("priceCents", i64::from(c.price_cents.unwrap_or(0)))
-                    .with("isNew", c.is_new),
-            );
-        }
-        events.extend(self.set_progress_event(set_code));
-        events.extend(self.balance_event());
-        events
+        booster.extend(self.set_progress_event(set_code));
+        booster.extend(self.year_progress_event(set_code));
+        booster.extend(self.balance_event());
+        OpeningEvents { per_card, booster }
     }
+
+    /// Emits the events of the cards revealed so far, up to `count` cards (all of them with
+    /// `usize::MAX`), then those of the whole booster once every card is revealed. Before
+    /// that, achievements would give away what the pile holds.
+    pub fn reveal_cards(&mut self, count: usize) {
+        let Some(pending) = self.pending_reveal.as_mut() else { return };
+        let upto = count.min(pending.per_card.len()).max(pending.revealed);
+        let mut events: Vec<Event> = pending.per_card[pending.revealed..upto].to_vec();
+        pending.revealed = upto;
+        if upto == pending.per_card.len() {
+            events.extend(std::mem::take(&mut pending.booster));
+            self.pending_reveal = None;
+        }
+        self.emit(events);
+    }
+
+    /// Emits whatever an opening still holds back: the player moved on.
+    pub(super) fn flush_reveal(&mut self) {
+        self.reveal_cards(usize::MAX);
+    }
+}
+
+/// The achievement events of an opened booster, see `Game::opening_events`.
+pub(super) struct OpeningEvents {
+    pub per_card: Vec<Event>,
+    pub booster: Vec<Event>,
+}
+
+/// An opened booster whose cards are being revealed one by one.
+pub(super) struct PendingReveal {
+    pub per_card: Vec<Event>,
+    pub booster: Vec<Event>,
+    pub revealed: usize,
+}
+
+impl Game {
 
     /// How far the player is in a set: overall, for rares and mythics, in foil (cards
     /// printed in foil only), and for the collector extras.

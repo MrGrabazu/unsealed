@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   buyBoosters,
   claimCharity,
@@ -8,6 +8,7 @@ import {
   listSets,
   openBooster,
   openBoosters,
+  revealCards,
   sellBoosters,
   takeUnlocks,
   type AchievementView,
@@ -20,7 +21,8 @@ import {
 import { AchievementCard } from "./AchievementCard";
 import { Achievements } from "./Achievements";
 import { BatchOpening } from "./BatchOpening";
-import { BoosterOpening } from "./BoosterOpening";
+import { CardDetails } from "./CardDetails";
+import { PackOpening } from "./PackOpening";
 import { Boosterium } from "./Boosterium";
 import { Collection } from "./Collection";
 import { rewardText } from "./boosterKinds";
@@ -60,6 +62,10 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   const [wallet, setWallet] = useState<WalletView | null>(null);
   const [cards, setCards] = useState<OpenedCard[] | null>(null);
   const [batch, setBatch] = useState<OpenedCard[][] | null>(null);
+  // The pack being opened: shown sealed until torn (then `cards` holds what it gave).
+  const [pack, setPack] = useState<{ setCode: string; kind: string } | null>(null);
+  // The card whose details are open.
+  const [detailsOf, setDetailsOf] = useState<{ setCode: string; uuid: string } | null>(null);
   // The booster kind shown in the opening view, to offer the next one.
   const [last, setLast] = useState<{ setCode: string; kind: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -76,22 +82,45 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   // Bumped when achievements unlock so the achievements tab reloads.
   const [unlockCount, setUnlockCount] = useState(0);
 
+  // During a fast batch opening, unlocked achievements wait for its summary (no spoilers).
+  const holdingToasts = useRef(false);
+  const heldToasts = useRef<AchievementView[]>([]);
+
+  const showToasts = useCallback((unlocked: AchievementView[]) => {
+    if (unlocked.length === 0) return;
+    setToasts((current) => [...current, ...unlocked]);
+    setUnlockCount((n) => n + unlocked.length);
+    for (const a of unlocked) {
+      setTimeout(() => setToasts((current) => current.filter((t) => t.id !== a.id)), TOAST_MS);
+    }
+  }, []);
+
+  const releaseToasts = useCallback(() => {
+    holdingToasts.current = false;
+    showToasts(heldToasts.current.splice(0));
+  }, [showToasts]);
+
   /** Refreshes the wallet and shows the achievements unlocked by the last action. */
   const refreshWallet = useCallback(async () => {
     try {
       setWallet(await getWallet());
       const unlocked = await takeUnlocks(lang);
-      if (unlocked.length > 0) {
-        setToasts((current) => [...current, ...unlocked]);
-        setUnlockCount((n) => n + unlocked.length);
-        for (const a of unlocked) {
-          setTimeout(() => setToasts((current) => current.filter((t) => t.id !== a.id)), TOAST_MS);
-        }
-      }
+      if (holdingToasts.current) heldToasts.current.push(...unlocked);
+      else showToasts(unlocked);
     } catch (e) {
       setError(String(e));
     }
-  }, [lang]);
+  }, [lang, showToasts]);
+
+  /** Cards of the pack were turned over: their achievements show up now. */
+  async function reveal(count: number) {
+    try {
+      await revealCards(count);
+      await refreshWallet();
+    } catch (e) {
+      setError(String(e));
+    }
+  }
 
   const loadAll = useCallback(() => {
     Promise.all([listSets(), getShop(), getWallet()])
@@ -126,6 +155,8 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   }
 
   async function openMany(setCode: string, kind: string, quantity: number) {
+    holdingToasts.current = true;
+    setPack(null);
     setCards(null);
     setBatch(await openBoosters(setCode, kind, quantity));
     setLast({ setCode, kind });
@@ -133,16 +164,41 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     setTab("open");
   }
 
-  async function open(setCode: string, kind: string) {
+  /** Shows the sealed pack. Nothing is opened (or used up) until the player tears it. */
+  function open(setCode: string, kind: string) {
     setBatch(null);
-    setCards(await openBooster(setCode, kind));
+    setCards(null);
+    setPack({ setCode, kind });
     setLast({ setCode, kind });
-    setOpenings((n) => n + 1);
     setTab("open");
+  }
+
+  /** The pack is torn open: the booster is drawn now. False when it failed (the pack
+   * then shows sealed again, with the error). */
+  async function tear(): Promise<boolean> {
+    if (!pack) return false;
+    setBusy(true);
+    setError(null);
+    try {
+      setCards(await openBooster(pack.setCode, pack.kind));
+      setOpenings((n) => n + 1);
+      return true;
+    } catch (e) {
+      setError(String(e));
+      return false;
+    } finally {
+      setBusy(false);
+      await refreshWallet();
+    }
   }
 
   /** Leaves the opening view: an opening is shown once, never replayed. */
   function closeOpening() {
+    // Leaving before every card is seen: what they unlock shows up now.
+    if (cards) void reveal(Number.MAX_SAFE_INTEGER);
+    releaseToasts();
+    setDetailsOf(null);
+    setPack(null);
     setCards(null);
     setBatch(null);
   }
@@ -169,7 +225,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   const buyAndOpen = (item: ShopItem) =>
     run(async () => {
       await buyBoosters(item.setCode, item.kind, 1);
-      await open(item.setCode, item.kind);
+      open(item.setCode, item.kind);
     });
 
   return (
@@ -223,29 +279,41 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
 
         {tab === "open" && wallet && (
           <section>
-            {cards || batch ? (
+            {pack || batch ? (
               <>
                 <div className="controls">
                   <button onClick={closeOpening}>{t("open.back")}</button>
-                  {remaining && (
-                    <button
-                      className="primary"
-                      disabled={busy}
-                      onClick={() => run(() => open(remaining.setCode, remaining.kind))}
-                    >
+                  {/* Once this pack is open: the next one of the same kind, if any is left. */}
+                  {remaining && (cards || batch) && (
+                    <button className="primary" disabled={busy} onClick={() => open(remaining.setCode, remaining.kind)}>
                       {t("open.next", { count: remaining.quantity })}
                     </button>
                   )}
                 </div>
-                {cards && <BoosterOpening cards={cards} />}
-                {batch && <BatchOpening boosters={batch} />}
+                {pack && (
+                  <PackOpening
+                    setCode={pack.setCode}
+                    set={sets.find((s) => s.code === pack.setCode)}
+                    kind={pack.kind}
+                    cards={cards}
+                    onTear={tear}
+                    onReveal={(count) => void reveal(count)}
+                    busy={busy}
+                    // The details live in the booster's set file (it holds cards from other sets too).
+                    onDetails={(card) => setDetailsOf({ setCode: pack.setCode, uuid: card.uuid })}
+                  />
+                )}
+                {batch && <BatchOpening boosters={batch} onFinished={releaseToasts} />}
+                {detailsOf && (
+                  <CardDetails setCode={detailsOf.setCode} uuid={detailsOf.uuid} onClose={() => setDetailsOf(null)} />
+                )}
               </>
             ) : (
               <SealedBoosters
                 sealed={wallet.sealed}
                 sets={sets}
                 busy={busy}
-                onOpen={(s) => run(() => open(s.setCode, s.kind))}
+                onOpen={(s) => open(s.setCode, s.kind)}
                 onOpenMany={(s, n) => run(() => openMany(s.setCode, s.kind, n))}
                 onSell={(s) =>
                   run(async () => {

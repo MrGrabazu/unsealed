@@ -214,6 +214,16 @@ fn open_boosters(
     with_game(&state, |g| g.open_boosters(&set_code, &kind, quantity))
 }
 
+/// The player turned over `count` cards of the booster being opened: their achievements
+/// happen now (those of the whole booster with the last card).
+#[tauri::command]
+fn reveal_cards(state: State<'_, SessionState>, count: usize) -> Result<(), String> {
+    with_game(&state, |g| {
+        g.reveal_cards(count);
+        Ok(())
+    })
+}
+
 #[tauri::command]
 fn get_collection(state: State<'_, SessionState>, set_code: String) -> Result<CollectionView, String> {
     with_game(&state, |g| g.collection(&set_code))
@@ -410,6 +420,7 @@ pub fn run() {
             buy_boosters,
             open_booster,
             open_boosters,
+            reveal_cards,
             get_collection,
             sell_cards,
             sell_duplicates,

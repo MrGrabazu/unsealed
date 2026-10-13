@@ -329,6 +329,9 @@ export const openBooster = (setCode: string, kind: string) =>
   invoke<OpenedCard[]>("open_booster", { setCode, kind });
 export const openBoosters = (setCode: string, kind: string, quantity: number) =>
   invoke<OpenedCard[][]>("open_boosters", { setCode, kind, quantity });
+/** The player turned over `count` cards of the booster being opened (their achievements
+ * happen then). A large count reveals everything left. */
+export const revealCards = (count: number) => invoke<void>("reveal_cards", { count });
 export const getCollection = (setCode: string) =>
   invoke<CollectionView>("get_collection", { setCode });
 export const getHistory = (limit: number, offset: number) => invoke<HistoryView>("get_history", { limit, offset });

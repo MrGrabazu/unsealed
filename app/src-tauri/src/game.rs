@@ -5,6 +5,7 @@ mod details;
 mod history;
 
 pub use achievements::{AchievementTexts, AchievementView, AchievementsView};
+use achievements::{OpeningEvents, PendingReveal};
 pub use details::CardDetailsView;
 pub use history::HistoryView;
 
@@ -279,6 +280,8 @@ pub struct Game {
     achievement_texts: AchievementTexts,
     /// See `set_card_language`.
     card_lang: String,
+    /// The booster being revealed, whose achievement events wait (see `reveal_cards`).
+    pending_reveal: Option<PendingReveal>,
     sets: HashMap<String, LoadedSet>,
     prices: Option<PriceFile>,
     /// Modification time of the prices file that `prices` was loaded from.
@@ -296,6 +299,13 @@ const BEST_PULLS: u32 = 12;
 
 fn err<E: ToString>(e: E) -> String {
     e.to_string()
+}
+
+/// A game closed in the middle of an opening still counts every card it gave.
+impl Drop for Game {
+    fn drop(&mut self) {
+        self.flush_reveal();
+    }
 }
 
 impl Game {
@@ -320,6 +330,7 @@ impl Game {
             notifications: Vec::new(),
             achievement_texts: AchievementTexts::default(),
             card_lang: "en".to_string(),
+            pending_reveal: None,
             sets: HashMap::new(),
             prices: None,
             prices_stamp: None,
@@ -403,6 +414,7 @@ impl Game {
     }
 
     pub fn buy_boosters(&mut self, set_code: &str, kind: &str, quantity: u32) -> Result<(), String> {
+        self.flush_reveal();
         if !(1..=MAX_PURCHASE).contains(&quantity) {
             return Err(format!("quantity must be between 1 and {MAX_PURCHASE}"));
         }
@@ -428,6 +440,7 @@ impl Game {
     /// Sells sealed boosters back at today's price minus the Boosterium's margin. As the
     /// price follows the market, this is how a player can speculate on boosters.
     pub fn sell_boosters(&mut self, set_code: &str, kind: &str, quantity: u32) -> Result<BoosterSaleResult, String> {
+        self.flush_reveal();
         if !(1..=MAX_PURCHASE).contains(&quantity) {
             return Err(format!("quantity must be between 1 and {MAX_PURCHASE}"));
         }
@@ -468,6 +481,7 @@ impl Game {
 
     /// Daily help for a player who is truly stranded.
     pub fn claim_charity(&mut self) -> Result<(), String> {
+        self.flush_reveal();
         let balance = self.store.balance().map_err(err)?;
         if !self.charity_open(balance)? {
             return Err("charity is not available".to_string());
@@ -500,8 +514,17 @@ impl Game {
     // ---- opening ----------------------------------------------------------------
 
     /// Opens one sealed booster the player owns and adds its cards to the collection.
-    /// Cards come back in reveal order: the best card last.
+    /// Cards come back in reveal order: the best card last. Their achievement events wait
+    /// for the cards to be revealed (`reveal_cards`).
     pub fn open_booster(&mut self, set_code: &str, kind: &str) -> Result<Vec<OpenedCard>, String> {
+        self.flush_reveal();
+        let (cards, events) = self.open_one(set_code, kind)?;
+        self.pending_reveal = Some(PendingReveal { per_card: events.per_card, booster: events.booster, revealed: 0 });
+        Ok(cards)
+    }
+
+    /// Draws one booster and records it, returning its cards and their events (not emitted).
+    fn open_one(&mut self, set_code: &str, kind: &str) -> Result<(Vec<OpenedCard>, OpeningEvents), String> {
         self.ensure_loaded(set_code)?;
         self.ensure_prices();
         let Self { sets, prices, rng, store, economy, clock, card_lang, .. } = self;
@@ -556,19 +579,22 @@ impl Game {
             card.is_new = *is_new;
         }
 
-        let mut events = self.opening_events(set_code, kind, &cards, outcome.cost_cents);
-        events.extend(self.year_progress_event(set_code));
-        self.emit(events);
-        Ok(cards)
+        let events = self.opening_events(set_code, kind, &cards, outcome.cost_cents);
+        Ok((cards, events))
     }
 
     /// Opens up to `quantity` sealed boosters in a row. Each opening is its own transaction, so
-    /// running out of stock part-way keeps (and returns) what was already opened.
+    /// running out of stock part-way keeps (and returns) what was already opened. Played fast,
+    /// so their events are emitted at once (the interface holds the notifications back).
     pub fn open_boosters(&mut self, set_code: &str, kind: &str, quantity: u32) -> Result<Vec<Vec<OpenedCard>>, String> {
+        self.flush_reveal();
         let mut opened = Vec::new();
         for _ in 0..quantity {
-            match self.open_booster(set_code, kind) {
-                Ok(cards) => opened.push(cards),
+            match self.open_one(set_code, kind) {
+                Ok((cards, events)) => {
+                    self.emit(events.per_card.into_iter().chain(events.booster).collect());
+                    opened.push(cards);
+                }
                 Err(_) if !opened.is_empty() => break,
                 Err(e) => return Err(e),
             }
@@ -630,6 +656,7 @@ impl Game {
 
     /// Sells cards at the Boosterium's price. Nothing is sold if any request is invalid.
     pub fn sell_cards(&mut self, requests: &[SaleRequest]) -> Result<SaleResult, String> {
+        self.flush_reveal();
         self.ensure_prices();
         let mut sales = Vec::with_capacity(requests.len());
         for r in requests {
@@ -1603,7 +1630,9 @@ mod tests {
         assert!(g.sell_duplicates("../secret").is_err());
     }
 
+    /// The achievements unlocked so far, once every card opened has been revealed.
     fn unlocked_ids(g: &mut Game) -> Vec<String> {
+        g.reveal_cards(usize::MAX);
         g.take_unlocks("en").into_iter().map(|a| a.id).collect()
     }
 
@@ -1644,6 +1673,35 @@ mod tests {
     }
 
     #[test]
+    fn achievements_unlock_as_the_cards_are_revealed() {
+        // One per card (the mythic, revealed last), one for the whole booster.
+        let defs = r#"
+            { "id": "mythic", "name": "M", "description": "d", "rarity": "rare", "emblem": "crown", "palette": "ember",
+              "condition": { "type": "event", "event": "CardAcquired", "where": [{ "field": "rarity", "op": "eq", "value": "mythic" }] } },
+            { "id": "open-1", "name": "O", "description": "d", "rarity": "common", "emblem": "pack", "palette": "ember",
+              "condition": { "type": "metric", "metric": "opened", "atLeast": 1 } }"#;
+        let (mut g, _) = game_with_engine("ach-reveal", PRICES, achievements(defs));
+        g.buy_boosters("TST", "play", 2).unwrap();
+        let cards = g.open_booster("TST", "play").unwrap();
+        assert_eq!(cards.iter().map(|c| c.rarity.as_str()).collect::<Vec<_>>(), ["common", "common", "mythic"]);
+        assert!(g.take_unlocks("en").is_empty(), "nothing before a card is seen");
+
+        g.reveal_cards(2);
+        assert!(g.take_unlocks("en").is_empty(), "two commons: nothing yet");
+        g.reveal_cards(1);
+        assert!(g.take_unlocks("en").is_empty(), "revealing fewer than already seen does nothing");
+        g.reveal_cards(3);
+        let ids: Vec<String> = g.take_unlocks("en").into_iter().map(|a| a.id).collect();
+        assert_eq!(ids, ["mythic", "open-1"], "the mythic, then the whole booster");
+
+        // Moving on emits what an opening still holds back.
+        g.open_booster("TST", "play").unwrap();
+        g.buy_boosters("TST", "play", 1).unwrap();
+        assert_eq!(g.achievements("en").unwrap().unlocked_count, 2);
+        assert!(g.pending_reveal.is_none());
+    }
+
+    #[test]
     fn achievements_are_shown_in_the_requested_language_with_english_as_fallback() {
         let (mut g, _) = game_with_engine("ach-lang", PRICES, achievements(OPEN_ONCE));
         let mut texts = AchievementTexts::default();
@@ -1653,6 +1711,7 @@ mod tests {
         g.set_achievement_texts(texts);
         g.buy_boosters("TST", "play", 1).unwrap();
         g.open_booster("TST", "play").unwrap();
+        g.reveal_cards(usize::MAX);
 
         let unlocked = g.take_unlocks("fr");
         assert_eq!((unlocked[0].name.as_str(), unlocked[0].description.as_deref()), ("Première ouverture", Some("Ouvrir un booster.")));
@@ -1669,6 +1728,7 @@ mod tests {
         let (mut g, _) = game_with_engine("ach-reward", PRICES, achievements(&reward));
         g.buy_boosters("TST", "play", 2).unwrap();
         g.open_booster("TST", "play").unwrap();
+        g.reveal_cards(usize::MAX);
 
         let w = g.wallet().unwrap();
         assert_eq!(w.balance_cents, 10_000 - 800 + 500);
