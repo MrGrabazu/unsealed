@@ -75,6 +75,9 @@ pub struct CollectionView {
     pub total_count: usize,
     pub completion_percent: f64,
     pub cards: Vec<CollectionCard>,
+    /// Cards only collector boosters give; they do not count toward completion.
+    pub extras: Vec<CollectionCard>,
+    pub extras_owned: usize,
 }
 
 #[derive(Debug, Serialize)]
@@ -233,9 +236,12 @@ struct LoadedSet {
     file: SetFile,
     colors: ColorIndex,
     index: HashMap<String, usize>,
-    /// Indices (in `file.cards`) of the set's own cards that a configured booster can
-    /// give, in collector number order. Defines what "complete" means for this set.
+    /// Indices (in `file.cards`) of the set's own cards that its main boosters can give,
+    /// in collector number order. Defines what "complete" means for this set.
     obtainable: Vec<usize>,
+    /// The set's own cards that only collector boosters give (showcase, borderless,
+    /// special foils...): collectible, but outside the completion target.
+    extras: Vec<usize>,
 }
 
 pub struct Game {
@@ -560,28 +566,32 @@ impl Game {
         let owned = self.store.owned_in_set(set_code).map_err(err)?;
         let set = &self.sets[set_code];
 
-        let cards: Vec<CollectionCard> = set
-            .obtainable
-            .iter()
-            .map(|&i| {
-                let c = &set.file.cards[i];
-                let have = owned.get(&c.uuid).copied().unwrap_or_default();
-                CollectionCard {
-                    uuid: c.uuid.clone(),
-                    name: c.name.clone(),
-                    number: c.number.clone(),
-                    rarity: c.rarity.clone(),
-                    image_url: image_url(&c.scryfall_id),
-                    quantity: have.normal,
-                    foil_quantity: have.foil,
-                    price_cents: self.market_price(&c.uuid, false),
-                    foil_price_cents: self.market_price(&c.uuid, true),
-                    sell_value_cents: self.sale_value(&c.uuid, false),
-                    foil_sell_value_cents: self.sale_value(&c.uuid, true),
-                }
-            })
-            .collect();
-        let owned_count = cards.iter().filter(|c| c.quantity + c.foil_quantity > 0).count();
+        let view = |indices: &[usize]| -> Vec<CollectionCard> {
+            indices
+                .iter()
+                .map(|&i| {
+                    let c = &set.file.cards[i];
+                    let have = owned.get(&c.uuid).copied().unwrap_or_default();
+                    CollectionCard {
+                        uuid: c.uuid.clone(),
+                        name: c.name.clone(),
+                        number: c.number.clone(),
+                        rarity: c.rarity.clone(),
+                        image_url: image_url(&c.scryfall_id),
+                        quantity: have.normal,
+                        foil_quantity: have.foil,
+                        price_cents: self.market_price(&c.uuid, false),
+                        foil_price_cents: self.market_price(&c.uuid, true),
+                        sell_value_cents: self.sale_value(&c.uuid, false),
+                        foil_sell_value_cents: self.sale_value(&c.uuid, true),
+                    }
+                })
+                .collect()
+        };
+        let owned_in = |cards: &[CollectionCard]| cards.iter().filter(|c| c.quantity + c.foil_quantity > 0).count();
+        let cards = view(&set.obtainable);
+        let extras = view(&set.extras);
+        let owned_count = owned_in(&cards);
         let total_count = cards.len();
         let completion_percent =
             if total_count == 0 { 0.0 } else { owned_count as f64 * 100.0 / total_count as f64 };
@@ -591,7 +601,9 @@ impl Game {
             owned_count,
             total_count,
             completion_percent,
+            extras_owned: owned_in(&extras),
             cards,
+            extras,
         })
     }
 
@@ -799,8 +811,8 @@ impl Game {
         let file: SetFile = read_json(&self.data_dir.join("sets").join(format!("{code}.json")))?;
         let colors = ColorIndex::from_cards(&file.cards);
         let index = file.cards.iter().enumerate().map(|(i, c)| (c.uuid.clone(), i)).collect();
-        let obtainable = obtainable_cards(&file);
-        self.sets.insert(code.to_string(), LoadedSet { file, colors, index, obtainable });
+        let (obtainable, extras) = obtainable_cards(&file);
+        self.sets.insert(code.to_string(), LoadedSet { file, colors, index, obtainable, extras });
         Ok(())
     }
 
@@ -835,22 +847,35 @@ impl Game {
     }
 }
 
-fn obtainable_cards(file: &SetFile) -> Vec<usize> {
-    let in_sheets: HashSet<&str> = file
-        .boosters
-        .values()
-        .flat_map(|cfg| cfg.sheets.values())
-        .flat_map(|sheet| sheet.cards.keys().map(String::as_str))
-        .collect();
-    let mut indices: Vec<usize> = file
-        .cards
-        .iter()
-        .enumerate()
-        .filter(|(_, c)| c.set_code == file.code && in_sheets.contains(c.uuid.as_str()))
-        .map(|(i, _)| i)
-        .collect();
-    indices.sort_by_key(|&i| number_key(&file.cards[i].number));
-    indices
+/// Booster kind whose exclusive cards stay outside the completion target.
+const COLLECTOR: &str = "collector";
+
+/// The set's own cards given by its main boosters, then those only collector boosters
+/// give, both in collector number order. A set offering nothing but collector boosters
+/// counts them as main boosters.
+fn obtainable_cards(file: &SetFile) -> (Vec<usize>, Vec<usize>) {
+    let has_main = file.boosters.keys().any(|k| k != COLLECTOR);
+    let in_sheets = |main: bool| -> HashSet<&str> {
+        file.boosters
+            .iter()
+            .filter(|(kind, _)| (kind.as_str() != COLLECTOR || !has_main) == main)
+            .flat_map(|(_, cfg)| cfg.sheets.values())
+            .flat_map(|sheet| sheet.cards.keys().map(String::as_str))
+            .collect()
+    };
+    let (main, collector) = (in_sheets(true), in_sheets(false));
+    let pick = |keep: &dyn Fn(&str) -> bool| {
+        let mut indices: Vec<usize> = file
+            .cards
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| c.set_code == file.code && keep(&c.uuid))
+            .map(|(i, _)| i)
+            .collect();
+        indices.sort_by_key(|&i| number_key(&file.cards[i].number));
+        indices
+    };
+    (pick(&|u| main.contains(u)), pick(&|u| collector.contains(u) && !main.contains(u)))
 }
 
 /// Sort key for collector numbers such as "12", "12★" or "A-12": leading digits first.
@@ -1043,6 +1068,33 @@ mod tests {
         format!(
             r#"{{ "updatedAt": "d{usd}", "cards": {{}}, "boosters": {{ "TST/play": {{ "usd": {usd}, "eur": 0 }} }} }}"#
         )
+    }
+
+    #[test]
+    fn collector_exclusive_cards_are_extras_outside_completion() {
+        let mut g = game("collector");
+        // The test set plus a collector booster giving the card no play booster gives.
+        let set = SET.replace(
+            r#""sourceSetCodes": ["TST"] } } }"#,
+            r#""sourceSetCodes": ["TST"] },
+              "collector": {
+                "boosters": [ { "contents": { "extra": 1 }, "weight": 1 } ],
+                "boostersTotalWeight": 1,
+                "sheets": { "extra": { "cards": { "x1": 1 }, "foil": true, "totalWeight": 1 } },
+                "sourceSetCodes": ["TST"] } } }"#,
+        );
+        fs::write(g.data_dir.join("sets/TST.json"), set).unwrap();
+
+        let view = g.collection("TST").unwrap();
+        assert_eq!(view.cards.iter().map(|c| c.uuid.as_str()).collect::<Vec<_>>(), ["m1", "c1"]);
+        assert_eq!(view.extras.iter().map(|c| c.uuid.as_str()).collect::<Vec<_>>(), ["x1"]);
+
+        g.buy_boosters("TST", "collector", 1).unwrap();
+        let cards = g.open_booster("TST", "collector").unwrap();
+        assert_eq!((cards[0].uuid.as_str(), cards[0].foil), ("x1", true));
+        let view = g.collection("TST").unwrap();
+        assert_eq!((view.owned_count, view.total_count, view.extras_owned), (0, 2, 1));
+        assert_eq!(view.extras[0].foil_quantity, 1);
     }
 
     #[test]

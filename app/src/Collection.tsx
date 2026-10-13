@@ -82,10 +82,35 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
     }
   }
 
-  const shown = view?.cards.filter((c) => {
+  const matches = (c: CollectionCard) => {
     const owned = c.quantity + c.foilQuantity > 0;
     return filter === "all" || (filter === "owned") === owned;
-  });
+  };
+  const shown = view?.cards.filter(matches);
+  const shownExtras = view?.extras.filter(matches);
+
+  function cardTile(c: CollectionCard) {
+    const total = c.quantity + c.foilQuantity;
+    return (
+      <div key={c.uuid} className={`collection-card ${total > 0 ? "" : "missing"}`} data-rarity={c.rarity}>
+        <div className="thumb">
+          <img src={c.imageUrl} alt={c.name} loading="lazy" draggable={false} />
+          {total > 1 && <span className="badge-qty">×{total}</span>}
+          {c.foilQuantity > 0 && <span className="badge-foil">FOIL</span>}
+        </div>
+        <div className="card-caption visible">
+          <span className="name">
+            #{c.number} {c.name}
+          </span>
+          <span className="price">{c.priceCents == null ? "—" : money(c.priceCents)}</span>
+        </div>
+        <div className="sell-row">
+          {sellButton(c, false)}
+          {sellButton(c, true)}
+        </div>
+      </div>
+    );
+  }
 
   function sellButton(card: CollectionCard, foil: boolean) {
     const value = foil ? card.foilSellValueCents : card.sellValueCents;
@@ -133,30 +158,16 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
           <p className="progress-label">
             {view.ownedCount} / {view.totalCount} cards ({view.completionPercent.toFixed(1)}%)
           </p>
-          <div className="collection-grid">
-            {shown?.map((c) => {
-              const total = c.quantity + c.foilQuantity;
-              return (
-                <div key={c.uuid} className={`collection-card ${total > 0 ? "" : "missing"}`} data-rarity={c.rarity}>
-                  <div className="thumb">
-                    <img src={c.imageUrl} alt={c.name} loading="lazy" draggable={false} />
-                    {total > 1 && <span className="badge-qty">×{total}</span>}
-                    {c.foilQuantity > 0 && <span className="badge-foil">FOIL</span>}
-                  </div>
-                  <div className="card-caption visible">
-                    <span className="name">
-                      #{c.number} {c.name}
-                    </span>
-                    <span className="price">{c.priceCents == null ? "—" : money(c.priceCents)}</span>
-                  </div>
-                  <div className="sell-row">
-                    {sellButton(c, false)}
-                    {sellButton(c, true)}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <div className="collection-grid">{shown?.map(cardTile)}</div>
+          {view.extras.length > 0 && (
+            <>
+              <h3>Collector extras</h3>
+              <p className="progress-label">
+                {view.extrasOwned} / {view.extras.length} · only in collector boosters, not counted in completion
+              </p>
+              <div className="collection-grid">{shownExtras?.map(cardTile)}</div>
+            </>
+          )}
         </>
       )}
     </section>

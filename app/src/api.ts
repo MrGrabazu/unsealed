@@ -48,6 +48,9 @@ export interface CollectionView {
   totalCount: number;
   completionPercent: number;
   cards: CollectionCard[];
+  /** Cards only collector boosters give; they do not count toward completion. */
+  extras: CollectionCard[];
+  extrasOwned: number;
 }
 
 export interface SealedStack {

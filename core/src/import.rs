@@ -70,18 +70,25 @@ fn to_entry(c: RawCard) -> Result<CardEntry, ConfigError> {
     })
 }
 
+/// The wanted booster kinds this set actually has, in the wanted order. Sets differ
+/// (older sets have draft boosters, not play boosters; not every set has a collector
+/// booster), so a kind the set lacks is skipped. Fails only when none is available.
+fn kept_kinds<'a>(booster: &BTreeMap<String, BoosterConfig>, kinds: &[&'a str]) -> Result<Vec<&'a str>, ConfigError> {
+    let kept: Vec<&str> = kinds.iter().copied().filter(|k| booster.contains_key(*k)).collect();
+    if kept.is_empty() {
+        return Err(ConfigError::UnknownBooster(kinds.join(", ")));
+    }
+    Ok(kept)
+}
+
 /// Codes of the other sets whose cards the kept booster configs draw from
 /// (MTGJSON `sourceSetCodes`, e.g. a Special Guests sheet in a Play Booster).
 /// Their raw files must be passed to `set_from_mtgjson`.
 pub fn source_set_codes(json: &str, kinds: &[&str]) -> Result<Vec<String>, ConfigError> {
     let raw: RawFile = serde_json::from_str(json)?;
     let mut codes = Vec::new();
-    for &kind in kinds {
-        let cfg = raw
-            .data
-            .booster
-            .get(kind)
-            .ok_or_else(|| ConfigError::UnknownBooster(kind.to_string()))?;
+    for kind in kept_kinds(&raw.data.booster, kinds)? {
+        let cfg = &raw.data.booster[kind];
         for c in &cfg.source_set_codes {
             if *c != raw.data.code && !codes.contains(c) {
                 codes.push(c.clone());
@@ -91,8 +98,8 @@ pub fn source_set_codes(json: &str, kinds: &[&str]) -> Result<Vec<String>, Confi
     Ok(codes)
 }
 
-/// Builds the compact set file from a raw MTGJSON set file, keeping only the
-/// booster kinds listed in `kinds`. Every kept config is validated, and every
+/// Builds the compact set file from a raw MTGJSON set file, keeping the booster
+/// kinds listed in `kinds` that the set has. Every kept config is validated, and every
 /// card referenced by a sheet must exist either in the set or in `extra_sets`
 /// (raw files of the sets returned by `source_set_codes`). Cards from other
 /// sets are embedded only when a kept sheet references them; they keep their
@@ -118,10 +125,8 @@ pub fn set_from_mtgjson(
 
     let mut boosters = BTreeMap::new();
     let mut used_foreign: HashSet<String> = HashSet::new();
-    for &kind in kinds {
-        let cfg = booster
-            .remove(kind)
-            .ok_or_else(|| ConfigError::UnknownBooster(kind.to_string()))?;
+    for kind in kept_kinds(&booster, kinds)? {
+        let cfg = booster.remove(kind).expect("kept kinds exist in the set");
         cfg.validate()?;
         for (sheet_name, sheet) in &cfg.sheets {
             for uuid in sheet.cards.keys() {

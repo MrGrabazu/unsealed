@@ -1,6 +1,6 @@
 {
   "sets": ["BLB", "DSK", "FDN"],
-  "boosters": ["play"],
+  "boosters": ["play", "collector"],
   "maxAgeHours": 24,
   "simBoosters": 20000
 }

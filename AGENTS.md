@@ -140,6 +140,7 @@ Le jeu est un client lourd : **il n'y a pas de serveur à héberger**. L'app con
 ## 9. Fonctionnalités de collection
 
 - Vue par set avec **pourcentage de complétion** et cartes manquantes affichées en grisé.
+- **Collector Boosters** : `data.json` liste les types de booster proposés (`play`, `collector`) ; chaque set garde ceux qu'il possède (le build n'échoue que si un set n'en a aucun). Changer cette liste déclenche un rebuild au lancement (`booster_kinds` du manifest). La complétion ne compte que les cartes des boosters principaux ; les cartes exclusives aux collectors (showcase, borderless, foils spéciaux) forment une section « Collector extras » à part.
 - Historique des ouvertures et des **meilleurs tirages**.
 - Statistiques personnelles (nombre de boosters ouverts, meilleure carte et sa valeur, etc.).
 - *Implémenté* : onglet **Stats** (`app/src/Stats.tsx`, `Game::stats`). Totaux d'ouverture, argent dépensé et gagné (agrégé depuis le `ledger`), rendement des boosters, valeur de la collection et patrimoine, meilleur et pire booster, 12 meilleurs tirages de tous les temps (au prix du tirage), tableau par booster et 20 dernières ouvertures. Tout est calculé à la demande depuis `openings` / `opening_cards` (index sur les prix, migration 6).
@@ -175,4 +176,5 @@ Le jeu est un client lourd : **il n'y a pas de serveur à héberger**. L'app con
 - Tout ce qui est équilibrage (taux, prix, pourcentage de revente, récompenses) doit vivre dans des fichiers de configuration.
 - Toute nouvelle config de set doit passer le test de simulation des taux avant d'être considérée comme valide.
 - **Tout le code est en anglais** : commentaires, noms de fonctions/méthodes/variables/types, messages d'erreur, noms de tests. Aucun français dans le code (la documentation du projet, comme ce fichier, reste en français).
+- **Commandes shell** : rester à la racine du dépôt et n'utiliser que des chemins relatifs à celle-ci (`app/src/...`, `core/src/...`, `npm --prefix app run build`). Jamais de `cd`, de `../`, de chemins `/c/...`, ni d'écriture hors du dépôt : cela déclenche des demandes de validation. Modifier les fichiers avec l'outil d'édition, jamais avec `sed`/`perl`/heredoc : le shell ne sait pas analyser ces commandes et demande une validation. Le shell sert aux commandes simples (`cargo`, `npm`, `git`).
 - En cas de doute sur un schéma de données externe (MTGJSON, Scryfall), consulter leur documentation actuelle plutôt que de supposer.

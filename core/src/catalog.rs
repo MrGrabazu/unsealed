@@ -81,6 +81,10 @@ pub struct Manifest {
     pub generated_at: String,
     pub prices_updated_at: String,
     pub sets: BTreeMap<String, ManifestSet>,
+    /// Booster kinds the data was built for (the configured list, not what each set has):
+    /// when the configuration asks for other kinds, the data must be rebuilt.
+    #[serde(default)]
+    pub booster_kinds: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

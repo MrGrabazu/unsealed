@@ -172,7 +172,12 @@ pub fn build(opts: &BuildOptions, progress: &mut dyn FnMut(&str)) -> Result<Mani
     write_json(&opts.out.join("prices.json"), &PriceFile { updated_at: bulk.updated_at.clone(), cards, boosters })?;
 
     let generated_at = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().to_string();
-    let manifest = Manifest { generated_at, prices_updated_at: bulk.updated_at, sets: manifest_sets };
+    let manifest = Manifest {
+        generated_at,
+        prices_updated_at: bulk.updated_at,
+        sets: manifest_sets,
+        booster_kinds: opts.boosters.clone(),
+    };
     write_json(&opts.out.join("manifest.json"), &manifest)?;
 
     // Older bulk files are useless now and weigh hundreds of MB each.

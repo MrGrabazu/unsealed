@@ -11,7 +11,7 @@ use serde::Deserialize;
 pub struct DataConfig {
     /// Set codes the game offers.
     pub sets: Vec<String>,
-    /// Booster kinds kept for each set.
+    /// Booster kinds offered; each set keeps those it has.
     #[serde(default = "default_boosters")]
     pub boosters: Vec<String>,
     /// Data older than this is rebuilt at launch. Prices move daily, so a day is the natural unit.
@@ -23,7 +23,7 @@ pub struct DataConfig {
 }
 
 fn default_boosters() -> Vec<String> {
-    vec!["play".to_string()]
+    vec!["play".to_string(), "collector".to_string()]
 }
 
 fn default_max_age_hours() -> i64 {
@@ -46,6 +46,8 @@ pub enum RefreshReason {
     NoData,
     /// A configured set is not installed.
     MissingSet(String),
+    /// The configuration asks for other booster kinds than the data was built for.
+    BoostersChanged,
     /// The data is older than the configured maximum age.
     Stale,
 }
@@ -55,6 +57,9 @@ pub fn refresh_reason(local: Option<&Manifest>, cfg: &DataConfig, now: i64) -> O
     let Some(manifest) = local else { return Some(RefreshReason::NoData) };
     if let Some(code) = cfg.sets.iter().find(|c| !manifest.sets.contains_key(*c)) {
         return Some(RefreshReason::MissingSet(code.clone()));
+    }
+    if manifest.booster_kinds != cfg.boosters {
+        return Some(RefreshReason::BoostersChanged);
     }
     // An unreadable timestamp or a clock set in the past counts as stale: rebuilding is harmless.
     let age = manifest.generated_at.parse::<i64>().ok().map(|t| now - t);

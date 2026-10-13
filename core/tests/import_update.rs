@@ -75,7 +75,16 @@ fn rejects_card_without_scryfall_id() {
 }
 
 #[test]
-fn rejects_missing_booster_kind() {
+fn keeps_the_wanted_kinds_the_set_has() {
+    use unsealed_core::import::source_set_codes;
+    let json = raw_set("u1", r#""scryfallId": "s1""#);
+    let set = set_from_mtgjson(&json, &["collector", "play"], &[]).unwrap();
+    assert_eq!(set.boosters.keys().collect::<Vec<_>>(), ["play"]);
+    assert!(source_set_codes(&json, &["collector", "play"]).unwrap().is_empty());
+}
+
+#[test]
+fn rejects_a_set_without_any_wanted_kind() {
     assert!(set_from_mtgjson(&raw_set("u1", r#""scryfallId": "s1""#), &["collector"], &[]).is_err());
 }
 
@@ -120,6 +129,7 @@ fn manifest(generated_at: &str, sets: &[&str]) -> Manifest {
                 )
             })
             .collect::<BTreeMap<_, _>>(),
+        booster_kinds: vec!["play".into(), "collector".into()],
     }
 }
 
@@ -130,7 +140,7 @@ fn data_config() -> DataConfig {
 #[test]
 fn data_config_applies_defaults() {
     let cfg = data_config();
-    assert_eq!((cfg.boosters, cfg.max_age_hours, cfg.sim_boosters), (vec!["play".to_string()], 24, 20_000));
+    assert_eq!((cfg.boosters, cfg.max_age_hours, cfg.sim_boosters), (vec!["play".to_string(), "collector".to_string()], 24, 20_000));
 }
 
 #[test]
@@ -152,4 +162,12 @@ fn refresh_only_when_data_is_older_than_the_limit() {
     // Clock moved back, or garbage timestamp: rebuild.
     assert_eq!(refresh_reason(Some(&local), &cfg, 500), Some(RefreshReason::Stale));
     assert_eq!(refresh_reason(Some(&manifest("x", &["BLB", "DSK"])), &cfg, 1_000), Some(RefreshReason::Stale));
+}
+
+#[test]
+fn refresh_when_the_wanted_booster_kinds_change() {
+    let cfg = data_config();
+    let mut local = manifest("1000", &["BLB", "DSK"]);
+    local.booster_kinds = vec!["play".into()];
+    assert_eq!(refresh_reason(Some(&local), &cfg, 1_100), Some(RefreshReason::BoostersChanged));
 }
