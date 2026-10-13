@@ -8,7 +8,7 @@ mod updater;
 
 use game::{
     AchievementTexts, AchievementView, AchievementsView, BoosterSaleResult, CardDetailsView, CollectionView, DataInfo,
-    Game, OpenedCard, SaleRequest, SaleResult, SetSummary, ShopItem, StatsView, WalletView,
+    Game, HistoryView, OpenedCard, SaleRequest, SaleResult, SetSummary, ShopItem, StatsView, WalletView,
 };
 use saves::{SaveInfo, Saves};
 use std::error::Error;
@@ -251,6 +251,18 @@ fn get_stats(state: State<'_, SessionState>) -> Result<StatsView, String> {
     with_game(&state, |g| g.stats())
 }
 
+/// The wallet's movements, newest first (`limit` of them, after `offset`).
+#[tauri::command]
+fn get_history(state: State<'_, SessionState>, limit: u32, offset: u32) -> Result<HistoryView, String> {
+    with_game(&state, |g| g.history(limit.min(200), offset))
+}
+
+/// Undoes a sale (for a penalty) or a recent purchase; returns the money moved (signed).
+#[tauri::command]
+fn undo_transaction(state: State<'_, SessionState>, id: i64) -> Result<i64, String> {
+    with_game(&state, |g| g.undo_transaction(id))
+}
+
 /// A card's details. Scryfall is asked on a worker thread, without holding the session:
 /// offline, the local part comes back alone (`online` is false).
 #[tauri::command]
@@ -406,6 +418,8 @@ pub fn run() {
             take_unlocks,
             get_stats,
             get_card_details,
+            get_history,
+            undo_transaction,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Unsealed");

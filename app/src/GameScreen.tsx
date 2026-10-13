@@ -26,15 +26,16 @@ import { Collection } from "./Collection";
 import { rewardText } from "./boosterKinds";
 import { DataStatusBar, useDataStatus } from "./DataStatus";
 import { Footer } from "./Footer";
+import { History } from "./History";
 import { useI18n } from "./i18n";
 import { Loading } from "./Loading";
 import { CurrencyContext, DEFAULT_CURRENCY, useMoney } from "./money";
 import { SealedBoosters } from "./SealedBoosters";
 import { Stats } from "./Stats";
 
-type Tab = "boosterium" | "open" | "collection" | "achievements" | "stats";
+type Tab = "boosterium" | "open" | "collection" | "achievements" | "stats" | "history";
 
-const TABS: Tab[] = ["boosterium", "open", "collection", "achievements", "stats"];
+const TABS: Tab[] = ["boosterium", "open", "collection", "achievements", "stats", "history"];
 
 /** How long a notification stays on screen. */
 const TOAST_MS = 8000;
@@ -268,6 +269,15 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
         {tab === "achievements" && <Achievements refreshKey={unlockCount} />}
 
         {tab === "stats" && <Stats refreshKey={`${openings}-${wallet?.balanceCents}`} />}
+
+        {tab === "history" && (
+          <History
+            onChanged={() => {
+              setOpenings((n) => n + 1);
+              void refreshWallet();
+            }}
+          />
+        )}
 
         <Footer />
 

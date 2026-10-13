@@ -8,6 +8,7 @@
 //! from the history that explains it.
 
 use rusqlite::{params, Connection, OptionalExtension, Transaction};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 use unsealed_core::achievements::Progress;
@@ -77,6 +78,17 @@ const MIGRATIONS: &[&str] = &[
     CREATE INDEX openings_value ON openings (value_cents);",
     // 7: what describes the save itself (name, dates), see `saves`
     "CREATE TABLE save_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL) WITHOUT ROWID;",
+    // 8: purchases and sales in detail (items as JSON, see `TxItem`), to show and undo them
+    "CREATE TABLE transactions (
+        id INTEGER PRIMARY KEY,
+        ledger_id INTEGER NOT NULL UNIQUE REFERENCES ledger (id),
+        at INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        amount_cents INTEGER NOT NULL,
+        items TEXT NOT NULL,
+        undone_at INTEGER,
+        undo_cents INTEGER
+    );",
 ];
 
 #[derive(Debug, thiserror::Error)]
@@ -87,8 +99,46 @@ pub enum StoreError {
     NoSealedBooster,
     #[error("not enough copies of card {0}")]
     NotOwned(String),
+    #[error("this transaction cannot be undone: {0}")]
+    CannotUndo(&'static str),
     #[error("database error: {0}")]
     Db(#[from] rusqlite::Error),
+    #[error("invalid transaction record: {0}")]
+    Record(#[from] serde_json::Error),
+}
+
+/// What a purchase or a sale was made of, kept to show it and to undo it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub enum TxItem {
+    Card { uuid: String, set_code: String, foil: bool, quantity: u32, unit_cents: u32 },
+    /// `cost_cents`: the cost basis of these boosters (what they cost the player).
+    Boosters { set_code: String, kind: String, quantity: u32, unit_cents: u32, cost_cents: i64 },
+}
+
+/// A purchase or a sale, as recorded.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TxRecord {
+    pub id: i64,
+    pub at: i64,
+    pub kind: String,
+    /// Signed, as in the wallet: negative for a purchase.
+    pub amount_cents: i64,
+    pub items: Vec<TxItem>,
+    pub undone_at: Option<i64>,
+    /// What undoing it cost (sale) or refunded (purchase), signed as in the wallet.
+    pub undo_cents: Option<i64>,
+}
+
+/// A movement of the wallet, with its transaction when it is a purchase or a sale that
+/// was recorded in detail (older ones were not).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HistoryRow {
+    pub at: i64,
+    pub kind: String,
+    pub amount_cents: i64,
+    pub details: Option<String>,
+    pub transaction: Option<TxRecord>,
 }
 
 pub type StoreResult<T> = Result<T, StoreError>;
@@ -362,7 +412,16 @@ impl Store {
         if balance < total {
             return Err(StoreError::InsufficientFunds { needed: total, available: balance });
         }
-        add_ledger(&tx, now, "booster_purchase", -total, Some(&format!("{set_code}/{kind} x{quantity}")))?;
+        let ledger_id =
+            add_ledger(&tx, now, "booster_purchase", -total, Some(&format!("{set_code}/{kind} x{quantity}")))?;
+        let item = TxItem::Boosters {
+            set_code: set_code.to_string(),
+            kind: kind.to_string(),
+            quantity,
+            unit_cents: unit_price_cents,
+            cost_cents: total,
+        };
+        add_transaction(&tx, ledger_id, now, "booster_purchase", -total, &[item])?;
         tx.execute(
             "INSERT INTO sealed (set_code, kind, quantity, cost_cents) VALUES (?1, ?2, ?3, ?4)
              ON CONFLICT (set_code, kind) DO UPDATE SET
@@ -386,7 +445,10 @@ impl Store {
         let tx = self.conn.transaction()?;
         let cost_cents = take_sealed(&tx, set_code, kind, quantity)?;
         let total_cents = i64::from(unit_cents) * i64::from(quantity);
-        add_ledger(&tx, now, "booster_sale", total_cents, Some(&format!("{set_code}/{kind} x{quantity}")))?;
+        let ledger_id =
+            add_ledger(&tx, now, "booster_sale", total_cents, Some(&format!("{set_code}/{kind} x{quantity}")))?;
+        let item = TxItem::Boosters { set_code: set_code.to_string(), kind: kind.to_string(), quantity, unit_cents, cost_cents };
+        add_transaction(&tx, ledger_id, now, "booster_sale", total_cents, &[item])?;
         tx.commit()?;
         Ok(BoosterSale { total_cents, cost_cents })
     }
@@ -598,15 +660,25 @@ impl Store {
         let tx = self.conn.transaction()?;
         let mut total = 0i64;
         let mut count = 0u32;
+        let mut items = Vec::with_capacity(sales.len());
         for s in sales {
-            let owned: Option<u32> = tx
+            let owned: Option<(u32, String)> = tx
                 .query_row(
-                    "SELECT quantity FROM collection WHERE card_uuid = ?1 AND foil = ?2",
+                    "SELECT quantity, set_code FROM collection WHERE card_uuid = ?1 AND foil = ?2",
                     params![s.uuid, s.foil],
-                    |r| r.get(0),
+                    |r| Ok((r.get(0)?, r.get(1)?)),
                 )
                 .optional()?;
-            match owned {
+            if let Some((_, set_code)) = &owned {
+                items.push(TxItem::Card {
+                    uuid: s.uuid.to_string(),
+                    set_code: set_code.clone(),
+                    foil: s.foil,
+                    quantity: s.quantity,
+                    unit_cents: s.unit_cents,
+                });
+            }
+            match owned.map(|(q, _)| q) {
                 Some(q) if q > s.quantity => {
                     tx.execute(
                         "UPDATE collection SET quantity = quantity - ?3 WHERE card_uuid = ?1 AND foil = ?2",
@@ -624,9 +696,103 @@ impl Store {
             total += i64::from(s.unit_cents) * i64::from(s.quantity);
             count += s.quantity;
         }
-        add_ledger(&tx, now, "card_sale", total, Some(&format!("{count} cards")))?;
+        let ledger_id = add_ledger(&tx, now, "card_sale", total, Some(&format!("{count} cards")))?;
+        add_transaction(&tx, ledger_id, now, "card_sale", total, &items)?;
         tx.commit()?;
         Ok(total)
+    }
+
+    // ---- history and undoing --------------------------------------------------
+
+    /// The wallet's movements, newest first, with the detail of the purchases and sales.
+    pub fn history(&self, limit: u32, offset: u32) -> StoreResult<Vec<HistoryRow>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT l.at, l.kind, l.amount_cents, l.details, t.id
+             FROM ledger l LEFT JOIN transactions t ON t.ledger_id = l.id
+             ORDER BY l.id DESC LIMIT ?1 OFFSET ?2",
+        )?;
+        let rows = stmt
+            .query_map(params![limit, offset], |r| {
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get::<_, Option<i64>>(4)?))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        rows.into_iter()
+            .map(|(at, kind, amount_cents, details, id)| {
+                let transaction = id.map(|id| transaction_of(&self.conn, id)).transpose()?.flatten();
+                Ok(HistoryRow { at, kind, amount_cents, details, transaction })
+            })
+            .collect()
+    }
+
+    pub fn transaction(&self, id: i64) -> StoreResult<Option<TxRecord>> {
+        transaction_of(&self.conn, id)
+    }
+
+    /// Undoes a sale: the player pays `cost_cents` (what they received plus the penalty)
+    /// and gets the cards or boosters back, with the boosters' cost basis.
+    pub fn undo_sale(&mut self, id: i64, cost_cents: i64, now: i64) -> StoreResult<()> {
+        let tx = self.conn.transaction()?;
+        let record = transaction_of(&tx, id)?.ok_or(StoreError::CannotUndo("unknown transaction"))?;
+        if !record.kind.ends_with("_sale") {
+            return Err(StoreError::CannotUndo("not a sale"));
+        }
+        if record.undone_at.is_some() {
+            return Err(StoreError::CannotUndo("already undone"));
+        }
+        let balance = balance_of(&tx)?;
+        if balance < cost_cents {
+            return Err(StoreError::InsufficientFunds { needed: cost_cents, available: balance });
+        }
+        for item in &record.items {
+            match item {
+                TxItem::Card { uuid, set_code, foil, quantity, .. } => {
+                    tx.execute(
+                        "INSERT INTO collection (card_uuid, foil, set_code, quantity, first_acquired_at)
+                         VALUES (?1, ?2, ?3, ?4, ?5)
+                         ON CONFLICT (card_uuid, foil) DO UPDATE SET quantity = quantity + excluded.quantity",
+                        params![uuid, foil, set_code, quantity, now],
+                    )?;
+                }
+                TxItem::Boosters { set_code, kind, quantity, cost_cents, .. } => {
+                    tx.execute(
+                        "INSERT INTO sealed (set_code, kind, quantity, cost_cents) VALUES (?1, ?2, ?3, ?4)
+                         ON CONFLICT (set_code, kind) DO UPDATE SET
+                            quantity = quantity + excluded.quantity,
+                            cost_cents = cost_cents + excluded.cost_cents",
+                        params![set_code, kind, quantity, cost_cents],
+                    )?;
+                }
+            }
+        }
+        add_ledger(&tx, now, "sale_undone", -cost_cents, Some(&id.to_string()))?;
+        tx.execute("UPDATE transactions SET undone_at = ?2, undo_cents = ?3 WHERE id = ?1", params![id, now, -cost_cents])?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Undoes a purchase while its boosters are still sealed: they go back to the Boosterium
+    /// and the player is refunded `refund_cents`.
+    pub fn undo_purchase(&mut self, id: i64, refund_cents: i64, now: i64) -> StoreResult<()> {
+        let tx = self.conn.transaction()?;
+        let record = transaction_of(&tx, id)?.ok_or(StoreError::CannotUndo("unknown transaction"))?;
+        if record.kind != "booster_purchase" {
+            return Err(StoreError::CannotUndo("not a purchase"));
+        }
+        if record.undone_at.is_some() {
+            return Err(StoreError::CannotUndo("already undone"));
+        }
+        for item in &record.items {
+            if let TxItem::Boosters { set_code, kind, quantity, .. } = item {
+                take_sealed(&tx, set_code, kind, *quantity).map_err(|e| match e {
+                    StoreError::NoSealedBooster => StoreError::CannotUndo("the boosters were opened or sold"),
+                    other => other,
+                })?;
+            }
+        }
+        add_ledger(&tx, now, "purchase_undone", refund_cents, Some(&id.to_string()))?;
+        tx.execute("UPDATE transactions SET undone_at = ?2, undo_cents = ?3 WHERE id = ?1", params![id, now, refund_cents])?;
+        tx.commit()?;
+        Ok(())
     }
 }
 
@@ -656,12 +822,36 @@ fn balance_of(conn: &Connection) -> rusqlite::Result<i64> {
     conn.query_row("SELECT COALESCE(SUM(amount_cents), 0) FROM ledger", [], |r| r.get(0))
 }
 
-fn add_ledger(conn: &Connection, at: i64, kind: &str, amount_cents: i64, details: Option<&str>) -> rusqlite::Result<()> {
+/// Adds a movement to the wallet and returns its id.
+fn add_ledger(conn: &Connection, at: i64, kind: &str, amount_cents: i64, details: Option<&str>) -> rusqlite::Result<i64> {
     conn.execute(
         "INSERT INTO ledger (at, kind, amount_cents, details) VALUES (?1, ?2, ?3, ?4)",
         params![at, kind, amount_cents, details],
     )?;
+    Ok(conn.last_insert_rowid())
+}
+
+/// Records a purchase or a sale in detail, next to its wallet movement.
+fn add_transaction(conn: &Connection, ledger_id: i64, at: i64, kind: &str, amount_cents: i64, items: &[TxItem]) -> StoreResult<()> {
+    conn.execute(
+        "INSERT INTO transactions (ledger_id, at, kind, amount_cents, items) VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![ledger_id, at, kind, amount_cents, serde_json::to_string(items)?],
+    )?;
     Ok(())
+}
+
+fn transaction_of(conn: &Connection, id: i64) -> StoreResult<Option<TxRecord>> {
+    let row = conn
+        .query_row(
+            "SELECT id, at, kind, amount_cents, items, undone_at, undo_cents FROM transactions WHERE id = ?1",
+            [id],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get::<_, String>(4)?, r.get(5)?, r.get(6)?)),
+        )
+        .optional()?;
+    row.map(|(id, at, kind, amount_cents, items, undone_at, undo_cents)| {
+        Ok(TxRecord { id, at, kind, amount_cents, items: serde_json::from_str(&items)?, undone_at, undo_cents })
+    })
+    .transpose()
 }
 
 fn migrate(conn: &mut Connection) -> rusqlite::Result<()> {
@@ -705,6 +895,60 @@ mod tests {
             store.buy_boosters("TST", "play", boosters, 0, 0).unwrap();
         }
         store
+    }
+
+    #[test]
+    fn undoing_a_card_sale_gives_the_card_back_once_at_a_cost() {
+        let mut store = store_with(1);
+        store.open_sealed("TST", "play", &[card("a", true, Some(500))], 1).unwrap();
+        store.sell_cards(&[Sale { uuid: "a", foil: true, quantity: 1, unit_cents: 400 }], 2).unwrap();
+        assert!(store.owned_in_set("TST").unwrap().is_empty());
+
+        let history = store.history(10, 0).unwrap();
+        let sale = history[0].transaction.clone().unwrap();
+        assert_eq!((sale.kind.as_str(), sale.amount_cents), ("card_sale", 400));
+        assert_eq!(
+            sale.items,
+            [TxItem::Card { uuid: "a".into(), set_code: "TST".into(), foil: true, quantity: 1, unit_cents: 400 }]
+        );
+
+        let before = store.balance().unwrap();
+        store.undo_sale(sale.id, 420, 3).unwrap();
+        assert_eq!(store.balance().unwrap(), before - 420);
+        assert_eq!(store.owned_in_set("TST").unwrap()["a"], Owned { normal: 0, foil: 1 });
+        assert!(matches!(store.undo_sale(sale.id, 420, 4), Err(StoreError::CannotUndo(_))));
+        let undone = store.transaction(sale.id).unwrap().unwrap();
+        assert_eq!((undone.undone_at, undone.undo_cents), (Some(3), Some(-420)));
+        assert_eq!(store.history(10, 0).unwrap()[0].kind, "sale_undone");
+    }
+
+    #[test]
+    fn undoing_needs_the_money_and_sealed_boosters() {
+        let mut store = store_with(0);
+        store.buy_boosters("TST", "play", 2, 300, 1).unwrap();
+        let purchase = store.history(1, 0).unwrap()[0].transaction.clone().unwrap();
+        store.open_sealed("TST", "play", &[card("a", false, None)], 2).unwrap();
+        // One of the two boosters was opened: the purchase cannot be undone any more.
+        assert!(matches!(store.undo_purchase(purchase.id, 570, 3), Err(StoreError::CannotUndo(_))));
+
+        store.sell_boosters("TST", "play", 1, 240, 4).unwrap();
+        let sale = store.history(1, 0).unwrap()[0].transaction.clone().unwrap();
+        // The sold booster carried half of the 600 paid.
+        assert!(matches!(&sale.items[0], TxItem::Boosters { cost_cents: 300, .. }));
+        assert!(matches!(store.undo_sale(sale.id, 1_000_000, 5), Err(StoreError::InsufficientFunds { .. })));
+        store.undo_sale(sale.id, 252, 5).unwrap();
+        assert_eq!(store.sealed_stacks().unwrap()[0], SealedRow { set_code: "TST".into(), kind: "play".into(), quantity: 1, cost_cents: 300 });
+    }
+
+    #[test]
+    fn a_purchase_undone_returns_its_boosters_and_refunds() {
+        let mut store = store_with(0);
+        store.buy_boosters("TST", "play", 2, 300, 1).unwrap();
+        let purchase = store.history(1, 0).unwrap()[0].transaction.clone().unwrap();
+        let before = store.balance().unwrap();
+        store.undo_purchase(purchase.id, 570, 2).unwrap();
+        assert_eq!(store.balance().unwrap(), before + 570);
+        assert!(store.sealed_stacks().unwrap().is_empty());
     }
 
     #[test]

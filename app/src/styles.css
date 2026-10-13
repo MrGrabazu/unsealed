@@ -220,6 +220,12 @@ button.sell.confirm { background: #7a1d1d; border-color: #c24040; color: #fff; }
 .trend .gain { color: #6fcf7f; }
 .trend .loss { color: #ff7a7a; }
 
+/* History */
+.history-table td { vertical-align: top; }
+.history-table td:first-child { white-space: nowrap; }
+.history-table tr.undone td { opacity: 0.55; }
+.history-table tr.undone td:last-child { opacity: 1; }
+
 /* Seals: amounts with a bronze, silver or gold coin */
 .money { display: inline-flex; align-items: center; gap: 0.22em; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .coin { width: 1.05em; height: 1.05em; flex: none; filter: drop-shadow(0 1px 1px #0008); }

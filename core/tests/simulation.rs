@@ -112,6 +112,20 @@ fn inclusion_probabilities_match_an_exhaustive_enumeration() {
 }
 
 #[test]
+fn a_light_card_among_many_heavy_ones_keeps_its_exact_rate() {
+    // Like CLB's set booster wildcard: hundreds of heavily weighted cards, 2 drawn. A coarse
+    // integration overestimated the light cards about twentyfold.
+    use unsealed_core::sim::inclusion_probabilities;
+    let mut weights = vec![50_000u64; 200];
+    weights.push(1_000);
+    let computed = inclusion_probabilities(&weights, 2)[200];
+    // Exact for two draws: picked first, or picked second after a heavy card.
+    let total = 200.0 * 50_000.0 + 1_000.0;
+    let exact = 1_000.0 / total + (1.0 - 1_000.0 / total) * 1_000.0 / (total - 50_000.0);
+    assert!((computed - exact).abs() / exact < 1e-3, "{computed} vs {exact}");
+}
+
+#[test]
 fn unknown_booster_kind_is_an_error() {
     assert!(BoosterConfig::from_set_json(FIXTURE, "collector").is_err());
 }

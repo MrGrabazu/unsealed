@@ -119,7 +119,12 @@ pub fn inclusion_probabilities(weights: &[u64], n: usize) -> Vec<f64> {
 /// rate its weight and keeping the first `n` arrivals. So a card of weight `w` is kept
 /// with probability ∫ w·e^(-wt) · P(fewer than n other cards arrived by t) dt, where the
 /// count of the others follows a Poisson binomial law (computed by dynamic programming).
-/// The integral is evaluated with Simpson's rule, fine enough for the fastest card.
+///
+/// The integrand vanishes once the card has surely arrived (t ≫ 1/w) or the others surely
+/// filled the `n` places (t ≫ n / their total weight), whichever comes first: the integral
+/// stops there, and Simpson's rule takes steps small next to the arrivals of the whole
+/// sheet. (Steps sized on a single card's weight are far too coarse when a sheet holds
+/// hundreds of heavily weighted cards, like CLB's set booster wildcard.)
 fn inclusion_of_weight(all: &[f64], w: f64, n: usize) -> f64 {
     let mut removed = false;
     let others: Vec<f64> = all
@@ -131,13 +136,9 @@ fn inclusion_of_weight(all: &[f64], w: f64, n: usize) -> f64 {
             !is_self
         })
         .collect();
-    let fastest = others.iter().copied().fold(w, f64::max);
-    // e^(-40) is negligible; each step must stay small next to the fastest arrival time.
-    let horizon = 40.0 / w;
-    let steps = ((horizon * fastest * 20.0) as usize).clamp(4_000, 200_000) / 2 * 2;
-    let h = horizon / steps as f64;
     let mut fewer = vec![0.0; n];
-    let mut integrand = |t: f64| {
+    // P(fewer than n other cards arrived by t).
+    let mut fewer_than_n = |t: f64| -> f64 {
         fewer.iter_mut().for_each(|p| *p = 0.0);
         fewer[0] = 1.0;
         for &x in &others {
@@ -146,8 +147,24 @@ fn inclusion_of_weight(all: &[f64], w: f64, n: usize) -> f64 {
                 fewer[k] = fewer[k] * (1.0 - arrived) + if k > 0 { fewer[k - 1] * arrived } else { 0.0 };
             }
         }
-        w * (-w * t).exp() * fewer.iter().sum::<f64>()
+        fewer.iter().sum()
     };
+
+    // e^(-40) is negligible: past `horizon`, the card itself has surely arrived; the others
+    // may have filled every place earlier.
+    let total: f64 = others.iter().sum::<f64>() + w;
+    let mut horizon = 40.0 / w;
+    let mut t = n as f64 / total;
+    while t < horizon {
+        if fewer_than_n(t) < 1e-14 {
+            horizon = t;
+            break;
+        }
+        t *= 2.0;
+    }
+    let steps = ((horizon * total * 40.0) as usize).clamp(4_000, 400_000) / 2 * 2;
+    let h = horizon / steps as f64;
+    let mut integrand = |t: f64| w * (-w * t).exp() * fewer_than_n(t);
     let mut sum = integrand(0.0) + integrand(horizon);
     for i in 1..steps {
         sum += integrand(i as f64 * h) * if i % 2 == 1 { 4.0 } else { 2.0 };

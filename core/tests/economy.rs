@@ -70,6 +70,41 @@ fn rejects_invalid_configs() {
 }
 
 #[test]
+fn undoing_a_sale_costs_more_as_time_goes_by() {
+    let c = config().cancellation;
+    let minutes = |m: i64| m * 60;
+    assert_eq!(c.sale_penalty_percent(minutes(0)), 5);
+    assert_eq!(c.sale_penalty_percent(minutes(5)), 5);
+    assert_eq!(c.sale_penalty_percent(minutes(6)), 10);
+    assert_eq!(c.sale_penalty_percent(minutes(60 * 20)), 25);
+    assert_eq!(c.sale_penalty_percent(minutes(60 * 24 * 2)), 50);
+    assert_eq!(c.sale_penalty_percent(minutes(60 * 24 * 10)), 75);
+    assert_eq!(c.sale_penalty_percent(minutes(60 * 24 * 60)), 90);
+    // Sold for 800: undoing it right away costs 840.
+    assert_eq!(c.sale_cancel_cost_cents(800, 30), 840);
+}
+
+#[test]
+fn a_purchase_can_only_be_undone_right_away() {
+    let c = config().cancellation;
+    assert_eq!(c.purchase_refund_cents(1_000, 60), Some(950));
+    assert_eq!(c.purchase_refund_cents(1_000, 5 * 60), Some(950));
+    assert_eq!(c.purchase_refund_cents(1_000, 5 * 60 + 1), None);
+    // An economy file without the section gets the same defaults.
+    let start = CONFIG.find(r#",
+  "cancellation""#).unwrap();
+    let without = format!("{}\n}}", &CONFIG[..start]);
+    let defaults = EconomyConfig::from_json(&without).unwrap().cancellation;
+    assert_eq!(defaults.sale_penalty_percent(0), 5);
+    assert!(bad_cancellation(r#""penaltyPercent": 50"#, r#""penaltyPercent": 150"#));
+    assert!(bad_cancellation(r#""withinMinutes": 60,"#, r#""withinMinutes": 2,"#));
+}
+
+fn bad_cancellation(from: &str, to: &str) -> bool {
+    EconomyConfig::from_json(&CONFIG.replace(from, to)).is_err()
+}
+
+#[test]
 fn seals_default_to_one_per_cent_with_coin_tiers() {
     let c = config();
     assert_eq!((c.currency.seals_per_cent, c.currency.silver_from, c.currency.gold_from), (1.0, 100, 10_000));

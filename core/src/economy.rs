@@ -18,6 +18,65 @@ pub struct EconomyConfig {
     pub booster_sell_rate_percent: u32,
     pub booster_prices: BoosterPrices,
     pub charity: Charity,
+    #[serde(default)]
+    pub cancellation: Cancellation,
+}
+
+/// Undoing a transaction. A sale can be undone at any time: the player pays back what they
+/// received plus a penalty that grows with the time elapsed. A purchase can only be undone
+/// right away (a misclick), while the boosters are sealed: otherwise refunding the price paid
+/// would insure every purchase against a falling market.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Cancellation {
+    /// Penalty by age of the sale, in increasing `within_minutes` order.
+    pub sale_steps: Vec<PenaltyStep>,
+    /// Penalty once older than the last step.
+    pub sale_penalty_after_percent: u32,
+    /// How long a purchase can be undone.
+    pub purchase_within_minutes: u32,
+    pub purchase_penalty_percent: u32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PenaltyStep {
+    pub within_minutes: u32,
+    pub penalty_percent: u32,
+}
+
+impl Default for Cancellation {
+    fn default() -> Self {
+        let step = |within_minutes, penalty_percent| PenaltyStep { within_minutes, penalty_percent };
+        Self {
+            sale_steps: vec![step(5, 5), step(60, 10), step(1_440, 25), step(4_320, 50), step(20_160, 75)],
+            sale_penalty_after_percent: 90,
+            purchase_within_minutes: 5,
+            purchase_penalty_percent: 5,
+        }
+    }
+}
+
+impl Cancellation {
+    /// Penalty for undoing a sale made `age_secs` ago, in percent of the amount received.
+    pub fn sale_penalty_percent(&self, age_secs: i64) -> u32 {
+        let minutes = age_secs.max(0) as f64 / 60.0;
+        self.sale_steps
+            .iter()
+            .find(|s| minutes <= f64::from(s.within_minutes))
+            .map_or(self.sale_penalty_after_percent, |s| s.penalty_percent)
+    }
+
+    /// What undoing a sale of `received_cents` costs: the amount plus the penalty.
+    pub fn sale_cancel_cost_cents(&self, received_cents: i64, age_secs: i64) -> i64 {
+        received_cents + received_cents * i64::from(self.sale_penalty_percent(age_secs)) / 100
+    }
+
+    /// What undoing a purchase of `paid_cents` refunds, or `None` once it is too late.
+    pub fn purchase_refund_cents(&self, paid_cents: i64, age_secs: i64) -> Option<i64> {
+        (age_secs.max(0) <= i64::from(self.purchase_within_minutes) * 60)
+            .then(|| paid_cents - paid_cents * i64::from(self.purchase_penalty_percent) / 100)
+    }
 }
 
 /// The market prices behind the economy, and how the game's own currency, the Seals, is
@@ -104,6 +163,14 @@ impl EconomyConfig {
         }
         if self.booster_sell_rate_percent > 100 {
             return Err(ConfigError::Invalid("boosterSellRatePercent must be between 0 and 100".into()));
+        }
+        let c = &self.cancellation;
+        let increasing = c.sale_steps.windows(2).all(|w| w[0].within_minutes < w[1].within_minutes);
+        let penalties = c.sale_steps.iter().map(|s| s.penalty_percent).chain([c.sale_penalty_after_percent, c.purchase_penalty_percent]);
+        if !increasing || penalties.into_iter().any(|p| p > 100) {
+            return Err(ConfigError::Invalid(
+                "cancellation: steps must have increasing withinMinutes and penalties of at most 100%".into(),
+            ));
         }
         if self.booster_prices.default_cents == 0 || self.booster_prices.ev_markup_percent == 0 {
             return Err(ConfigError::Invalid(

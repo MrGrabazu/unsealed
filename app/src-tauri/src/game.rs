@@ -2,9 +2,11 @@
 
 mod achievements;
 mod details;
+mod history;
 
 pub use achievements::{AchievementTexts, AchievementView, AchievementsView};
 pub use details::CardDetailsView;
+pub use history::HistoryView;
 
 use crate::store::{OpeningCard, OpeningOrder, OpeningRow, Sale, Store};
 use rand::SeedableRng;
@@ -1198,6 +1200,44 @@ mod tests {
         format!(
             r#"{{ "updatedAt": "d{usd}", "cards": {{}}, "boosters": {{ "TST/play": {{ "usd": {usd}, "eur": 0 }} }} }}"#
         )
+    }
+
+    #[test]
+    fn undo_offers_follow_the_penalty_scale_over_time() {
+        use std::sync::atomic::AtomicI64;
+        let now = Arc::new(AtomicI64::new(1_000));
+        let clock_now = now.clone();
+        let mut g = Game::with_parts(
+            data_dir("undo", PRICES),
+            Store::open_in_memory().unwrap(),
+            test_economy(),
+            no_achievements(),
+            ChaCha8Rng::seed_from_u64(1),
+            Box::new(move || Clock { now: clock_now.load(Ordering::SeqCst), day: "2026-10-13".into() }),
+        )
+        .unwrap();
+        g.buy_boosters("TST", "play", 2).unwrap();
+        g.open_booster("TST", "play").unwrap();
+        // The $10.00 mythic sells for 800.
+        g.sell_cards(&[SaleRequest { uuid: "m1".into(), foil: false, quantity: 1 }]).unwrap();
+
+        let offer = |g: &mut Game, i: usize| g.history(10, 0).unwrap().entries[i].undo.as_ref().map(|o| (o.amount_cents, o.penalty_percent));
+        assert_eq!(offer(&mut g, 0), Some((840, 5)));
+        // The first purchase cannot be undone: one of its boosters was opened.
+        assert_eq!(offer(&mut g, 1), None);
+        g.buy_boosters("TST", "play", 1).unwrap();
+        assert_eq!(offer(&mut g, 0), Some((380, 5)), "a fresh purchase can be undone");
+
+        now.fetch_add(2 * 24 * 3600, Ordering::SeqCst);
+        assert_eq!(offer(&mut g, 1), Some((1_200, 50)), "the sale, two days later");
+        assert_eq!(offer(&mut g, 0), None, "too late to undo the purchase");
+
+        let sale = g.history(10, 0).unwrap().entries[1].transaction_id.unwrap();
+        let balance = g.wallet().unwrap().balance_cents;
+        assert_eq!(g.undo_transaction(sale).unwrap(), -1_200);
+        assert_eq!(g.wallet().unwrap().balance_cents, balance - 1_200);
+        assert_eq!(g.collection("TST").unwrap().cards[0].quantity, 1, "the mythic is back");
+        assert!(g.undo_transaction(sale).is_err());
     }
 
     /// Diagnostic on the real data of `dist/` (built by `data-builder`).

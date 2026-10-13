@@ -12,5 +12,17 @@
   "charity": {
     "amountCents": 2000,
     "maxClaimsPerDay": 1
+  },
+  "cancellation": {
+    "saleSteps": [
+      { "withinMinutes": 5, "penaltyPercent": 5 },
+      { "withinMinutes": 60, "penaltyPercent": 10 },
+      { "withinMinutes": 1440, "penaltyPercent": 25 },
+      { "withinMinutes": 4320, "penaltyPercent": 50 },
+      { "withinMinutes": 20160, "penaltyPercent": 75 }
+    ],
+    "salePenaltyAfterPercent": 90,
+    "purchaseWithinMinutes": 5,
+    "purchasePenaltyPercent": 5
   }
 }

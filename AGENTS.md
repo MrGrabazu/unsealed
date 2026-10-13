@@ -148,6 +148,13 @@ Le jeu est un client lourd : **il n'y a pas de serveur à héberger**. L'app con
 - **Complétion foil** : ne compte que les cartes imprimées en foil (`finishes`). **Année complète** : tous les sets proposés de l'année, avec au moins 2 sets pour l'achievement livré.
 - **Pas encore fait** : complétion par bloc (aucun set proposé n'appartient à un bloc, les blocs ont disparu en 2019), illustrations personnalisées par achievement.
 
+## 7 bis. Historique et annulation
+
+- **Onglet Historique** : tous les mouvements du portefeuille (table `ledger`), les achats et ventes avec leur détail (table `transactions`, migration 8 : articles en JSON, `TxItem`). Les ventes antérieures à cette version n'ont pas de détail et ne s'annulent pas.
+- **Annuler une vente** : on récupère cartes ou boosters (avec leur coût d'achat) en rendant la somme reçue **plus une pénalité qui croît avec le temps** (`cancellation.saleSteps` de `economy.json` : 5 % ≤ 5 min, 10 % ≤ 1 h, 25 % ≤ 1 jour, 50 % ≤ 3 jours, 75 % ≤ 2 semaines, 90 % au-delà). Il faut avoir les Sceaux ; une seule fois.
+- **Annuler un achat** : seulement contre le clic malheureux, dans les 5 minutes et si tous ses boosters sont encore scellés, remboursé moins 5 %. Au-delà, la revente au Boosterium existe ; un remboursement au prix payé plus tardif serait une assurance gratuite contre la baisse du marché.
+- Les compteurs d'achievements (ex. cartes vendues) ne sont pas décomptés par une annulation.
+
 ## 8 ter. Parties, sauvegardes et écrans
 
 - **Accueil** au lancement (titre, accroche, menu) : Continuer (la partie ouverte, sinon la dernière jouée), Nouvelle partie, Charger une partie (renommer, supprimer), Options, À propos. Pendant le jeu, « Menu » revient à l'accueil sans fermer la partie.
@@ -180,7 +187,7 @@ Le jeu est un client lourd : **il n'y a pas de serveur à héberger**. L'app con
 - Vue par set avec **pourcentage de complétion** et cartes manquantes affichées en grisé.
 - **Collector Boosters** : `data.json` liste les types de booster proposés (`play`, `collector`) ; chaque set garde ceux qu'il possède (le build n'échoue que si un set n'en a aucun). Changer cette liste déclenche un rebuild au lancement (`booster_kinds` du manifest). La complétion ne compte que les cartes des boosters principaux ; les cartes exclusives aux collectors (showcase, borderless, foils spéciaux) forment une section « Collector extras » à part.
 - **Sets proposés** : `"sets": "all"` → tous les sets MTGJSON des types `core`, `expansion`, `masters`, `draft_innovation`, `funny` et `starter` (hors sets en ligne) qui ont un booster voulu (`play`, `draft`, `set`, `default` = booster unique des sets d'avant 1996, `collector`). Environ 178 sets, d'Alpha (1993) à aujourd'hui. Un type de booster qui échoue à la simulation est retiré seul (le set reste proposé) ; la raison est listée dans `skipped` du manifest.
-- **Taux attendus sans doublon** : sur une feuille aux poids inégaux (vieux sets imprimés sur planche, une carte pouvant occuper 1 à 5 cases), la probabilité qu'une carte soit tirée est calculée exactement (`sim::inclusion_probabilities`), pas en n × poids / total.
+- **Taux attendus sans doublon** : sur une feuille aux poids inégaux (vieux sets imprimés sur planche, une carte pouvant occuper 1 à 5 cases ; « wildcard » des Set Boosters aux poids de 1 à 55), la probabilité qu'une carte soit tirée est calculée exactement (`sim::inclusion_probabilities`, intégrale numérique dont le pas suit le poids total de la feuille), pas en n × poids / total. Tout changement de ce calcul incrémente `VALIDATION_VERSION` (builder) pour revalider toutes les configs.
 - Historique des ouvertures et des **meilleurs tirages**.
 - Statistiques personnelles (nombre de boosters ouverts, meilleure carte et sa valeur, etc.).
 - *Implémenté* : onglet **Stats** (`app/src/Stats.tsx`, `Game::stats`). Totaux d'ouverture, argent dépensé et gagné (agrégé depuis le `ledger`), rendement des boosters, valeur de la collection et patrimoine, meilleur et pire booster, 12 meilleurs tirages de tous les temps (au prix du tirage), tableau par booster et 20 dernières ouvertures. Tout est calculé à la demande depuis `openings` / `opening_cards` (index sur les prix, migration 6).

@@ -243,6 +243,44 @@ export interface CardDetailsView {
   online: boolean;
 }
 
+/** The wallet's movements, newest first. */
+export interface HistoryView {
+  entries: HistoryEntry[];
+  hasMore: boolean;
+}
+
+export interface HistoryEntry {
+  /** Unix time, in seconds. */
+  at: number;
+  /** "booster_purchase", "card_sale", "booster_sale", "sale_undone", "purchase_undone",
+   * "charity", "achievement_reward", "starting_balance"... */
+  kind: string;
+  /** Signed, as in the wallet. */
+  amountCents: number;
+  /** Purchases and sales recorded in detail (not the oldest ones). */
+  transactionId: number | null;
+  items: {
+    /** The card's name, or the set's name for boosters. */
+    name: string;
+    setCode: string;
+    boosterKind: string | null;
+    foil: boolean;
+    quantity: number;
+    unitCents: number;
+  }[];
+  undoneAt: number | null;
+  undoCents: number | null;
+  /** Whether, and at what price, it can be undone now. */
+  undo: {
+    /** What undoing a sale costs, or undoing a purchase refunds. */
+    amountCents: number;
+    penaltyPercent: number;
+    affordable: boolean;
+    /** For a purchase: until when (Unix time, seconds). */
+    until: number | null;
+  } | null;
+}
+
 /** A game (its own collection, wallet and achievements), saved automatically. */
 export interface SaveInfo {
   id: string;
@@ -293,7 +331,10 @@ export const openBoosters = (setCode: string, kind: string, quantity: number) =>
   invoke<OpenedCard[][]>("open_boosters", { setCode, kind, quantity });
 export const getCollection = (setCode: string) =>
   invoke<CollectionView>("get_collection", { setCode });
-export const getCardDetails = (setCode: string, uuid: string) =>
+export const getHistory = (limit: number, offset: number) => invoke<HistoryView>("get_history", { limit, offset });
+/** Returns the money moved (negative: what undoing a sale cost). */
+export const undoTransaction = (id: number) => invoke<number>("undo_transaction", { id });
+export const getCardDetails =(setCode: string, uuid: string) =>
   invoke<CardDetailsView>("get_card_details", { setCode, uuid });
 export const sellCards =(requests: SaleRequest[]) => invoke<SaleResult>("sell_cards", { requests });
 export const sellDuplicates = (setCode: string) => invoke<SaleResult>("sell_duplicates", { setCode });

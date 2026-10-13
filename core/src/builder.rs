@@ -187,7 +187,7 @@ fn build_set(
 }
 
 /// Bump whenever the draw or the expected rates change: every config is validated again.
-const VALIDATION_VERSION: u32 = 2;
+const VALIDATION_VERSION: u32 = 3;
 
 /// Identifies a booster config and the simulation it passed (FNV-1a over its JSON form).
 fn fingerprint(cfg: &BoosterConfig, sim_boosters: u64) -> Result<String, BuildError> {
