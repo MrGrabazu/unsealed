@@ -26,6 +26,7 @@ import { BoosterOpening } from "./BoosterOpening";
 import { Boosterium } from "./Boosterium";
 import { Collection } from "./Collection";
 import { CurrencyContext, useMoney } from "./money";
+import { PriceTrend } from "./PriceTrend";
 
 type Tab = "boosterium" | "open" | "collection" | "achievements";
 
@@ -81,6 +82,7 @@ function SealedRow(props: {
           </span>
         </span>
       </span>
+      <PriceTrend history={s.history} />
       <strong>×{s.quantity}</strong>
       <button disabled={busy} onClick={props.onSell}>
         Sell one ({money(s.sellValueCents)})

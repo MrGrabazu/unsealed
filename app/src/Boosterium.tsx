@@ -1,5 +1,6 @@
 import type { ShopItem, WalletView } from "./api";
 import { useMoney } from "./money";
+import { PriceTrend } from "./PriceTrend";
 
 interface Props {
   shop: ShopItem[];
@@ -43,6 +44,7 @@ export function Boosterium({ shop, wallet, onBuy, onBuyAndOpen, onClaimCharity, 
                 {item.setCode} · {item.kind} booster · sells back for {money(item.sellBackCents)}
               </div>
             </div>
+            <PriceTrend history={item.history} />
             <div className="shop-price" title="Follows the market value of the cards">
               {money(item.priceCents)}
             </div>

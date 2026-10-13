@@ -102,6 +102,7 @@ Le jeu est un client lourd : **il n'y a pas de serveur à héberger**. L'app con
 - **Achat** des boosters au prix marché (ou prix configuré).
 - **Revente** des cartes à un **pourcentage du prix marché** (type buylist). **Valeur actuelle : prix du marché actuel − 20 % (soit 80 %)**, à équilibrer et à garder configurable.
   - Objectif : comme dans la réalité, la plupart des ouvertures sont perdantes, et un gros tirage procure un vrai plaisir.
+- **Historique des prix des boosters** : à chaque nouveau `prices.json`, le prix de chaque booster est enregistré en SQLite (table `price_history`, un point par snapshot `updatedAt`). Le Boosterium et les boosters scellés affichent les 30 derniers points en sparkline, avec la variation depuis la mise à jour précédente (`PriceTrend.tsx`).
 - **Capital de départ** et **petit revenu quotidien** pour éviter un game over définitif.
 - Tous les paramètres économiques sont **configurables** (pas de valeurs en dur dans le code).
 

@@ -104,6 +104,8 @@ pub struct SealedStack {
     pub price_cents: u32,
     /// What the Boosterium pays today for one booster of this stack.
     pub sell_value_cents: u32,
+    /// Recent prices of one booster, oldest first.
+    pub history: Vec<u32>,
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
@@ -133,6 +135,8 @@ pub struct ShopItem {
     pub price_cents: u32,
     /// What the Boosterium would pay today for such a booster.
     pub sell_back_cents: u32,
+    /// Recent prices, oldest first (one per price update seen by this install).
+    pub history: Vec<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -185,6 +189,9 @@ pub struct Game {
     rng: ChaCha8Rng,
     clock: ClockFn,
 }
+
+/// How many past prices the Boosterium shows per booster.
+const PRICE_HISTORY_POINTS: u32 = 30;
 
 fn err<E: ToString>(e: E) -> String {
     e.to_string()
@@ -259,6 +266,7 @@ impl Game {
                     sell_back_cents: self.economy.booster_sell_value_cents(price_cents),
                     set_code: set.code.clone(),
                     set_name: set.name.clone(),
+                    history: self.price_history(&set.code, kind),
                     kind: kind.clone(),
                 });
             }
@@ -281,6 +289,7 @@ impl Game {
             .into_iter()
             .map(|row| {
                 let price_cents = self.booster_price(&row.set_code, &row.kind);
+                let history = self.price_history(&row.set_code, &row.kind);
                 SealedStack {
                     set_name: names.get(&row.set_code).cloned().unwrap_or_else(|| row.set_code.clone()),
                     set_code: row.set_code,
@@ -289,6 +298,7 @@ impl Game {
                     cost_cents: row.cost_cents,
                     price_cents,
                     sell_value_cents: self.economy.booster_sell_value_cents(price_cents),
+                    history,
                 }
             })
             .collect();
@@ -361,6 +371,10 @@ impl Game {
             .and_then(|p| p.boosters.get(&format!("{set_code}/{kind}")))
             .map(|v| if self.economy.currency.code == "EUR" { v.eur } else { v.usd });
         self.economy.booster_price_cents(set_code, kind, ev)
+    }
+
+    fn price_history(&self, set_code: &str, kind: &str) -> Vec<u32> {
+        self.store.booster_price_history(set_code, kind, PRICE_HISTORY_POINTS).unwrap_or_default()
     }
 
     /// Daily help for a player who is truly stranded.
@@ -601,6 +615,23 @@ impl Game {
         }
         self.prices = read_json(&path).ok();
         self.prices_stamp = stamp;
+        self.record_price_snapshot();
+    }
+
+    /// Remembers today's booster prices so the Boosterium can show how the market moves.
+    /// The history is a convenience: a failure to record it never disturbs the game.
+    fn record_price_snapshot(&mut self) {
+        let Some(snapshot) = self.prices.as_ref().map(|p| p.updated_at.clone()) else { return };
+        let Ok(sets) = self.list_sets() else { return };
+        let prices: Vec<(String, String, u32)> = sets
+            .iter()
+            .flat_map(|set| set.boosters.iter().map(move |kind| (set.code.clone(), kind.clone())))
+            .map(|(set, kind)| {
+                let price = self.booster_price(&set, &kind);
+                (set, kind, price)
+            })
+            .collect();
+        let _ = self.store.record_booster_prices(&snapshot, (self.clock)().now, &prices);
     }
 }
 
@@ -768,6 +799,7 @@ mod tests {
                 kind: "play".into(),
                 price_cents: 400,
                 sell_back_cents: 320,
+                history: vec![400],
             }]
         );
     }
@@ -797,6 +829,7 @@ mod tests {
                 cost_cents: 800,
                 price_cents: 400,
                 sell_value_cents: 320,
+                history: vec![400],
             }]
         );
 
@@ -808,8 +841,20 @@ mod tests {
     /// Prices where a TST booster is worth $10.00 on the market.
     fn market_prices(usd: u32) -> String {
         format!(
-            r#"{{ "updatedAt": "d", "cards": {{}}, "boosters": {{ "TST/play": {{ "usd": {usd}, "eur": 0 }} }} }}"#
+            r#"{{ "updatedAt": "d{usd}", "cards": {{}}, "boosters": {{ "TST/play": {{ "usd": {usd}, "eur": 0 }} }} }}"#
         )
+    }
+
+    #[test]
+    fn shop_and_stacks_expose_the_price_history() {
+        let (mut g, _) = game_with("history", &market_prices(1_000));
+        assert_eq!(g.shop().unwrap()[0].history, [1_000]);
+
+        std::thread::sleep(std::time::Duration::from_millis(30));
+        fs::write(g.data_dir.join("prices.json"), market_prices(1_500)).unwrap();
+        assert_eq!(g.shop().unwrap()[0].history, [1_000, 1_500]);
+        g.buy_boosters("TST", "play", 1).unwrap();
+        assert_eq!(g.wallet().unwrap().sealed[0].history, [1_000, 1_500]);
     }
 
     #[test]

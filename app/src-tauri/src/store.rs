@@ -63,6 +63,15 @@ const MIGRATIONS: &[&str] = &[
         PRIMARY KEY (metric, value)
     ) WITHOUT ROWID;
     CREATE TABLE ach_unlocked (id TEXT PRIMARY KEY, unlocked_at INTEGER NOT NULL) WITHOUT ROWID;",
+    // 5: booster price history, one point per published price snapshot
+    "CREATE TABLE price_history (
+        set_code TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        snapshot TEXT NOT NULL,
+        at INTEGER NOT NULL,
+        price_cents INTEGER NOT NULL,
+        PRIMARY KEY (set_code, kind, snapshot)
+    ) WITHOUT ROWID;",
 ];
 
 #[derive(Debug, thiserror::Error)]
@@ -298,6 +307,34 @@ impl Store {
         Ok(BoosterSale { total_cents, cost_cents })
     }
 
+    // ---- price history --------------------------------------------------------
+
+    /// Records booster prices for one price snapshot. A snapshot already recorded is left untouched.
+    pub fn record_booster_prices(&mut self, snapshot: &str, at: i64, prices: &[(String, String, u32)]) -> StoreResult<()> {
+        let tx = self.conn.transaction()?;
+        for (set_code, kind, price_cents) in prices {
+            tx.execute(
+                "INSERT OR IGNORE INTO price_history (set_code, kind, snapshot, at, price_cents)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![set_code, kind, snapshot, at, price_cents],
+            )?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// The latest `limit` recorded prices of a booster, oldest first.
+    pub fn booster_price_history(&self, set_code: &str, kind: &str, limit: u32) -> StoreResult<Vec<u32>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT price_cents FROM (
+                 SELECT price_cents, at, snapshot FROM price_history WHERE set_code = ?1 AND kind = ?2
+                 ORDER BY at DESC, snapshot DESC LIMIT ?3
+             ) ORDER BY at ASC, snapshot ASC",
+        )?;
+        let rows = stmt.query_map(params![set_code, kind, limit], |r| r.get(0))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
     /// Sealed boosters owned.
     pub fn sealed_stacks(&self) -> StoreResult<Vec<SealedRow>> {
         let mut stmt = self.conn.prepare(
@@ -464,6 +501,20 @@ fn migrate(conn: &mut Connection) -> rusqlite::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn price_history_keeps_one_point_per_snapshot_oldest_first() {
+        let mut store = Store::open_in_memory().unwrap();
+        let point = |cents: u32| vec![("TST".to_string(), "play".to_string(), cents)];
+        store.record_booster_prices("d1", 100, &point(700)).unwrap();
+        store.record_booster_prices("d2", 200, &point(900)).unwrap();
+        // Recording a snapshot twice does not duplicate or overwrite it.
+        store.record_booster_prices("d2", 300, &point(1)).unwrap();
+        store.record_booster_prices("d3", 400, &point(800)).unwrap();
+        assert_eq!(store.booster_price_history("TST", "play", 30).unwrap(), [700, 900, 800]);
+        assert_eq!(store.booster_price_history("TST", "play", 2).unwrap(), [900, 800]);
+        assert!(store.booster_price_history("TST", "draft", 30).unwrap().is_empty());
+    }
 
     fn card<'a>(uuid: &'a str, foil: bool, price: Option<u32>) -> OpeningCard<'a> {
         OpeningCard { uuid, set_code: "TST", foil, price_cents: price }

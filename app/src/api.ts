@@ -61,6 +61,8 @@ export interface SealedStack {
   priceCents: number;
   /** What the Boosterium pays today for one booster. */
   sellValueCents: number;
+  /** Recent prices of one booster, oldest first. */
+  history: number[];
 }
 
 export interface BoosterSaleResult {
@@ -84,6 +86,8 @@ export interface ShopItem {
   priceCents: number;
   /** What the Boosterium would pay today for such a booster. */
   sellBackCents: number;
+  /** Recent prices, oldest first. */
+  history: number[];
 }
 
 export interface SaleRequest {

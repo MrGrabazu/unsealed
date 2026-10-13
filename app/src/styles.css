@@ -179,3 +179,8 @@ button.sell.confirm { background: #7a1d1d; border-color: #c24040; color: #fff; }
   from { filter: drop-shadow(0 0 4px var(--accent)); }
   to { filter: drop-shadow(0 0 16px var(--accent)); }
 }
+
+.trend { display: inline-flex; align-items: center; gap: 8px; font-size: 0.85rem; white-space: nowrap; }
+.trend svg { color: var(--muted); }
+.trend .gain { color: #6fcf7f; }
+.trend .loss { color: #ff7a7a; }
