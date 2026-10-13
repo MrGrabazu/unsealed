@@ -5,7 +5,8 @@ mod game;
 mod store;
 
 use game::{
-    BoosterSaleResult, CollectionView, Game, OpenedCard, SaleRequest, SaleResult, SetSummary, ShopItem, WalletView,
+    AchievementView, AchievementsView, BoosterSaleResult, CollectionView, Game, OpenedCard, SaleRequest, SaleResult,
+    SetSummary, ShopItem, WalletView,
 };
 use std::error::Error;
 use std::fs;
@@ -13,6 +14,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use store::Store;
 use tauri::{Manager, State};
+use unsealed_core::achievements::Engine;
 use unsealed_core::economy::EconomyConfig;
 
 type GameState = Mutex<Game>;
@@ -20,6 +22,9 @@ type GameState = Mutex<Game>;
 /// Economy settings shipped with the app. A `economy.json` in the data directory
 /// overrides them (this is how published balance changes will reach players).
 const DEFAULT_ECONOMY: &str = include_str!("../../../config/economy.json");
+
+/// Achievement definitions shipped with the app, overridable the same way.
+const DEFAULT_ACHIEVEMENTS: &str = include_str!("../../../config/achievements.json");
 
 fn locked<'a>(state: &'a State<'_, GameState>) -> Result<std::sync::MutexGuard<'a, Game>, String> {
     state.lock().map_err(|_| "game state is poisoned".to_string())
@@ -89,6 +94,17 @@ fn claim_charity(state: State<'_, GameState>) -> Result<(), String> {
     locked(&state)?.claim_charity()
 }
 
+#[tauri::command]
+fn get_achievements(state: State<'_, GameState>) -> Result<AchievementsView, String> {
+    locked(&state)?.achievements()
+}
+
+/// Achievements unlocked since the last call.
+#[tauri::command]
+fn take_unlocks(state: State<'_, GameState>) -> Result<Vec<AchievementView>, String> {
+    Ok(locked(&state)?.take_unlocks())
+}
+
 /// Where the player's save lives. `UNSEALED_DB` overrides everything; debug builds
 /// use the repository's `.dev-data/` so development never touches a real save.
 fn resolve_db_path(app: &tauri::AppHandle) -> Result<PathBuf, Box<dyn Error>> {
@@ -122,13 +138,20 @@ fn load_economy(data_dir: &Path) -> Result<EconomyConfig, Box<dyn Error>> {
     Ok(EconomyConfig::from_json(&json)?)
 }
 
+fn load_achievements(data_dir: &Path) -> Result<Engine, Box<dyn Error>> {
+    let json =
+        fs::read_to_string(data_dir.join("achievements.json")).unwrap_or_else(|_| DEFAULT_ACHIEVEMENTS.to_string());
+    Ok(Engine::from_json(&json)?)
+}
+
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             let data_dir = resolve_data_dir(app.handle())?;
             let economy = load_economy(&data_dir)?;
+            let engine = load_achievements(&data_dir)?;
             let store = Store::open(&resolve_db_path(app.handle())?)?;
-            app.manage(Mutex::new(Game::new(data_dir, store, economy)?));
+            app.manage(Mutex::new(Game::new(data_dir, store, economy, engine)?));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -142,6 +165,8 @@ pub fn run() {
             sell_cards,
             sell_duplicates,
             claim_charity,
+            get_achievements,
+            take_unlocks,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Unsealed");

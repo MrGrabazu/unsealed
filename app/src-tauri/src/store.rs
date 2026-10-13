@@ -10,6 +10,7 @@
 use rusqlite::{params, Connection, OptionalExtension, Transaction};
 use std::collections::HashMap;
 use std::path::Path;
+use unsealed_core::achievements::Progress;
 
 const MIGRATIONS: &[&str] = &[
     // 1: collection and opening history
@@ -54,6 +55,14 @@ const MIGRATIONS: &[&str] = &[
     ) WITHOUT ROWID;",
     // 3: cost basis of sealed boosters, to measure the profit or loss of speculation
     "ALTER TABLE sealed ADD COLUMN cost_cents INTEGER NOT NULL DEFAULT 0;",
+    // 4: achievement progress
+    "CREATE TABLE ach_metrics (name TEXT PRIMARY KEY, value INTEGER NOT NULL) WITHOUT ROWID;
+    CREATE TABLE ach_seen (
+        metric TEXT NOT NULL,
+        value TEXT NOT NULL,
+        PRIMARY KEY (metric, value)
+    ) WITHOUT ROWID;
+    CREATE TABLE ach_unlocked (id TEXT PRIMARY KEY, unlocked_at INTEGER NOT NULL) WITHOUT ROWID;",
 ];
 
 #[derive(Debug, thiserror::Error)]
@@ -99,6 +108,15 @@ pub struct SealedRow {
     pub kind: String,
     pub quantity: u32,
     pub cost_cents: i64,
+}
+
+/// What an unlocked achievement pays, once resolved against the available data.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GrantedReward {
+    pub achievement_id: String,
+    pub cash_cents: u32,
+    /// (set code, booster kind, quantity) of free sealed boosters.
+    pub sealed: Option<(String, String, u32)>,
 }
 
 /// Result of opening a sealed booster.
@@ -172,6 +190,65 @@ impl Store {
 
     pub fn claim_charity(&mut self, amount_cents: u32, day: &str, now: i64) -> StoreResult<()> {
         add_ledger(&self.conn, now, "charity", i64::from(amount_cents), Some(day))?;
+        Ok(())
+    }
+
+    // ---- achievements ---------------------------------------------------------
+
+    pub fn load_progress(&self) -> StoreResult<Progress> {
+        let mut progress = Progress::default();
+        let mut stmt = self.conn.prepare("SELECT name, value FROM ach_metrics")?;
+        for row in stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)))? {
+            let (name, value) = row?;
+            progress.metrics.insert(name, value);
+        }
+        let mut stmt = self.conn.prepare("SELECT metric, value FROM ach_seen")?;
+        for row in stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))? {
+            let (metric, value) = row?;
+            progress.seen.entry(metric).or_default().insert(value);
+        }
+        let mut stmt = self.conn.prepare("SELECT id, unlocked_at FROM ach_unlocked")?;
+        for row in stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)))? {
+            let (id, at) = row?;
+            progress.unlocked.insert(id, at);
+        }
+        Ok(progress)
+    }
+
+    /// Saves the achievement progress and pays the rewards of the achievements that are
+    /// unlocked for the first time, atomically. A reward is paid once, whatever happens.
+    pub fn save_progress(&mut self, progress: &Progress, rewards: &[GrantedReward], now: i64) -> StoreResult<()> {
+        let tx = self.conn.transaction()?;
+        for (name, value) in &progress.metrics {
+            tx.execute(
+                "INSERT INTO ach_metrics (name, value) VALUES (?1, ?2)
+                 ON CONFLICT (name) DO UPDATE SET value = excluded.value",
+                params![name, value],
+            )?;
+        }
+        for (metric, values) in &progress.seen {
+            for value in values {
+                tx.execute("INSERT OR IGNORE INTO ach_seen (metric, value) VALUES (?1, ?2)", params![metric, value])?;
+            }
+        }
+        for (id, at) in &progress.unlocked {
+            let inserted =
+                tx.execute("INSERT OR IGNORE INTO ach_unlocked (id, unlocked_at) VALUES (?1, ?2)", params![id, at])?;
+            let Some(reward) = rewards.iter().find(|r| r.achievement_id == *id).filter(|_| inserted == 1) else {
+                continue;
+            };
+            if reward.cash_cents > 0 {
+                add_ledger(&tx, now, "achievement_reward", i64::from(reward.cash_cents), Some(id))?;
+            }
+            if let Some((set_code, kind, quantity)) = &reward.sealed {
+                tx.execute(
+                    "INSERT INTO sealed (set_code, kind, quantity, cost_cents) VALUES (?1, ?2, ?3, 0)
+                     ON CONFLICT (set_code, kind) DO UPDATE SET quantity = quantity + excluded.quantity",
+                    params![set_code, kind, quantity],
+                )?;
+            }
+        }
+        tx.commit()?;
         Ok(())
     }
 
@@ -553,6 +630,33 @@ mod tests {
         assert_eq!(store.charity_claims_on("2026-10-13").unwrap(), 1);
         assert_eq!(store.charity_claims_on("2026-10-14").unwrap(), 0);
         assert_eq!(store.balance().unwrap(), 12_000);
+    }
+
+    #[test]
+    fn progress_round_trips_and_rewards_are_paid_exactly_once() {
+        let mut store = store_with(0);
+        let mut progress = Progress::default();
+        progress.metrics.insert("boosters_opened".into(), 10);
+        progress.seen.entry("sets_opened".into()).or_default().insert("\"BLB\"".into());
+        progress.unlocked.insert("open-10".into(), 5);
+        let reward = GrantedReward {
+            achievement_id: "open-10".into(),
+            cash_cents: 500,
+            sealed: Some(("TST".into(), "play".into(), 2)),
+        };
+
+        store.save_progress(&progress, std::slice::from_ref(&reward), 5).unwrap();
+        assert_eq!(store.load_progress().unwrap(), progress);
+        assert_eq!(store.balance().unwrap(), 10_500);
+        let stacks = store.sealed_stacks().unwrap();
+        assert_eq!((stacks[0].quantity, stacks[0].cost_cents), (2, 0));
+
+        // Saving again (even with the reward listed again) pays nothing more.
+        progress.metrics.insert("boosters_opened".into(), 11);
+        store.save_progress(&progress, &[reward], 6).unwrap();
+        assert_eq!(store.balance().unwrap(), 10_500);
+        assert_eq!(store.sealed_stacks().unwrap()[0].quantity, 2);
+        assert_eq!(store.load_progress().unwrap().metrics["boosters_opened"], 11);
     }
 
     #[test]

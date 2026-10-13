@@ -1,5 +1,9 @@
 //! Game logic exposed to the UI. Independent from Tauri so it can be unit tested.
 
+mod achievements;
+
+pub use achievements::{AchievementView, AchievementsView};
+
 use crate::store::{OpeningCard, Sale, Store};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -8,6 +12,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 use std::time::SystemTime;
+use unsealed_core::achievements::{Engine, Event};
 use unsealed_core::catalog::{Manifest, PriceFile, SetFile};
 use unsealed_core::economy::{charity_available, EconomyConfig};
 use unsealed_core::{open_booster, ColorIndex};
@@ -170,6 +175,9 @@ pub struct Game {
     data_dir: PathBuf,
     store: Store,
     economy: EconomyConfig,
+    engine: Engine,
+    /// Achievements unlocked and not yet shown to the player.
+    notifications: Vec<AchievementView>,
     sets: HashMap<String, LoadedSet>,
     prices: Option<PriceFile>,
     /// Modification time of the prices file that `prices` was loaded from.
@@ -183,19 +191,31 @@ fn err<E: ToString>(e: E) -> String {
 }
 
 impl Game {
-    pub fn new(data_dir: PathBuf, store: Store, economy: EconomyConfig) -> Result<Self, String> {
-        Self::with_parts(data_dir, store, economy, ChaCha8Rng::from_entropy(), Box::new(system_clock))
+    pub fn new(data_dir: PathBuf, store: Store, economy: EconomyConfig, engine: Engine) -> Result<Self, String> {
+        Self::with_parts(data_dir, store, economy, engine, ChaCha8Rng::from_entropy(), Box::new(system_clock))
     }
 
     pub fn with_parts(
         data_dir: PathBuf,
         mut store: Store,
         economy: EconomyConfig,
+        engine: Engine,
         rng: ChaCha8Rng,
         clock: ClockFn,
     ) -> Result<Self, String> {
         store.ensure_starting_balance(economy.starting_balance_cents, clock().now).map_err(err)?;
-        Ok(Self { data_dir, store, economy, sets: HashMap::new(), prices: None, prices_stamp: None, rng, clock })
+        Ok(Self {
+            data_dir,
+            store,
+            economy,
+            engine,
+            notifications: Vec::new(),
+            sets: HashMap::new(),
+            prices: None,
+            prices_stamp: None,
+            rng,
+            clock,
+        })
     }
 
     pub fn list_sets(&self) -> Result<Vec<SetSummary>, String> {
@@ -283,7 +303,16 @@ impl Game {
         self.ensure_prices();
         let price = self.booster_price(set_code, kind);
         let now = (self.clock)().now;
-        self.store.buy_boosters(set_code, kind, quantity, price, now).map(|_| ()).map_err(err)
+        self.store.buy_boosters(set_code, kind, quantity, price, now).map_err(err)?;
+
+        let mut events = vec![Event::new("BoosterBought")
+            .with("setCode", set_code)
+            .with("kind", kind)
+            .with("quantity", quantity)
+            .with("totalCents", i64::from(price) * i64::from(quantity))];
+        events.extend(self.balance_event());
+        self.emit(events);
+        Ok(())
     }
 
     /// Sells sealed boosters back at today's price minus the Boosterium's margin. As the
@@ -296,11 +325,21 @@ impl Game {
         let unit = self.economy.booster_sell_value_cents(self.booster_price(set_code, kind));
         let now = (self.clock)().now;
         let sale = self.store.sell_boosters(set_code, kind, quantity, unit, now).map_err(err)?;
-        Ok(BoosterSaleResult {
+        let result = BoosterSaleResult {
             quantity,
             total_cents: sale.total_cents,
             profit_cents: sale.total_cents - sale.cost_cents,
-        })
+        };
+
+        let mut events = vec![Event::new("BoosterSold")
+            .with("setCode", set_code)
+            .with("kind", kind)
+            .with("quantity", quantity)
+            .with("totalCents", result.total_cents)
+            .with("profitCents", result.profit_cents)];
+        events.extend(self.balance_event());
+        self.emit(events);
+        Ok(result)
     }
 
     /// Current price of a sealed booster (follows the market unless overridden in the config).
@@ -320,7 +359,13 @@ impl Game {
             return Err("charity is not available".to_string());
         }
         let clock = (self.clock)();
-        self.store.claim_charity(self.economy.charity.amount_cents, &clock.day, clock.now).map_err(err)
+        let amount = self.economy.charity.amount_cents;
+        self.store.claim_charity(amount, &clock.day, clock.now).map_err(err)?;
+
+        let mut events = vec![Event::new("CharityClaimed").with("amountCents", amount)];
+        events.extend(self.balance_event());
+        self.emit(events);
+        Ok(())
     }
 
     fn charity_open(&mut self, balance: i64) -> Result<bool, String> {
@@ -379,7 +424,7 @@ impl Game {
             .collect();
         cards.sort_by_key(|c| (rarity_rank(&c.rarity), c.foil));
 
-        let flags = {
+        let outcome = {
             let records: Vec<OpeningCard<'_>> = cards
                 .iter()
                 .map(|c| OpeningCard {
@@ -389,11 +434,14 @@ impl Game {
                     price_cents: c.price_cents,
                 })
                 .collect();
-            store.open_sealed(set_code, kind, &records, clock().now).map_err(err)?.is_new
+            store.open_sealed(set_code, kind, &records, clock().now).map_err(err)?
         };
-        for (card, is_new) in cards.iter_mut().zip(flags) {
-            card.is_new = is_new;
+        for (card, is_new) in cards.iter_mut().zip(&outcome.is_new) {
+            card.is_new = *is_new;
         }
+
+        let events = self.opening_events(set_code, kind, &cards, outcome.cost_cents);
+        self.emit(events);
         Ok(cards)
     }
 
@@ -456,7 +504,12 @@ impl Game {
             sales.push(Sale { uuid: &r.uuid, foil: r.foil, quantity: r.quantity, unit_cents });
         }
         let sold_count = sales.iter().map(|s| s.quantity).sum();
-        let total_cents = self.store.sell_cards(&sales, (self.clock)().now).map_err(err)?;
+        let context = self.sale_context();
+        let now = (self.clock)().now;
+        let total_cents = self.store.sell_cards(&sales, now).map_err(err)?;
+
+        let events = self.sale_events(&context, requests, total_cents);
+        self.emit(events);
         Ok(SaleResult { sold_count, total_cents })
     }
 
@@ -625,8 +678,25 @@ mod tests {
         dir
     }
 
-    /// A game plus a handle to change the current day (October, 2026).
+    /// An engine without achievements: most tests must not be disturbed by rewards.
+    fn no_achievements() -> Engine {
+        Engine::from_json(r#"{ "achievements": [] }"#).unwrap()
+    }
+
+    /// An engine with the given achievements (a JSON list) and an `opened` metric.
+    fn achievements(list: &str) -> Engine {
+        Engine::from_json(&format!(
+            r#"{{ "metrics": {{ "opened": {{ "event": "BoosterOpened", "op": "sum" }} }}, "achievements": [{list}] }}"#
+        ))
+        .unwrap()
+    }
+
     fn game_with(name: &str, prices: &str) -> (Game, Arc<AtomicU32>) {
+        game_with_engine(name, prices, no_achievements())
+    }
+
+    /// A game plus a handle to change the current day (October, 2026).
+    fn game_with_engine(name: &str, prices: &str, engine: Engine) -> (Game, Arc<AtomicU32>) {
         let day = Arc::new(AtomicU32::new(13));
         let handle = day.clone();
         let clock: ClockFn = Box::new(move || Clock {
@@ -637,6 +707,7 @@ mod tests {
             data_dir(name, prices),
             Store::open_in_memory().unwrap(),
             test_economy(),
+            engine,
             ChaCha8Rng::seed_from_u64(1),
             clock,
         )
@@ -906,6 +977,140 @@ mod tests {
         assert!(g.sell_duplicates("../secret").is_err());
     }
 
+    fn unlocked_ids(g: &mut Game) -> Vec<String> {
+        g.take_unlocks().into_iter().map(|a| a.id).collect()
+    }
+
+    const OPEN_ONCE: &str = r#"{ "id": "open-1", "name": "First Crack", "description": "Open a booster.",
+        "rarity": "common", "emblem": "pack", "palette": "ember",
+        "condition": { "type": "metric", "metric": "opened", "atLeast": 1 } }"#;
+
+    #[test]
+    fn opening_unlocks_an_achievement_and_notifies_once() {
+        let (mut g, _) = game_with_engine("ach-open", PRICES, achievements(OPEN_ONCE));
+        g.buy_boosters("TST", "play", 1).unwrap();
+        assert!(unlocked_ids(&mut g).is_empty());
+
+        g.open_booster("TST", "play").unwrap();
+        assert_eq!(unlocked_ids(&mut g), ["open-1"]);
+        assert!(g.take_unlocks().is_empty()); // notified once
+
+        let view = g.achievements().unwrap();
+        assert_eq!((view.total, view.unlocked_count, view.secret_remaining), (1, 1, 0));
+        assert!(view.items[0].unlocked && view.items[0].unlocked_at.is_some());
+    }
+
+    #[test]
+    fn rewards_pay_cash_and_free_boosters_once() {
+        let reward = OPEN_ONCE.replace(
+            r#""condition""#,
+            r#""reward": { "cashCents": 500, "sealed": { "setCode": "latest", "kind": "play", "quantity": 2 } },
+        "condition""#,
+        );
+        let (mut g, _) = game_with_engine("ach-reward", PRICES, achievements(&reward));
+        g.buy_boosters("TST", "play", 2).unwrap();
+        g.open_booster("TST", "play").unwrap();
+
+        let w = g.wallet().unwrap();
+        assert_eq!(w.balance_cents, 10_000 - 800 + 500);
+        // The unopened bought booster (cost 400) plus the 2 free ones: two stacks merged.
+        assert_eq!(w.sealed.len(), 1);
+        assert_eq!((w.sealed[0].quantity, w.sealed[0].cost_cents), (3, 400));
+        let unlocked = g.take_unlocks();
+        assert_eq!(unlocked[0].reward.as_deref(), Some("+$5.00 + 2 × Test Set play boosters"));
+
+        // Opening again never pays the reward a second time.
+        g.open_booster("TST", "play").unwrap();
+        assert_eq!(g.wallet().unwrap().balance_cents, 10_000 - 800 + 500);
+    }
+
+    #[test]
+    fn a_secret_achievement_stays_hidden_until_it_is_unlocked() {
+        let wrong_card = r#"{ "id": "wrong-card", "name": "Wrong Card", "secret": true,
+            "description": "Sell the most valuable card you own.",
+            "rarity": "uncommon", "emblem": "eye", "palette": "rose",
+            "condition": { "type": "event", "event": "CardSold", "where": [
+              { "field": "wasMostValuableCard", "op": "eq", "value": true },
+              { "field": "unitCents", "op": "gte", "value": 400 } ] } }"#;
+        let (mut g, _) = game_with_engine("ach-secret", PRICES, achievements(wrong_card));
+        g.buy_boosters("TST", "play", 1).unwrap();
+        g.open_booster("TST", "play").unwrap();
+
+        let hidden = g.achievements().unwrap();
+        assert_eq!(hidden.secret_remaining, 1);
+        let item = &hidden.items[0];
+        assert_eq!((item.name.as_str(), item.emblem.as_str()), ("Secret achievement", "question"));
+        assert!(item.description.is_none() && item.progress.is_none() && item.reward.is_none());
+        assert_eq!(item.rarity, "uncommon"); // the rarity is the only hint
+
+        // Selling a cheap card does not trigger it: it is not the most valuable one.
+        g.sell_cards(&[SaleRequest { uuid: "c1".into(), foil: false, quantity: 1 }]).unwrap();
+        assert!(unlocked_ids(&mut g).is_empty());
+        // Selling the $10 mythic does.
+        g.sell_cards(&[SaleRequest { uuid: "m1".into(), foil: false, quantity: 1 }]).unwrap();
+        assert_eq!(unlocked_ids(&mut g), ["wrong-card"]);
+
+        let shown = g.achievements().unwrap();
+        assert_eq!((shown.secret_remaining, shown.items[0].name.as_str()), (0, "Wrong Card"));
+        assert!(shown.items[0].description.is_some());
+    }
+
+    #[test]
+    fn set_progress_and_balance_events_reach_the_engine() {
+        let list = r#"
+          { "id": "set-complete", "name": "Complete Set", "description": "x", "rarity": "rare",
+            "emblem": "trophy", "palette": "gold", "condition": { "type": "event", "event": "SetProgress",
+            "where": [{ "field": "completionPermille", "op": "gte", "value": 1000 }] } },
+          { "id": "mythics", "name": "Mythics", "description": "x", "rarity": "rare",
+            "emblem": "crown", "palette": "ember", "condition": { "type": "event", "event": "SetProgress",
+            "where": [{ "field": "allMythicsOwned", "op": "eq", "value": true }] } },
+          { "id": "rock-bottom", "name": "Rock Bottom", "description": "x", "rarity": "common", "secret": true,
+            "emblem": "skull", "palette": "onyx", "condition": { "type": "event", "event": "BalanceChanged",
+            "where": [{ "field": "balanceCents", "op": "lte", "value": 0 }] } }"#;
+        let (mut g, _) = game_with_engine("ach-events", PRICES, achievements(list));
+        g.buy_boosters("TST", "play", 25).unwrap(); // spends the whole $100
+        assert_eq!(unlocked_ids(&mut g), ["rock-bottom"]);
+
+        // The fixture set has one mythic and one common: one opening completes the set.
+        g.open_booster("TST", "play").unwrap();
+        let mut ids = unlocked_ids(&mut g);
+        ids.sort();
+        assert_eq!(ids, ["mythics", "set-complete"]);
+    }
+
+    #[test]
+    fn selling_boosters_for_a_profit_unlocks_speculation_achievements() {
+        let speculator = r#"{ "id": "speculator", "name": "Speculator", "description": "x", "rarity": "uncommon",
+            "emblem": "chart", "palette": "forest", "condition": { "type": "event", "event": "BoosterSold",
+            "where": [{ "field": "profitCents", "op": "gte", "value": 100 }] } }"#;
+        let (mut g, _) = game_with_engine("ach-spec", &market_prices(1_000), achievements(speculator));
+        g.buy_boosters("TST", "play", 1).unwrap(); // bought at $10.00
+
+        // Sold right away at 80%: a loss, no achievement.
+        std::thread::sleep(std::time::Duration::from_millis(30));
+        g.buy_boosters("TST", "play", 1).unwrap();
+        g.sell_boosters("TST", "play", 1).unwrap();
+        assert!(unlocked_ids(&mut g).is_empty());
+
+        // The market rises 50%: the remaining booster now sells above its cost.
+        fs::write(g.data_dir.join("prices.json"), market_prices(1_500)).unwrap();
+        g.sell_boosters("TST", "play", 1).unwrap();
+        assert_eq!(unlocked_ids(&mut g), ["speculator"]);
+    }
+
+    #[test]
+    fn the_shipped_achievements_work_end_to_end_with_the_shipped_economy() {
+        let engine = Engine::from_json(include_str!("../../../config/achievements.json")).unwrap();
+        let (mut g, _) = game_with_engine("ach-shipped", PRICES, engine);
+        g.buy_boosters("TST", "play", 3).unwrap();
+        g.open_booster("TST", "play").unwrap();
+        // First booster: "First Crack"; the fixture mythic is a $10 card.
+        assert!(unlocked_ids(&mut g).contains(&"open-1".to_string()));
+        let view = g.achievements().unwrap();
+        assert!(view.total >= 40 && view.unlocked_count >= 1);
+        assert!(view.secret_remaining >= 5);
+    }
+
     /// Needs the real data: run `data-builder` first, then
     /// `cargo test -p unsealed-app -- --ignored --nocapture`.
     #[test]
@@ -916,6 +1121,7 @@ mod tests {
             dist,
             Store::open_in_memory().unwrap(),
             EconomyConfig::from_json(ECONOMY).unwrap(),
+            Engine::from_json(include_str!("../../../config/achievements.json")).unwrap(),
             ChaCha8Rng::seed_from_u64(7),
             Box::new(system_clock),
         )
@@ -940,6 +1146,11 @@ mod tests {
             );
             assert_eq!(view.owned_count, new_cards);
             assert!(view.owned_count > 0 && view.owned_count <= view.total_count);
+        }
+        let view = g.achievements().unwrap();
+        println!("achievements: {}/{} unlocked", view.unlocked_count, view.total);
+        for a in g.take_unlocks() {
+            println!("  unlocked: {} ({}) reward: {:?}", a.name, a.rarity, a.reward);
         }
         println!("balance after the session: {} cents", g.wallet().unwrap().balance_cents);
     }

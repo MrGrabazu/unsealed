@@ -158,3 +158,16 @@ button.sell.confirm { background: #7a1d1d; border-color: #c24040; color: #fff; }
 
 .gain { color: #6fcf7f; }
 .loss { color: #ff7a7a; }
+
+.ach-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 22px 18px; }
+.ach-item { display: flex; flex-direction: column; gap: 6px; }
+.ach-card { width: 100%; height: auto; display: block; filter: drop-shadow(0 6px 14px #0008); }
+.ach-card.locked { filter: grayscale(0.85) brightness(0.55) drop-shadow(0 6px 14px #0008); }
+.ach-caption { display: flex; flex-direction: column; gap: 2px; font-size: 12px; text-align: center; min-height: 32px; }
+
+.toasts { position: fixed; right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 12px; z-index: 50; }
+.toast { display: flex; align-items: center; gap: 14px; text-align: left; background: var(--panel); border: 1px solid var(--accent); border-radius: 12px; padding: 10px 16px 10px 10px; box-shadow: 0 10px 30px #000a; animation: toast-in 0.35s ease-out; }
+.toast-card { width: 70px; flex: none; }
+.toast-text { display: flex; flex-direction: column; gap: 2px; }
+.toast-text strong { color: var(--accent); }
+@keyframes toast-in { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }

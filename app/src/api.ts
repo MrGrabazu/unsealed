@@ -97,6 +97,32 @@ export interface SaleResult {
   totalCents: number;
 }
 
+export interface AchievementView {
+  id: string;
+  /** Position in the achievement collection (1-based). */
+  number: number;
+  name: string;
+  /** Hidden (null) for a locked secret achievement. */
+  description: string | null;
+  secret: boolean;
+  rarity: "common" | "uncommon" | "rare" | "mythic";
+  emblem: string;
+  palette: string;
+  unlocked: boolean;
+  unlockedAt: number | null;
+  progress: { current: number; goal: number } | null;
+  reward: string | null;
+}
+
+export interface AchievementsView {
+  total: number;
+  unlockedCount: number;
+  secretRemaining: number;
+  items: AchievementView[];
+}
+
+export const getAchievements = () => invoke<AchievementsView>("get_achievements");
+export const takeUnlocks = () => invoke<AchievementView[]>("take_unlocks");
 export const listSets = () => invoke<SetSummary[]>("list_sets");
 export const getWallet = () => invoke<WalletView>("get_wallet");
 export const getShop = () => invoke<ShopItem[]>("get_shop");

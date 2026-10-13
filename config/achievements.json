@@ -1,0 +1,300 @@
+{
+  "metrics": {
+    "boosters_opened": { "event": "BoosterOpened", "op": "sum" },
+    "value_opened_cents": { "event": "BoosterOpened", "op": "sum", "field": "valueCents" },
+    "cards_sold": { "event": "CardSold", "op": "sum", "field": "quantity" },
+    "sets_opened": { "event": "BoosterOpened", "op": "distinct", "field": "setCode" },
+    "sets_completed": {
+      "event": "SetProgress",
+      "where": [{ "field": "completionPermille", "op": "gte", "value": 1000 }],
+      "op": "distinct",
+      "field": "setCode"
+    },
+    "no_mythic_streak": {
+      "event": "BoosterOpened",
+      "op": "streak",
+      "resetWhen": [{ "field": "mythicCount", "op": "gt", "value": 0 }]
+    },
+    "no_new_card_streak": {
+      "event": "BoosterOpened",
+      "op": "streak",
+      "resetWhen": [{ "field": "newCardCount", "op": "gt", "value": 0 }]
+    },
+    "best_balance_cents": { "event": "BalanceChanged", "op": "max", "field": "balanceCents" },
+    "achievements_unlocked": { "event": "AchievementUnlocked", "op": "sum" }
+  },
+
+  "achievements": [
+    {
+      "id": "open-1", "name": "First Crack", "description": "Open your first booster.",
+      "rarity": "common", "emblem": "pack", "palette": "ember",
+      "condition": { "type": "metric", "metric": "boosters_opened", "atLeast": 1 }
+    },
+    {
+      "id": "open-10", "name": "Getting Started", "description": "Open 10 boosters.",
+      "rarity": "common", "emblem": "pack", "palette": "ember",
+      "condition": { "type": "metric", "metric": "boosters_opened", "atLeast": 10 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 1 } }
+    },
+    {
+      "id": "open-100", "name": "Booster Addict", "description": "Open 100 boosters.",
+      "rarity": "uncommon", "emblem": "pack", "palette": "ocean",
+      "condition": { "type": "metric", "metric": "boosters_opened", "atLeast": 100 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 3 } }
+    },
+    {
+      "id": "open-1000", "name": "Pack Rat", "description": "Open 1,000 boosters.",
+      "rarity": "rare", "emblem": "pack", "palette": "royal",
+      "condition": { "type": "metric", "metric": "boosters_opened", "atLeast": 1000 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 10 } }
+    },
+    {
+      "id": "open-10000", "name": "Pack Machine", "description": "Open 10,000 boosters.",
+      "rarity": "mythic", "emblem": "pack", "palette": "gold",
+      "condition": { "type": "metric", "metric": "boosters_opened", "atLeast": 10000 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 50 } }
+    },
+    {
+      "id": "open-100000", "name": "Unsealed Legend", "description": "Open 100,000 boosters.",
+      "rarity": "mythic", "emblem": "crown", "palette": "gold",
+      "condition": { "type": "metric", "metric": "boosters_opened", "atLeast": 100000 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 200 } }
+    },
+
+    {
+      "id": "value-100", "name": "Hundred Club", "description": "Open cards worth $100 in total.",
+      "rarity": "common", "emblem": "coin", "palette": "gold",
+      "condition": { "type": "metric", "metric": "value_opened_cents", "atLeast": 10000 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 1 } }
+    },
+    {
+      "id": "value-1000", "name": "Four Figures", "description": "Open cards worth $1,000 in total.",
+      "rarity": "uncommon", "emblem": "coin", "palette": "gold",
+      "condition": { "type": "metric", "metric": "value_opened_cents", "atLeast": 100000 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 3 } }
+    },
+    {
+      "id": "value-10000", "name": "Five Figures", "description": "Open cards worth $10,000 in total.",
+      "rarity": "rare", "emblem": "coin", "palette": "gold",
+      "condition": { "type": "metric", "metric": "value_opened_cents", "atLeast": 1000000 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 10 } }
+    },
+    {
+      "id": "value-100000", "name": "Six Figures", "description": "Open cards worth $100,000 in total.",
+      "rarity": "mythic", "emblem": "coin", "palette": "gold",
+      "condition": { "type": "metric", "metric": "value_opened_cents", "atLeast": 10000000 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 40 } }
+    },
+
+    {
+      "id": "sold-10", "name": "Small Trader", "description": "Sell 10 cards.",
+      "rarity": "common", "emblem": "scale", "palette": "forest",
+      "condition": { "type": "metric", "metric": "cards_sold", "atLeast": 10 },
+      "reward": { "cashCents": 500 }
+    },
+    {
+      "id": "sold-100", "name": "Market Regular", "description": "Sell 100 cards.",
+      "rarity": "uncommon", "emblem": "scale", "palette": "forest",
+      "condition": { "type": "metric", "metric": "cards_sold", "atLeast": 100 },
+      "reward": { "cashCents": 2000 }
+    },
+    {
+      "id": "sold-1000", "name": "Bulk Baron", "description": "Sell 1,000 cards.",
+      "rarity": "rare", "emblem": "scale", "palette": "forest",
+      "condition": { "type": "metric", "metric": "cards_sold", "atLeast": 1000 },
+      "reward": { "cashCents": 10000 }
+    },
+
+    {
+      "id": "explorer", "name": "Explorer", "description": "Open boosters from 3 different sets.",
+      "rarity": "common", "emblem": "book", "palette": "ocean",
+      "condition": { "type": "metric", "metric": "sets_opened", "atLeast": 3 },
+      "reward": { "cashCents": 500 }
+    },
+    {
+      "id": "halfway", "name": "Halfway There", "description": "Own half of the cards of a set.",
+      "rarity": "uncommon", "emblem": "cards", "palette": "ice",
+      "condition": { "type": "event", "event": "SetProgress", "where": [{ "field": "completionPermille", "op": "gte", "value": 500 }] },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 2 } }
+    },
+    {
+      "id": "mythic-collector", "name": "Mythic Collector", "description": "Own every mythic card of a set.",
+      "rarity": "rare", "emblem": "crown", "palette": "ember",
+      "condition": { "type": "event", "event": "SetProgress", "where": [{ "field": "allMythicsOwned", "op": "eq", "value": true }] },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 5 } }
+    },
+    {
+      "id": "rare-hunter", "name": "Rare Hunter", "description": "Own every rare card of a set.",
+      "rarity": "rare", "emblem": "gem", "palette": "rose",
+      "condition": { "type": "event", "event": "SetProgress", "where": [{ "field": "allRaresOwned", "op": "eq", "value": true }] },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 5 } }
+    },
+    {
+      "id": "set-complete", "name": "Complete Set", "description": "Own every card of a set.",
+      "rarity": "rare", "emblem": "trophy", "palette": "gold",
+      "condition": { "type": "event", "event": "SetProgress", "where": [{ "field": "completionPermille", "op": "gte", "value": 1000 }] },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 10 } }
+    },
+    {
+      "id": "three-sets", "name": "Triple Crown", "description": "Complete 3 different sets.",
+      "rarity": "mythic", "emblem": "trophy", "palette": "gold",
+      "condition": { "type": "metric", "metric": "sets_completed", "atLeast": 3 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 30 } }
+    },
+
+    {
+      "id": "shiny-mythic", "name": "Shiny!", "description": "Pull a foil mythic card.",
+      "rarity": "rare", "emblem": "star", "palette": "rose",
+      "condition": { "type": "event", "event": "CardAcquired", "where": [
+        { "field": "rarity", "op": "eq", "value": "mythic" }, { "field": "foil", "op": "eq", "value": true }
+      ] },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 3 } }
+    },
+    {
+      "id": "double-mythic", "name": "Double Trouble", "description": "Open two mythic cards in the same booster.",
+      "rarity": "rare", "emblem": "crown", "palette": "ember",
+      "condition": { "type": "event", "event": "BoosterOpened", "where": [{ "field": "mythicCount", "op": "gte", "value": 2 }] },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 3 } }
+    },
+    {
+      "id": "foil-frenzy", "name": "Foil Frenzy", "description": "Open two foil cards in the same booster.",
+      "rarity": "uncommon", "emblem": "star", "palette": "ice",
+      "condition": { "type": "event", "event": "BoosterOpened", "where": [{ "field": "foilCount", "op": "gte", "value": 2 }] },
+      "reward": { "cashCents": 1000 }
+    },
+    {
+      "id": "chase-card", "name": "Chase Card", "description": "Pull a card worth $50 or more.",
+      "rarity": "uncommon", "emblem": "gem", "palette": "royal",
+      "condition": { "type": "event", "event": "CardAcquired", "where": [{ "field": "priceCents", "op": "gte", "value": 5000 }] },
+      "reward": { "cashCents": 1000 }
+    },
+    {
+      "id": "high-roller", "name": "High Roller", "description": "Pull a card worth $200 or more.",
+      "rarity": "rare", "emblem": "gem", "palette": "royal",
+      "condition": { "type": "event", "event": "CardAcquired", "where": [{ "field": "priceCents", "op": "gte", "value": 20000 }] },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 5 } }
+    },
+    {
+      "id": "jackpot-card", "name": "Jackpot", "description": "Pull a card worth $1,000 or more.",
+      "rarity": "mythic", "emblem": "gem", "palette": "gold",
+      "condition": { "type": "event", "event": "CardAcquired", "where": [{ "field": "priceCents", "op": "gte", "value": 100000 }] },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 25 } }
+    },
+    {
+      "id": "jackpot-pack", "name": "Golden Pack", "description": "Open a booster whose cards are worth $100 or more.",
+      "rarity": "rare", "emblem": "bolt", "palette": "gold",
+      "condition": { "type": "event", "event": "BoosterOpened", "where": [{ "field": "valueCents", "op": "gte", "value": 10000 }] },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 3 } }
+    },
+    {
+      "id": "profit-pack", "name": "Paid Off", "description": "Open a booster that pays back $50 more than you paid, once sold.",
+      "rarity": "uncommon", "emblem": "chart", "palette": "forest",
+      "condition": { "type": "event", "event": "BoosterOpened", "where": [{ "field": "profitCents", "op": "gte", "value": 5000 }] },
+      "reward": { "cashCents": 1500 }
+    },
+
+    {
+      "id": "bulk-buyer", "name": "Bulk Buyer", "description": "Buy 10 boosters at once.",
+      "rarity": "common", "emblem": "coin", "palette": "ocean",
+      "condition": { "type": "event", "event": "BoosterBought", "where": [{ "field": "quantity", "op": "gte", "value": 10 }] }
+    },
+    {
+      "id": "speculator", "name": "Speculator", "description": "Sell sealed boosters for $5 more than you paid.",
+      "rarity": "uncommon", "emblem": "chart", "palette": "forest",
+      "condition": { "type": "event", "event": "BoosterSold", "where": [{ "field": "profitCents", "op": "gte", "value": 500 }] },
+      "reward": { "cashCents": 1000 }
+    },
+    {
+      "id": "market-wizard", "name": "Market Wizard", "description": "Sell sealed boosters for $50 more than you paid.",
+      "rarity": "rare", "emblem": "chart", "palette": "royal",
+      "condition": { "type": "event", "event": "BoosterSold", "where": [{ "field": "profitCents", "op": "gte", "value": 5000 }] },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 5 } }
+    },
+    {
+      "id": "sacrifice", "name": "Necessary Sacrifice", "description": "Sell the last copy of a card worth $20 or more.",
+      "rarity": "uncommon", "emblem": "scale", "palette": "rose",
+      "condition": { "type": "event", "event": "CardSold", "where": [
+        { "field": "wasLastCopy", "op": "eq", "value": true }, { "field": "unitCents", "op": "gte", "value": 2000 }
+      ] }
+    },
+    {
+      "id": "nest-egg", "name": "Nest Egg", "description": "Hold $1,000 at once.",
+      "rarity": "rare", "emblem": "coin", "palette": "gold",
+      "condition": { "type": "metric", "metric": "best_balance_cents", "atLeast": 100000 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 5 } }
+    },
+    {
+      "id": "tycoon", "name": "Tycoon", "description": "Hold $10,000 at once.",
+      "rarity": "mythic", "emblem": "crown", "palette": "gold",
+      "condition": { "type": "metric", "metric": "best_balance_cents", "atLeast": 1000000 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 30 } }
+    },
+
+    {
+      "id": "dud", "name": "Dud", "secret": true, "description": "Open a booster whose cards are worth less than $1.",
+      "rarity": "common", "emblem": "skull", "palette": "onyx",
+      "condition": { "type": "event", "event": "BoosterOpened", "where": [{ "field": "valueCents", "op": "lt", "value": 100 }] },
+      "reward": { "cashCents": 300 }
+    },
+    {
+      "id": "drought", "name": "Drought", "secret": true, "description": "Open 25 boosters in a row without a mythic card.",
+      "rarity": "rare", "emblem": "hourglass", "palette": "onyx",
+      "condition": { "type": "metric", "metric": "no_mythic_streak", "atLeast": 25 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 3 } }
+    },
+    {
+      "id": "dry-spell", "name": "Nothing New", "secret": true, "description": "Open 5 boosters in a row without a single new card.",
+      "rarity": "uncommon", "emblem": "hourglass", "palette": "ice",
+      "condition": { "type": "metric", "metric": "no_new_card_streak", "atLeast": 5 },
+      "reward": { "cashCents": 1000 }
+    },
+    {
+      "id": "wrong-card", "name": "Wrong Card", "secret": true, "description": "Sell the most valuable card you own.",
+      "rarity": "uncommon", "emblem": "eye", "palette": "rose",
+      "condition": { "type": "event", "event": "CardSold", "where": [
+        { "field": "wasMostValuableCard", "op": "eq", "value": true }, { "field": "unitCents", "op": "gte", "value": 400 }
+      ] }
+    },
+    {
+      "id": "rock-bottom", "name": "Rock Bottom", "secret": true, "description": "Reach a balance of zero.",
+      "rarity": "uncommon", "emblem": "skull", "palette": "onyx",
+      "condition": { "type": "event", "event": "BalanceChanged", "where": [{ "field": "balanceCents", "op": "lte", "value": 0 }] }
+    },
+    {
+      "id": "charity-case", "name": "Charity Case", "secret": true, "description": "Accept the Boosterium's help.",
+      "rarity": "common", "emblem": "key", "palette": "ice",
+      "condition": { "type": "event", "event": "CharityClaimed" }
+    },
+    {
+      "id": "bad-investment", "name": "Bad Investment", "secret": true, "description": "Sell sealed boosters for $5 less than you paid.",
+      "rarity": "common", "emblem": "chart", "palette": "onyx",
+      "condition": { "type": "event", "event": "BoosterSold", "where": [{ "field": "profitCents", "op": "lte", "value": -500 }] },
+      "reward": { "cashCents": 300 }
+    },
+    {
+      "id": "bulk-sale", "name": "Clearance Sale", "secret": true, "description": "Sell 50 cards in a single sale.",
+      "rarity": "uncommon", "emblem": "cards", "palette": "forest",
+      "condition": { "type": "event", "event": "SaleCompleted", "where": [{ "field": "cardCount", "op": "gte", "value": 50 }] },
+      "reward": { "cashCents": 1000 }
+    },
+
+    {
+      "id": "achiever", "name": "Achiever", "description": "Unlock 10 achievements.",
+      "rarity": "uncommon", "emblem": "trophy", "palette": "ocean",
+      "condition": { "type": "metric", "metric": "achievements_unlocked", "atLeast": 10 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 3 } }
+    },
+    {
+      "id": "completionist", "name": "Completionist", "description": "Unlock 25 achievements.",
+      "rarity": "rare", "emblem": "trophy", "palette": "royal",
+      "condition": { "type": "metric", "metric": "achievements_unlocked", "atLeast": 25 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 10 } }
+    },
+    {
+      "id": "unsealed", "name": "Unsealed", "description": "Unlock every other achievement.",
+      "rarity": "mythic", "emblem": "crown", "palette": "gold",
+      "condition": { "type": "allOthers" },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 100 } }
+    }
+  ]
+}

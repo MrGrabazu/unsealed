@@ -123,6 +123,16 @@ Le client ne doit **jamais** télécharger directement les fichiers bruts de MTG
   - rareté proportionnelle à la difficulté de l'achievement ;
   - forment leur propre collection « méta », dont la complétion est l'achievement ultime.
 
+### 8 bis. État actuel de l'implémentation
+
+- **Définitions** : `config/achievements.json` (44 achievements, dont 8 secrets). Un `achievements.json` dans le dossier de données le remplace.
+- **Moteur** : `core/src/achievements.rs`. Des *métriques* (`sum`, `max`, `streak`, `distinct`) sont alimentées par les événements ; une *condition* débloque sur seuil de métrique, sur un événement filtré, ou `allOthers` (l'ultime). Un déblocage émet `AchievementUnlocked`, ce qui permet des méta-achievements.
+- **Événements émis par le jeu** (`app/src-tauri/src/game/achievements.rs`) : `BoosterOpened`, `CardAcquired`, `SetProgress`, `CardSold`, `SaleCompleted`, `BoosterBought`, `BoosterSold`, `CharityClaimed`, `BalanceChanged`. Ajouter un champ ou un événement demande du code ; ajouter un achievement n'en demande pas.
+- **Récompenses** : `cashCents` et/ou boosters offerts (`setCode` explicite ou `"latest"`). Payées une seule fois, dans la même transaction que le déblocage.
+- **Cartes** : dessinées en SVG par `app/src/AchievementCard.tsx` (cadre, médaillon à fond procédural selon l'id, ruban). Look volontairement différent de toute mise en page de carte à jouer. Les listes `EMBLEMS` et `PALETTES` de `core/src/achievements.rs` doivent rester synchronisées avec celles du composant.
+- **Secrets** : tant qu'ils sont verrouillés, seuls la rareté et le numéro sont exposés (nom, objectif, récompense et visuel restent cachés, côté Rust).
+- **Pas encore fait** : complétion « tout en foil », « bloc ou année complète » (il faut ces données), illustrations personnalisées par achievement.
+
 ## 9. Fonctionnalités de collection
 
 - Vue par set avec **pourcentage de complétion** et cartes manquantes affichées en grisé.
@@ -144,7 +154,7 @@ Le client ne doit **jamais** télécharger directement les fichiers bruts de MTG
 |---|---|
 | `core/` | Crate `unsealed-core` : parsing MTGJSON, tirage à seed, simulation, import, plan de mise à jour |
 | `data-builder/` | Produit `dist/` (sets compacts, `prices.json`, `manifest.json`) ; chaque config de booster doit passer la simulation |
-| `config/` | `economy.json` : devise, capital de départ, prix des boosters (défaut + surcharges par set/type), taux de revente, aide quotidienne. Embarqué dans l'app ; un `economy.json` dans le dossier de données le remplace |
+| `config/` | `economy.json` : devise, capital de départ, prix des boosters (suivent la valeur espérée × `evMarkupPercent`, surcharges fixes possibles), taux de revente (cartes et boosters scellés), aide quotidienne. `achievements.json` : voir 8 bis. Embarqués dans l'app ; un fichier du même nom dans le dossier de données les remplace |
 | `app/` | Frontend React/Vite ; `app/src-tauri/` = shell Tauri 2 (logique de jeu dans `game.rs`, testable sans Tauri) |
 
 - Données : `cargo run --release -p data-builder -- --sets BLB,DSK,FDN` (écrit `dist/`, cache dans `.cache/`)

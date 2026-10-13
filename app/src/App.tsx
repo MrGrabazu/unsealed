@@ -7,18 +7,32 @@ import {
   listSets,
   openBooster,
   sellBoosters,
+  takeUnlocks,
+  type AchievementView,
   type OpenedCard,
   type SealedStack,
   type SetSummary,
   type ShopItem,
   type WalletView,
 } from "./api";
+import { AchievementCard } from "./AchievementCard";
+import { Achievements } from "./Achievements";
 import { BoosterOpening } from "./BoosterOpening";
 import { Boosterium } from "./Boosterium";
 import { Collection } from "./Collection";
 import { CurrencyContext, useMoney } from "./money";
 
-type Tab = "boosterium" | "open" | "collection";
+type Tab = "boosterium" | "open" | "collection" | "achievements";
+
+const TAB_LABELS: Record<Tab, string> = {
+  boosterium: "Boosterium",
+  open: "Open boosters",
+  collection: "Collection",
+  achievements: "Achievements",
+};
+
+/** How long a notification stays on screen. */
+const TOAST_MS = 8000;
 
 // Fan Content Policy notice (AGENTS.md, section 2). Check the wording against the current policy.
 const DISCLAIMER =
@@ -80,9 +94,22 @@ export function App() {
   const symbol = wallet?.currency.symbol ?? "$";
   const money = (cents: number) => `${symbol}${(cents / 100).toFixed(2)}`;
 
+  const [toasts, setToasts] = useState<AchievementView[]>([]);
+  // Bumped when achievements unlock so the achievements tab reloads.
+  const [unlockCount, setUnlockCount] = useState(0);
+
+  /** Refreshes the wallet and shows the achievements unlocked by the last action. */
   const refreshWallet = useCallback(async () => {
     try {
       setWallet(await getWallet());
+      const unlocked = await takeUnlocks();
+      if (unlocked.length > 0) {
+        setToasts((current) => [...current, ...unlocked]);
+        setUnlockCount((n) => n + unlocked.length);
+        for (const a of unlocked) {
+          setTimeout(() => setToasts((current) => current.filter((t) => t.id !== a.id)), TOAST_MS);
+        }
+      }
     } catch (e) {
       setError(String(e));
     }
@@ -136,9 +163,9 @@ export function App() {
         </header>
 
         <nav className="tabs">
-          {(["boosterium", "open", "collection"] as Tab[]).map((t) => (
+          {(Object.keys(TAB_LABELS) as Tab[]).map((t) => (
             <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>
-              {t === "boosterium" ? "Boosterium" : t === "open" ? "Open boosters" : "Collection"}
+              {TAB_LABELS[t]}
               {t === "open" && wallet && wallet.sealed.length > 0 && (
                 <span className="tab-count">{wallet.sealed.reduce((n, s) => n + s.quantity, 0)}</span>
               )}
@@ -194,7 +221,28 @@ export function App() {
 
         {tab === "collection" && <Collection sets={sets} refreshKey={openings} onChanged={refreshWallet} />}
 
+        {tab === "achievements" && <Achievements refreshKey={unlockCount} />}
+
         <footer>{DISCLAIMER}</footer>
+
+        <div className="toasts" aria-live="polite">
+          {toasts.map((a) => (
+            <button
+              key={a.id}
+              className="toast"
+              onClick={() => setToasts((current) => current.filter((t) => t.id !== a.id))}
+            >
+              <div className="toast-card">
+                <AchievementCard item={a} />
+              </div>
+              <div className="toast-text">
+                <strong>Achievement unlocked!</strong>
+                <span>{a.name}</span>
+                {a.reward && <span className="gain">Reward: {a.reward}</span>}
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
     </CurrencyContext.Provider>
   );
