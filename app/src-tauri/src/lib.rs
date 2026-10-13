@@ -86,6 +86,16 @@ fn open_booster(
 }
 
 #[tauri::command]
+fn open_boosters(
+    state: State<'_, GameState>,
+    set_code: String,
+    kind: String,
+    quantity: u32,
+) -> Result<Vec<Vec<OpenedCard>>, String> {
+    locked(&state)?.open_boosters(&set_code, &kind, quantity)
+}
+
+#[tauri::command]
 fn get_collection(state: State<'_, GameState>, set_code: String) -> Result<CollectionView, String> {
     locked(&state)?.collection(&set_code)
 }
@@ -195,6 +205,7 @@ pub fn run() {
             sell_boosters,
             buy_boosters,
             open_booster,
+            open_boosters,
             get_collection,
             sell_cards,
             sell_duplicates,

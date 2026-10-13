@@ -139,6 +139,8 @@ export const sellBoosters = (setCode: string, kind: string, quantity: number) =>
   invoke<BoosterSaleResult>("sell_boosters", { setCode, kind, quantity });
 export const openBooster = (setCode: string, kind: string) =>
   invoke<OpenedCard[]>("open_booster", { setCode, kind });
+export const openBoosters = (setCode: string, kind: string, quantity: number) =>
+  invoke<OpenedCard[][]>("open_boosters", { setCode, kind, quantity });
 export const getCollection = (setCode: string) =>
   invoke<CollectionView>("get_collection", { setCode });
 export const sellCards = (requests: SaleRequest[]) => invoke<SaleResult>("sell_cards", { requests });

@@ -95,7 +95,7 @@ Le jeu est un client lourd : **il n'y a pas de serveur à héberger**. L'app con
 - **Mode simulation** : ouvrir N boosters (ex. 100 000) côté Rust et comparer les taux obtenus aux taux attendus.
   - Sert de test de validation de chaque config de set.
   - Permet d'afficher l'**EV réelle** de chaque booster dans le Boosterium.
-- **Ouverture en lot** (×10, ×100) avec animation accélérée qui ne ralentit que sur les grosses cartes. Indispensable pour rendre atteignables les gros paliers d'achievements.
+- **Ouverture en lot** (×10, ×100) avec animation accélérée qui ne ralentit que sur les grosses cartes. Indispensable pour rendre atteignables les gros paliers d'achievements. *Implémenté* : `Game::open_boosters` (une transaction par booster, s'arrête proprement si le stock s'épuise) et `BatchOpening.tsx` (carte « grosse » = mythique, rare foil ou prix ≥ 5 ; résumé final avec valeur totale, nouveautés, meilleurs tirages).
 
 ## 7. Économie (Boosterium)
 

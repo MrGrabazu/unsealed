@@ -456,6 +456,20 @@ impl Game {
         Ok(cards)
     }
 
+    /// Opens up to `quantity` sealed boosters in a row. Each opening is its own transaction, so
+    /// running out of stock part-way keeps (and returns) what was already opened.
+    pub fn open_boosters(&mut self, set_code: &str, kind: &str, quantity: u32) -> Result<Vec<Vec<OpenedCard>>, String> {
+        let mut opened = Vec::new();
+        for _ in 0..quantity {
+            match self.open_booster(set_code, kind) {
+                Ok(cards) => opened.push(cards),
+                Err(_) if !opened.is_empty() => break,
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(opened)
+    }
+
     // ---- collection and selling ------------------------------------------------------
 
     /// The player's collection for one set, with completion progress.
@@ -859,6 +873,18 @@ mod tests {
         assert_eq!(cards[0].price_cents, Some(100));
         assert_eq!(cards[2].price_cents, Some(1_000));
         assert_eq!(cards[0].image_url, "https://cards.scryfall.io/normal/front/a/b/abcdef.jpg");
+    }
+
+    #[test]
+    fn opens_many_boosters_and_stops_when_the_stock_runs_out() {
+        let mut g = game("batch");
+        g.buy_boosters("TST", "play", 3).unwrap();
+        let opened = g.open_boosters("TST", "play", 10).unwrap();
+        assert_eq!(opened.len(), 3);
+        // Discoveries are only flagged in the first booster.
+        assert!(opened[0].iter().any(|c| c.is_new));
+        assert!(opened[1..].iter().all(|b| b.iter().all(|c| !c.is_new)));
+        assert!(g.open_boosters("TST", "play", 5).is_err());
     }
 
     #[test]

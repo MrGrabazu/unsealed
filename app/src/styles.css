@@ -171,3 +171,11 @@ button.sell.confirm { background: #7a1d1d; border-color: #c24040; color: #fff; }
 .toast-text { display: flex; flex-direction: column; gap: 2px; }
 .toast-text strong { color: var(--accent); }
 @keyframes toast-in { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* Batch opening: smaller cards, big pulls pulse. */
+.cards.compact { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 14px 10px; }
+.big { animation: big-pulse 0.9s ease-in-out infinite alternate; border-radius: 6px; }
+@keyframes big-pulse {
+  from { filter: drop-shadow(0 0 4px var(--accent)); }
+  to { filter: drop-shadow(0 0 16px var(--accent)); }
+}

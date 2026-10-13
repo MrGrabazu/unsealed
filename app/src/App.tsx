@@ -8,6 +8,7 @@ import {
   getWallet,
   listSets,
   openBooster,
+  openBoosters,
   sellBoosters,
   takeUnlocks,
   type AchievementView,
@@ -20,6 +21,7 @@ import {
 } from "./api";
 import { AchievementCard } from "./AchievementCard";
 import { Achievements } from "./Achievements";
+import { BatchOpening } from "./BatchOpening";
 import { BoosterOpening } from "./BoosterOpening";
 import { Boosterium } from "./Boosterium";
 import { Collection } from "./Collection";
@@ -52,7 +54,16 @@ function WalletBar({ wallet }: { wallet: WalletView }) {
   );
 }
 
-function SealedRow(props: { stack: SealedStack; busy: boolean; onOpen: () => void; onSell: () => void }) {
+/** Batch sizes offered next to "Open one". */
+const BATCH_SIZES = [10, 100];
+
+function SealedRow(props: {
+  stack: SealedStack;
+  busy: boolean;
+  onOpen: () => void;
+  onOpenMany: (quantity: number) => void;
+  onSell: () => void;
+}) {
   const money = useMoney();
   const { stack: s, busy } = props;
   // Profit if the whole stack were sold back today.
@@ -74,6 +85,11 @@ function SealedRow(props: { stack: SealedStack; busy: boolean; onOpen: () => voi
       <button disabled={busy} onClick={props.onSell}>
         Sell one ({money(s.sellValueCents)})
       </button>
+      {BATCH_SIZES.filter((n) => s.quantity >= n).map((n) => (
+        <button key={n} disabled={busy} onClick={() => props.onOpenMany(n)}>
+          Open ×{n}
+        </button>
+      ))}
       <button className="primary" disabled={busy} onClick={props.onOpen}>
         Open one
       </button>
@@ -87,6 +103,7 @@ export function App() {
   const [shop, setShop] = useState<ShopItem[]>([]);
   const [wallet, setWallet] = useState<WalletView | null>(null);
   const [cards, setCards] = useState<OpenedCard[] | null>(null);
+  const [batch, setBatch] = useState<OpenedCard[][] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<Tab>("boosterium");
@@ -164,7 +181,15 @@ export function App() {
     }
   }
 
+  async function openMany(setCode: string, kind: string, quantity: number) {
+    setCards(null);
+    setBatch(await openBoosters(setCode, kind, quantity));
+    setOpenings((n) => n + 1);
+    setTab("open");
+  }
+
   async function open(setCode: string, kind: string) {
+    setBatch(null);
     setCards(await openBooster(setCode, kind));
     setOpenings((n) => n + 1);
     setTab("open");
@@ -233,6 +258,7 @@ export function App() {
                   stack={s}
                   busy={busy}
                   onOpen={() => run(() => open(s.setCode, s.kind))}
+                  onOpenMany={(n) => run(() => openMany(s.setCode, s.kind, n))}
                   onSell={() =>
                     run(async () => {
                       const sale = await sellBoosters(s.setCode, s.kind, 1);
@@ -247,6 +273,7 @@ export function App() {
               ))}
             </div>
             {cards && <BoosterOpening cards={cards} />}
+            {batch && <BatchOpening boosters={batch} />}
           </section>
         )}
 
