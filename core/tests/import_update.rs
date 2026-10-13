@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 use std::io::Cursor;
-use unsealed_core::catalog::{Manifest, ManifestSet};
+use unsealed_core::catalog::{AllSets, Manifest, ManifestSet, SetSelection};
 use unsealed_core::import::{parse_cents, prices_from_scryfall_jsonl, set_from_mtgjson};
 use unsealed_core::update::{refresh_reason, DataConfig, RefreshReason};
 
@@ -152,7 +152,11 @@ fn manifest(generated_at: &str, sets: &[&str]) -> Manifest {
                 )
             })
             .collect::<BTreeMap<_, _>>(),
-        booster_kinds: ["play", "draft", "set", "collector"].map(String::from).to_vec(),
+        booster_kinds: ["play", "draft", "set", "default", "collector"].map(String::from).to_vec(),
+        // What `data_config` asks for.
+        requested_sets: Some(SetSelection::List(vec!["BLB".into(), "DSK".into()])),
+        set_types: Vec::new(),
+        skipped: BTreeMap::new(),
     }
 }
 
@@ -163,7 +167,7 @@ fn data_config() -> DataConfig {
 #[test]
 fn data_config_applies_defaults() {
     let cfg = data_config();
-    assert_eq!(cfg.boosters, ["play", "draft", "set", "collector"]);
+    assert_eq!(cfg.boosters, ["play", "draft", "set", "default", "collector"]);
     assert_eq!((cfg.max_age_hours, cfg.sim_boosters), (24, 20_000));
 }
 
@@ -189,9 +193,26 @@ fn refresh_only_when_data_is_older_than_the_limit() {
 }
 
 #[test]
-fn refresh_when_the_wanted_booster_kinds_change() {
+fn refresh_when_the_wanted_booster_kinds_or_sets_change() {
     let cfg = data_config();
     let mut local = manifest("1000", &["BLB", "DSK"]);
     local.booster_kinds = vec!["play".into()];
-    assert_eq!(refresh_reason(Some(&local), &cfg, 1_100), Some(RefreshReason::BoostersChanged));
+    assert_eq!(refresh_reason(Some(&local), &cfg, 1_100), Some(RefreshReason::ConfigChanged));
+
+    let all = DataConfig::from_json(r#"{"sets":"all"}"#).unwrap();
+    assert_eq!(all.sets, SetSelection::All(AllSets::All));
+    assert!(all.set_types.contains(&"expansion".to_string()));
+    let local = manifest("1000", &["BLB", "DSK"]);
+    assert_eq!(refresh_reason(Some(&local), &all, 1_100), Some(RefreshReason::ConfigChanged));
+    let mut local = manifest("1000", &["BLB"]);
+    (local.requested_sets, local.set_types) = (Some(all.sets.clone()), all.set_types.clone());
+    assert_eq!(refresh_reason(Some(&local), &all, 1_100), None);
+}
+
+#[test]
+fn a_requested_set_left_out_does_not_trigger_a_rebuild_loop() {
+    let cfg = data_config();
+    let mut local = manifest("1000", &["BLB"]);
+    local.skipped.insert("DSK".into(), "failed the simulation".into());
+    assert_eq!(refresh_reason(Some(&local), &cfg, 1_100), None);
 }

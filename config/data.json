@@ -1,6 +1,7 @@
 {
-  "sets": ["BLB", "DSK", "FDN", "DMU", "BRO", "ONE", "MOM", "WOE", "LCI", "MKM"],
-  "boosters": ["play", "draft", "set", "collector"],
+  "sets": "all",
+  "setTypes": ["core", "expansion", "masters", "draft_innovation", "funny", "starter"],
+  "boosters": ["play", "draft", "set", "default", "collector"],
   "maxAgeHours": 24,
   "simBoosters": 20000
 }

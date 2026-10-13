@@ -1,9 +1,11 @@
 //! Builds the compact game data (sets, prices, manifest) from MTGJSON and Scryfall.
 //! Shared by the `data-builder` CLI and by the app, which refreshes its data in the
-//! background at launch. Every kept booster config must pass a rate simulation.
+//! background at launch. Every kept booster config must pass a rate simulation; a set
+//! that cannot be built is left out (and listed in the manifest) instead of failing all.
 
-use crate::catalog::{BoosterValue, Manifest, ManifestSet, PriceFile, PriceSet};
-use crate::import::{featured_card, prices_by_uuid, prices_from_scryfall_jsonl, set_from_mtgjson, source_set_codes};
+use crate::booster::BoosterConfig;
+use crate::catalog::{BoosterValue, Manifest, ManifestSet, PriceFile, PriceSet, SetFile, SetSelection};
+use crate::import::{compact_set, featured_card, prices_by_uuid, prices_from_scryfall_jsonl, read_all_printings, AllPrintings};
 use crate::sim::expected_value_cents;
 use crate::{simulate, ColorIndex};
 use flate2::read::GzDecoder;
@@ -18,9 +20,14 @@ use std::time::{Duration, SystemTime};
 
 const USER_AGENT: &str = "Unsealed/0.1 (unofficial fan project)";
 const ACCEPT: &str = "application/json;q=0.9,*/*;q=0.8";
-/// Raw MTGJSON set files are reused for this long. A set's content barely changes once
-/// released (prices, which move daily, come from Scryfall), and there are dozens of them.
+/// Every MTGJSON set in one file (about 180 MB compressed).
+const ALL_PRINTINGS_URL: &str = "https://mtgjson.com/api/v5/AllPrintings.json.gz";
+const ALL_PRINTINGS_FILE: &str = "AllPrintings.json.gz";
+/// The MTGJSON file is reused for this long. A set's content barely changes once released
+/// (prices, which move daily, come from Scryfall).
 const MTGJSON_MAX_AGE: Duration = Duration::from_secs(7 * 24 * 3600);
+/// Booster configs that already passed the simulation, by fingerprint (see `fingerprint`).
+const VALIDATED_FILE: &str = "validated.json";
 /// A config whose simulated rates deviate by more than this many standard deviations is rejected.
 const MAX_Z: f64 = 5.0;
 
@@ -30,14 +37,17 @@ pub type BuildError = Box<dyn std::error::Error + Send + Sync>;
 /// The progress is an estimate (fixed shares per step), but it never goes back.
 pub type Progress<'a> = &'a mut dyn FnMut(&str, f64);
 
-/// Share of the overall progress taken by the sets (download and validation).
-const SETS_SHARE: f64 = 0.5;
-/// Where the Scryfall bulk download ends in the overall progress.
+/// Where each step ends in the overall progress.
+const MTGJSON_DOWNLOAD_END: f64 = 0.25;
+const MTGJSON_READ_END: f64 = 0.3;
+const SETS_END: f64 = 0.6;
 const BULK_END: f64 = 0.9;
 
 #[derive(Debug, Clone)]
 pub struct BuildOptions {
-    pub sets: Vec<String>,
+    pub sets: SetSelection,
+    /// With `SetSelection::All`: the MTGJSON set types kept.
+    pub set_types: Vec<String>,
     pub boosters: Vec<String>,
     /// Where `manifest.json`, `prices.json` and `sets/` are written.
     pub out: PathBuf,
@@ -88,18 +98,99 @@ fn is_fresh(path: &Path, max_age: Duration) -> bool {
         .is_some_and(|age| age < max_age)
 }
 
-/// Returns the raw MTGJSON file of a set, downloading it when the cache is too old.
-/// The download advances the overall progress from `span.0` to `span.1`.
-fn read_mtgjson_set(cache: &Path, code: &str, progress: Progress<'_>, span: (f64, f64)) -> Result<String, BuildError> {
-    let path = cache.join(format!("{code}.json"));
+/// Every MTGJSON set, downloaded when the cached copy is too old.
+fn read_mtgjson(cache: &Path, progress: Progress<'_>) -> Result<AllPrintings, BuildError> {
+    let path = cache.join(ALL_PRINTINGS_FILE);
     if !is_fresh(&path, MTGJSON_MAX_AGE) {
-        let message = format!("Downloading {code} from MTGJSON");
-        progress(&message, span.0);
-        download(&format!("https://mtgjson.com/api/v5/{code}.json"), &path, &mut |f| {
-            progress(&message, span.0 + (span.1 - span.0) * f)
-        })?;
+        let message = "Downloading every set from MTGJSON (large file)";
+        progress(message, 0.0);
+        download(ALL_PRINTINGS_URL, &path, &mut |f| progress(message, MTGJSON_DOWNLOAD_END * f))?;
     }
-    Ok(fs::read_to_string(&path)?)
+    progress("Reading the sets", MTGJSON_DOWNLOAD_END);
+    Ok(read_all_printings(GzDecoder::new(BufReader::new(File::open(&path)?)))?)
+}
+
+/// The requested sets that have a wanted booster, and the others with the reason.
+fn select_sets(all: &AllPrintings, opts: &BuildOptions, kinds: &[&str]) -> (Vec<String>, BTreeMap<String, String>) {
+    let mut skipped = BTreeMap::new();
+    let mut selected = Vec::new();
+    match &opts.sets {
+        SetSelection::List(codes) => {
+            for code in codes {
+                match all.data.get(code) {
+                    None => {
+                        skipped.insert(code.clone(), "unknown set".to_string());
+                    }
+                    Some(set) if !set.has_any_booster(kinds) => {
+                        skipped.insert(code.clone(), "no wanted booster".to_string());
+                    }
+                    Some(_) => selected.push(code.clone()),
+                }
+            }
+        }
+        SetSelection::All(_) => selected.extend(
+            all.data
+                .values()
+                .filter(|s| !s.is_online_only && opts.set_types.contains(&s.set_type) && s.has_any_booster(kinds))
+                .map(|s| s.code.clone()),
+        ),
+    }
+    (selected, skipped)
+}
+
+/// Builds one set's compact file and checks its booster configs by simulation, unless
+/// an identical config already passed (`validated` maps config keys to fingerprints).
+/// A booster kind that fails is dropped (and reported in `dropped` as "CODE/kind"); the
+/// set fails only when none is left.
+fn build_set(
+    all: &AllPrintings,
+    code: &str,
+    kinds: &[&str],
+    sim_boosters: u64,
+    validated: &mut BTreeMap<String, String>,
+    dropped: &mut BTreeMap<String, String>,
+) -> Result<SetFile, BuildError> {
+    let raw = &all.data[code];
+    let extras = raw
+        .source_set_codes(kinds)?
+        .iter()
+        .map(|c| all.data.get(c).ok_or_else(|| format!("source set {c} not found")))
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut set = compact_set(raw, &all.meta.version, kinds, &extras)?;
+    let colors = ColorIndex::from_cards(&set.cards);
+    let mut failed = Vec::new();
+    for (kind, cfg) in &set.boosters {
+        let key = format!("{code}/{kind}");
+        let print = fingerprint(cfg, sim_boosters)?;
+        if validated.get(&key) == Some(&print) {
+            continue;
+        }
+        let report = simulate(cfg, &colors, sim_boosters, &mut ChaCha8Rng::seed_from_u64(1))?;
+        let z = report.max_abs_z();
+        if z > MAX_Z {
+            failed.push(kind.clone());
+            dropped.insert(key, format!("failed the simulation (max |z| = {z:.2})"));
+        } else {
+            validated.insert(key, print);
+        }
+    }
+    for kind in failed {
+        set.boosters.remove(&kind);
+    }
+    if set.boosters.is_empty() {
+        return Err("every booster failed the simulation".into());
+    }
+    Ok(set)
+}
+
+/// Bump whenever the draw or the expected rates change: every config is validated again.
+const VALIDATION_VERSION: u32 = 2;
+
+/// Identifies a booster config and the simulation it passed (FNV-1a over its JSON form).
+fn fingerprint(cfg: &BoosterConfig, sim_boosters: u64) -> Result<String, BuildError> {
+    let text = format!("{}|{sim_boosters}|{MAX_Z}|v{VALIDATION_VERSION}", serde_json::to_string(cfg)?);
+    let hash = text.bytes().fold(0xcbf2_9ce4_8422_2325u64, |h, b| (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3));
+    Ok(format!("{hash:016x}"))
 }
 
 /// Writes a file next to its destination, then renames it over it: a reader never sees half a file.
@@ -167,35 +258,26 @@ pub fn build(opts: &BuildOptions, progress: Progress<'_>) -> Result<Manifest, Bu
     let mut built_boosters = Vec::new();
     let mut built_sets = Vec::new();
 
-    let set_count = opts.sets.len().max(1) as f64;
-    for (i, code) in opts.sets.iter().enumerate() {
-        // This set's slice of the progress: its file, then the sets it draws from, then validation.
-        let at = |f: f64| SETS_SHARE * (i as f64 + f) / set_count;
-        let json = read_mtgjson_set(&opts.cache, code, progress, (at(0.0), at(0.5)))?;
-        let extra_codes = source_set_codes(&json, &kinds).map_err(|e| format!("{code}: {e}"))?;
-        let extra_share = 0.3 / extra_codes.len().max(1) as f64;
-        let extra_jsons = extra_codes
-            .iter()
-            .enumerate()
-            .map(|(k, c)| {
-                let start = 0.5 + extra_share * k as f64;
-                read_mtgjson_set(&opts.cache, c, progress, (at(start), at(start + extra_share)))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        let extra_refs: Vec<&str> = extra_jsons.iter().map(String::as_str).collect();
-        let set = set_from_mtgjson(&json, &kinds, &extra_refs).map_err(|e| format!("{code}: {e}"))?;
+    let all = read_mtgjson(&opts.cache, progress)?;
+    let (codes, mut skipped) = select_sets(&all, opts, &kinds);
+    let validated_path = opts.cache.join(VALIDATED_FILE);
+    let mut validated: BTreeMap<String, String> =
+        fs::read_to_string(&validated_path).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
 
-        progress(&format!("Validating {code} pull rates"), at(0.8));
-        let colors = ColorIndex::from_cards(&set.cards);
+    for (i, code) in codes.iter().enumerate() {
+        let at = MTGJSON_READ_END + (SETS_END - MTGJSON_READ_END) * i as f64 / codes.len().max(1) as f64;
+        progress(&format!("Preparing {} ({}/{})", all.data[code].name, i + 1, codes.len()), at);
+        let set = match build_set(&all, code, &kinds, opts.sim_boosters, &mut validated, &mut skipped) {
+            Ok(set) => set,
+            Err(e) => {
+                eprintln!("{code} left out: {e}");
+                skipped.insert(code.clone(), e.to_string());
+                continue;
+            }
+        };
         for (kind, cfg) in &set.boosters {
             built_boosters.push((format!("{code}/{kind}"), cfg.clone()));
-            let report = simulate(cfg, &colors, opts.sim_boosters, &mut ChaCha8Rng::seed_from_u64(1))?;
-            let z = report.max_abs_z();
-            if z > MAX_Z {
-                return Err(format!("{code}/{kind}: simulation failed, max |z| = {z:.2}").into());
-            }
         }
-
         wanted.extend(set.cards.iter().map(|c| c.scryfall_id.clone()));
         all_cards.extend(set.cards.iter().cloned());
         write_json(&sets_dir.join(format!("{code}.json")), &set)?;
@@ -212,6 +294,11 @@ pub fn build(opts: &BuildOptions, progress: Progress<'_>) -> Result<Manifest, Bu
         );
         built_sets.push(set);
     }
+    drop(all); // hundreds of MB, no longer needed
+    if built_sets.is_empty() {
+        return Err("no set could be built".into());
+    }
+    write_json(&validated_path, &validated)?;
 
     // Prices come from the Scryfall "default_cards" bulk file, cached by file name
     // (the name embeds its timestamp, so a new version is downloaded automatically).
@@ -225,9 +312,9 @@ pub fn build(opts: &BuildOptions, progress: Progress<'_>) -> Result<Manifest, Bu
     let bulk_path = opts.cache.join(&file_name);
     if !bulk_path.exists() {
         let message = "Downloading Scryfall prices (large file)";
-        progress(message, SETS_SHARE);
+        progress(message, SETS_END);
         download(&bulk.jsonl_download_uri, &bulk_path, &mut |f| {
-            progress(message, SETS_SHARE + (BULK_END - SETS_SHARE) * f)
+            progress(message, SETS_END + (BULK_END - SETS_END) * f)
         })?;
     }
     progress("Reading prices", BULK_END);
@@ -265,13 +352,28 @@ pub fn build(opts: &BuildOptions, progress: Progress<'_>) -> Result<Manifest, Bu
         prices_updated_at: bulk.updated_at,
         sets: manifest_sets,
         booster_kinds: opts.boosters.clone(),
+        requested_sets: Some(opts.sets.clone()),
+        set_types: opts.set_types.clone(),
+        skipped,
     };
     write_json(&opts.out.join("manifest.json"), &manifest)?;
 
-    // Older bulk files are useless now and weigh hundreds of MB each.
+    // Older bulk files weigh hundreds of MB each, and per-set MTGJSON files are no longer
+    // used (AllPrintings replaced them).
     for entry in fs::read_dir(&opts.cache)?.flatten() {
         let name = entry.file_name().to_string_lossy().into_owned();
-        if name.starts_with("default-cards-") && name != file_name {
+        let old_bulk = name.starts_with("default-cards-") && name != file_name;
+        let per_set = name
+            .strip_suffix(".json")
+            .is_some_and(|stem| !stem.is_empty() && stem.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit()));
+        if old_bulk || per_set {
+            let _ = fs::remove_file(entry.path());
+        }
+    }
+    // Sets no longer offered.
+    for entry in fs::read_dir(&sets_dir)?.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if name.strip_suffix(".json").is_some_and(|code| !manifest.sets.contains_key(code)) {
             let _ = fs::remove_file(entry.path());
         }
     }

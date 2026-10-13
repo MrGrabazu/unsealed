@@ -2,7 +2,7 @@
 //! too old (or incomplete), rebuilds it from MTGJSON and Scryfall. The game stays playable on the
 //! previous data meanwhile; the new files are swapped in atomically by the builder.
 
-use crate::game::Game;
+use crate::Session;
 use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -58,6 +58,7 @@ pub fn spawn(app: AppHandle, status: SharedStatus, data_dir: PathBuf, cache_dir:
 
         let opts = BuildOptions {
             sets: cfg.sets.clone(),
+            set_types: cfg.set_types.clone(),
             boosters: cfg.boosters.clone(),
             out: data_dir,
             cache: cache_dir,
@@ -76,9 +77,9 @@ pub fn spawn(app: AppHandle, status: SharedStatus, data_dir: PathBuf, cache_dir:
         match result {
             Ok(_) => {
                 // Drop what the game cached from the old files, without holding its lock during the build.
-                if let Some(game) = app.try_state::<Mutex<Game>>() {
-                    if let Ok(mut game) = game.lock() {
-                        game.reload_data();
+                if let Some(session) = app.try_state::<Mutex<Session>>() {
+                    if let Ok(mut session) = session.lock() {
+                        session.reload_data();
                     }
                 }
                 set_status(&app, &status, DataStatus::UpToDate);

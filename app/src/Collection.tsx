@@ -7,6 +7,7 @@ import {
   type CollectionView,
   type SetSummary,
 } from "./api";
+import { Loading } from "./Loading";
 import { useMoney } from "./money";
 
 type Filter = "all" | "owned" | "missing";
@@ -150,6 +151,7 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
 
       {error && <p className="error">{error}</p>}
       {notice && <p className="notice">{notice}</p>}
+      {!view && !error && <Loading label="Loading the collection…" />}
       {view && (
         <>
           <div className="progress">

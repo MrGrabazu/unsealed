@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { getStats, type OpeningView, type StatsView } from "./api";
+import { kindLabel } from "./boosterKinds";
 import { Card } from "./Card";
+import { Loading } from "./Loading";
 import { useMoney } from "./money";
 
 const noop = () => {};
@@ -24,7 +26,7 @@ function OpeningPanel({ title, opening }: { title: string; opening: OpeningView 
       <span className="stat-label">{title}</span>
       <strong className="stat-value">{money(opening.valueCents)}</strong>
       <span>
-        {opening.setName} · {opening.kind} booster
+        {opening.setName} · {kindLabel(opening.kind)}
       </span>
       <span className="hint">
         {formatDate(opening.openedAt)}
@@ -47,7 +49,7 @@ export function Stats({ refreshKey }: { refreshKey: string }) {
   }, [refreshKey]);
 
   if (error) return <p className="error">{error}</p>;
-  if (!stats) return null;
+  if (!stats) return <Loading label="Loading statistics…" />;
   if (stats.boostersOpened === 0) {
     return <p className="hint">No booster opened yet. Your statistics will show up here.</p>;
   }
@@ -126,7 +128,7 @@ export function Stats({ refreshKey }: { refreshKey: string }) {
           {s.boosters.map((b) => (
             <tr key={`${b.setCode}/${b.kind}`}>
               <td>
-                {b.setName} · {b.kind}
+                {b.setName} · {kindLabel(b.kind)}
               </td>
               <td>{b.boosters.toLocaleString()}</td>
               <td>{money(b.valueCents)}</td>
@@ -152,7 +154,7 @@ export function Stats({ refreshKey }: { refreshKey: string }) {
             <tr key={o.id}>
               <td>{formatDate(o.openedAt)}</td>
               <td>
-                {o.setName} · {o.kind}
+                {o.setName} · {kindLabel(o.kind)}
               </td>
               <td>{money(o.valueCents)}</td>
               <td>

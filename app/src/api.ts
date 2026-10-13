@@ -181,12 +181,37 @@ export interface StatsView {
   boosters: BoosterStatsView[];
 }
 
+/** A game (its own collection, wallet and achievements), saved automatically. */
+export interface SaveInfo {
+  id: string;
+  name: string;
+  /** Unix times, in seconds. */
+  createdAt: number;
+  lastPlayedAt: number;
+}
+
+export interface DataInfo {
+  setCount: number;
+  boosterCount: number;
+  pricesUpdatedAt: string | null;
+  /** Unix time of the last data build, in seconds. */
+  builtAt: number | null;
+}
+
 export type DataStatus =
   | { state: "checking" }
   | { state: "upToDate" }
   | { state: "updating"; message: string; /** Estimate, 0 to 100. */ percent: number }
   | { state: "failed"; message: string };
 
+export const listSaves = () => invoke<SaveInfo[]>("list_saves");
+export const currentSave = () => invoke<SaveInfo | null>("current_save");
+export const newGame = (name: string) => invoke<SaveInfo>("new_game", { name });
+export const loadGame = (id: string) => invoke<SaveInfo>("load_game", { id });
+export const createSavePoint = (name: string) => invoke<SaveInfo>("create_save_point", { name });
+export const renameSave = (id: string, name: string) => invoke<SaveInfo>("rename_save", { id, name });
+export const deleteSave = (id: string) => invoke<void>("delete_save", { id });
+export const getDataInfo = () => invoke<DataInfo>("get_data_info");
 export const getDataStatus = () => invoke<DataStatus>("get_data_status");
 export const getAchievements = () => invoke<AchievementsView>("get_achievements");
 export const takeUnlocks = () => invoke<AchievementView[]>("take_unlocks");

@@ -4,9 +4,25 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Unsealed — Crack &amp; Collect</title>
+    <!-- Inline, so the splash shows at once, before the app's scripts and styles load. -->
+    <style>
+      html, body { margin: 0; background: #12131a; color: #e8e6df; font-family: system-ui, "Segoe UI", sans-serif; }
+      .splash { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+      .splash h1 { margin: 0; font-size: 48px; letter-spacing: 0.06em; }
+      .splash p { margin: 0; color: #e0a526; font-style: italic; }
+      .splash .spinner { margin-top: 18px; width: 28px; height: 28px; border-radius: 50%; border: 3px solid #343748; border-top-color: #e0a526; animation: splash-spin 0.9s linear infinite; }
+      @keyframes splash-spin { to { transform: rotate(360deg); } }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Replaced by the app once it has started. -->
+      <div class="splash">
+        <h1>Unsealed</h1>
+        <p>Crack &amp; Collect</p>
+        <div class="spinner"></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

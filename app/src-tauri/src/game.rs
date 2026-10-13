@@ -10,7 +10,7 @@ use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use unsealed_core::achievements::{Engine, Event};
 use unsealed_core::catalog::{Manifest, PriceFile, SetFile};
@@ -320,30 +320,7 @@ impl Game {
     }
 
     pub fn list_sets(&self) -> Result<Vec<SetSummary>, String> {
-        let path = self.data_dir.join("manifest.json");
-        // First launch: the background download has not produced any data yet.
-        if !path.exists() {
-            return Ok(Vec::new());
-        }
-        let manifest: Manifest = read_json(&path)?;
-        let mut sets: Vec<SetSummary> = manifest
-            .sets
-            .into_iter()
-            .map(|(code, s)| SetSummary {
-                code,
-                name: s.name,
-                release_date: s.release_date,
-                boosters: s.boosters,
-                art: s.featured.map(|f| SetArt {
-                    image_url: art_crop_url(&f.scryfall_id),
-                    card_name: f.name,
-                    artist: f.artist,
-                }),
-                icon_url: s.icon_svg_uri,
-            })
-            .collect();
-        sets.sort_by(|a, b| b.release_date.cmp(&a.release_date));
-        Ok(sets)
+        read_sets(&self.data_dir)
     }
 
     // ---- Boosterium: wallet, shop, charity -------------------------------------
@@ -898,6 +875,64 @@ fn obtainable_cards(file: &SetFile) -> (Vec<usize>, Vec<usize>) {
 fn number_key(number: &str) -> (u32, String) {
     let digits: String = number.chars().take_while(char::is_ascii_digit).collect();
     (digits.parse().unwrap_or(u32::MAX), number.to_string())
+}
+
+/// The sets the downloaded data offers, newest first. Needs no game: the home screen and
+/// the options read it too.
+pub fn read_sets(data_dir: &Path) -> Result<Vec<SetSummary>, String> {
+    Ok(read_manifest(data_dir)?.map(|m| sets_of(m)).unwrap_or_default())
+}
+
+/// What the downloaded data contains, for the options screen.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DataInfo {
+    pub set_count: usize,
+    pub booster_count: usize,
+    /// Date of the card prices (Scryfall), if any data was built.
+    pub prices_updated_at: Option<String>,
+    /// Unix time of the last data build.
+    pub built_at: Option<i64>,
+}
+
+pub fn data_info(data_dir: &Path) -> Result<DataInfo, String> {
+    let manifest = read_manifest(data_dir)?;
+    Ok(DataInfo {
+        set_count: manifest.as_ref().map_or(0, |m| m.sets.len()),
+        booster_count: manifest.as_ref().map_or(0, |m| m.sets.values().map(|s| s.boosters.len()).sum()),
+        prices_updated_at: manifest.as_ref().map(|m| m.prices_updated_at.clone()),
+        built_at: manifest.and_then(|m| m.generated_at.parse().ok()),
+    })
+}
+
+/// `None` on first launch: the background download has not produced any data yet.
+fn read_manifest(data_dir: &Path) -> Result<Option<Manifest>, String> {
+    let path = data_dir.join("manifest.json");
+    if !path.exists() {
+        return Ok(None);
+    }
+    read_json(&path).map(Some)
+}
+
+fn sets_of(manifest: Manifest) -> Vec<SetSummary> {
+    let mut sets: Vec<SetSummary> = manifest
+        .sets
+        .into_iter()
+        .map(|(code, s)| SetSummary {
+            code,
+            name: s.name,
+            release_date: s.release_date,
+            boosters: s.boosters,
+            art: s.featured.map(|f| SetArt {
+                image_url: art_crop_url(&f.scryfall_id),
+                card_name: f.name,
+                artist: f.artist,
+            }),
+            icon_url: s.icon_svg_uri,
+        })
+        .collect();
+    sets.sort_by(|a, b| b.release_date.cmp(&a.release_date));
+    sets
 }
 
 fn read_json<T: serde::de::DeserializeOwned>(path: &std::path::Path) -> Result<T, String> {

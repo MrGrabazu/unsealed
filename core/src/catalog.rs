@@ -99,6 +99,32 @@ pub struct Manifest {
     /// when the configuration asks for other kinds, the data must be rebuilt.
     #[serde(default)]
     pub booster_kinds: Vec<String>,
+    /// The set selection the data was built for, likewise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requested_sets: Option<SetSelection>,
+    /// Set types kept when every set is requested, likewise.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub set_types: Vec<String>,
+    /// Requested sets ("CODE") or booster kinds ("CODE/kind") left out, with the reason
+    /// (no wanted booster, invalid data, failed simulation...). They are not retried
+    /// until the data is rebuilt for another reason.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub skipped: BTreeMap<String, String>,
+}
+
+/// Which sets the game offers: an explicit list of codes, or `"all"` (every set of the
+/// configured types that has a wanted booster).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum SetSelection {
+    List(Vec<String>),
+    All(AllSets),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AllSets {
+    All,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

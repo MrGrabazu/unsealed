@@ -16,7 +16,8 @@
         "width": 1180,
         "height": 800,
         "minWidth": 820,
-        "minHeight": 600
+        "minHeight": 600,
+        "backgroundColor": "#12131a"
       }
     ],
     "security": {

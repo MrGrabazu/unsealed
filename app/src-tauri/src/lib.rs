@@ -2,25 +2,25 @@
 //! The frontend only displays; every draw, price and payment is computed in Rust.
 
 mod game;
+mod saves;
 mod store;
 mod updater;
 
 use game::{
-    AchievementView, AchievementsView, BoosterSaleResult, CollectionView, Game, OpenedCard, SaleRequest, SaleResult,
-    SetSummary, ShopItem, StatsView, WalletView,
+    AchievementView, AchievementsView, BoosterSaleResult, CollectionView, DataInfo, Game, OpenedCard, SaleRequest,
+    SaleResult, SetSummary, ShopItem, StatsView, WalletView,
 };
+use saves::{SaveInfo, Saves};
 use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use store::Store;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{Manager, State};
 use unsealed_core::achievements::Engine;
 use unsealed_core::economy::EconomyConfig;
 use unsealed_core::update::DataConfig;
 use updater::{DataStatus, SharedStatus};
-
-type GameState = Mutex<Game>;
 
 /// Economy settings shipped with the app. A `economy.json` in the data directory
 /// overrides them (this is how published balance changes will reach players).
@@ -32,9 +32,103 @@ const DEFAULT_ACHIEVEMENTS: &str = include_str!("../../../config/achievements.js
 /// Which sets to download and how fresh they must be, overridable the same way.
 const DEFAULT_DATA: &str = include_str!("../../../config/data.json");
 
-fn locked<'a>(state: &'a State<'_, GameState>) -> Result<std::sync::MutexGuard<'a, Game>, String> {
+/// What is running: the saves, and the game being played, if any (none on the home screen
+/// at launch).
+pub(crate) struct Session {
+    data_dir: PathBuf,
+    saves: Saves,
+    current: Option<(SaveInfo, Game)>,
+}
+
+impl Session {
+    /// Called after a background data refresh, when a game is open.
+    pub(crate) fn reload_data(&mut self) {
+        if let Some((_, game)) = self.current.as_mut() {
+            game.reload_data();
+        }
+    }
+
+    fn play(&mut self, id: &str) -> Result<SaveInfo, String> {
+        let (info, store) = self.saves.open(id, now())?;
+        let economy = load_economy(&self.data_dir).map_err(|e| e.to_string())?;
+        let engine = load_achievements(&self.data_dir).map_err(|e| e.to_string())?;
+        let game = Game::new(self.data_dir.clone(), store, economy, engine)?;
+        self.current = Some((info.clone(), game));
+        Ok(info)
+    }
+}
+
+type SessionState = Mutex<Session>;
+
+fn now() -> i64 {
+    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0)
+}
+
+fn session<'a>(state: &'a State<'_, SessionState>) -> Result<std::sync::MutexGuard<'a, Session>, String> {
     state.lock().map_err(|_| "game state is poisoned".to_string())
 }
+
+/// Runs `f` on the game being played.
+fn with_game<T>(state: &State<'_, SessionState>, f: impl FnOnce(&mut Game) -> Result<T, String>) -> Result<T, String> {
+    let mut session = session(state)?;
+    let (_, game) = session.current.as_mut().ok_or("no game is loaded")?;
+    f(game)
+}
+
+// ---- games and saves ----------------------------------------------------------------
+
+#[tauri::command]
+fn list_saves(state: State<'_, SessionState>) -> Result<Vec<SaveInfo>, String> {
+    Ok(session(&state)?.saves.list())
+}
+
+/// The game being played, if any.
+#[tauri::command]
+fn current_save(state: State<'_, SessionState>) -> Result<Option<SaveInfo>, String> {
+    Ok(session(&state)?.current.as_ref().map(|(info, _)| info.clone()))
+}
+
+#[tauri::command]
+fn new_game(state: State<'_, SessionState>, name: String) -> Result<SaveInfo, String> {
+    let mut session = session(&state)?;
+    let info = session.saves.create(&name, now())?;
+    session.play(&info.id)
+}
+
+#[tauri::command]
+fn load_game(state: State<'_, SessionState>, id: String) -> Result<SaveInfo, String> {
+    session(&state)?.play(&id)
+}
+
+/// Manual save: copies the game being played into a new save point.
+#[tauri::command]
+fn create_save_point(state: State<'_, SessionState>, name: String) -> Result<SaveInfo, String> {
+    let session = session(&state)?;
+    let (info, _) = session.current.as_ref().ok_or("no game is loaded")?;
+    session.saves.save_point(&info.id, &name, now())
+}
+
+#[tauri::command]
+fn rename_save(state: State<'_, SessionState>, id: String, name: String) -> Result<SaveInfo, String> {
+    let mut session = session(&state)?;
+    let info = session.saves.rename(&id, &name)?;
+    if let Some((current, _)) = session.current.as_mut().filter(|(c, _)| c.id == id) {
+        current.name = info.name.clone();
+    }
+    Ok(info)
+}
+
+/// Deletes a save for good. Deleting the game being played closes it first.
+#[tauri::command]
+fn delete_save(state: State<'_, SessionState>, id: String) -> Result<(), String> {
+    let mut session = session(&state)?;
+    if session.current.as_ref().is_some_and(|(c, _)| c.id == id) {
+        session.current = None;
+    }
+    session.saves.delete(&id)
+}
+
+// ---- data -------------------------------------------------------------------------
 
 #[tauri::command]
 fn get_data_status(status: State<'_, SharedStatus>) -> DataStatus {
@@ -42,109 +136,114 @@ fn get_data_status(status: State<'_, SharedStatus>) -> DataStatus {
 }
 
 #[tauri::command]
-fn list_sets(state: State<'_, GameState>) -> Result<Vec<SetSummary>, String> {
-    locked(&state)?.list_sets()
+fn get_data_info(state: State<'_, SessionState>) -> Result<DataInfo, String> {
+    game::data_info(&session(&state)?.data_dir)
 }
 
 #[tauri::command]
-fn get_wallet(state: State<'_, GameState>) -> Result<WalletView, String> {
-    locked(&state)?.wallet()
+fn list_sets(state: State<'_, SessionState>) -> Result<Vec<SetSummary>, String> {
+    game::read_sets(&session(&state)?.data_dir)
+}
+
+// ---- the game being played ----------------------------------------------------------
+
+#[tauri::command]
+fn get_wallet(state: State<'_, SessionState>) -> Result<WalletView, String> {
+    with_game(&state, |g| g.wallet())
 }
 
 #[tauri::command]
-fn get_shop(state: State<'_, GameState>) -> Result<Vec<ShopItem>, String> {
-    locked(&state)?.shop()
+fn get_shop(state: State<'_, SessionState>) -> Result<Vec<ShopItem>, String> {
+    with_game(&state, |g| g.shop())
 }
 
 #[tauri::command]
 fn sell_boosters(
-    state: State<'_, GameState>,
+    state: State<'_, SessionState>,
     set_code: String,
     kind: String,
     quantity: u32,
 ) -> Result<BoosterSaleResult, String> {
-    locked(&state)?.sell_boosters(&set_code, &kind, quantity)
+    with_game(&state, |g| g.sell_boosters(&set_code, &kind, quantity))
 }
 
 #[tauri::command]
-fn buy_boosters(
-    state: State<'_, GameState>,
-    set_code: String,
-    kind: String,
-    quantity: u32,
-) -> Result<(), String> {
-    locked(&state)?.buy_boosters(&set_code, &kind, quantity)
+fn buy_boosters(state: State<'_, SessionState>, set_code: String, kind: String, quantity: u32) -> Result<(), String> {
+    with_game(&state, |g| g.buy_boosters(&set_code, &kind, quantity))
 }
 
 #[tauri::command]
-fn open_booster(
-    state: State<'_, GameState>,
-    set_code: String,
-    kind: String,
-) -> Result<Vec<OpenedCard>, String> {
-    locked(&state)?.open_booster(&set_code, &kind)
+fn open_booster(state: State<'_, SessionState>, set_code: String, kind: String) -> Result<Vec<OpenedCard>, String> {
+    with_game(&state, |g| g.open_booster(&set_code, &kind))
 }
 
 #[tauri::command]
 fn open_boosters(
-    state: State<'_, GameState>,
+    state: State<'_, SessionState>,
     set_code: String,
     kind: String,
     quantity: u32,
 ) -> Result<Vec<Vec<OpenedCard>>, String> {
-    locked(&state)?.open_boosters(&set_code, &kind, quantity)
+    with_game(&state, |g| g.open_boosters(&set_code, &kind, quantity))
 }
 
 #[tauri::command]
-fn get_collection(state: State<'_, GameState>, set_code: String) -> Result<CollectionView, String> {
-    locked(&state)?.collection(&set_code)
+fn get_collection(state: State<'_, SessionState>, set_code: String) -> Result<CollectionView, String> {
+    with_game(&state, |g| g.collection(&set_code))
 }
 
 #[tauri::command]
-fn sell_cards(state: State<'_, GameState>, requests: Vec<SaleRequest>) -> Result<SaleResult, String> {
-    locked(&state)?.sell_cards(&requests)
+fn sell_cards(state: State<'_, SessionState>, requests: Vec<SaleRequest>) -> Result<SaleResult, String> {
+    with_game(&state, |g| g.sell_cards(&requests))
 }
 
 #[tauri::command]
-fn sell_duplicates(state: State<'_, GameState>, set_code: String) -> Result<SaleResult, String> {
-    locked(&state)?.sell_duplicates(&set_code)
+fn sell_duplicates(state: State<'_, SessionState>, set_code: String) -> Result<SaleResult, String> {
+    with_game(&state, |g| g.sell_duplicates(&set_code))
 }
 
 #[tauri::command]
-fn claim_charity(state: State<'_, GameState>) -> Result<(), String> {
-    locked(&state)?.claim_charity()
+fn claim_charity(state: State<'_, SessionState>) -> Result<(), String> {
+    with_game(&state, |g| g.claim_charity())
 }
 
 #[tauri::command]
-fn get_achievements(state: State<'_, GameState>) -> Result<AchievementsView, String> {
-    locked(&state)?.achievements()
+fn get_achievements(state: State<'_, SessionState>) -> Result<AchievementsView, String> {
+    with_game(&state, |g| g.achievements())
 }
 
 /// Achievements unlocked since the last call.
 #[tauri::command]
-fn take_unlocks(state: State<'_, GameState>) -> Result<Vec<AchievementView>, String> {
-    Ok(locked(&state)?.take_unlocks())
+fn take_unlocks(state: State<'_, SessionState>) -> Result<Vec<AchievementView>, String> {
+    with_game(&state, |g| Ok(g.take_unlocks()))
 }
 
 #[tauri::command]
-fn get_stats(state: State<'_, GameState>) -> Result<StatsView, String> {
-    locked(&state)?.stats()
+fn get_stats(state: State<'_, SessionState>) -> Result<StatsView, String> {
+    with_game(&state, |g| g.stats())
 }
 
-/// Where the player's save lives. `UNSEALED_DB` overrides everything; debug builds
-/// use the repository's `.dev-data/` so development never touches a real save.
-fn resolve_db_path(app: &tauri::AppHandle) -> Result<PathBuf, Box<dyn Error>> {
-    let path = if let Ok(path) = std::env::var("UNSEALED_DB") {
-        PathBuf::from(path)
-    } else if cfg!(debug_assertions) {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../.dev-data/unsealed.sqlite")
-    } else {
-        app.path().app_data_dir()?.join("unsealed.sqlite")
-    };
-    if let Some(dir) = path.parent() {
-        fs::create_dir_all(dir)?;
+// ---- setup --------------------------------------------------------------------------
+
+/// Where the player's games live. `UNSEALED_SAVES_DIR` overrides everything; debug builds
+/// use the repository's `.dev-data/` so development never touches real saves.
+fn resolve_saves_dir(app: &tauri::AppHandle) -> Result<PathBuf, Box<dyn Error>> {
+    if let Ok(dir) = std::env::var("UNSEALED_SAVES_DIR") {
+        return Ok(dir.into());
     }
-    Ok(path)
+    Ok(app_dir(app)?.join("saves"))
+}
+
+/// The single save of the versions without games, adopted as the first game.
+fn legacy_db_path(app: &tauri::AppHandle) -> Result<PathBuf, Box<dyn Error>> {
+    Ok(app_dir(app)?.join("unsealed.sqlite"))
+}
+
+fn app_dir(app: &tauri::AppHandle) -> Result<PathBuf, Box<dyn Error>> {
+    if cfg!(debug_assertions) {
+        return Ok(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../.dev-data"));
+    }
+    Ok(app.path().app_data_dir()?)
 }
 
 /// Where the downloaded data lives. `UNSEALED_DATA_DIR` overrides everything; debug
@@ -187,11 +286,16 @@ pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             let data_dir = resolve_data_dir(app.handle())?;
-            let economy = load_economy(&data_dir)?;
-            let engine = load_achievements(&data_dir)?;
-            let store = Store::open(&resolve_db_path(app.handle())?)?;
+            // Fail early on a broken configuration rather than when a game is loaded.
+            load_economy(&data_dir)?;
+            load_achievements(&data_dir)?;
             let data_config = load_data_config(&data_dir)?;
-            app.manage(Mutex::new(Game::new(data_dir.clone(), store, economy, engine)?));
+
+            let saves = Saves::new(resolve_saves_dir(app.handle())?)?;
+            if let Some(adopted) = saves.adopt_legacy(&legacy_db_path(app.handle())?, now())? {
+                eprintln!("previous save adopted as game {}", adopted.id);
+            }
+            app.manage(Mutex::new(Session { data_dir: data_dir.clone(), saves, current: None }));
 
             let status: SharedStatus = Arc::new(Mutex::new(DataStatus::Checking));
             app.manage(status.clone());
@@ -203,7 +307,15 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            list_saves,
+            current_save,
+            new_game,
+            load_game,
+            create_save_point,
+            rename_save,
+            delete_save,
             get_data_status,
+            get_data_info,
             list_sets,
             get_wallet,
             get_shop,

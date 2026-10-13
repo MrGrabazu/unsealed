@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AchievementCard } from "./AchievementCard";
 import { getAchievements, type AchievementsView } from "./api";
+import { Loading } from "./Loading";
 
 type Filter = "all" | "unlocked" | "locked" | "secret";
 
@@ -17,7 +18,7 @@ export function Achievements({ refreshKey }: { refreshKey: number }) {
   }, [refreshKey]);
 
   if (error) return <p className="error">{error}</p>;
-  if (!view) return null;
+  if (!view) return <Loading label="Loading achievements…" />;
 
   const shown = view.items.filter((a) => {
     switch (filter) {

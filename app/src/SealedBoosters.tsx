@@ -1,4 +1,5 @@
 import type { SealedStack, SetSummary } from "./api";
+import { kindLabel } from "./boosterKinds";
 import { useMoney } from "./money";
 import { PriceTrend } from "./PriceTrend";
 import { SetIcon } from "./SetIcon";
@@ -49,7 +50,7 @@ export function SealedBoosters({ sealed, sets, busy, onOpen, onOpenMany, onSell,
                 <span className="sealed-qty">×{s.quantity}</span>
               </div>
               <span className="hint">
-                {s.kind} booster · paid {money(s.costCents)} · worth {money(s.quantity * s.sellValueCents)} if sold ·{" "}
+                {kindLabel(s.kind)} · paid {money(s.costCents)} · worth {money(s.quantity * s.sellValueCents)} if sold ·{" "}
                 <span className={pnl >= 0 ? "gain" : "loss"}>
                   {pnl >= 0 ? "+" : "−"}
                   {money(Math.abs(pnl))}

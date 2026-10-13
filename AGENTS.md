@@ -72,19 +72,22 @@ Le jeu est un client lourd : **il n'y a pas de serveur à héberger**. L'app con
 ```
 [Lancement de l'app]
    └── thread de fond (updater.rs)
-         ├── lit le manifest local ; refresh_reason() décide : aucune donnée, set manquant, ou données plus vieilles que maxAgeHours (24 h)
+         ├── lit le manifest local ; refresh_reason() décide : aucune donnée, set manquant, config changée (sets, types, boosters), ou données plus vieilles que maxAgeHours (24 h)
          ├── si oui : core::builder::build()
-         │     ├── télécharge les sets MTGJSON voulus et leurs sets annexes (cache 7 jours) et le bulk Scryfall default_cards (cache par nom de fichier)
-         │     ├── valide chaque config de booster par simulation
+         │     ├── télécharge AllPrintings.json.gz de MTGJSON (~180 Mo, cache 7 jours) et le bulk Scryfall default_cards (cache par nom de fichier)
+         │     ├── sélectionne les sets (liste explicite, ou "all" : types de setTypes, hors sets en ligne, avec un booster voulu)
+         │     ├── valide chaque config de booster par simulation (sauf si déjà validée à l'identique : cache validated.json)
+         │     ├── met de côté les sets invalides (`skipped` du manifest) au lieu d'échouer
          │     └── écrit sets/, prices.json, manifest.json (rename atomique, manifest en dernier)
-         └── émet l'événement `data-status` ; l'UI se recharge à la fin
+         └── émet l'événement `data-status` (message + pourcentage estimé) ; l'UI affiche une barre de progression et se recharge à la fin
 [Client Unsealed]
    └── reste jouable sur les anciennes données pendant la mise à jour (ou affiche une erreur non bloquante hors ligne)
    └── charge les images depuis le CDN Scryfall
 ```
 
 - Les sets proposés et la fraîcheur maximale vivent dans `config/data.json` (surchargeable par un `data.json` du dossier de données).
-- Les gros fichiers bruts sont gardés dans le dossier de cache de l'app ; les anciens bulks Scryfall sont supprimés après chaque build.
+- Les gros fichiers bruts sont gardés dans le dossier de cache de l'app ; les anciens bulks Scryfall (et les anciens fichiers MTGJSON par set) sont supprimés après chaque build.
+- En debug, le core et ses dépendances lourdes sont compilés optimisés (`Cargo.toml` racine) : sinon le build lancé par l'app serait des dizaines de fois plus lent.
 - `UNSEALED_NO_UPDATE=1` désactive le job (développement).
 - Le CLI `data-builder` appelle le même code (`core/src/builder.rs`).
 
@@ -142,11 +145,21 @@ Le jeu est un client lourd : **il n'y a pas de serveur à héberger**. L'app con
 - **Complétion foil** : ne compte que les cartes imprimées en foil (`finishes`). **Année complète** : tous les sets proposés de l'année, avec au moins 2 sets pour l'achievement livré.
 - **Pas encore fait** : complétion par bloc (aucun set proposé n'appartient à un bloc, les blocs ont disparu en 2019), illustrations personnalisées par achievement.
 
+## 8 ter. Parties, sauvegardes et écrans
+
+- **Accueil** au lancement (titre, accroche, menu) : Continuer (la partie ouverte, sinon la dernière jouée), Nouvelle partie, Charger une partie (renommer, supprimer), Options, À propos. Pendant le jeu, « Menu » revient à l'accueil sans fermer la partie.
+- **Une partie = un fichier SQLite** dans `saves/` (`app/src-tauri/src/saves.rs`), qui se décrit lui-même dans sa table `save_meta` (nom, dates). Plusieurs joueurs d'une même machine ont chacun leur partie ; pas de notion de profil pour l'instant.
+- **Sauvegarde automatique** : chaque action est enregistrée aussitôt. **Sauvegarde manuelle** = « Save point » : une copie de la partie (`VACUUM INTO`), chargeable plus tard ; elle compte comme jouée juste avant l'originale, pour que « Continuer » reprenne l'originale.
+- L'ancienne sauvegarde unique (`unsealed.sqlite`) est adoptée comme première partie au premier lancement, puis renommée en `.migrated`.
+- **Chargement** : écran de démarrage inline dans `index.html` et fond de fenêtre sombre (`backgroundColor`) pour éviter tout écran blanc ; composant `Loading` sur chaque écran qui attend des données.
+- **À propos** : description, gratuité et absence de valeur réelle, notice de la Fan Content Policy mot pour mot (`app/src/legal.ts`), crédits Scryfall et MTGJSON.
+
 ## 9. Fonctionnalités de collection
 
 - Vue par set avec **pourcentage de complétion** et cartes manquantes affichées en grisé.
 - **Collector Boosters** : `data.json` liste les types de booster proposés (`play`, `collector`) ; chaque set garde ceux qu'il possède (le build n'échoue que si un set n'en a aucun). Changer cette liste déclenche un rebuild au lancement (`booster_kinds` du manifest). La complétion ne compte que les cartes des boosters principaux ; les cartes exclusives aux collectors (showcase, borderless, foils spéciaux) forment une section « Collector extras » à part.
-- **Sets proposés** : 3 sets à Play Boosters (BLB, DSK, FDN) et 7 sets 2022-2024 (DMU, BRO, ONE, MOM, WOE, LCI, MKM) avec Draft, Set et Collector Boosters (MKM : Play et Collector). Tous passent la simulation. Les sets 1993-2019 ne sont pas encore proposés.
+- **Sets proposés** : `"sets": "all"` → tous les sets MTGJSON des types `core`, `expansion`, `masters`, `draft_innovation`, `funny` et `starter` (hors sets en ligne) qui ont un booster voulu (`play`, `draft`, `set`, `default` = booster unique des sets d'avant 1996, `collector`). Environ 178 sets, d'Alpha (1993) à aujourd'hui. Un type de booster qui échoue à la simulation est retiré seul (le set reste proposé) ; la raison est listée dans `skipped` du manifest.
+- **Taux attendus sans doublon** : sur une feuille aux poids inégaux (vieux sets imprimés sur planche, une carte pouvant occuper 1 à 5 cases), la probabilité qu'une carte soit tirée est calculée exactement (`sim::inclusion_probabilities`), pas en n × poids / total.
 - Historique des ouvertures et des **meilleurs tirages**.
 - Statistiques personnelles (nombre de boosters ouverts, meilleure carte et sa valeur, etc.).
 - *Implémenté* : onglet **Stats** (`app/src/Stats.tsx`, `Game::stats`). Totaux d'ouverture, argent dépensé et gagné (agrégé depuis le `ledger`), rendement des boosters, valeur de la collection et patrimoine, meilleur et pire booster, 12 meilleurs tirages de tous les temps (au prix du tirage), tableau par booster et 20 dernières ouvertures. Tout est calculé à la demande depuis `openings` / `opening_cards` (index sur les prix, migration 6).
@@ -169,8 +182,8 @@ Le jeu est un client lourd : **il n'y a pas de serveur à héberger**. L'app con
 | `config/` | `economy.json` : devise, capital de départ, prix des boosters (suivent la valeur espérée × `evMarkupPercent`, surcharges fixes possibles), taux de revente (cartes et boosters scellés), aide quotidienne. `achievements.json` : voir 8 bis. `data.json` : sets à télécharger, types de boosters, âge maximal des données. Embarqués dans l'app ; un fichier du même nom dans le dossier de données les remplace |
 | `app/` | Frontend React/Vite ; `app/src-tauri/` = shell Tauri 2 (logique de jeu dans `game.rs`, testable sans Tauri) |
 
-- Données : `cargo run --release -p data-builder -- --sets BLB,DSK,FDN,DMU,BRO,ONE,MOM,WOE,LCI,MKM` (écrit `dist/`, cache dans `.cache/`)
-- App en dev : `cd app && npm install && npm run tauri dev` (en debug elle lit `dist/` ; `UNSEALED_DATA_DIR` surcharge)
+- Données : `cargo run --release -p data-builder -- --sets all` (ou une liste : `--sets BLB,FDN`) ; écrit `dist/`, cache dans `.cache/`, et liste les sets mis de côté avec la raison
+- App en dev : `cd app && npm install && npm run tauri dev` (en debug elle lit `dist/` et range les parties dans `.dev-data/saves/` ; `UNSEALED_DATA_DIR` et `UNSEALED_SAVES_DIR` surchargent)
 - Tests : `cargo test --workspace` ; build du front : `cd app && npm run build`
 - Node : Vite 6 est utilisé car Node 21 est installé (Vite 7+ exige Node ≥ 20.19 / 22.12) ; passer à Node 22 LTS permettra de monter Vite.
 

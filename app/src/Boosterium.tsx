@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { SetSummary, ShopItem, WalletView } from "./api";
+import { kindLabel, kindRank } from "./boosterKinds";
 import { useMoney } from "./money";
 import { PriceTrend } from "./PriceTrend";
 import { SetIcon } from "./SetIcon";
@@ -14,16 +15,8 @@ interface Props {
   busy: boolean;
 }
 
-/** Display order of booster kinds; unknown kinds come last, alphabetically. */
-const KIND_ORDER = ["play", "draft", "set", "collector"];
 /** Budget filter choices, in cents (0 = any price). */
 const PRICE_LIMITS = [0, 1_000, 2_500, 5_000];
-
-const kindRank = (kind: string) => {
-  const i = KIND_ORDER.indexOf(kind);
-  return i === -1 ? KIND_ORDER.length : i;
-};
-const kindLabel = (kind: string) => `${kind.charAt(0).toUpperCase()}${kind.slice(1)} booster`;
 
 interface SetGroup {
   set: SetSummary;
@@ -34,6 +27,7 @@ interface SetGroup {
 /** The shop: buy sealed boosters, and ask for help when truly stranded. */
 export function Boosterium({ shop, sets, wallet, onBuy, onBuyAndOpen, onClaimCharity, busy }: Props) {
   const money = useMoney();
+  const [search, setSearch] = useState("");
   const [year, setYear] = useState("all");
   const [maxPrice, setMaxPrice] = useState(0);
   const [open, setOpen] = useState<Set<string>>(new Set());
@@ -42,8 +36,10 @@ export function Boosterium({ shop, sets, wallet, onBuy, onBuyAndOpen, onClaimCha
   const inBudget = (item: ShopItem) => maxPrice === 0 || item.priceCents <= maxPrice;
   const years = [...new Set(sets.map((s) => s.releaseDate.slice(0, 4)))];
   // `sets` comes newest first.
+  const query = search.trim().toLowerCase();
   const groups: SetGroup[] = sets
     .filter((set) => year === "all" || set.releaseDate.startsWith(year))
+    .filter((set) => !query || set.name.toLowerCase().includes(query) || set.code.toLowerCase() === query)
     .map((set) => ({
       set,
       products: shop
@@ -80,6 +76,12 @@ export function Boosterium({ shop, sets, wallet, onBuy, onBuyAndOpen, onClaimCha
       </p>
 
       <div className="controls">
+        <input
+          type="search"
+          placeholder="Search a set (name or code)"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
         <select value={year} onChange={(e) => setYear(e.target.value)}>
           <option value="all">All years</option>
           {years.map((y) => (

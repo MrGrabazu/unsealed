@@ -75,6 +75,8 @@ const MIGRATIONS: &[&str] = &[
     // 6: indexes for the statistics (best pulls, best and worst boosters)
     "CREATE INDEX opening_cards_price ON opening_cards (price_cents);
     CREATE INDEX openings_value ON openings (value_cents);",
+    // 7: what describes the save itself (name, dates), see `saves`
+    "CREATE TABLE save_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL) WITHOUT ROWID;",
 ];
 
 #[derive(Debug, thiserror::Error)]
@@ -229,6 +231,26 @@ impl Store {
         conn.pragma_update(None, "foreign_keys", true)?;
         migrate(&mut conn)?;
         Ok(Self { conn })
+    }
+
+    // ---- save description -------------------------------------------------------
+
+    pub fn meta(&self, key: &str) -> StoreResult<Option<String>> {
+        Ok(self.conn.query_row("SELECT value FROM save_meta WHERE key = ?1", [key], |r| r.get(0)).optional()?)
+    }
+
+    pub fn set_meta(&mut self, key: &str, value: &str) -> StoreResult<()> {
+        self.conn.execute(
+            "INSERT INTO save_meta (key, value) VALUES (?1, ?2) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+            params![key, value],
+        )?;
+        Ok(())
+    }
+
+    /// Writes a consistent copy of the whole save to `path` (which must not exist).
+    pub fn copy_to(&self, path: &Path) -> StoreResult<()> {
+        self.conn.execute("VACUUM INTO ?1", [path.to_string_lossy()])?;
+        Ok(())
     }
 
     // ---- wallet -------------------------------------------------------------

@@ -1,3 +1,16 @@
 [workspace]
 members = ["core", "data-builder", "app/src-tauri"]
 resolver = "2"
+
+# The data build (JSON parsing, decompression, booster simulations) is far too slow
+# unoptimized, and the app runs it in the background even in debug builds.
+[profile.dev.package.unsealed-core]
+opt-level = 3
+[profile.dev.package.serde_json]
+opt-level = 3
+[profile.dev.package.flate2]
+opt-level = 3
+[profile.dev.package.miniz_oxide]
+opt-level = 3
+[profile.dev.package.rand_chacha]
+opt-level = 3

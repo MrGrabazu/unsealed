@@ -50,6 +50,67 @@ fn cfg() -> BoosterConfig {
     BoosterConfig::from_set_json(FIXTURE, "play").expect("valid fixture")
 }
 
+/// Like Alpha's commons: 84 cards on a 121-slot print sheet (one card fills 1 to 5
+/// slots), 11 drawn without duplicates.
+fn print_sheet_config() -> BoosterConfig {
+    let weights: Vec<u64> = (0..84).map(|i| [1, 1, 1, 2, 3, 5][i % 6]).collect();
+    let total: u64 = weights.iter().sum();
+    let cards: Vec<String> = weights.iter().enumerate().map(|(i, w)| format!(r#""c{i}": {w}"#)).collect();
+    let json = format!(
+        r#"{{ "boosters": [ {{ "contents": {{ "common": 11 }}, "weight": 1 }} ],
+             "boostersTotalWeight": 1,
+             "sheets": {{ "common": {{ "cards": {{ {} }}, "foil": false, "totalWeight": {total} }} }},
+             "sourceSetCodes": [] }}"#,
+        cards.join(",")
+    );
+    serde_json::from_str(&json).unwrap()
+}
+
+#[test]
+fn uneven_sheets_without_duplicates_match_their_expected_rates() {
+    let report = simulate(&print_sheet_config(), &no_colors(), 50_000, &mut ChaCha8Rng::seed_from_u64(3)).unwrap();
+    // A first-order estimate (11 × weight / total) is off by more than 10 standard deviations here.
+    assert!(report.max_abs_z() < 5.0, "max |z| = {}", report.max_abs_z());
+}
+
+/// Exact inclusion probabilities of successive sampling, by enumerating every draw order.
+fn brute_force_inclusion(weights: &[f64], n: usize) -> Vec<f64> {
+    fn walk(weights: &[f64], left: &mut Vec<bool>, n: usize, p: f64, out: &mut [f64]) {
+        if n == 0 {
+            return;
+        }
+        let total: f64 = weights.iter().zip(left.iter()).filter(|(_, &l)| l).map(|(w, _)| w).sum();
+        for i in 0..weights.len() {
+            if left[i] {
+                let q = p * weights[i] / total;
+                out[i] += q;
+                left[i] = false;
+                walk(weights, left, n - 1, q, out);
+                left[i] = true;
+            }
+        }
+    }
+    let mut out = vec![0.0; weights.len()];
+    walk(weights, &mut vec![true; weights.len()], n, 1.0, &mut out);
+    out
+}
+
+#[test]
+fn inclusion_probabilities_match_an_exhaustive_enumeration() {
+    use unsealed_core::sim::inclusion_probabilities;
+    for (weights, n) in [(vec![1, 1, 3, 5, 2, 1], 2), (vec![1, 2, 3, 5, 1, 4, 2], 3), (vec![1, 1, 10, 1], 2)] {
+        let exact = brute_force_inclusion(&weights.iter().map(|&w| w as f64).collect::<Vec<_>>(), n);
+        let computed = inclusion_probabilities(&weights, n);
+        for (c, e) in computed.iter().zip(&exact) {
+            assert!((c - e).abs() < 1e-4, "{weights:?} n={n}: {computed:?} vs {exact:?}");
+        }
+    }
+    // Closed forms: equal weights, a single card, everything drawn, zero weight.
+    assert!(inclusion_probabilities(&[2, 2, 2, 2], 3).iter().all(|p| (p - 0.75).abs() < 1e-12));
+    assert_eq!(inclusion_probabilities(&[1, 3], 1), [0.25, 0.75]);
+    assert_eq!(inclusion_probabilities(&[1, 4, 0], 2), [1.0, 1.0, 0.0]);
+}
+
 #[test]
 fn unknown_booster_kind_is_an_error() {
     assert!(BoosterConfig::from_set_json(FIXTURE, "collector").is_err());
