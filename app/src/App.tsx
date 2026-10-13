@@ -1,7 +1,9 @@
+import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useState } from "react";
 import {
   buyBoosters,
   claimCharity,
+  getDataStatus,
   getShop,
   getWallet,
   listSets,
@@ -9,6 +11,7 @@ import {
   sellBoosters,
   takeUnlocks,
   type AchievementView,
+  type DataStatus,
   type OpenedCard,
   type SealedStack,
   type SetSummary,
@@ -115,15 +118,37 @@ export function App() {
     }
   }, []);
 
-  useEffect(() => {
+  const [dataStatus, setDataStatus] = useState<DataStatus>({ state: "checking" });
+
+  const loadAll = useCallback(() => {
     Promise.all([listSets(), getShop(), getWallet()])
       .then(([sets, shop, wallet]) => {
         setSets(sets);
         setShop(shop);
         setWallet(wallet);
+        setOpenings((n) => n + 1);
       })
       .catch((e) => setError(String(e)));
   }, []);
+
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
+
+  // The backend refreshes the card data in the background; reload everything once it is done.
+  useEffect(() => {
+    let previous: DataStatus["state"] = "checking";
+    const onStatus = (status: DataStatus) => {
+      setDataStatus(status);
+      if (previous === "updating" && status.state === "upToDate") loadAll();
+      previous = status.state;
+    };
+    getDataStatus().then(onStatus).catch(() => {});
+    const unlisten = listen<DataStatus>("data-status", (e) => onStatus(e.payload));
+    return () => {
+      unlisten.then((f) => f());
+    };
+  }, [loadAll]);
 
   /** Runs a game action with the busy flag and error handling. */
   async function run(action: () => Promise<void>) {
@@ -173,12 +198,18 @@ export function App() {
           ))}
         </nav>
 
+        {dataStatus.state === "updating" && (
+          <p className="hint data-status">Updating card data and prices: {dataStatus.message}…</p>
+        )}
+        {dataStatus.state === "failed" && (
+          <p className="hint data-status">
+            Could not refresh card data ({dataStatus.message}). Playing with the data already downloaded.
+          </p>
+        )}
         {error && <p className="error">{error}</p>}
         {notice && <p className="notice">{notice}</p>}
-        {!error && sets.length === 0 && (
-          <p className="hint">
-            No data found. Run <code>cargo run --release -p data-builder -- --sets BLB,DSK,FDN</code> first.
-          </p>
+        {!error && sets.length === 0 && dataStatus.state !== "updating" && dataStatus.state !== "checking" && (
+          <p className="hint">No card data yet. It is downloaded automatically when the app starts with a connection.</p>
         )}
 
         {tab === "boosterium" && wallet && (

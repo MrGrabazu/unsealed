@@ -3,6 +3,7 @@
 
 mod game;
 mod store;
+mod updater;
 
 use game::{
     AchievementView, AchievementsView, BoosterSaleResult, CollectionView, Game, OpenedCard, SaleRequest, SaleResult,
@@ -11,11 +12,13 @@ use game::{
 use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use store::Store;
 use tauri::{Manager, State};
 use unsealed_core::achievements::Engine;
 use unsealed_core::economy::EconomyConfig;
+use unsealed_core::update::DataConfig;
+use updater::{DataStatus, SharedStatus};
 
 type GameState = Mutex<Game>;
 
@@ -26,8 +29,16 @@ const DEFAULT_ECONOMY: &str = include_str!("../../../config/economy.json");
 /// Achievement definitions shipped with the app, overridable the same way.
 const DEFAULT_ACHIEVEMENTS: &str = include_str!("../../../config/achievements.json");
 
+/// Which sets to download and how fresh they must be, overridable the same way.
+const DEFAULT_DATA: &str = include_str!("../../../config/data.json");
+
 fn locked<'a>(state: &'a State<'_, GameState>) -> Result<std::sync::MutexGuard<'a, Game>, String> {
     state.lock().map_err(|_| "game state is poisoned".to_string())
+}
+
+#[tauri::command]
+fn get_data_status(status: State<'_, SharedStatus>) -> DataStatus {
+    status.lock().map(|s| s.clone()).unwrap_or(DataStatus::Checking)
 }
 
 #[tauri::command]
@@ -144,6 +155,19 @@ fn load_achievements(data_dir: &Path) -> Result<Engine, Box<dyn Error>> {
     Ok(Engine::from_json(&json)?)
 }
 
+fn load_data_config(data_dir: &Path) -> Result<DataConfig, Box<dyn Error>> {
+    let json = fs::read_to_string(data_dir.join("data.json")).unwrap_or_else(|_| DEFAULT_DATA.to_string());
+    Ok(DataConfig::from_json(&json)?)
+}
+
+/// Where the large raw downloads (MTGJSON sets, Scryfall bulk file) are kept.
+fn resolve_cache_dir(app: &tauri::AppHandle) -> Result<PathBuf, Box<dyn Error>> {
+    if cfg!(debug_assertions) {
+        return Ok(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../.cache"));
+    }
+    Ok(app.path().app_cache_dir()?)
+}
+
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
@@ -151,10 +175,20 @@ pub fn run() {
             let economy = load_economy(&data_dir)?;
             let engine = load_achievements(&data_dir)?;
             let store = Store::open(&resolve_db_path(app.handle())?)?;
-            app.manage(Mutex::new(Game::new(data_dir, store, economy, engine)?));
+            let data_config = load_data_config(&data_dir)?;
+            app.manage(Mutex::new(Game::new(data_dir.clone(), store, economy, engine)?));
+
+            let status: SharedStatus = Arc::new(Mutex::new(DataStatus::Checking));
+            app.manage(status.clone());
+            if std::env::var("UNSEALED_NO_UPDATE").is_ok() {
+                *status.lock().expect("fresh mutex") = DataStatus::UpToDate;
+            } else {
+                updater::spawn(app.handle().clone(), status, data_dir, resolve_cache_dir(app.handle())?, data_config);
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            get_data_status,
             list_sets,
             get_wallet,
             get_shop,

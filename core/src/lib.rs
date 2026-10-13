@@ -4,6 +4,7 @@
 
 pub mod achievements;
 pub mod booster;
+pub mod builder;
 pub mod catalog;
 pub mod draw;
 pub mod economy;

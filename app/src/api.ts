@@ -121,6 +121,13 @@ export interface AchievementsView {
   items: AchievementView[];
 }
 
+export type DataStatus =
+  | { state: "checking" }
+  | { state: "upToDate" }
+  | { state: "updating"; message: string }
+  | { state: "failed"; message: string };
+
+export const getDataStatus = () => invoke<DataStatus>("get_data_status");
 export const getAchievements = () => invoke<AchievementsView>("get_achievements");
 export const takeUnlocks = () => invoke<AchievementView[]>("take_unlocks");
 export const listSets = () => invoke<SetSummary[]>("list_sets");

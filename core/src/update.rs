@@ -1,68 +1,65 @@
-//! Decides what the client must (re)download at launch, from the remote manifest
-//! and the local state. Pure logic: no network, no clock access, so it is testable.
+//! Decides at launch whether the local data must be rebuilt. The client builds its own
+//! data from MTGJSON and Scryfall (see `builder`), so the only state is the local manifest.
+//! Pure logic: no network, no clock access, so it is testable.
 
 use crate::catalog::Manifest;
-use std::collections::BTreeMap;
+use serde::Deserialize;
 
-#[derive(Debug, Clone, Copy)]
-pub struct UpdateConfig {
-    /// Minimum delay between two manifest checks. Prices are published daily, so
-    /// this bounds staleness to roughly one publication cycle plus this delay.
-    pub check_interval_secs: i64,
-    /// Prices older than this are flagged as stale (e.g. warning in the UI).
-    pub stale_prices_secs: i64,
+/// What to download and how fresh it must be (shipped as `config/data.json`).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DataConfig {
+    /// Set codes the game offers.
+    pub sets: Vec<String>,
+    /// Booster kinds kept for each set.
+    #[serde(default = "default_boosters")]
+    pub boosters: Vec<String>,
+    /// Data older than this is rebuilt at launch. Prices move daily, so a day is the natural unit.
+    #[serde(default = "default_max_age_hours")]
+    pub max_age_hours: i64,
+    /// Boosters simulated per kept config to validate its rates.
+    #[serde(default = "default_sim_boosters")]
+    pub sim_boosters: u64,
 }
 
-impl Default for UpdateConfig {
-    fn default() -> Self {
-        Self { check_interval_secs: 12 * 3600, stale_prices_secs: 48 * 3600 }
+fn default_boosters() -> Vec<String> {
+    vec!["play".to_string()]
+}
+
+fn default_max_age_hours() -> i64 {
+    24
+}
+
+fn default_sim_boosters() -> u64 {
+    20_000
+}
+
+impl DataConfig {
+    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
     }
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct LocalState {
-    /// Installed set code -> `source_version` of the local file.
-    pub sets: BTreeMap<String, String>,
-    pub prices_updated_at: Option<String>,
-    /// Unix time of the last successful manifest check.
-    pub last_check_at: Option<i64>,
-    /// Unix time at which the local prices file was downloaded.
-    pub prices_fetched_at: Option<i64>,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RefreshReason {
+    /// Nothing usable on disk yet (first launch).
+    NoData,
+    /// A configured set is not installed.
+    MissingSet(String),
+    /// The data is older than the configured maximum age.
+    Stale,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct UpdatePlan {
-    pub sets_to_fetch: Vec<String>,
-    pub fetch_prices: bool,
-}
-
-/// Whether the manifest should be fetched now.
-pub fn should_check(local: &LocalState, now: i64, cfg: &UpdateConfig) -> bool {
-    match local.last_check_at {
-        Some(t) => now - t >= cfg.check_interval_secs || now < t,
-        None => true,
+/// Whether the data must be rebuilt now. `now` is a Unix time in seconds.
+pub fn refresh_reason(local: Option<&Manifest>, cfg: &DataConfig, now: i64) -> Option<RefreshReason> {
+    let Some(manifest) = local else { return Some(RefreshReason::NoData) };
+    if let Some(code) = cfg.sets.iter().find(|c| !manifest.sets.contains_key(*c)) {
+        return Some(RefreshReason::MissingSet(code.clone()));
     }
-}
-
-/// Compares the remote manifest to the local state. Only installed sets are
-/// refreshed; other sets are downloaded on demand when the player opens them.
-pub fn plan_update(local: &LocalState, remote: &Manifest) -> UpdatePlan {
-    let sets_to_fetch = local
-        .sets
-        .iter()
-        .filter(|(code, version)| {
-            remote.sets.get(*code).is_some_and(|r| &r.source_version != *version)
-        })
-        .map(|(code, _)| code.clone())
-        .collect();
-    let fetch_prices = local.prices_updated_at.as_deref() != Some(remote.prices_updated_at.as_str());
-    UpdatePlan { sets_to_fetch, fetch_prices }
-}
-
-/// Whether the local prices are old enough to warn the player.
-pub fn prices_are_stale(local: &LocalState, now: i64, cfg: &UpdateConfig) -> bool {
-    match local.prices_fetched_at {
-        Some(t) => now - t > cfg.stale_prices_secs,
-        None => true,
+    // An unreadable timestamp or a clock set in the past counts as stale: rebuilding is harmless.
+    let age = manifest.generated_at.parse::<i64>().ok().map(|t| now - t);
+    match age {
+        Some(secs) if (0..cfg.max_age_hours * 3600).contains(&secs) => None,
+        _ => Some(RefreshReason::Stale),
     }
 }

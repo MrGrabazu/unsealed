@@ -498,13 +498,7 @@ dependencies = [
 name = "data-builder"
 version = "0.1.0"
 dependencies = [
- "flate2",
- "rand",
- "rand_chacha",
- "serde",
- "serde_json",
  "unsealed-core",
- "ureq",
 ]
 
 [[package]]
@@ -3793,11 +3787,13 @@ dependencies = [
 name = "unsealed-core"
 version = "0.1.0"
 dependencies = [
+ "flate2",
  "rand",
  "rand_chacha",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+ "ureq",
 ]
 
 [[package]]

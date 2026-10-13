@@ -67,23 +67,26 @@ Règle générale : **la logique métier vit en Rust** (tirage, économie, achie
 
 ## 5. Architecture de distribution des données
 
-Le client ne doit **jamais** télécharger directement les fichiers bruts de MTGJSON ou Scryfall (plusieurs centaines de Mo).
+Le jeu est un client lourd : **il n'y a pas de serveur à héberger**. L'app construit elle-même ses données sur la machine du joueur, en tâche de fond.
 
 ```
-[GitHub Action quotidienne]
-   ├── récupère MTGJSON + bulk data Scryfall
-   ├── produit des fichiers compacts et compressés par set :
-   │     - config des boosters
-   │     - cartes (données utiles uniquement)
-   │     - prix
-   └── publie sur GitHub Releases / CDN gratuit
-            │
-            ▼
+[Lancement de l'app]
+   └── thread de fond (updater.rs)
+         ├── lit le manifest local ; refresh_reason() décide : aucune donnée, set manquant, ou données plus vieilles que maxAgeHours (24 h)
+         ├── si oui : core::builder::build()
+         │     ├── télécharge les sets MTGJSON voulus (cache 24 h) et le bulk Scryfall default_cards (cache par nom de fichier)
+         │     ├── valide chaque config de booster par simulation
+         │     └── écrit sets/, prices.json, manifest.json (rename atomique, manifest en dernier)
+         └── émet l'événement `data-status` ; l'UI se recharge à la fin
 [Client Unsealed]
-   ├── télécharge uniquement les sets que le joueur ouvre
-   ├── met à jour un petit fichier de prix chaque jour
-   └── charge les images depuis le CDN Scryfall, avec cache local
+   └── reste jouable sur les anciennes données pendant la mise à jour (ou affiche une erreur non bloquante hors ligne)
+   └── charge les images depuis le CDN Scryfall
 ```
+
+- Les sets proposés et la fraîcheur maximale vivent dans `config/data.json` (surchargeable par un `data.json` du dossier de données).
+- Les gros fichiers bruts sont gardés dans le dossier de cache de l'app ; les anciens bulks Scryfall sont supprimés après chaque build.
+- `UNSEALED_NO_UPDATE=1` désactive le job (développement).
+- Le CLI `data-builder` appelle le même code (`core/src/builder.rs`).
 
 ## 6. Moteur de tirage
 
@@ -152,9 +155,9 @@ Le client ne doit **jamais** télécharger directement les fichiers bruts de MTG
 
 | Dossier | Rôle |
 |---|---|
-| `core/` | Crate `unsealed-core` : parsing MTGJSON, tirage à seed, simulation, import, plan de mise à jour |
-| `data-builder/` | Produit `dist/` (sets compacts, `prices.json`, `manifest.json`) ; chaque config de booster doit passer la simulation |
-| `config/` | `economy.json` : devise, capital de départ, prix des boosters (suivent la valeur espérée × `evMarkupPercent`, surcharges fixes possibles), taux de revente (cartes et boosters scellés), aide quotidienne. `achievements.json` : voir 8 bis. Embarqués dans l'app ; un fichier du même nom dans le dossier de données les remplace |
+| `core/` | Crate `unsealed-core` : parsing MTGJSON, tirage à seed, simulation, import, construction des données (`builder`), décision de mise à jour (`update`) |
+| `data-builder/` | CLI fin autour de `core::builder` : produit `dist/` (sets compacts, `prices.json`, `manifest.json`) ; chaque config de booster doit passer la simulation. L'app fait la même chose seule au lancement |
+| `config/` | `economy.json` : devise, capital de départ, prix des boosters (suivent la valeur espérée × `evMarkupPercent`, surcharges fixes possibles), taux de revente (cartes et boosters scellés), aide quotidienne. `achievements.json` : voir 8 bis. `data.json` : sets à télécharger, types de boosters, âge maximal des données. Embarqués dans l'app ; un fichier du même nom dans le dossier de données les remplace |
 | `app/` | Frontend React/Vite ; `app/src-tauri/` = shell Tauri 2 (logique de jeu dans `game.rs`, testable sans Tauri) |
 
 - Données : `cargo run --release -p data-builder -- --sets BLB,DSK,FDN` (écrit `dist/`, cache dans `.cache/`)

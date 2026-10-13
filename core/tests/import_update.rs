@@ -2,9 +2,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::io::Cursor;
 use unsealed_core::catalog::{Manifest, ManifestSet};
 use unsealed_core::import::{parse_cents, prices_from_scryfall_jsonl, set_from_mtgjson};
-use unsealed_core::update::{
-    plan_update, prices_are_stale, should_check, LocalState, UpdateConfig, UpdatePlan,
-};
+use unsealed_core::update::{refresh_reason, DataConfig, RefreshReason};
 
 fn raw_set(sheet_card: &str, scryfall_id: &str) -> String {
     format!(
@@ -104,53 +102,54 @@ fn extracts_only_wanted_prices() {
     assert_eq!((p.usd, p.usd_foil, p.eur, p.eur_foil), (Some(25), None, Some(20), Some(110)));
 }
 
-fn manifest(version: &str, prices: &str) -> Manifest {
+fn manifest(generated_at: &str, sets: &[&str]) -> Manifest {
     Manifest {
-        generated_at: "0".into(),
-        prices_updated_at: prices.into(),
-        sets: BTreeMap::from([(
-            "BLB".to_string(),
-            ManifestSet {
-                name: "Bloomburrow".into(),
-                release_date: "2024-08-02".into(),
-                source_version: version.into(),
-                boosters: vec!["play".into()],
-            },
-        )]),
+        generated_at: generated_at.into(),
+        prices_updated_at: "day1".into(),
+        sets: sets
+            .iter()
+            .map(|code| {
+                (
+                    code.to_string(),
+                    ManifestSet {
+                        name: "Set".into(),
+                        release_date: "2024-08-02".into(),
+                        source_version: "v1".into(),
+                        boosters: vec!["play".into()],
+                    },
+                )
+            })
+            .collect::<BTreeMap<_, _>>(),
     }
 }
 
+fn data_config() -> DataConfig {
+    DataConfig::from_json(r#"{"sets":["BLB","DSK"]}"#).unwrap()
+}
+
 #[test]
-fn plan_refreshes_only_what_changed() {
-    let local = LocalState {
-        sets: BTreeMap::from([("BLB".to_string(), "v1".to_string())]),
-        prices_updated_at: Some("day1".into()),
-        ..Default::default()
-    };
-    assert_eq!(plan_update(&local, &manifest("v1", "day1")), UpdatePlan::default());
+fn data_config_applies_defaults() {
+    let cfg = data_config();
+    assert_eq!((cfg.boosters, cfg.max_age_hours, cfg.sim_boosters), (vec!["play".to_string()], 24, 20_000));
+}
+
+#[test]
+fn refresh_when_nothing_is_installed_or_a_set_is_missing() {
+    let cfg = data_config();
+    assert_eq!(refresh_reason(None, &cfg, 1_000), Some(RefreshReason::NoData));
     assert_eq!(
-        plan_update(&local, &manifest("v2", "day2")),
-        UpdatePlan { sets_to_fetch: vec!["BLB".into()], fetch_prices: true }
+        refresh_reason(Some(&manifest("1000", &["BLB"])), &cfg, 1_100),
+        Some(RefreshReason::MissingSet("DSK".into()))
     );
 }
 
 #[test]
-fn plan_ignores_sets_that_are_not_installed() {
-    let local = LocalState { prices_updated_at: Some("day1".into()), ..Default::default() };
-    assert!(plan_update(&local, &manifest("v9", "day1")).sets_to_fetch.is_empty());
-}
-
-#[test]
-fn check_interval_and_stale_prices() {
-    let cfg = UpdateConfig::default();
-    let mut local = LocalState::default();
-    assert!(should_check(&local, 1_000, &cfg));
-    assert!(prices_are_stale(&local, 1_000, &cfg));
-
-    local.last_check_at = Some(1_000);
-    local.prices_fetched_at = Some(1_000);
-    assert!(!should_check(&local, 1_000 + 3600, &cfg));
-    assert!(should_check(&local, 1_000 + cfg.check_interval_secs, &cfg));
-    assert!(!prices_are_stale(&local, 1_000 + 3600, &cfg));
-    assert!(prices_are_stale(&local, 1_000 + cfg.stale_prices_secs + 1, &cfg));
+fn refresh_only_when_data_is_older_than_the_limit() {
+    let cfg = data_config();
+    let local = manifest("1000", &["BLB", "DSK"]);
+    assert_eq!(refresh_reason(Some(&local), &cfg, 1_000 + 23 * 3600), None);
+    assert_eq!(refresh_reason(Some(&local), &cfg, 1_000 + 24 * 3600), Some(RefreshReason::Stale));
+    // Clock moved back, or garbage timestamp: rebuild.
+    assert_eq!(refresh_reason(Some(&local), &cfg, 500), Some(RefreshReason::Stale));
+    assert_eq!(refresh_reason(Some(&manifest("x", &["BLB", "DSK"])), &cfg, 1_000), Some(RefreshReason::Stale));
 }

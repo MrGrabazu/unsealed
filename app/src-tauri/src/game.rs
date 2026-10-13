@@ -218,8 +218,19 @@ impl Game {
         })
     }
 
+    /// Forgets everything loaded from the data directory; called after a background refresh.
+    pub fn reload_data(&mut self) {
+        self.sets.clear();
+        self.prices = None;
+        self.prices_stamp = None;
+    }
+
     pub fn list_sets(&self) -> Result<Vec<SetSummary>, String> {
         let path = self.data_dir.join("manifest.json");
+        // First launch: the background download has not produced any data yet.
+        if !path.exists() {
+            return Ok(Vec::new());
+        }
         let manifest: Manifest = read_json(&path)?;
         let mut sets: Vec<SetSummary> = manifest
             .sets
