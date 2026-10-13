@@ -24,20 +24,20 @@
     "description": "Apri 100.000 buste."
   },
   "value-100": {
-    "name": "Club dei cento",
-    "description": "Apri carte per un valore totale di 100 $."
+    "name": "Primo bottino",
+    "description": "Apri carte per un valore totale di {cents:10000}."
   },
   "value-1000": {
-    "name": "Quattro cifre",
-    "description": "Apri carte per un valore totale di 1.000 $."
+    "name": "Tesoro nascosto",
+    "description": "Apri carte per un valore totale di {cents:100000}."
   },
   "value-10000": {
-    "name": "Cinque cifre",
-    "description": "Apri carte per un valore totale di 10.000 $."
+    "name": "Tesoro del drago",
+    "description": "Apri carte per un valore totale di {cents:1000000}."
   },
   "value-100000": {
-    "name": "Sei cifre",
-    "description": "Apri carte per un valore totale di 100.000 $."
+    "name": "Imperatore dei Sigilli",
+    "description": "Apri carte per un valore totale di {cents:10000000}."
   },
   "sold-10": {
     "name": "Piccolo mercante",
@@ -117,23 +117,23 @@
   },
   "chase-card": {
     "name": "Carta ambita",
-    "description": "Trova una carta che vale 50 $ o più."
+    "description": "Trova una carta che vale {cents:5000} o più."
   },
   "high-roller": {
     "name": "Pezzo grosso",
-    "description": "Trova una carta che vale 200 $ o più."
+    "description": "Trova una carta che vale {cents:20000} o più."
   },
   "jackpot-card": {
     "name": "Jackpot",
-    "description": "Trova una carta che vale 1.000 $ o più."
+    "description": "Trova una carta che vale {cents:100000} o più."
   },
   "jackpot-pack": {
     "name": "Busta d'oro",
-    "description": "Apri una busta le cui carte valgono 100 $ o più."
+    "description": "Apri una busta le cui carte valgono {cents:10000} o più."
   },
   "profit-pack": {
     "name": "Ripagato",
-    "description": "Apri una busta che, una volta venduta, rende 50 $ più di quanto l'hai pagata."
+    "description": "Apri una busta che, una volta venduta, rende {cents:5000} più di quanto l'hai pagata."
   },
   "bulk-buyer": {
     "name": "All'ingrosso",
@@ -141,27 +141,27 @@
   },
   "speculator": {
     "name": "Speculatore",
-    "description": "Vendi buste sigillate a 5 $ più di quanto le hai pagate."
+    "description": "Vendi buste sigillate a {cents:500} più di quanto le hai pagate."
   },
   "market-wizard": {
     "name": "Mago della borsa",
-    "description": "Vendi buste sigillate a 50 $ più di quanto le hai pagate."
+    "description": "Vendi buste sigillate a {cents:5000} più di quanto le hai pagate."
   },
   "sacrifice": {
     "name": "Sacrificio necessario",
-    "description": "Vendi l'ultima copia di una carta che vale 20 $ o più."
+    "description": "Vendi l'ultima copia di una carta che vale {cents:2000} o più."
   },
   "nest-egg": {
     "name": "Gruzzoletto",
-    "description": "Possiedi 1.000 $ in una volta."
+    "description": "Possiedi {cents:100000} in una volta."
   },
   "tycoon": {
     "name": "Magnate",
-    "description": "Possiedi 10.000 $ in una volta."
+    "description": "Possiedi {cents:1000000} in una volta."
   },
   "dud": {
     "name": "Fregatura",
-    "description": "Apri una busta le cui carte valgono meno di 1 $."
+    "description": "Apri una busta le cui carte valgono meno di {cents:100}."
   },
   "drought": {
     "name": "Siccità",
@@ -185,7 +185,7 @@
   },
   "bad-investment": {
     "name": "Cattivo affare",
-    "description": "Vendi buste sigillate a 5 $ meno di quanto le hai pagate."
+    "description": "Vendi buste sigillate a {cents:500} meno di quanto le hai pagate."
   },
   "bulk-sale": {
     "name": "Svendita totale",

@@ -9,6 +9,10 @@ export const fr: Messages = {
   "common.ok": "OK",
   "common.none": "—",
 
+  // ---- currency (the game's own, fictional: Seals)
+  "currency.amount_one": "{count} Sceau",
+  "currency.amount_other": "{count} Sceaux",
+
   // ---- booster kinds
   "kind.play": "Booster de jeu",
   "kind.draft": "Booster de draft",
@@ -231,7 +235,8 @@ export const fr: Messages = {
   "about.free1": "Unsealed est entièrement gratuit : aucun achat, aucune microtransaction, aucune publicité.",
   "about.free2":
     "Sa monnaie, ses boosters et ses cartes sont virtuels. Ils ne peuvent être ni achetés, ni vendus, ni échangés contre quoi que ce soit de réel, et n'ont aucune valeur monétaire.",
-  "about.free3": "Les prix du marché sont affichés uniquement à titre de divertissement.",
+  "about.free3":
+    "Les prix sont en Sceaux, la monnaie propre au jeu. Ils suivent le marché réel des cartes, uniquement pour le plaisir : les Sceaux n'ont aucune valeur en dehors du jeu.",
   "about.fcpTitle": "Fan Content Policy",
   "about.fcpOriginal": "Mention officielle (en anglais, comme requis) :",
   "about.fcp1":

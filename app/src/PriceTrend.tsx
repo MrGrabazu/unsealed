@@ -1,12 +1,13 @@
 import { useI18n } from "./i18n";
-import { useMoney } from "./money";
+import { useMoneyText } from "./money";
 
 const WIDTH = 90;
 const HEIGHT = 26;
 
 /** Sparkline of a booster's recent prices with the change since the previous price update. */
 export function PriceTrend({ history }: { history: number[] }) {
-  const money = useMoney();
+  // A title attribute holds text only: amounts are written out.
+  const money = useMoneyText();
   const { t } = useI18n();
   if (history.length < 2) {
     return <span className="hint trend">{t("trend.tracking")}</span>;

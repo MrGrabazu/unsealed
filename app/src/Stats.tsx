@@ -162,9 +162,13 @@ export function Stats({ refreshKey }: { refreshKey: string }) {
               </td>
               <td>{money(o.valueCents)}</td>
               <td>
-                {o.bestCard
-                  ? `${cardName(t, o.bestCard)} · ${money(o.bestCard.priceCents ?? 0)}`
-                  : t("common.none")}
+                {o.bestCard ? (
+                  <>
+                    {cardName(t, o.bestCard)} · {money(o.bestCard.priceCents ?? 0)}
+                  </>
+                ) : (
+                  t("common.none")
+                )}
               </td>
             </tr>
           ))}

@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { SetSummary, ShopItem, WalletView } from "./api";
 import { kindLabel, kindRank } from "./boosterKinds";
 import { useI18n } from "./i18n";
-import { useMoney } from "./money";
+import { useMoney, useMoneyText } from "./money";
 import { PriceTrend } from "./PriceTrend";
 import { SetIcon } from "./SetIcon";
 
@@ -28,7 +28,8 @@ interface SetGroup {
 /** The shop: buy sealed boosters, and ask for help when truly stranded. */
 export function Boosterium({ shop, sets, wallet, onBuy, onBuyAndOpen, onClaimCharity, busy }: Props) {
   const money = useMoney();
-  const { t, plural } = useI18n();
+  const moneyText = useMoneyText();
+  const { t, tx, plural } = useI18n();
   const [search, setSearch] = useState("");
   const [year, setYear] = useState("all");
   const [maxPrice, setMaxPrice] = useState(0);
@@ -67,9 +68,9 @@ export function Boosterium({ shop, sets, wallet, onBuy, onBuyAndOpen, onClaimCha
     <section>
       {wallet.charity.available && (
         <div className="charity">
-          <p>{t("shop.charity", { amount: money(wallet.charity.amountCents) })}</p>
+          <p>{tx("shop.charity", { amount: money(wallet.charity.amountCents) })}</p>
           <button className="primary" onClick={onClaimCharity} disabled={busy}>
-            {t("shop.charityAccept", { amount: money(wallet.charity.amountCents) })}
+            {tx("shop.charityAccept", { amount: money(wallet.charity.amountCents) })}
           </button>
         </div>
       )}
@@ -90,7 +91,8 @@ export function Boosterium({ shop, sets, wallet, onBuy, onBuyAndOpen, onClaimCha
         <select value={maxPrice} onChange={(e) => setMaxPrice(Number(e.target.value))}>
           {PRICE_LIMITS.map((limit) => (
             <option key={limit} value={limit}>
-              {limit === 0 ? t("shop.anyPrice") : t("shop.under", { amount: money(limit) })}
+              {/* An <option> holds text only: the amount is written out. */}
+              {limit === 0 ? t("shop.anyPrice") : t("shop.under", { amount: moneyText(limit) })}
             </option>
           ))}
         </select>
@@ -132,7 +134,7 @@ export function Boosterium({ shop, sets, wallet, onBuy, onBuyAndOpen, onClaimCha
                     </span>
                   )}
                 </span>
-                <span className="shop-from">{t("shop.from", { amount: money(cheapest) })}</span>
+                <span className="shop-from">{tx("shop.from", { amount: money(cheapest) })}</span>
               </button>
 
               {expanded && (
@@ -141,7 +143,7 @@ export function Boosterium({ shop, sets, wallet, onBuy, onBuyAndOpen, onClaimCha
                     <div key={`${item.setCode}/${item.kind}`} className="shop-row">
                       <div>
                         <div className="shop-name">{kindLabel(t, item.kind)}</div>
-                        <div className="hint">{t("shop.sellsBack", { amount: money(item.sellBackCents) })}</div>
+                        <div className="hint">{tx("shop.sellsBack", { amount: money(item.sellBackCents) })}</div>
                       </div>
                       <PriceTrend history={item.history} />
                       <div className="shop-price" title={t("shop.priceTitle")}>

@@ -105,9 +105,11 @@ pub struct CollectionView {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+/// How the interface shows amounts: in Seals, with a bronze, silver or gold coin.
 pub struct CurrencyView {
-    pub code: String,
-    pub symbol: String,
+    pub seals_per_cent: f64,
+    pub silver_from: u64,
+    pub gold_from: u64,
 }
 
 #[derive(Debug, Serialize)]
@@ -395,8 +397,9 @@ impl Game {
         Ok(WalletView {
             balance_cents: balance,
             currency: CurrencyView {
-                code: self.economy.currency.code.clone(),
-                symbol: self.economy.currency.symbol.clone(),
+                seals_per_cent: self.economy.currency.seals_per_cent,
+                silver_from: self.economy.currency.silver_from,
+                gold_from: self.economy.currency.gold_from,
             },
             charity: CharityStatus { amount_cents: self.economy.charity.amount_cents, available: charity_open },
             sealed,
@@ -459,7 +462,7 @@ impl Game {
             .prices
             .as_ref()
             .and_then(|p| p.boosters.get(&format!("{set_code}/{kind}")))
-            .map(|v| if self.economy.currency.code == "EUR" { v.eur } else { v.usd });
+            .map(|v| if self.economy.currency.market == "EUR" { v.eur } else { v.usd });
         self.economy.booster_price_cents(set_code, kind, ev)
     }
 
@@ -1160,7 +1163,7 @@ mod tests {
     fn a_new_player_has_the_starting_capital_and_no_help() {
         let mut g = game("wallet");
         let w = g.wallet().unwrap();
-        assert_eq!((w.balance_cents, w.currency.symbol.as_str()), (10_000, "$"));
+        assert_eq!((w.balance_cents, w.currency.seals_per_cent, w.currency.gold_from), (10_000, 1.0, 10_000));
         assert!(w.sealed.is_empty());
         assert!(!w.charity.available);
     }

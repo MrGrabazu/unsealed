@@ -9,6 +9,10 @@ export const es: Messages = {
   "common.ok": "Aceptar",
   "common.none": "—",
 
+  // ---- currency (the game's own, fictional: Seals)
+  "currency.amount_one": "{count} Sello",
+  "currency.amount_other": "{count} Sellos",
+
   // ---- booster kinds
   "kind.play": "Sobre de juego",
   "kind.draft": "Sobre de draft",
@@ -231,7 +235,8 @@ export const es: Messages = {
   "about.free1": "Unsealed es totalmente gratis: sin compras, sin microtransacciones, sin publicidad.",
   "about.free2":
     "Su moneda, sobres y cartas son virtuales. No se pueden comprar, vender ni cambiar por nada real, y no tienen valor monetario.",
-  "about.free3": "Los precios de mercado se muestran solo como entretenimiento.",
+  "about.free3":
+    "Los precios están en Sellos, la moneda propia del juego. Siguen el mercado real de cartas solo por diversión: los Sellos no tienen ningún valor fuera del juego.",
   "about.fcpTitle": "Fan Content Policy",
   "about.fcpOriginal": "Aviso oficial (en inglés, como se exige):",
   "about.fcp1":

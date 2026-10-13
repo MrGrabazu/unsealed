@@ -28,7 +28,7 @@ import { DataStatusBar, useDataStatus } from "./DataStatus";
 import { Footer } from "./Footer";
 import { useI18n } from "./i18n";
 import { Loading } from "./Loading";
-import { CurrencyContext, useMoney } from "./money";
+import { CurrencyContext, DEFAULT_CURRENCY, useMoney } from "./money";
 import { SealedBoosters } from "./SealedBoosters";
 import { Stats } from "./Stats";
 
@@ -67,9 +67,9 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   // Bumped after each opening so the collection view reloads.
   const [openings, setOpenings] = useState(0);
 
-  // This component renders the currency provider, so it cannot use `useMoney` itself.
-  const symbol = wallet?.currency.symbol ?? "$";
-  const money = (cents: number) => `${symbol}${(cents / 100).toFixed(2)}`;
+  // This component renders the currency provider, so it cannot use `useMoneyText` itself.
+  const currency = wallet?.currency ?? DEFAULT_CURRENCY;
+  const money = (cents: number) => i18n.plural("currency.amount", Math.round(cents * currency.sealsPerCent));
 
   const [toasts, setToasts] = useState<AchievementView[]>([]);
   // Bumped when achievements unlock so the achievements tab reloads.
@@ -172,7 +172,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     });
 
   return (
-    <CurrencyContext.Provider value={symbol}>
+    <CurrencyContext.Provider value={currency}>
       <div className="app">
         <header>
           <h1>Unsealed</h1>

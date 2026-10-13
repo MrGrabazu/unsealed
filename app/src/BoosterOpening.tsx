@@ -7,7 +7,7 @@ import { useMoney } from "./money";
 /** Reveals the cards of an opened booster one by one. */
 export function BoosterOpening({ cards }: { cards: OpenedCard[] }) {
   const money = useMoney();
-  const { t } = useI18n();
+  const { t, tx } = useI18n();
   const [revealed, setRevealed] = useState(0);
 
   // A new booster starts face down.
@@ -21,7 +21,7 @@ export function BoosterOpening({ cards }: { cards: OpenedCard[] }) {
       <div className="opening-bar">
         <span>{t("open.revealed", { revealed, total: cards.length })}</span>
         {!done && <button onClick={() => setRevealed(cards.length)}>{t("open.revealAll")}</button>}
-        {done && <strong className="total">{t("open.boosterValue", { amount: money(total) })}</strong>}
+        {done && <strong className="total">{tx("open.boosterValue", { amount: money(total) })}</strong>}
       </div>
       <div className="cards">
         {cards.map((card, i) => (

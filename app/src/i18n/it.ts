@@ -9,6 +9,10 @@ export const it: Messages = {
   "common.ok": "OK",
   "common.none": "—",
 
+  // ---- currency (the game's own, fictional: Seals)
+  "currency.amount_one": "{count} Sigillo",
+  "currency.amount_other": "{count} Sigilli",
+
   // ---- booster kinds
   "kind.play": "Busta di gioco",
   "kind.draft": "Busta draft",
@@ -231,7 +235,8 @@ export const it: Messages = {
   "about.free1": "Unsealed è completamente gratuito: nessun acquisto, nessuna microtransazione, nessuna pubblicità.",
   "about.free2":
     "La sua valuta, le buste e le carte sono virtuali. Non possono essere comprate, vendute o scambiate con nulla di reale e non hanno alcun valore monetario.",
-  "about.free3": "I prezzi di mercato sono mostrati solo a scopo di intrattenimento.",
+  "about.free3":
+    "I prezzi sono in Sigilli, la moneta propria del gioco. Seguono il mercato reale delle carte solo per divertimento: i Sigilli non hanno alcun valore fuori dal gioco.",
   "about.fcpTitle": "Fan Content Policy",
   "about.fcpOriginal": "Avviso ufficiale (in inglese, come richiesto):",
   "about.fcp1":

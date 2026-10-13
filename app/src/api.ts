@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 // Mirrors the structs serialized by the Rust side (src-tauri/src/game.rs).
-// All amounts are integer cents of the configured currency.
+// All amounts are integer cents of the market currency; the interface shows them in Seals.
 
 export interface SetSummary {
   code: string;
@@ -87,7 +87,8 @@ export interface BoosterSaleResult {
 
 export interface WalletView {
   balanceCents: number;
-  currency: { code: string; symbol: string };
+  /** How amounts are shown (in Seals, see money.tsx). */
+  currency: { sealsPerCent: number; silverFrom: number; goldFrom: number };
   charity: { amountCents: number; available: boolean };
   sealed: SealedStack[];
 }

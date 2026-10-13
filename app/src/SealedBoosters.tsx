@@ -21,7 +21,7 @@ interface Props {
 /** The sealed boosters the player owns, to pick the next one to open. */
 export function SealedBoosters({ sealed, sets, busy, onOpen, onOpenMany, onSell, onGoShopping }: Props) {
   const money = useMoney();
-  const { t } = useI18n();
+  const { t, tx } = useI18n();
   if (sealed.length === 0) {
     return (
       <div className="empty-state">
@@ -52,8 +52,8 @@ export function SealedBoosters({ sealed, sets, busy, onOpen, onOpenMany, onSell,
                 <span className="sealed-qty">×{s.quantity}</span>
               </div>
               <span className="hint">
-                {kindLabel(t, s.kind)} · {t("open.paid", { amount: money(s.costCents) })} ·{" "}
-                {t("open.worth", { amount: money(s.quantity * s.sellValueCents) })} ·{" "}
+                {kindLabel(t, s.kind)} · {tx("open.paid", { amount: money(s.costCents) })} ·{" "}
+                {tx("open.worth", { amount: money(s.quantity * s.sellValueCents) })} ·{" "}
                 <span className={pnl >= 0 ? "gain" : "loss"}>
                   {pnl >= 0 ? "+" : "−"}
                   {money(Math.abs(pnl))}
@@ -71,7 +71,7 @@ export function SealedBoosters({ sealed, sets, busy, onOpen, onOpenMany, onSell,
                   </button>
                 ))}
                 <button disabled={busy} onClick={() => onSell(s)}>
-                  {t("open.sellOne", { amount: money(s.sellValueCents) })}
+                  {tx("open.sellOne", { amount: money(s.sellValueCents) })}
                 </button>
               </div>
             </div>

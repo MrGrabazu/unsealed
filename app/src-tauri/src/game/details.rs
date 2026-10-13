@@ -59,7 +59,7 @@ pub struct PrintingView {
     pub rarity: String,
     pub released_at: Option<String>,
     pub image_url: Option<String>,
-    /// Today's market prices on Scryfall, in the game currency.
+    /// Today's market prices on Scryfall, in cents of the market currency.
     pub price_cents: Option<u32>,
     pub foil_price_cents: Option<u32>,
     /// The set is offered by the Boosterium.
@@ -133,7 +133,7 @@ impl Game {
         view.online = true;
 
         let offered: Vec<String> = self.list_sets().unwrap_or_default().into_iter().map(|s| s.code).collect();
-        let eur = self.economy.currency.code == "EUR";
+        let eur = self.economy.currency.market == "EUR";
         // Copies owned, by set then by Scryfall id.
         let mut owned_by_set: HashMap<String, HashMap<String, (u32, u32)>> = HashMap::new();
         view.printings = printings

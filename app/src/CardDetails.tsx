@@ -30,7 +30,7 @@ const rarityName = (t: I18n["t"], rarity: string) => {
 /** A card in detail: large image (turned over for double-faced cards), rules text, prices,
  * copies owned and every other printing. */
 export function CardDetails({ setCode, uuid, onClose }: Props) {
-  const { t, cardLang } = useI18n();
+  const { t, tx, cardLang } = useI18n();
   const money = useMoney();
   const [details, setDetails] = useState<CardDetailsView | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -117,7 +117,7 @@ export function CardDetails({ setCode, uuid, onClose }: Props) {
                     <dd>
                       {price(details.priceCents)}
                       {details.sellValueCents > 0 && (
-                        <span className="hint"> · {t("details.buys", { amount: money(details.sellValueCents) })}</span>
+                        <span className="hint"> · {tx("details.buys", { amount: money(details.sellValueCents) })}</span>
                       )}
                     </dd>
                   </>
@@ -130,7 +130,7 @@ export function CardDetails({ setCode, uuid, onClose }: Props) {
                       {details.foilSellValueCents > 0 && (
                         <span className="hint">
                           {" "}
-                          · {t("details.buys", { amount: money(details.foilSellValueCents) })}
+                          · {tx("details.buys", { amount: money(details.foilSellValueCents) })}
                         </span>
                       )}
                     </dd>
@@ -157,7 +157,7 @@ export function CardDetails({ setCode, uuid, onClose }: Props) {
                         <span>
                           {price(p.priceCents)}
                           {p.foilPriceCents != null && (
-                            <span className="hint"> · {t("details.foilPrice", { amount: money(p.foilPriceCents) })}</span>
+                            <span className="hint"> · {tx("details.foilPrice", { amount: money(p.foilPriceCents) })}</span>
                           )}
                         </span>
                         <span className="printing-tags">

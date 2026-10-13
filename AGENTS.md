@@ -102,6 +102,9 @@ Le jeu est un client lourd : **il n'y a pas de serveur à héberger**. L'app con
 
 ## 7. Économie (Boosterium)
 
+- **Monnaie du jeu : les Sceaux** (*Seals*, « Siegel », « Sellos », « Sigilli »), fictive, pour marquer que rien n'a de valeur réelle. En interne, tout reste en centimes de la **devise du marché** (`currency.market` de `economy.json` : USD ou EUR, source des prix Scryfall) ; l'interface affiche `centimes × sealsPerCent` (1 par défaut : 7,61 $ → 761 Sceaux), en nombre entier, avec une **pièce en forme de sceau** bronze, argent (`silverFrom`, 100) ou or (`goldFrom`, 10 000) selon le montant (`app/src/money.tsx`). Là où un élément est impossible (listes déroulantes, infobulles, notifications), le montant s'écrit en toutes lettres.
+- Les textes de configuration écrivent les montants en jetons `{cents:N}` (ex. descriptions d'achievements), convertis à l'affichage : ils restent justes si le ratio change. Un test interdit le « $ » dans les achievements et exige les mêmes jetons dans chaque traduction.
+
 - **Achat** des boosters au prix marché (ou prix configuré).
 - **Revente** des cartes à un **pourcentage du prix marché** (type buylist). **Valeur actuelle : prix du marché actuel − 20 % (soit 80 %)**, à équilibrer et à garder configurable.
   - Objectif : comme dans la réalité, la plupart des ouvertures sont perdantes, et un gros tirage procure un vrai plaisir.

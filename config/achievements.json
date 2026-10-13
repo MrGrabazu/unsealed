@@ -68,25 +68,25 @@
     },
 
     {
-      "id": "value-100", "name": "Hundred Club", "description": "Open cards worth $100 in total.",
+      "id": "value-100", "name": "First Hoard", "description": "Open cards worth {cents:10000} in total.",
       "rarity": "common", "emblem": "coin", "palette": "gold",
       "condition": { "type": "metric", "metric": "value_opened_cents", "atLeast": 10000 },
       "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 1 } }
     },
     {
-      "id": "value-1000", "name": "Four Figures", "description": "Open cards worth $1,000 in total.",
+      "id": "value-1000", "name": "Treasure Trove", "description": "Open cards worth {cents:100000} in total.",
       "rarity": "uncommon", "emblem": "coin", "palette": "gold",
       "condition": { "type": "metric", "metric": "value_opened_cents", "atLeast": 100000 },
       "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 3 } }
     },
     {
-      "id": "value-10000", "name": "Five Figures", "description": "Open cards worth $10,000 in total.",
+      "id": "value-10000", "name": "Dragon's Hoard", "description": "Open cards worth {cents:1000000} in total.",
       "rarity": "rare", "emblem": "coin", "palette": "gold",
       "condition": { "type": "metric", "metric": "value_opened_cents", "atLeast": 1000000 },
       "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 10 } }
     },
     {
-      "id": "value-100000", "name": "Six Figures", "description": "Open cards worth $100,000 in total.",
+      "id": "value-100000", "name": "Seal Emperor", "description": "Open cards worth {cents:10000000} in total.",
       "rarity": "mythic", "emblem": "coin", "palette": "gold",
       "condition": { "type": "metric", "metric": "value_opened_cents", "atLeast": 10000000 },
       "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 40 } }
@@ -211,31 +211,31 @@
       "reward": { "cashCents": 1000 }
     },
     {
-      "id": "chase-card", "name": "Chase Card", "description": "Pull a card worth $50 or more.",
+      "id": "chase-card", "name": "Chase Card", "description": "Pull a card worth {cents:5000} or more.",
       "rarity": "uncommon", "emblem": "gem", "palette": "royal",
       "condition": { "type": "event", "event": "CardAcquired", "where": [{ "field": "priceCents", "op": "gte", "value": 5000 }] },
       "reward": { "cashCents": 1000 }
     },
     {
-      "id": "high-roller", "name": "High Roller", "description": "Pull a card worth $200 or more.",
+      "id": "high-roller", "name": "High Roller", "description": "Pull a card worth {cents:20000} or more.",
       "rarity": "rare", "emblem": "gem", "palette": "royal",
       "condition": { "type": "event", "event": "CardAcquired", "where": [{ "field": "priceCents", "op": "gte", "value": 20000 }] },
       "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 5 } }
     },
     {
-      "id": "jackpot-card", "name": "Jackpot", "description": "Pull a card worth $1,000 or more.",
+      "id": "jackpot-card", "name": "Jackpot", "description": "Pull a card worth {cents:100000} or more.",
       "rarity": "mythic", "emblem": "gem", "palette": "gold",
       "condition": { "type": "event", "event": "CardAcquired", "where": [{ "field": "priceCents", "op": "gte", "value": 100000 }] },
       "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 25 } }
     },
     {
-      "id": "jackpot-pack", "name": "Golden Pack", "description": "Open a booster whose cards are worth $100 or more.",
+      "id": "jackpot-pack", "name": "Golden Pack", "description": "Open a booster whose cards are worth {cents:10000} or more.",
       "rarity": "rare", "emblem": "bolt", "palette": "gold",
       "condition": { "type": "event", "event": "BoosterOpened", "where": [{ "field": "valueCents", "op": "gte", "value": 10000 }] },
       "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 3 } }
     },
     {
-      "id": "profit-pack", "name": "Paid Off", "description": "Open a booster that pays back $50 more than you paid, once sold.",
+      "id": "profit-pack", "name": "Paid Off", "description": "Open a booster that pays back {cents:5000} more than you paid, once sold.",
       "rarity": "uncommon", "emblem": "chart", "palette": "forest",
       "condition": { "type": "event", "event": "BoosterOpened", "where": [{ "field": "profitCents", "op": "gte", "value": 5000 }] },
       "reward": { "cashCents": 1500 }
@@ -247,39 +247,39 @@
       "condition": { "type": "event", "event": "BoosterBought", "where": [{ "field": "quantity", "op": "gte", "value": 10 }] }
     },
     {
-      "id": "speculator", "name": "Speculator", "description": "Sell sealed boosters for $5 more than you paid.",
+      "id": "speculator", "name": "Speculator", "description": "Sell sealed boosters for {cents:500} more than you paid.",
       "rarity": "uncommon", "emblem": "chart", "palette": "forest",
       "condition": { "type": "event", "event": "BoosterSold", "where": [{ "field": "profitCents", "op": "gte", "value": 500 }] },
       "reward": { "cashCents": 1000 }
     },
     {
-      "id": "market-wizard", "name": "Market Wizard", "description": "Sell sealed boosters for $50 more than you paid.",
+      "id": "market-wizard", "name": "Market Wizard", "description": "Sell sealed boosters for {cents:5000} more than you paid.",
       "rarity": "rare", "emblem": "chart", "palette": "royal",
       "condition": { "type": "event", "event": "BoosterSold", "where": [{ "field": "profitCents", "op": "gte", "value": 5000 }] },
       "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 5 } }
     },
     {
-      "id": "sacrifice", "name": "Necessary Sacrifice", "description": "Sell the last copy of a card worth $20 or more.",
+      "id": "sacrifice", "name": "Necessary Sacrifice", "description": "Sell the last copy of a card worth {cents:2000} or more.",
       "rarity": "uncommon", "emblem": "scale", "palette": "rose",
       "condition": { "type": "event", "event": "CardSold", "where": [
         { "field": "wasLastCopy", "op": "eq", "value": true }, { "field": "unitCents", "op": "gte", "value": 2000 }
       ] }
     },
     {
-      "id": "nest-egg", "name": "Nest Egg", "description": "Hold $1,000 at once.",
+      "id": "nest-egg", "name": "Nest Egg", "description": "Hold {cents:100000} at once.",
       "rarity": "rare", "emblem": "coin", "palette": "gold",
       "condition": { "type": "metric", "metric": "best_balance_cents", "atLeast": 100000 },
       "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 5 } }
     },
     {
-      "id": "tycoon", "name": "Tycoon", "description": "Hold $10,000 at once.",
+      "id": "tycoon", "name": "Tycoon", "description": "Hold {cents:1000000} at once.",
       "rarity": "mythic", "emblem": "crown", "palette": "gold",
       "condition": { "type": "metric", "metric": "best_balance_cents", "atLeast": 1000000 },
       "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 30 } }
     },
 
     {
-      "id": "dud", "name": "Dud", "secret": true, "description": "Open a booster whose cards are worth less than $1.",
+      "id": "dud", "name": "Dud", "secret": true, "description": "Open a booster whose cards are worth less than {cents:100}.",
       "rarity": "common", "emblem": "skull", "palette": "onyx",
       "condition": { "type": "event", "event": "BoosterOpened", "where": [{ "field": "valueCents", "op": "lt", "value": 100 }] },
       "reward": { "cashCents": 300 }
@@ -314,7 +314,7 @@
       "condition": { "type": "event", "event": "CharityClaimed" }
     },
     {
-      "id": "bad-investment", "name": "Bad Investment", "secret": true, "description": "Sell sealed boosters for $5 less than you paid.",
+      "id": "bad-investment", "name": "Bad Investment", "secret": true, "description": "Sell sealed boosters for {cents:500} less than you paid.",
       "rarity": "common", "emblem": "chart", "palette": "onyx",
       "condition": { "type": "event", "event": "BoosterSold", "where": [{ "field": "profitCents", "op": "lte", "value": -500 }] },
       "reward": { "cashCents": 300 }

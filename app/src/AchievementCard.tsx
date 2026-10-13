@@ -1,6 +1,7 @@
 import { useId, type ReactNode } from "react";
 import type { AchievementView } from "./api";
 import { useI18n } from "./i18n";
+import { useAmountsInText } from "./money";
 
 // Achievement cards are drawn here, in SVG, with Unsealed's own visual identity: a framed
 // medallion with a banner. They deliberately share nothing with the layout of any trading
@@ -252,12 +253,13 @@ export function AchievementCard({ item }: { item: AchievementView }) {
   const [frameLight, frameDark] = FRAMES[item.rarity];
   const emblem = EMBLEMS[item.emblem] ?? EMBLEMS.star;
   const { t } = useI18n();
+  const amountsInText = useAmountsInText();
   const hidden = item.secret && !item.unlocked;
 
   const name = hidden ? "???" : item.name;
   // Bold capitals are about 0.72em wide, plus 1.5px of letter spacing; the banner holds ~470px.
   const nameSize = Math.max(24, Math.min(44, Math.floor((470 / name.length - 1.5) / 0.72)));
-  const text = hidden ? t("achievements.secretText") : (item.description ?? "");
+  const text = hidden ? t("achievements.secretText") : amountsInText(item.description ?? "");
   const lines = wrap(text, 32, 3);
   const ratio = item.progress && item.progress.goal > 0 ? item.progress.current / item.progress.goal : 0;
 

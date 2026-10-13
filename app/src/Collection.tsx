@@ -11,7 +11,7 @@ import { CardDetails } from "./CardDetails";
 import { CardImage } from "./CardImage";
 import { useI18n } from "./i18n";
 import { Loading } from "./Loading";
-import { useMoney } from "./money";
+import { useMoney, useMoneyText } from "./money";
 
 type Filter = "all" | "owned" | "missing";
 
@@ -26,7 +26,8 @@ interface Props {
 /** Collection of one set: completion progress, missing cards greyed out, selling. */
 export function Collection({ sets, refreshKey, onChanged }: Props) {
   const money = useMoney();
-  const { t, plural } = useI18n();
+  const moneyText = useMoneyText();
+  const { t, tx, plural } = useI18n();
   const [setCode, setSetCode] = useState("");
   const [view, setView] = useState<CollectionView | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
@@ -66,7 +67,7 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
     setPending(null);
     try {
       const result = await sellCards([{ uuid: card.uuid, foil, quantity: 1 }]);
-      setNotice(t("collection.sold", { card: card.name, amount: money(result.totalCents) }));
+      setNotice(t("collection.sold", { card: card.name, amount: moneyText(result.totalCents) }));
       await reload();
       onChanged();
     } catch (e) {
@@ -80,7 +81,7 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
       setNotice(
         result.soldCount === 0
           ? t("collection.noDuplicates")
-          : plural("collection.soldDuplicates", result.soldCount, { amount: money(result.totalCents) }),
+          : plural("collection.soldDuplicates", result.soldCount, { amount: moneyText(result.totalCents) }),
       );
       await reload();
       onChanged();
@@ -140,8 +141,8 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
         onMouseLeave={() => confirming && setPending(null)}
       >
         {confirming
-          ? t("collection.sacrifice", { amount: money(value) })
-          : t(foil ? "collection.sellFoil" : "collection.sell", { amount: money(value) })}
+          ? tx("collection.sacrifice", { amount: money(value) })
+          : tx(foil ? "collection.sellFoil" : "collection.sell", { amount: money(value) })}
       </button>
     );
   }

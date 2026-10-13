@@ -9,6 +9,10 @@ export const de: Messages = {
   "common.ok": "OK",
   "common.none": "—",
 
+  // ---- currency (the game's own, fictional: Seals)
+  "currency.amount_one": "{count} Siegel",
+  "currency.amount_other": "{count} Siegel",
+
   // ---- booster kinds
   "kind.play": "Play-Booster",
   "kind.draft": "Draft-Booster",
@@ -231,7 +235,8 @@ export const de: Messages = {
   "about.free1": "Unsealed ist komplett kostenlos: keine Käufe, keine Mikrotransaktionen, keine Werbung.",
   "about.free2":
     "Währung, Booster und Karten sind virtuell. Sie können nicht gegen etwas Reales gekauft, verkauft oder getauscht werden und haben keinen Geldwert.",
-  "about.free3": "Marktpreise werden nur zur Unterhaltung angezeigt.",
+  "about.free3":
+    "Die Preise sind in Siegeln, der eigenen Währung des Spiels. Sie folgen nur zum Spaß dem echten Kartenmarkt: Siegel haben außerhalb des Spiels keinen Wert.",
   "about.fcpTitle": "Fan Content Policy",
   "about.fcpOriginal": "Offizieller Hinweis (wie vorgeschrieben auf Englisch):",
   "about.fcp1":

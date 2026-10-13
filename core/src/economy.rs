@@ -1,5 +1,6 @@
 //! Economy rules, driven by a hand-edited config file (see `config/economy.json`).
-//! Amounts are integer cents of the configured currency.
+//! Amounts are integer cents of the market currency (USD or EUR). The player never sees
+//! them: the interface shows Seals, a fictional currency derived from them (`Currency`).
 
 use crate::booster::ConfigError;
 use crate::catalog::PriceSet;
@@ -19,11 +20,36 @@ pub struct EconomyConfig {
     pub charity: Charity,
 }
 
+/// The market prices behind the economy, and how the game's own currency, the Seals, is
+/// derived from them. Seals keep the game visibly apart from real money while following
+/// the real market.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Currency {
-    /// "USD" or "EUR": also selects which Scryfall price is used as the market price.
-    pub code: String,
-    pub symbol: String,
+    /// "USD" or "EUR": which Scryfall prices drive the economy.
+    #[serde(alias = "code")]
+    pub market: String,
+    /// Seals shown for one cent of the market currency.
+    #[serde(default = "one")]
+    pub seals_per_cent: f64,
+    /// From this many Seals, an amount shows a silver coin (bronze below).
+    #[serde(default = "silver_from")]
+    pub silver_from: u64,
+    /// From this many Seals, an amount shows a gold coin.
+    #[serde(default = "gold_from")]
+    pub gold_from: u64,
+}
+
+fn one() -> f64 {
+    1.0
+}
+
+fn silver_from() -> u64 {
+    100
+}
+
+fn gold_from() -> u64 {
+    10_000
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -61,11 +87,17 @@ impl EconomyConfig {
     }
 
     pub fn validate(&self) -> Result<(), ConfigError> {
-        if !matches!(self.currency.code.as_str(), "USD" | "EUR") {
+        if !matches!(self.currency.market.as_str(), "USD" | "EUR") {
             return Err(ConfigError::Invalid(format!(
-                "unsupported currency `{}` (expected USD or EUR)",
-                self.currency.code
+                "unsupported market currency `{}` (expected USD or EUR)",
+                self.currency.market
             )));
+        }
+        if !(self.currency.seals_per_cent > 0.0) {
+            return Err(ConfigError::Invalid("currency.sealsPerCent must be positive".into()));
+        }
+        if self.currency.silver_from == 0 || self.currency.silver_from >= self.currency.gold_from {
+            return Err(ConfigError::Invalid("currency: 0 < silverFrom < goldFrom is required".into()));
         }
         if self.sell_rate_percent > 100 {
             return Err(ConfigError::Invalid("sellRatePercent must be between 0 and 100".into()));
@@ -102,7 +134,7 @@ impl EconomyConfig {
     /// Market price of a card in the configured currency. A foil card without a foil
     /// price has no price (it is not valued as a regular copy).
     pub fn market_price_cents(&self, prices: &PriceSet, foil: bool) -> Option<u32> {
-        match (self.currency.code.as_str(), foil) {
+        match (self.currency.market.as_str(), foil) {
             ("EUR", true) => prices.eur_foil,
             ("EUR", false) => prices.eur,
             (_, true) => prices.usd_foil,

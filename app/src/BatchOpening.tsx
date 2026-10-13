@@ -30,7 +30,7 @@ const RARITY_COUNTS: Record<string, "rarity.common" | "rarity.uncommon" | "rarit
 /** Plays an accelerated opening of many boosters, then shows a summary of the haul. */
 export function BatchOpening({ boosters }: { boosters: OpenedCard[][] }) {
   const money = useMoney();
-  const { t, plural } = useI18n();
+  const { t, tx, plural } = useI18n();
   const [index, setIndex] = useState(0);
   const [faceUp, setFaceUp] = useState(false);
   const [skipped, setSkipped] = useState(false);
@@ -93,7 +93,7 @@ export function BatchOpening({ boosters }: { boosters: OpenedCard[][] }) {
     <section className="opening">
       <div className="opening-bar">
         <strong>{t("batch.summary", { boosters: boosters.length, cards: summary.cardCount })}</strong>
-        <strong className="total">{t("batch.total", { amount: money(summary.value) })}</strong>
+        <strong className="total">{tx("batch.total", { amount: money(summary.value) })}</strong>
         <span>{t("batch.newCards", { count: summary.newCount })}</span>
       </div>
       <p className="hint">

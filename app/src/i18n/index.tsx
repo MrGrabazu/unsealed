@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, Fragment, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { setCardLanguage } from "../api";
 import { de } from "./de";
 import { en, type MessageKey, type Messages } from "./en";
@@ -41,6 +41,8 @@ export interface I18n {
   cardLang: CardLang;
   /** The text of `key` in the current language, with its `{placeholders}` filled. */
   t: (key: MessageKey, vars?: Vars) => string;
+  /** Like `t`, but placeholders may be elements (an amount with its coin, for instance). */
+  tx: (key: MessageKey, vars: Record<string, ReactNode>) => ReactNode;
   /** The plural form of `base` that fits `count` (also available as `{count}`). */
   plural: (base: PluralBase, count: number, vars?: Vars) => string;
   /** Unix time in seconds, as a medium date and short time. */
@@ -103,6 +105,13 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       setCardLangSetting,
       cardLang,
       t,
+      tx: (key, vars) =>
+        (messages[key] ?? en[key])
+          .split(/(\{\w+\})/)
+          .map((part, i) => {
+            const name = /^\{(\w+)\}$/.exec(part)?.[1];
+            return <Fragment key={i}>{name && name in vars ? vars[name] : part}</Fragment>;
+          }),
       plural: (base, count, vars) => {
         const form = rules.select(count) === "one" ? "one" : "other";
         return t(`${base}_${form}` as MessageKey, { count: numbers.format(count), ...vars });

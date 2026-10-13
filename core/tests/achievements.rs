@@ -198,6 +198,21 @@ fn invalid_configs_are_rejected() {
     assert!(bad(r#""op": "max", "field": "priceCents""#, r#""op": "max""#), "max without field");
 }
 
+/// The `{cents:N}` amount tokens of a text, in order.
+fn amount_tokens(text: &str) -> Vec<&str> {
+    text.match_indices("{cents:").map(|(i, _)| &text[i..i + text[i..].find('}').map_or(0, |end| end + 1)]).collect()
+}
+
+#[test]
+fn the_shipped_definitions_write_amounts_as_tokens_not_dollars() {
+    let engine = Engine::from_json(SHIPPED).unwrap();
+    for def in engine.definitions() {
+        assert!(!def.name.contains('$') && !def.description.contains('$'), "{}: names a real currency", def.id);
+    }
+    let chase = engine.definitions().iter().find(|d| d.id == "chase-card").unwrap();
+    assert_eq!(amount_tokens(&chase.description), ["{cents:5000}"]);
+}
+
 #[test]
 fn every_shipped_translation_covers_exactly_the_shipped_achievements() {
     let translations = [
@@ -220,7 +235,15 @@ fn every_shipped_translation_covers_exactly_the_shipped_achievements() {
             for field in ["name", "description"] {
                 let value = text[field].as_str().unwrap_or_default();
                 assert!(!value.trim().is_empty(), "{lang}/{id}: empty {field}");
+                assert!(!value.contains('$'), "{lang}/{id}: {field} names a real currency");
             }
+            // Amounts are `{cents:N}` tokens, shown in Seals: the same ones as in English.
+            let english = &engine.definitions().iter().find(|d| d.id == *id).unwrap().description;
+            assert_eq!(
+                amount_tokens(text["description"].as_str().unwrap_or_default()),
+                amount_tokens(english),
+                "{lang}/{id}: amounts differ from English"
+            );
         }
     }
 }

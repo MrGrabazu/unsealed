@@ -24,20 +24,20 @@
     "description": "Abre 100.000 sobres."
   },
   "value-100": {
-    "name": "Club de los cien",
-    "description": "Abre cartas por un valor total de 100 $."
+    "name": "Primer botín",
+    "description": "Abre cartas por un valor total de {cents:10000}."
   },
   "value-1000": {
-    "name": "Cuatro cifras",
-    "description": "Abre cartas por un valor total de 1.000 $."
+    "name": "Tesoro escondido",
+    "description": "Abre cartas por un valor total de {cents:100000}."
   },
   "value-10000": {
-    "name": "Cinco cifras",
-    "description": "Abre cartas por un valor total de 10.000 $."
+    "name": "Tesoro del dragón",
+    "description": "Abre cartas por un valor total de {cents:1000000}."
   },
   "value-100000": {
-    "name": "Seis cifras",
-    "description": "Abre cartas por un valor total de 100.000 $."
+    "name": "Emperador de los Sellos",
+    "description": "Abre cartas por un valor total de {cents:10000000}."
   },
   "sold-10": {
     "name": "Pequeño comerciante",
@@ -117,23 +117,23 @@
   },
   "chase-card": {
     "name": "Carta codiciada",
-    "description": "Consigue una carta que valga 50 $ o más."
+    "description": "Consigue una carta que valga {cents:5000} o más."
   },
   "high-roller": {
     "name": "Gran apostador",
-    "description": "Consigue una carta que valga 200 $ o más."
+    "description": "Consigue una carta que valga {cents:20000} o más."
   },
   "jackpot-card": {
     "name": "Premio gordo",
-    "description": "Consigue una carta que valga 1.000 $ o más."
+    "description": "Consigue una carta que valga {cents:100000} o más."
   },
   "jackpot-pack": {
     "name": "Sobre de oro",
-    "description": "Abre un sobre cuyas cartas valgan 100 $ o más."
+    "description": "Abre un sobre cuyas cartas valgan {cents:10000} o más."
   },
   "profit-pack": {
     "name": "Salió rentable",
-    "description": "Abre un sobre que, una vez vendido, te deje 50 $ más de lo que pagaste."
+    "description": "Abre un sobre que, una vez vendido, te deje {cents:5000} más de lo que pagaste."
   },
   "bulk-buyer": {
     "name": "Compra al por mayor",
@@ -141,27 +141,27 @@
   },
   "speculator": {
     "name": "Especulador",
-    "description": "Vende sobres sellados por 5 $ más de lo que pagaste."
+    "description": "Vende sobres sellados por {cents:500} más de lo que pagaste."
   },
   "market-wizard": {
     "name": "Mago del mercado",
-    "description": "Vende sobres sellados por 50 $ más de lo que pagaste."
+    "description": "Vende sobres sellados por {cents:5000} más de lo que pagaste."
   },
   "sacrifice": {
     "name": "Sacrificio necesario",
-    "description": "Vende la última copia de una carta que valga 20 $ o más."
+    "description": "Vende la última copia de una carta que valga {cents:2000} o más."
   },
   "nest-egg": {
     "name": "Buen colchón",
-    "description": "Ten 1.000 $ a la vez."
+    "description": "Ten {cents:100000} a la vez."
   },
   "tycoon": {
     "name": "Magnate",
-    "description": "Ten 10.000 $ a la vez."
+    "description": "Ten {cents:1000000} a la vez."
   },
   "dud": {
     "name": "Fiasco",
-    "description": "Abre un sobre cuyas cartas valgan menos de 1 $."
+    "description": "Abre un sobre cuyas cartas valgan menos de {cents:100}."
   },
   "drought": {
     "name": "Sequía",
@@ -185,7 +185,7 @@
   },
   "bad-investment": {
     "name": "Mala inversión",
-    "description": "Vende sobres sellados por 5 $ menos de lo que pagaste."
+    "description": "Vende sobres sellados por {cents:500} menos de lo que pagaste."
   },
   "bulk-sale": {
     "name": "Liquidación total",

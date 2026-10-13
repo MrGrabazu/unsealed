@@ -14,6 +14,10 @@ export const en = {
   "common.ok": "OK",
   "common.none": "—",
 
+  // ---- currency (the game's own, fictional: Seals)
+  "currency.amount_one": "{count} Seal",
+  "currency.amount_other": "{count} Seals",
+
   // ---- booster kinds
   "kind.play": "Play booster",
   "kind.draft": "Draft booster",
@@ -236,7 +240,8 @@ export const en = {
   "about.free1": "Unsealed is entirely free: no purchase, no microtransaction, no advertising.",
   "about.free2":
     "Its currency, boosters and cards are virtual. They cannot be bought, sold or exchanged for anything real, and they have no monetary value.",
-  "about.free3": "Market prices are shown for entertainment only.",
+  "about.free3":
+    "Prices are in Seals, the game's own currency. They follow the real card market for fun only: Seals have no value outside the game.",
   "about.fcpTitle": "Fan Content Policy",
   "about.fcpOriginal": "Official notice (in English, as required):",
   "about.fcp1":

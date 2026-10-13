@@ -4,7 +4,7 @@ import { getAchievements, type AchievementsView } from "./api";
 import { rewardText } from "./boosterKinds";
 import { useI18n } from "./i18n";
 import { Loading } from "./Loading";
-import { useMoney } from "./money";
+import { useMoneyText } from "./money";
 
 type Filter = "all" | "unlocked" | "locked" | "secret";
 
@@ -12,7 +12,7 @@ type Filter = "all" | "unlocked" | "locked" | "secret";
 export function Achievements({ refreshKey }: { refreshKey: number }) {
   const i18n = useI18n();
   const { t, lang, formatNumber } = i18n;
-  const money = useMoney();
+  const moneyText = useMoneyText();
   const [view, setView] = useState<AchievementsView | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +63,7 @@ export function Achievements({ refreshKey }: { refreshKey: number }) {
       </p>
       <div className="ach-grid">
         {shown.map((a) => {
-          const reward = a.reward && t("achievement.reward", { reward: rewardText(i18n, money, a.reward) });
+          const reward = a.reward && t("achievement.reward", { reward: rewardText(i18n, moneyText, a.reward) });
           return (
             <div key={a.id} className="ach-item">
               <AchievementCard item={a} />
