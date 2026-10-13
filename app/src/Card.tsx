@@ -25,6 +25,7 @@ export function Card({ card, faceUp, clickable, onReveal }: Props) {
         <div className="face front">
           <img src={card.imageUrl} alt={card.name} draggable={false} />
           {card.foil && <div className="foil-sheen" />}
+          {card.isNew && <span className="badge-new">NEW</span>}
         </div>
       </motion.div>
       <div className={`card-caption ${faceUp ? "visible" : ""}`}>

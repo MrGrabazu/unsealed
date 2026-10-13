@@ -3,3 +3,4 @@ node_modules/
 .cache/
 dist/
 app/src-tauri/gen/
+.dev-data/

@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { listSets, openBooster, type OpenedCard, type SetSummary } from "./api";
 import { BoosterOpening } from "./BoosterOpening";
+import { Collection } from "./Collection";
+
+type Tab = "open" | "collection";
 
 // Fan Content Policy notice (AGENTS.md, section 2). Check the wording against the current policy.
 const DISCLAIMER =
@@ -15,6 +18,9 @@ export function App() {
   const [cards, setCards] = useState<OpenedCard[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState<Tab>("open");
+  // Bumped after each opening so the collection view reloads.
+  const [openings, setOpenings] = useState(0);
 
   useEffect(() => {
     listSets()
@@ -40,6 +46,7 @@ export function App() {
     setError(null);
     try {
       setCards(await openBooster(setCode, kind));
+      setOpenings((n) => n + 1);
     } catch (e) {
       setError(String(e));
     } finally {
@@ -54,6 +61,18 @@ export function App() {
         <p className="tagline">Crack &amp; Collect</p>
       </header>
 
+      <nav className="tabs">
+        <button className={tab === "open" ? "active" : ""} onClick={() => setTab("open")}>
+          Open boosters
+        </button>
+        <button className={tab === "collection" ? "active" : ""} onClick={() => setTab("collection")}>
+          Collection
+        </button>
+      </nav>
+
+      {tab === "collection" && <Collection sets={sets} refreshKey={openings} />}
+
+      {tab === "open" && (
       <div className="controls">
         <select value={setCode} onChange={(e) => chooseSet(e.target.value)} disabled={sets.length === 0}>
           {sets.map((s) => (
@@ -73,6 +92,7 @@ export function App() {
           {busy ? "Opening…" : "Open a booster"}
         </button>
       </div>
+      )}
 
       {error && <p className="error">{error}</p>}
       {!error && sets.length === 0 && (
@@ -80,7 +100,7 @@ export function App() {
           No data found. Run <code>cargo run --release -p data-builder -- --sets BLB,DSK,FDN</code> first.
         </p>
       )}
-      {cards && <BoosterOpening cards={cards} />}
+      {tab === "open" && cards && <BoosterOpening cards={cards} />}
 
       <footer>{DISCLAIMER}</footer>
     </div>
