@@ -8,6 +8,8 @@ export interface SetSummary {
   name: string;
   releaseDate: string;
   boosters: string[];
+  /** Art crop of the set's featured card. Must be shown unaltered, with its artist. */
+  art: { imageUrl: string; cardName: string; artist: string } | null;
 }
 
 export interface OpenedCard {

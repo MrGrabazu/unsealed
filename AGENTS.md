@@ -102,6 +102,9 @@ Le jeu est un client lourd : **il n'y a pas de serveur à héberger**. L'app con
 - **Achat** des boosters au prix marché (ou prix configuré).
 - **Revente** des cartes à un **pourcentage du prix marché** (type buylist). **Valeur actuelle : prix du marché actuel − 20 % (soit 80 %)**, à équilibrer et à garder configurable.
   - Objectif : comme dans la réalité, la plupart des ouvertures sont perdantes, et un gros tirage procure un vrai plaisir.
+- **Présentation** : une ligne par set (filtres par année et budget, prix « à partir de »), qui se déplie sur la liste de ses produits (types de booster, triés Play → Draft → Set → Collector). La vente de **boîtes de boosters** est prévue plus tard : elles s'ajouteront à cette liste de produits.
+- **Illustration des sets** : l'*art crop* Scryfall de la carte phare (la plus chère des boosters principaux, choisie au build : `featured` du manifest). Règles Scryfall : afficher l'artiste et le copyright à côté, ne jamais flouter, recadrer ni recolorer l'image. Pas de logo ni de symbole de set (marques de Wizards).
+- **Onglet d'ouverture** : grille des boosters possédés (vide avec un lien vers le Boosterium s'il n'y en a plus) ; une ouverture s'affiche une seule fois, quitter l'onglet la referme.
 - **Historique des prix des boosters** : à chaque nouveau `prices.json`, le prix de chaque booster est enregistré en SQLite (table `price_history`, un point par snapshot `updatedAt`). Le Boosterium et les boosters scellés affichent les 30 derniers points en sparkline, avec la variation depuis la mise à jour précédente (`PriceTrend.tsx`).
 - **Capital de départ** et **petit revenu quotidien** pour éviter un game over définitif.
 - Tous les paramètres économiques sont **configurables** (pas de valeurs en dur dans le code).

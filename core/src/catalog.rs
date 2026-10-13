@@ -23,6 +23,17 @@ pub struct SetFile {
     pub boosters: BTreeMap<String, BoosterConfig>,
 }
 
+/// Booster kind whose exclusive cards are extras, outside a set's completion target.
+pub const COLLECTOR_KIND: &str = "collector";
+
+impl SetFile {
+    /// Whether a booster kind is one of the set's main boosters (those that define what
+    /// completing the set means). A set offering nothing but collector boosters counts them.
+    pub fn is_main_booster(&self, kind: &str) -> bool {
+        kind != COLLECTOR_KIND || self.boosters.keys().all(|k| k == COLLECTOR_KIND)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CardEntry {
@@ -40,6 +51,9 @@ pub struct CardEntry {
     pub layout: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub side: Option<String>,
+    /// Illustrator, to credit the art wherever it is shown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artist: Option<String>,
 }
 
 /// Prices in cents, as given by Scryfall.
@@ -94,4 +108,16 @@ pub struct ManifestSet {
     pub release_date: String,
     pub source_version: String,
     pub boosters: Vec<String>,
+    /// The card whose art illustrates the set in the shop.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub featured: Option<FeaturedCard>,
+}
+
+/// A card shown as the face of its set. Its art must be shown with its artist's name.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FeaturedCard {
+    pub scryfall_id: String,
+    pub name: String,
+    pub artist: String,
 }

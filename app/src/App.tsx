@@ -14,7 +14,6 @@ import {
   type AchievementView,
   type DataStatus,
   type OpenedCard,
-  type SealedStack,
   type SetSummary,
   type ShopItem,
   type WalletView,
@@ -26,7 +25,7 @@ import { BoosterOpening } from "./BoosterOpening";
 import { Boosterium } from "./Boosterium";
 import { Collection } from "./Collection";
 import { CurrencyContext, useMoney } from "./money";
-import { PriceTrend } from "./PriceTrend";
+import { SealedBoosters } from "./SealedBoosters";
 import { Stats } from "./Stats";
 
 type Tab = "boosterium" | "open" | "collection" | "achievements" | "stats";
@@ -57,50 +56,6 @@ function WalletBar({ wallet }: { wallet: WalletView }) {
   );
 }
 
-/** Batch sizes offered next to "Open one". */
-const BATCH_SIZES = [10, 100];
-
-function SealedRow(props: {
-  stack: SealedStack;
-  busy: boolean;
-  onOpen: () => void;
-  onOpenMany: (quantity: number) => void;
-  onSell: () => void;
-}) {
-  const money = useMoney();
-  const { stack: s, busy } = props;
-  // Profit if the whole stack were sold back today.
-  const pnl = s.quantity * s.sellValueCents - s.costCents;
-  return (
-    <div className="inventory-row">
-      <span>
-        {s.setName} · {s.kind} booster
-        <span className="hint">
-          {" "}
-          paid {money(s.costCents)} · worth {money(s.quantity * s.sellValueCents)} if sold ·{" "}
-          <span className={pnl >= 0 ? "gain" : "loss"}>
-            {pnl >= 0 ? "+" : "−"}
-            {money(Math.abs(pnl))}
-          </span>
-        </span>
-      </span>
-      <PriceTrend history={s.history} />
-      <strong>×{s.quantity}</strong>
-      <button disabled={busy} onClick={props.onSell}>
-        Sell one ({money(s.sellValueCents)})
-      </button>
-      {BATCH_SIZES.filter((n) => s.quantity >= n).map((n) => (
-        <button key={n} disabled={busy} onClick={() => props.onOpenMany(n)}>
-          Open ×{n}
-        </button>
-      ))}
-      <button className="primary" disabled={busy} onClick={props.onOpen}>
-        Open one
-      </button>
-    </div>
-  );
-}
-
 export function App() {
   const [notice, setNotice] = useState<string | null>(null);
   const [sets, setSets] = useState<SetSummary[]>([]);
@@ -108,6 +63,8 @@ export function App() {
   const [wallet, setWallet] = useState<WalletView | null>(null);
   const [cards, setCards] = useState<OpenedCard[] | null>(null);
   const [batch, setBatch] = useState<OpenedCard[][] | null>(null);
+  // The booster kind shown in the opening view, to offer the next one.
+  const [last, setLast] = useState<{ setCode: string; kind: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<Tab>("boosterium");
@@ -188,6 +145,7 @@ export function App() {
   async function openMany(setCode: string, kind: string, quantity: number) {
     setCards(null);
     setBatch(await openBoosters(setCode, kind, quantity));
+    setLast({ setCode, kind });
     setOpenings((n) => n + 1);
     setTab("open");
   }
@@ -195,9 +153,23 @@ export function App() {
   async function open(setCode: string, kind: string) {
     setBatch(null);
     setCards(await openBooster(setCode, kind));
+    setLast({ setCode, kind });
     setOpenings((n) => n + 1);
     setTab("open");
   }
+
+  /** Leaves the opening view: an opening is shown once, never replayed. */
+  function closeOpening() {
+    setCards(null);
+    setBatch(null);
+  }
+
+  function switchTab(t: Tab) {
+    if (t !== tab) closeOpening();
+    setTab(t);
+  }
+
+  const remaining = last && wallet?.sealed.find((s) => s.setCode === last.setCode && s.kind === last.kind);
 
   const buy = (item: ShopItem, quantity: number) =>
     run(() => buyBoosters(item.setCode, item.kind, quantity));
@@ -218,7 +190,7 @@ export function App() {
 
         <nav className="tabs">
           {(Object.keys(TAB_LABELS) as Tab[]).map((t) => (
-            <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>
+            <button key={t} className={tab === t ? "active" : ""} onClick={() => switchTab(t)}>
               {TAB_LABELS[t]}
               {t === "open" && wallet && wallet.sealed.length > 0 && (
                 <span className="tab-count">{wallet.sealed.reduce((n, s) => n + s.quantity, 0)}</span>
@@ -244,6 +216,7 @@ export function App() {
         {tab === "boosterium" && wallet && (
           <Boosterium
             shop={shop}
+            sets={sets}
             wallet={wallet}
             onBuy={buy}
             onBuyAndOpen={buyAndOpen}
@@ -254,30 +227,43 @@ export function App() {
 
         {tab === "open" && wallet && (
           <section>
-            <div className="inventory">
-              {wallet.sealed.length === 0 && <p className="hint">No sealed booster. Buy some in the Boosterium.</p>}
-              {wallet.sealed.map((s) => (
-                <SealedRow
-                  key={`${s.setCode}/${s.kind}`}
-                  stack={s}
-                  busy={busy}
-                  onOpen={() => run(() => open(s.setCode, s.kind))}
-                  onOpenMany={(n) => run(() => openMany(s.setCode, s.kind, n))}
-                  onSell={() =>
-                    run(async () => {
-                      const sale = await sellBoosters(s.setCode, s.kind, 1);
-                      setNotice(
-                        `Sold 1 ${s.setCode} booster for ${money(sale.totalCents)} (${
-                          sale.profitCents >= 0 ? "profit" : "loss"
-                        } ${money(Math.abs(sale.profitCents))}).`,
-                      );
-                    })
-                  }
-                />
-              ))}
-            </div>
-            {cards && <BoosterOpening cards={cards} />}
-            {batch && <BatchOpening boosters={batch} />}
+            {cards || batch ? (
+              <>
+                <div className="controls">
+                  <button onClick={closeOpening}>← Back to my boosters</button>
+                  {remaining && (
+                    <button
+                      className="primary"
+                      disabled={busy}
+                      onClick={() => run(() => open(remaining.setCode, remaining.kind))}
+                    >
+                      Open the next one ({remaining.quantity} left)
+                    </button>
+                  )}
+                </div>
+                {cards && <BoosterOpening cards={cards} />}
+                {batch && <BatchOpening boosters={batch} />}
+              </>
+            ) : (
+              <SealedBoosters
+                sealed={wallet.sealed}
+                sets={sets}
+                busy={busy}
+                onOpen={(s) => run(() => open(s.setCode, s.kind))}
+                onOpenMany={(s, n) => run(() => openMany(s.setCode, s.kind, n))}
+                onSell={(s) =>
+                  run(async () => {
+                    const sale = await sellBoosters(s.setCode, s.kind, 1);
+                    setNotice(
+                      `Sold 1 ${s.setCode} booster for ${money(sale.totalCents)} (${
+                        sale.profitCents >= 0 ? "profit" : "loss"
+                      } ${money(Math.abs(sale.profitCents))}).`,
+                    );
+                  })
+                }
+                onGoShopping={() => switchTab("boosterium")}
+              />
+            )}
           </section>
         )}
 

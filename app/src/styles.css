@@ -149,6 +149,28 @@ h2 { margin: 24px 0 4px; }
 .shop-name { font-weight: 600; }
 .shop-price { color: var(--accent); font-weight: 700; min-width: 70px; text-align: right; }
 .shop-actions { display: flex; gap: 8px; }
+.shop-set { background: var(--panel); border-radius: 10px; }
+.shop-set.open { outline: 1px solid #343748; }
+.shop-set-header { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; background: none; border: none; padding: 12px 16px; }
+.shop-set-title { display: flex; flex-direction: column; flex: 1; }
+.shop-chevron { color: var(--accent); width: 12px; }
+.shop-from { color: var(--accent); font-weight: 600; }
+/* Natural aspect ratio: the art crop is never cropped further, blurred or recolored. */
+.shop-art { height: 64px; width: auto; border-radius: 6px; flex: none; }
+.shop-credit { color: var(--muted); font-size: 11px; font-style: italic; }
+
+/* Sealed boosters owned */
+.sealed-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; margin: 20px 0; }
+.sealed-tile { display: flex; flex-direction: column; background: var(--panel); border-radius: 10px; overflow: hidden; }
+/* Scaled to the tile width, never cropped, blurred or recolored. */
+.sealed-art { width: 100%; height: auto; display: block; }
+.sealed-body { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; }
+.sealed-title { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.sealed-qty { color: var(--accent); font-weight: 700; font-size: 18px; }
+.sealed-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.empty-state { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin: 24px 0; color: var(--muted); }
+.shop-products { display: flex; flex-direction: column; gap: 8px; padding: 0 12px 12px 38px; }
+.shop-products .shop-row { background: var(--bg); }
 .inventory { display: flex; flex-direction: column; gap: 10px; margin: 20px 0; }
 .inventory-row span { flex: 1; }
 

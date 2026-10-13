@@ -3,7 +3,7 @@
 //! background at launch. Every kept booster config must pass a rate simulation.
 
 use crate::catalog::{BoosterValue, Manifest, ManifestSet, PriceFile, PriceSet};
-use crate::import::{prices_by_uuid, prices_from_scryfall_jsonl, set_from_mtgjson, source_set_codes};
+use crate::import::{featured_card, prices_by_uuid, prices_from_scryfall_jsonl, set_from_mtgjson, source_set_codes};
 use crate::sim::expected_value_cents;
 use crate::{simulate, ColorIndex};
 use flate2::read::GzDecoder;
@@ -101,6 +101,7 @@ pub fn build(opts: &BuildOptions, progress: &mut dyn FnMut(&str)) -> Result<Mani
     let mut wanted = HashSet::new();
     let mut all_cards = Vec::new();
     let mut built_boosters = Vec::new();
+    let mut built_sets = Vec::new();
 
     for code in &opts.sets {
         let json = read_mtgjson_set(&opts.cache, code, progress)?;
@@ -129,12 +130,14 @@ pub fn build(opts: &BuildOptions, progress: &mut dyn FnMut(&str)) -> Result<Mani
         manifest_sets.insert(
             code.clone(),
             ManifestSet {
-                name: set.name,
-                release_date: set.release_date,
-                source_version: set.source_version,
+                name: set.name.clone(),
+                release_date: set.release_date.clone(),
+                source_version: set.source_version.clone(),
                 boosters: set.boosters.keys().cloned().collect(),
+                featured: None, // chosen once prices are known
             },
         );
+        built_sets.push(set);
     }
 
     // Prices come from the Scryfall "default_cards" bulk file, cached by file name
@@ -155,6 +158,11 @@ pub fn build(opts: &BuildOptions, progress: &mut dyn FnMut(&str)) -> Result<Mani
     let reader = BufReader::new(GzDecoder::new(BufReader::new(File::open(&bulk_path)?)));
     let by_scryfall_id = prices_from_scryfall_jsonl(reader, &wanted)?;
     let cards = prices_by_uuid(&by_scryfall_id, &all_cards);
+    for set in &built_sets {
+        if let Some(entry) = manifest_sets.get_mut(&set.code) {
+            entry.featured = featured_card(set, &cards);
+        }
+    }
 
     // Expected market value of each booster: the game prices boosters from it.
     let mut boosters = BTreeMap::new();

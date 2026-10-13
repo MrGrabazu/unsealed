@@ -1,7 +1,7 @@
 //! Conversion of raw MTGJSON / Scryfall data into the compact catalog files.
 
 use crate::booster::{BoosterConfig, ConfigError};
-use crate::catalog::{CardEntry, PriceSet, SetFile};
+use crate::catalog::{CardEntry, FeaturedCard, PriceSet, SetFile};
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashSet};
 use std::io::BufRead;
@@ -43,6 +43,8 @@ struct RawCard {
     finishes: Vec<String>,
     layout: String,
     side: Option<String>,
+    #[serde(default)]
+    artist: Option<String>,
     identifiers: RawIdentifiers,
 }
 
@@ -67,7 +69,49 @@ fn to_entry(c: RawCard) -> Result<CardEntry, ConfigError> {
         finishes: c.finishes,
         layout: c.layout,
         side: c.side,
+        artist: c.artist,
     })
+}
+
+/// The set's chase card: its most valuable own card from its main boosters (the
+/// non-foil price, else the foil one), which illustrates the set. Cards without an
+/// artist cannot be credited and are skipped; with no price at all, the first mythic
+/// or rare by collector number is used.
+pub fn featured_card(set: &SetFile, prices: &BTreeMap<String, PriceSet>) -> Option<FeaturedCard> {
+    let in_main: HashSet<&str> = set
+        .boosters
+        .iter()
+        .filter(|(kind, _)| set.is_main_booster(kind))
+        .flat_map(|(_, cfg)| cfg.sheets.values())
+        .flat_map(|sheet| sheet.cards.keys().map(String::as_str))
+        .collect();
+    let price = |c: &CardEntry| prices.get(&c.uuid).and_then(|p| p.usd.or(p.usd_foil)).unwrap_or(0);
+    let rank = |c: &CardEntry| match c.rarity.as_str() {
+        "mythic" => 2,
+        "rare" => 1,
+        _ => 0,
+    };
+    let candidates = set
+        .cards
+        .iter()
+        .filter(|c| c.set_code == set.code && c.artist.is_some() && in_main.contains(c.uuid.as_str()));
+    // Highest price, then highest rarity, then lowest collector number.
+    let best = candidates.min_by(|a, b| {
+        (price(b), rank(b))
+            .cmp(&(price(a), rank(a)))
+            .then_with(|| number_order(&a.number).cmp(&number_order(&b.number)))
+    })?;
+    Some(FeaturedCard {
+        scryfall_id: best.scryfall_id.clone(),
+        name: best.name.clone(),
+        artist: best.artist.clone()?,
+    })
+}
+
+/// Sort key for collector numbers such as "12", "12★" or "A-12": leading digits first.
+fn number_order(number: &str) -> (u32, &str) {
+    let digits: String = number.chars().take_while(char::is_ascii_digit).collect();
+    (digits.parse().unwrap_or(u32::MAX), number)
 }
 
 /// The wanted booster kinds this set actually has, in the wanted order. Sets differ

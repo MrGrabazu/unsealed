@@ -27,6 +27,18 @@ pub struct SetSummary {
     pub name: String,
     pub release_date: String,
     pub boosters: Vec<String>,
+    /// Art illustrating the set, with its credit.
+    pub art: Option<SetArt>,
+}
+
+/// The art crop of a set's featured card. Scryfall requires the artist to be credited
+/// wherever an art crop is shown, and the image to be left unaltered.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetArt {
+    pub image_url: String,
+    pub card_name: String,
+    pub artist: String,
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
@@ -320,6 +332,11 @@ impl Game {
                 name: s.name,
                 release_date: s.release_date,
                 boosters: s.boosters,
+                art: s.featured.map(|f| SetArt {
+                    image_url: art_crop_url(&f.scryfall_id),
+                    card_name: f.name,
+                    artist: f.artist,
+                }),
             })
             .collect();
         sets.sort_by(|a, b| b.release_date.cmp(&a.release_date));
@@ -848,18 +865,13 @@ impl Game {
     }
 }
 
-/// Booster kind whose exclusive cards stay outside the completion target.
-const COLLECTOR: &str = "collector";
-
 /// The set's own cards given by its main boosters, then those only collector boosters
-/// give, both in collector number order. A set offering nothing but collector boosters
-/// counts them as main boosters.
+/// give (see `SetFile::is_main_booster`), both in collector number order.
 fn obtainable_cards(file: &SetFile) -> (Vec<usize>, Vec<usize>) {
-    let has_main = file.boosters.keys().any(|k| k != COLLECTOR);
     let in_sheets = |main: bool| -> HashSet<&str> {
         file.boosters
             .iter()
-            .filter(|(kind, _)| (kind.as_str() != COLLECTOR || !has_main) == main)
+            .filter(|(kind, _)| file.is_main_booster(kind) == main)
             .flat_map(|(_, cfg)| cfg.sheets.values())
             .flat_map(|sheet| sheet.cards.keys().map(String::as_str))
             .collect()
@@ -892,8 +904,17 @@ fn read_json<T: serde::de::DeserializeOwned>(path: &std::path::Path) -> Result<T
 
 /// Scryfall CDN image of a card (normal size). Double-faced back sides are not handled yet.
 fn image_url(scryfall_id: &str) -> String {
+    scryfall_image(scryfall_id, "normal")
+}
+
+/// Scryfall CDN crop of a card's art only. Must be shown with the artist's name.
+fn art_crop_url(scryfall_id: &str) -> String {
+    scryfall_image(scryfall_id, "art_crop")
+}
+
+fn scryfall_image(scryfall_id: &str, version: &str) -> String {
     match scryfall_id.get(0..2) {
-        Some(p) => format!("https://cards.scryfall.io/normal/front/{}/{}/{scryfall_id}.jpg", &p[0..1], &p[1..2]),
+        Some(p) => format!("https://cards.scryfall.io/{version}/front/{}/{}/{scryfall_id}.jpg", &p[0..1], &p[1..2]),
         None => String::new(),
     }
 }

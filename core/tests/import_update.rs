@@ -84,6 +84,27 @@ fn keeps_the_wanted_kinds_the_set_has() {
 }
 
 #[test]
+fn the_featured_card_is_the_most_valuable_credited_card_of_the_main_boosters() {
+    use unsealed_core::catalog::PriceSet;
+    use unsealed_core::import::featured_card;
+    let mut set = set_from_mtgjson(&raw_set("u1", r#""scryfallId": "s1""#), &["play"], &[]).unwrap();
+    // Without an artist, a card cannot be credited, so it cannot illustrate the set.
+    assert_eq!(featured_card(&set, &BTreeMap::new()), None);
+
+    set.cards[0].artist = Some("Jane Doe".into());
+    let mut second = set.cards[0].clone();
+    (second.uuid, second.scryfall_id, second.name, second.number) = ("u2".into(), "s2".into(), "B".into(), "2".into());
+    set.cards.push(second);
+    set.boosters.get_mut("play").unwrap().sheets.get_mut("common").unwrap().cards.insert("u2".into(), 1);
+
+    // No price: the lowest collector number. Otherwise: the most valuable card.
+    assert_eq!(featured_card(&set, &BTreeMap::new()).unwrap().name, "A");
+    let prices = [("u2".to_string(), PriceSet { usd: Some(500), ..Default::default() })].into();
+    let featured = featured_card(&set, &prices).unwrap();
+    assert_eq!((featured.name.as_str(), featured.scryfall_id.as_str(), featured.artist.as_str()), ("B", "s2", "Jane Doe"));
+}
+
+#[test]
 fn rejects_a_set_without_any_wanted_kind() {
     assert!(set_from_mtgjson(&raw_set("u1", r#""scryfallId": "s1""#), &["collector"], &[]).is_err());
 }
@@ -125,6 +146,7 @@ fn manifest(generated_at: &str, sets: &[&str]) -> Manifest {
                         release_date: "2024-08-02".into(),
                         source_version: "v1".into(),
                         boosters: vec!["play".into()],
+                        featured: None,
                     },
                 )
             })
