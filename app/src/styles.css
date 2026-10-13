@@ -1,0 +1,108 @@
+:root {
+  --bg: #12131a;
+  --panel: #1b1d28;
+  --text: #e8e6df;
+  --muted: #8d90a0;
+  --accent: #e0a526;
+  --rare: #e0c15a;
+  --mythic: #e2682c;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, "Segoe UI", sans-serif;
+}
+
+.app { max-width: 1180px; margin: 0 auto; padding: 24px 24px 80px; }
+
+header { display: flex; align-items: baseline; gap: 14px; }
+h1 { margin: 0; font-size: 28px; letter-spacing: 0.04em; }
+.tagline { margin: 0; color: var(--accent); font-style: italic; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
+
+select, button {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid #343748;
+  border-radius: 8px;
+  padding: 9px 14px;
+  font: inherit;
+}
+button { cursor: pointer; }
+button:disabled, select:disabled { opacity: 0.5; cursor: default; }
+button.primary { background: var(--accent); color: #1a1405; border-color: var(--accent); font-weight: 600; }
+
+.error { color: #ff7a7a; }
+.hint { color: var(--muted); }
+code { background: var(--panel); padding: 2px 6px; border-radius: 4px; }
+
+.opening-bar { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; color: var(--muted); }
+.total { color: var(--accent); }
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 22px 16px;
+  perspective: 1400px;
+}
+
+.card-slot { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+
+/* Card format: 63 x 88 mm. */
+.card {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 63 / 88;
+  transform-style: preserve-3d;
+  border-radius: 4.5%;
+}
+.card.clickable { cursor: pointer; box-shadow: 0 0 0 3px var(--accent), 0 0 24px #e0a52655; }
+
+.face {
+  position: absolute;
+  inset: 0;
+  border-radius: 4.5%;
+  overflow: hidden;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.front { transform: rotateY(180deg); background: #000; }
+/* Never crop the image: the artist and copyright line must stay visible. */
+.front img { width: 100%; height: 100%; object-fit: contain; display: block; user-select: none; }
+
+/* Original card back (not the Magic one). */
+.back {
+  display: grid;
+  place-items: center;
+  background: repeating-linear-gradient(45deg, #26304f 0 10px, #1d2540 10px 20px);
+  border: 6px solid #0d1124;
+}
+.back span { font-size: 64px; font-weight: 700; color: var(--accent); opacity: 0.85; }
+
+.card[data-rarity="rare"] .front { box-shadow: 0 0 18px var(--rare); }
+.card[data-rarity="mythic"] .front { box-shadow: 0 0 22px var(--mythic); }
+
+.foil-sheen {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: color-dodge;
+  opacity: 0.45;
+  background: linear-gradient(115deg, transparent 20%, #ff7bd0 35%, #7bd0ff 50%, #b6ff7b 65%, transparent 80%);
+  background-size: 250% 250%;
+  animation: sheen 3.5s linear infinite;
+}
+@keyframes sheen { from { background-position: 0% 50%; } to { background-position: 250% 50%; } }
+
+.card-caption { display: flex; justify-content: space-between; width: 100%; font-size: 13px; opacity: 0; transition: opacity 0.4s 0.3s; }
+.card-caption.visible { opacity: 1; }
+.card-caption .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 8px; }
+.card-caption .price { color: var(--accent); }
+
+footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #2a2c3a; color: var(--muted); font-size: 12px; line-height: 1.5; }

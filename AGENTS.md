@@ -138,6 +138,19 @@ Le client ne doit **jamais** télécharger directement les fichiers bruts de MTG
 5. **Achievements** : moteur événementiel et premiers paliers.
 6. Ensuite : Collector Boosters, sets plus anciens, statistiques, cartes d'achievement, pipeline de distribution des données.
 
+## 10 bis. Structure du dépôt et commandes
+
+| Dossier | Rôle |
+|---|---|
+| `core/` | Crate `unsealed-core` : parsing MTGJSON, tirage à seed, simulation, import, plan de mise à jour |
+| `data-builder/` | Produit `dist/` (sets compacts, `prices.json`, `manifest.json`) ; chaque config de booster doit passer la simulation |
+| `app/` | Frontend React/Vite ; `app/src-tauri/` = shell Tauri 2 (logique de jeu dans `game.rs`, testable sans Tauri) |
+
+- Données : `cargo run --release -p data-builder -- --sets BLB,DSK,FDN` (écrit `dist/`, cache dans `.cache/`)
+- App en dev : `cd app && npm install && npm run tauri dev` (en debug elle lit `dist/` ; `UNSEALED_DATA_DIR` surcharge)
+- Tests : `cargo test --workspace` ; build du front : `cd app && npm run build`
+- Node : Vite 6 est utilisé car Node 21 est installé (Vite 7+ exige Node ≥ 20.19 / 22.12) ; passer à Node 22 LTS permettra de monter Vite.
+
 ## 11. Règles pour l'agent
 
 - Ne jamais introduire de mécanique liée à de l'argent réel, de la publicité conditionnant l'accès, ou un échange de valeur réelle.
