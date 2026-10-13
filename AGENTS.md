@@ -63,7 +63,7 @@ Règle générale : **la logique métier vit en Rust** (tirage, économie, achie
 - Prix quotidiens (USD/EUR, foil / non-foil).
 
 ### Prix des boosters scellés
-- Pas de source gratuite fiable : à définir dans la **configuration** du set, ou à calculer à partir de l'**espérance de valeur (EV)** du booster plus une marge.
+- Pas de source gratuite fiable : **décision actuelle = fichier de configuration édité à la main** par le mainteneur (un prix par set et par type de booster). Calcul à partir de l'**espérance de valeur (EV)** plus une marge = piste future, non retenue pour le moment.
 
 ## 5. Architecture de distribution des données
 
@@ -97,7 +97,7 @@ Le client ne doit **jamais** télécharger directement les fichiers bruts de MTG
 ## 7. Économie (Boosterium)
 
 - **Achat** des boosters au prix marché (ou prix configuré).
-- **Revente** des cartes à un **pourcentage du prix marché** (type buylist, ordre de grandeur 50 à 70 %, valeur à équilibrer et à garder configurable).
+- **Revente** des cartes à un **pourcentage du prix marché** (type buylist). **Valeur actuelle : prix du marché actuel − 20 % (soit 80 %)**, à équilibrer et à garder configurable.
   - Objectif : comme dans la réalité, la plupart des ouvertures sont perdantes, et un gros tirage procure un vrai plaisir.
 - **Capital de départ** et **petit revenu quotidien** pour éviter un game over définitif.
 - Tous les paramètres économiques sont **configurables** (pas de valeurs en dur dans le code).
