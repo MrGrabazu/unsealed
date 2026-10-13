@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 use unsealed_core::catalog::{Manifest, ManifestSet, PriceFile};
 use unsealed_core::import::{prices_from_scryfall_jsonl, set_from_mtgjson, source_set_codes};
-use unsealed_core::simulate;
+use unsealed_core::{simulate, ColorIndex};
 
 const USER_AGENT: &str = "Unsealed-data-builder/0.1";
 const ACCEPT: &str = "application/json;q=0.9,*/*;q=0.8";
@@ -131,8 +131,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         let extra_refs: Vec<&str> = extra_jsons.iter().map(String::as_str).collect();
         let set = set_from_mtgjson(&json, &kinds, &extra_refs).map_err(|e| format!("{code}: {e}"))?;
 
+        let colors = ColorIndex::from_cards(&set.cards);
         for (kind, cfg) in &set.boosters {
-            let report = simulate(cfg, opts.sim_boosters, &mut ChaCha8Rng::seed_from_u64(1))?;
+            let report = simulate(cfg, &colors, opts.sim_boosters, &mut ChaCha8Rng::seed_from_u64(1))?;
             let z = report.max_abs_z();
             if z > MAX_Z {
                 return Err(format!("{code}/{kind}: simulation failed, max |z| = {z:.2}").into());

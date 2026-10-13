@@ -1,7 +1,7 @@
 //! Simulation mode: opens N boosters and compares observed rates to expected rates.
 
 use crate::booster::BoosterConfig;
-use crate::draw::{open_booster, DrawError};
+use crate::draw::{open_booster, ColorIndex, DrawError};
 use rand::Rng;
 use std::collections::BTreeMap;
 
@@ -43,6 +43,9 @@ impl SimReport {
 /// Theoretical expected number of copies of each card per booster.
 /// Exact for sheets that allow duplicates; first-order approximation otherwise
 /// (later draws from the same sheet are slightly conditioned).
+///
+/// Cards of color-balanced sheets are left out: balancing changes their per-card
+/// frequencies by design (see `draw`), so they are checked by invariant instead.
 pub fn expected_rates(cfg: &BoosterConfig) -> BTreeMap<(String, bool), f64> {
     let mut out = BTreeMap::new();
     for pack in &cfg.boosters {
@@ -59,17 +62,23 @@ pub fn expected_rates(cfg: &BoosterConfig) -> BTreeMap<(String, bool), f64> {
             }
         }
     }
+    for sheet in cfg.sheets.values().filter(|s| s.balance_colors) {
+        for uuid in sheet.cards.keys() {
+            out.remove(&(uuid.clone(), sheet.foil));
+        }
+    }
     out
 }
 
 pub fn simulate<R: Rng + ?Sized>(
     cfg: &BoosterConfig,
+    colors: &ColorIndex,
     n: u64,
     rng: &mut R,
 ) -> Result<SimReport, DrawError> {
     let mut counts: BTreeMap<(String, bool), u64> = BTreeMap::new();
     for _ in 0..n {
-        for c in open_booster(cfg, rng)? {
+        for c in open_booster(cfg, colors, rng)? {
             *counts.entry((c.uuid, c.foil)).or_insert(0) += 1;
         }
     }

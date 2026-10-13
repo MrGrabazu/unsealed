@@ -10,5 +10,5 @@ pub mod sim;
 pub mod update;
 
 pub use booster::{BoosterConfig, BoosterPack, BoosterSheet, ConfigError};
-pub use draw::{open_booster, DrawError, DrawnCard};
+pub use draw::{open_booster, ColorIndex, DrawError, DrawnCard};
 pub use sim::{simulate, SimReport};
