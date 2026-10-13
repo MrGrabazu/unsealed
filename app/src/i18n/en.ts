@@ -247,6 +247,32 @@ export const en = {
     "Card images, set symbols and prices are provided by Scryfall (scryfall.com). Unsealed is not produced by or endorsed by Scryfall.",
   "about.sources2": "Booster contents and pull rates come from MTGJSON (mtgjson.com).",
 
+  // ---- card details
+  "card.flip": "Turn over",
+  "details.open": "See the details",
+  "details.loading": "Loading the card…",
+  "details.notPrintedIn": "Not printed in {language}: shown in English.",
+  "details.close": "Close",
+  "details.offline": "Card text and other printings are unavailable right now (no connection?). Showing what the game knows.",
+  "details.set": "{set} · #{number} · {rarity}",
+  "details.artist": "Illustrated by {artist}",
+  "details.market": "Market price",
+  "details.marketFoil": "Foil market price",
+  "details.buys": "the Boosterium buys it for {amount}",
+  "details.owned": "Owned",
+  "details.ownedCount": "{normal} normal · {foil} foil",
+  "details.printings": "Every printing",
+  "details.printingsHint": "This card in every set it was printed in, at today's market prices.",
+  "details.inGame": "in the game",
+  "details.thisOne": "this one",
+  "details.ownedShort": "owned: {count}",
+  "details.foilPrice": "foil {amount}",
+  "rarityName.common": "Common",
+  "rarityName.uncommon": "Uncommon",
+  "rarityName.rare": "Rare",
+  "rarityName.mythic": "Mythic rare",
+  "rarityName.special": "Special",
+
   // ---- footer
   "footer.sources": "Card images and prices are provided by Scryfall.",
 };

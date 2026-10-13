@@ -37,6 +37,8 @@ export interface I18n {
   setLang: (lang: Lang) => void;
   cardLangSetting: CardLangSetting;
   setCardLangSetting: (setting: CardLangSetting) => void;
+  /** The card language in effect ("auto" resolved to the interface language). */
+  cardLang: CardLang;
   /** The text of `key` in the current language, with its `{placeholders}` filled. */
   t: (key: MessageKey, vars?: Vars) => string;
   /** The plural form of `base` that fits `count` (also available as `{count}`). */
@@ -99,6 +101,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       setLang,
       cardLangSetting,
       setCardLangSetting,
+      cardLang,
       t,
       plural: (base, count, vars) => {
         const form = rules.select(count) === "one" ? "one" : "other";
@@ -107,7 +110,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       formatDate: (seconds) => dates.format(new Date(seconds * 1000)),
       formatNumber: (n) => numbers.format(n),
     };
-  }, [lang, setLang, cardLangSetting, setCardLangSetting]);
+  }, [lang, setLang, cardLangSetting, setCardLangSetting, cardLang]);
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }

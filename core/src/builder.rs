@@ -58,7 +58,8 @@ pub struct BuildOptions {
     pub sim_boosters: u64,
 }
 
-fn http_get(url: &str) -> Result<ureq::Response, BuildError> {
+/// A GET with the headers Scryfall and MTGJSON ask for (shared with `scryfall`).
+pub(crate) fn http_get(url: &str) -> Result<ureq::Response, BuildError> {
     Ok(ureq::get(url).set("User-Agent", USER_AGENT).set("Accept", ACCEPT).call()?)
 }
 

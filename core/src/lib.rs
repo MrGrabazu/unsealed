@@ -9,6 +9,7 @@ pub mod catalog;
 pub mod draw;
 pub mod economy;
 pub mod import;
+pub mod scryfall;
 pub mod sim;
 pub mod update;
 

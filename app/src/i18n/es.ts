@@ -242,6 +242,32 @@ export const es: Messages = {
     "Las imágenes de cartas, los símbolos de edición y los precios los proporciona Scryfall (scryfall.com). Unsealed no está producido ni respaldado por Scryfall.",
   "about.sources2": "El contenido de los sobres y las probabilidades provienen de MTGJSON (mtgjson.com).",
 
+  // ---- card details
+  "card.flip": "Dar la vuelta",
+  "details.open": "Ver el detalle",
+  "details.loading": "Cargando la carta…",
+  "details.notPrintedIn": "No impresa en {language}: se muestra en inglés.",
+  "details.close": "Cerrar",
+  "details.offline": "El texto de la carta y sus otras impresiones no están disponibles ahora (¿sin conexión?). Se muestra lo que sabe el juego.",
+  "details.set": "{set} · n.º {number} · {rarity}",
+  "details.artist": "Ilustrada por {artist}",
+  "details.market": "Precio de mercado",
+  "details.marketFoil": "Precio de mercado foil",
+  "details.buys": "el Boosterium la compra por {amount}",
+  "details.owned": "En posesión",
+  "details.ownedCount": "{normal} normal · {foil} foil",
+  "details.printings": "Todas las impresiones",
+  "details.printingsHint": "Esta carta en cada edición en la que se imprimió, a los precios de mercado de hoy.",
+  "details.inGame": "en el juego",
+  "details.thisOne": "esta",
+  "details.ownedShort": "en posesión: {count}",
+  "details.foilPrice": "foil {amount}",
+  "rarityName.common": "Común",
+  "rarityName.uncommon": "Infrecuente",
+  "rarityName.rare": "Rara",
+  "rarityName.mythic": "Rara mítica",
+  "rarityName.special": "Especial",
+
   // ---- footer
   "footer.sources": "Las imágenes y precios de las cartas los proporciona Scryfall.",
 };

@@ -1,8 +1,10 @@
 //! Game logic exposed to the UI. Independent from Tauri so it can be unit tested.
 
 mod achievements;
+mod details;
 
 pub use achievements::{AchievementTexts, AchievementView, AchievementsView};
+pub use details::CardDetailsView;
 
 use crate::store::{OpeningCard, OpeningOrder, OpeningRow, Sale, Store};
 use rand::SeedableRng;
@@ -58,6 +60,8 @@ pub struct OpenedCard {
     pub foil: bool,
     pub sheet: String,
     pub image_url: String,
+    /// Back face, for double-faced cards.
+    pub back_image_url: Option<String>,
     /// Market price in the game currency (cents), if known.
     pub price_cents: Option<u32>,
     /// First time the player owns this card (in any finish).
@@ -72,6 +76,8 @@ pub struct CollectionCard {
     pub number: String,
     pub rarity: String,
     pub image_url: String,
+    /// Back face, for double-faced cards.
+    pub back_image_url: Option<String>,
     pub quantity: u32,
     pub foil_quantity: u32,
     pub price_cents: Option<u32>,
@@ -516,11 +522,12 @@ impl Game {
                     .as_ref()
                     .and_then(|p| p.cards.get(&d.uuid))
                     .and_then(|p| economy.market_price_cents(p, d.foil));
-                let (name, image_url) = localized(card, card_lang);
+                let shown = localized(card, card_lang);
                 OpenedCard {
-                    image_url,
+                    image_url: shown.image_url,
+                    back_image_url: shown.back_image_url,
                     uuid: d.uuid,
-                    name,
+                    name: shown.name,
                     number: card.number.clone(),
                     rarity: card.rarity.clone(),
                     set_code: card.set_code.clone(),
@@ -585,13 +592,14 @@ impl Game {
                 .map(|&i| {
                     let c = &set.file.cards[i];
                     let have = owned.get(&c.uuid).copied().unwrap_or_default();
-                    let (name, image_url) = localized(c, &self.card_lang);
+                    let shown = localized(c, &self.card_lang);
                     CollectionCard {
                         uuid: c.uuid.clone(),
-                        name,
+                        name: shown.name,
                         number: c.number.clone(),
                         rarity: c.rarity.clone(),
-                        image_url,
+                        image_url: shown.image_url,
+                        back_image_url: shown.back_image_url,
                         quantity: have.normal,
                         foil_quantity: have.foil,
                         price_cents: self.market_price(&c.uuid, false),
@@ -781,15 +789,16 @@ impl Game {
         self.ensure_loaded(booster_set).ok()?;
         let set = &self.sets[booster_set];
         let card = &set.file.cards[*set.index.get(uuid)?];
-        let (name, image_url) = localized(card, &self.card_lang);
+        let shown = localized(card, &self.card_lang);
         Some(OpenedCard {
             uuid: card.uuid.clone(),
-            name,
+            name: shown.name,
             number: card.number.clone(),
             rarity: card.rarity.clone(),
             set_code: card.set_code.clone(),
             scryfall_id: card.scryfall_id.clone(),
-            image_url,
+            image_url: shown.image_url,
+            back_image_url: shown.back_image_url,
             foil,
             sheet: String::new(),
             price_cents,
@@ -963,12 +972,34 @@ fn read_json<T: serde::de::DeserializeOwned>(path: &std::path::Path) -> Result<T
     serde_json::from_str(&text).map_err(|e| format!("invalid {}: {e}", path.display()))
 }
 
-/// A card's name and image in `lang`, or in English when it was not printed in that language.
-/// A translated name without a translated printing on Scryfall keeps the English image.
-fn localized(card: &CardEntry, lang: &str) -> (String, String) {
-    match card.foreign.get(lang) {
-        Some(f) => (f.name.clone(), image_url(f.scryfall_id.as_deref().unwrap_or(&card.scryfall_id))),
-        None => (card.name.clone(), image_url(&card.scryfall_id)),
+/// Layouts whose Scryfall printing has a back face image.
+const DOUBLE_FACED: &[&str] = &["transform", "modal_dfc", "reversible_card", "double_faced_token", "art_series", "battle"];
+
+/// How a card looks in a language: its name and images.
+struct Shown {
+    name: String,
+    image_url: String,
+    /// For double-faced cards.
+    back_image_url: Option<String>,
+    /// The printing shown (the translated one when it exists).
+    scryfall_id: String,
+    /// The language actually shown: the requested one, or "en" when not printed in it.
+    lang: String,
+}
+
+/// A card's name and images in `lang`, or in English when it was not printed in that language.
+/// A translated name without a translated printing on Scryfall keeps the English images.
+fn localized(card: &CardEntry, lang: &str) -> Shown {
+    let foreign = card.foreign.get(lang);
+    let scryfall_id = foreign.and_then(|f| f.scryfall_id.clone()).unwrap_or_else(|| card.scryfall_id.clone());
+    Shown {
+        name: foreign.map_or(&card.name, |f| &f.name).clone(),
+        image_url: image_url(&scryfall_id),
+        back_image_url: DOUBLE_FACED
+            .contains(&card.layout.as_str())
+            .then(|| scryfall_image_face(&scryfall_id, "normal", "back")),
+        scryfall_id,
+        lang: if foreign.is_some() { lang.to_string() } else { "en".to_string() },
     }
 }
 
@@ -983,8 +1014,12 @@ fn art_crop_url(scryfall_id: &str) -> String {
 }
 
 fn scryfall_image(scryfall_id: &str, version: &str) -> String {
+    scryfall_image_face(scryfall_id, version, "front")
+}
+
+fn scryfall_image_face(scryfall_id: &str, version: &str, face: &str) -> String {
     match scryfall_id.get(0..2) {
-        Some(p) => format!("https://cards.scryfall.io/{version}/front/{}/{}/{scryfall_id}.jpg", &p[0..1], &p[1..2]),
+        Some(p) => format!("https://cards.scryfall.io/{version}/{face}/{}/{}/{scryfall_id}.jpg", &p[0..1], &p[1..2]),
         None => String::new(),
     }
 }
@@ -1160,6 +1195,62 @@ mod tests {
         format!(
             r#"{{ "updatedAt": "d{usd}", "cards": {{}}, "boosters": {{ "TST/play": {{ "usd": {usd}, "eur": 0 }} }} }}"#
         )
+    }
+
+    /// Diagnostic on the real data of `dist/` (built by `data-builder`).
+    #[test]
+    #[ignore = "needs the data built in dist/"]
+    fn real_data_shows_german_cards() {
+        let dist = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../dist");
+        let mut g = Game::with_parts(
+            dist,
+            Store::open_in_memory().unwrap(),
+            test_economy(),
+            no_achievements(),
+            ChaCha8Rng::seed_from_u64(1),
+            Box::new(|| Clock { now: 0, day: "2026-10-13".into() }),
+        )
+        .unwrap();
+        g.set_card_language("de");
+        let view = g.collection("BLB").unwrap();
+        let german = view.cards.iter().filter(|c| c.image_url.contains("/front/")).take(3);
+        for c in german {
+            println!("{} -> {}", c.name, c.image_url);
+        }
+        assert!(view.cards.iter().any(|c| c.name == "Bannendes Licht"), "set name: {}", view.set_name);
+    }
+
+    #[test]
+    fn card_details_combine_local_data_and_every_printing() {
+        let mut g = game_with_booster("details");
+        g.open_booster("TST", "play").unwrap();
+
+        let (mut view, query) = g.card_details_local("TST", "m1").unwrap();
+        assert_eq!((view.name.as_str(), view.owned, view.price_cents), ("Mythic", 1, Some(1_000)));
+        assert!(!view.online && view.back_image_url.is_none());
+        assert_eq!((query.english_id.as_str(), query.localized_id), ("123456", None));
+
+        let printing = |id: &str, set: &str, usd: &str| -> unsealed_core::scryfall::Card {
+            serde_json::from_str(&format!(
+                r#"{{ "id": "{id}", "oracle_id": "o1", "name": "Mythic", "set": "{set}", "set_name": "Set {set}",
+                     "collector_number": "2", "rarity": "mythic", "mana_cost": "{{2}}{{G}}", "type_line": "Creature",
+                     "oracle_text": "Trample", "power": "3", "toughness": "4", "prices": {{ "usd": "{usd}" }} }}"#
+            ))
+            .unwrap()
+        };
+        let card = printing("123456", "tst", "10.00");
+        let printings = [printing("old1", "old", "2.50"), card.clone()];
+        g.card_details_complete(&mut view, &card, None, &printings);
+
+        assert!(view.online);
+        assert_eq!(view.faces[0].stats.as_deref(), Some("3/4"));
+        assert_eq!(view.faces[0].mana_cost.as_deref(), Some("{2}{G}"));
+        let summary: Vec<_> = view
+            .printings
+            .iter()
+            .map(|p| (p.set_code.as_str(), p.in_game, p.owned, p.current, p.price_cents))
+            .collect();
+        assert_eq!(summary, [("OLD", false, 0, false, Some(250)), ("TST", true, 1, true, Some(1_000))]);
     }
 
     #[test]

@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import type { OpenedCard } from "./api";
+import { CardImage } from "./CardImage";
 import { useI18n } from "./i18n";
 import { useMoney } from "./money";
 
@@ -27,7 +28,8 @@ export function Card({ card, faceUp, clickable, onReveal }: Props) {
           <span>U</span>
         </div>
         <div className="face front">
-          <img src={card.imageUrl} alt={card.name} draggable={false} />
+          {/* Only a revealed card can be turned over: before that, a click reveals it. */}
+          <CardImage front={card.imageUrl} back={faceUp ? card.backImageUrl : null} alt={card.name} />
           {card.foil && <div className="foil-sheen" />}
           {card.isNew && <span className="badge-new">{t("open.new")}</span>}
         </div>

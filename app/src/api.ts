@@ -26,6 +26,8 @@ export interface OpenedCard {
   foil: boolean;
   sheet: string;
   imageUrl: string;
+  /** Back face, for double-faced cards. */
+  backImageUrl: string | null;
   /** Market price, if known. */
   priceCents: number | null;
   /** First time the player owns this card (in any finish). */
@@ -38,6 +40,8 @@ export interface CollectionCard {
   number: string;
   rarity: string;
   imageUrl: string;
+  /** Back face, for double-faced cards. */
+  backImageUrl: string | null;
   quantity: number;
   foilQuantity: number;
   priceCents: number | null;
@@ -190,6 +194,54 @@ export interface StatsView {
   boosters: BoosterStatsView[];
 }
 
+/** A card's details: local data, plus Scryfall's when it could be reached (`online`). */
+export interface CardDetailsView {
+  uuid: string;
+  setCode: string;
+  setName: string;
+  name: string;
+  /** The card language, or "en" when the card was not printed in it. */
+  shownLanguage: string;
+  number: string;
+  rarity: string;
+  imageUrl: string;
+  backImageUrl: string | null;
+  artist: string | null;
+  canBeFoil: boolean;
+  canBeNonfoil: boolean;
+  priceCents: number | null;
+  foilPriceCents: number | null;
+  sellValueCents: number;
+  foilSellValueCents: number;
+  owned: number;
+  ownedFoil: number;
+  faces: {
+    name: string;
+    manaCost: string | null;
+    typeLine: string | null;
+    text: string | null;
+    flavorText: string | null;
+    /** "3/4", a loyalty or a defense. */
+    stats: string | null;
+  }[];
+  printings: {
+    setCode: string;
+    setName: string;
+    number: string;
+    rarity: string;
+    releasedAt: string | null;
+    imageUrl: string | null;
+    /** Today's market prices on Scryfall. */
+    priceCents: number | null;
+    foilPriceCents: number | null;
+    inGame: boolean;
+    owned: number;
+    ownedFoil: number;
+    current: boolean;
+  }[];
+  online: boolean;
+}
+
 /** A game (its own collection, wallet and achievements), saved automatically. */
 export interface SaveInfo {
   id: string;
@@ -240,7 +292,9 @@ export const openBoosters = (setCode: string, kind: string, quantity: number) =>
   invoke<OpenedCard[][]>("open_boosters", { setCode, kind, quantity });
 export const getCollection = (setCode: string) =>
   invoke<CollectionView>("get_collection", { setCode });
-export const sellCards = (requests: SaleRequest[]) => invoke<SaleResult>("sell_cards", { requests });
+export const getCardDetails = (setCode: string, uuid: string) =>
+  invoke<CardDetailsView>("get_card_details", { setCode, uuid });
+export const sellCards =(requests: SaleRequest[]) => invoke<SaleResult>("sell_cards", { requests });
 export const sellDuplicates = (setCode: string) => invoke<SaleResult>("sell_duplicates", { setCode });
 export const claimCharity = () => invoke<void>("claim_charity");
 export const getStats = () => invoke<StatsView>("get_stats");

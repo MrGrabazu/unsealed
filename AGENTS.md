@@ -164,6 +164,14 @@ Le jeu est un client lourd : **il n'y a pas de serveur à héberger**. L'app con
 - **Restent en anglais** : les noms « Unsealed », « Crack & Collect » et « Boosterium », la notice de la Fan Content Policy (texte officiel, affiché tel quel, suivi d'une explication traduite), les étapes détaillées du téléchargement des données et les messages d'erreur venant du Rust.
 - **Ajouter une langue** : un fichier `app/src/i18n/<code>.ts`, une entrée dans `LANGUAGES` et `MESSAGES` (`i18n/index.tsx`), un `config/achievements.<code>.json`, et une ligne dans `ACHIEVEMENT_TRANSLATIONS` (`lib.rs`) et dans le test des traductions.
 
+## 8 quinquies. Fiche détaillée d'une carte
+
+- **Ouverture** : clic sur une carte de la Collection. La fiche montre la grande image, le texte de chaque face (coût en symboles de mana, type, texte, texte d'ambiance, force/endurance ou loyauté), l'artiste, les prix du marché normal et foil, ce que le Boosterium en donne, les exemplaires possédés, et **toutes les impressions** de la carte (set, numéro, année, prix du jour, « dans le jeu », exemplaires possédés).
+- **Source** : la partie locale vient des données du jeu ; le texte et les impressions viennent de l'**API Scryfall à la demande** (`core/src/scryfall.rs`), avec cache mémoire pour la session et au moins 100 ms entre deux requêtes (conditions de Scryfall). La commande Tauri est asynchrone et n'appelle le réseau ni sur le fil principal ni en tenant la session. Hors ligne, seule la partie locale s'affiche.
+- **Langue** : le texte vient de l'impression dans la langue des cartes quand elle existe (`printed_*`), sinon du texte Oracle anglais.
+- **Cartes double face** (transform, modal double face, réversible, bataille…) : bouton « Retourner » sur la fiche, dans la Collection et à l'ouverture (une fois la carte révélée). L'image du dos vient du CDN Scryfall (`/back/`).
+- Test réseau à la demande : `cargo test -p unsealed-core --test scryfall_live -- --ignored`.
+
 ## 9. Fonctionnalités de collection
 
 - Vue par set avec **pourcentage de complétion** et cartes manquantes affichées en grisé.

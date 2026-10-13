@@ -242,6 +242,32 @@ export const fr: Messages = {
     "Les images des cartes, les symboles d'extension et les prix sont fournis par Scryfall (scryfall.com). Unsealed n'est ni produit ni approuvé par Scryfall.",
   "about.sources2": "Le contenu des boosters et les taux de tirage proviennent de MTGJSON (mtgjson.com).",
 
+  // ---- card details
+  "card.flip": "Retourner",
+  "details.open": "Voir le détail",
+  "details.loading": "Chargement de la carte…",
+  "details.notPrintedIn": "Pas imprimée en {language} : affichée en anglais.",
+  "details.close": "Fermer",
+  "details.offline": "Le texte de la carte et ses autres impressions sont indisponibles pour l'instant (pas de connexion ?). Voici ce que le jeu connaît.",
+  "details.set": "{set} · n° {number} · {rarity}",
+  "details.artist": "Illustrée par {artist}",
+  "details.market": "Prix du marché",
+  "details.marketFoil": "Prix du marché en foil",
+  "details.buys": "le Boosterium la rachète {amount}",
+  "details.owned": "Possédées",
+  "details.ownedCount": "{normal} normale(s) · {foil} foil",
+  "details.printings": "Toutes les impressions",
+  "details.printingsHint": "Cette carte dans chaque extension où elle a été imprimée, aux prix du marché du jour.",
+  "details.inGame": "dans le jeu",
+  "details.thisOne": "celle-ci",
+  "details.ownedShort": "possédée(s) : {count}",
+  "details.foilPrice": "foil {amount}",
+  "rarityName.common": "Commune",
+  "rarityName.uncommon": "Peu commune",
+  "rarityName.rare": "Rare",
+  "rarityName.mythic": "Rare mythique",
+  "rarityName.special": "Spéciale",
+
   // ---- footer
   "footer.sources": "Images et prix des cartes fournis par Scryfall.",
 };

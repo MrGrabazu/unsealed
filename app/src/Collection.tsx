@@ -7,6 +7,8 @@ import {
   type CollectionView,
   type SetSummary,
 } from "./api";
+import { CardDetails } from "./CardDetails";
+import { CardImage } from "./CardImage";
 import { useI18n } from "./i18n";
 import { Loading } from "./Loading";
 import { useMoney } from "./money";
@@ -32,6 +34,8 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
   const [notice, setNotice] = useState<string | null>(null);
   // "uuid:foil" of a last copy waiting for a second click to confirm the sacrifice.
   const [pending, setPending] = useState<string | null>(null);
+  // The card whose details are open.
+  const [detailsOf, setDetailsOf] = useState<string | null>(null);
 
   useEffect(() => {
     if (!setCode && sets.length > 0) setSetCode(sets[0].code);
@@ -96,8 +100,15 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
     const total = c.quantity + c.foilQuantity;
     return (
       <div key={c.uuid} className={`collection-card ${total > 0 ? "" : "missing"}`} data-rarity={c.rarity}>
-        <div className="thumb">
-          <img src={c.imageUrl} alt={c.name} loading="lazy" draggable={false} />
+        <div
+          className="thumb clickable-thumb"
+          role="button"
+          tabIndex={0}
+          title={t("details.open")}
+          onClick={() => setDetailsOf(c.uuid)}
+          onKeyDown={(e) => e.key === "Enter" && setDetailsOf(c.uuid)}
+        >
+          <CardImage front={c.imageUrl} back={c.backImageUrl} alt={c.name} lazy />
           {total > 1 && <span className="badge-qty">×{total}</span>}
           {c.foilQuantity > 0 && <span className="badge-foil">{t("collection.foilBadge")}</span>}
         </div>
@@ -179,6 +190,9 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
             </>
           )}
         </>
+      )}
+      {view && detailsOf && (
+        <CardDetails setCode={view.setCode} uuid={detailsOf} onClose={() => setDetailsOf(null)} />
       )}
     </section>
   );

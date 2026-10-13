@@ -7,8 +7,8 @@ mod store;
 mod updater;
 
 use game::{
-    AchievementTexts, AchievementView, AchievementsView, BoosterSaleResult, CollectionView, DataInfo, Game, OpenedCard, SaleRequest,
-    SaleResult, SetSummary, ShopItem, StatsView, WalletView,
+    AchievementTexts, AchievementView, AchievementsView, BoosterSaleResult, CardDetailsView, CollectionView, DataInfo,
+    Game, OpenedCard, SaleRequest, SaleResult, SetSummary, ShopItem, StatsView, WalletView,
 };
 use saves::{SaveInfo, Saves};
 use std::error::Error;
@@ -19,6 +19,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{Manager, State};
 use unsealed_core::achievements::Engine;
 use unsealed_core::economy::EconomyConfig;
+use unsealed_core::scryfall;
 use unsealed_core::update::DataConfig;
 use updater::{DataStatus, SharedStatus};
 
@@ -250,6 +251,34 @@ fn get_stats(state: State<'_, SessionState>) -> Result<StatsView, String> {
     with_game(&state, |g| g.stats())
 }
 
+/// A card's details. Scryfall is asked on a worker thread, without holding the session:
+/// offline, the local part comes back alone (`online` is false).
+#[tauri::command]
+async fn get_card_details(
+    state: State<'_, SessionState>,
+    scryfall: State<'_, Arc<scryfall::Client>>,
+    set_code: String,
+    uuid: String,
+) -> Result<CardDetailsView, String> {
+    let (mut view, query) = with_game(&state, |g| g.card_details_local(&set_code, &uuid))?;
+    let client = scryfall.inner().clone();
+    let remote = tauri::async_runtime::spawn_blocking(move || {
+        let card = client.card(&query.english_id).ok()?;
+        let printed = query.localized_id.as_deref().and_then(|id| client.card(id).ok());
+        let printings = card.oracle_id.as_deref().and_then(|o| client.prints(o).ok()).unwrap_or_default();
+        Some((card, printed, printings))
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    if let Some((card, printed, printings)) = remote {
+        with_game(&state, |g| {
+            g.card_details_complete(&mut view, &card, printed.as_ref(), &printings);
+            Ok(())
+        })?;
+    }
+    Ok(view)
+}
+
 // ---- setup --------------------------------------------------------------------------
 
 /// Where the player's games live. `UNSEALED_SAVES_DIR` overrides everything; debug builds
@@ -340,6 +369,8 @@ pub fn run() {
                 card_lang: "en".to_string(),
             }));
 
+            app.manage(Arc::new(scryfall::Client::default()));
+
             let status: SharedStatus = Arc::new(Mutex::new(DataStatus::Checking));
             app.manage(status.clone());
             if std::env::var("UNSEALED_NO_UPDATE").is_ok() {
@@ -374,6 +405,7 @@ pub fn run() {
             get_achievements,
             take_unlocks,
             get_stats,
+            get_card_details,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Unsealed");

@@ -242,6 +242,32 @@ export const de: Messages = {
     "Kartenbilder, Set-Symbole und Preise werden von Scryfall (scryfall.com) bereitgestellt. Unsealed wird nicht von Scryfall erstellt oder unterstützt.",
   "about.sources2": "Booster-Inhalte und Ziehraten stammen von MTGJSON (mtgjson.com).",
 
+  // ---- card details
+  "card.flip": "Umdrehen",
+  "details.open": "Details ansehen",
+  "details.loading": "Karte wird geladen …",
+  "details.notPrintedIn": "Nicht auf {language} gedruckt: wird auf Englisch angezeigt.",
+  "details.close": "Schließen",
+  "details.offline": "Kartentext und weitere Drucke sind gerade nicht verfügbar (keine Verbindung?). Angezeigt wird, was das Spiel weiß.",
+  "details.set": "{set} · Nr. {number} · {rarity}",
+  "details.artist": "Illustriert von {artist}",
+  "details.market": "Marktpreis",
+  "details.marketFoil": "Marktpreis (Foil)",
+  "details.buys": "das Boosterium kauft sie für {amount}",
+  "details.owned": "Im Besitz",
+  "details.ownedCount": "{normal} normal · {foil} Foil",
+  "details.printings": "Alle Drucke",
+  "details.printingsHint": "Diese Karte in jedem Set, in dem sie gedruckt wurde, zu den heutigen Marktpreisen.",
+  "details.inGame": "im Spiel",
+  "details.thisOne": "diese",
+  "details.ownedShort": "im Besitz: {count}",
+  "details.foilPrice": "Foil {amount}",
+  "rarityName.common": "Häufig",
+  "rarityName.uncommon": "Nicht so häufig",
+  "rarityName.rare": "Selten",
+  "rarityName.mythic": "Mythisch selten",
+  "rarityName.special": "Besonders",
+
   // ---- footer
   "footer.sources": "Kartenbilder und Preise werden von Scryfall bereitgestellt.",
 };
