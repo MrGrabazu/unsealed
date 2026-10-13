@@ -154,6 +154,14 @@ Le jeu est un client lourd : **il n'y a pas de serveur à héberger**. L'app con
 - **Chargement** : écran de démarrage inline dans `index.html` et fond de fenêtre sombre (`backgroundColor`) pour éviter tout écran blanc ; composant `Loading` sur chaque écran qui attend des données.
 - **À propos** : description, gratuité et absence de valeur réelle, notice de la Fan Content Policy mot pour mot (`app/src/legal.ts`), crédits Scryfall et MTGJSON.
 
+## 8 quater. Langues
+
+- **Interface** en anglais, français, allemand, espagnol et italien. Module maison sans dépendance : `app/src/i18n/` (`en.ts` = référence ; `fr.ts`, `de.ts`, `es.ts`, `it.ts` typés `Messages`, donc **TypeScript refuse une langue incomplète**). `t(clé, { variables })`, `plural(base, n)` (clés `_one` / `_other` via `Intl.PluralRules`), dates et nombres au format de la langue.
+- **Choix** dans Options, mémorisé dans le `localStorage` ; par défaut la langue du système si elle est proposée, sinon l'anglais.
+- **Achievements** : l'anglais vit dans `config/achievements.json`, les traductions dans `config/achievements.<langue>.json` (id → nom et description), surchargeables depuis le dossier de données. Un test vérifie que chaque fichier couvre exactement les achievements définis : **ajouter un achievement oblige à le traduire**. Les récompenses sont renvoyées en données et formulées par l'interface.
+- **Restent en anglais** : les noms « Unsealed », « Crack & Collect » et « Boosterium », la notice de la Fan Content Policy (texte officiel, affiché tel quel, suivi d'une explication traduite), les noms et images des cartes, les noms des sets, les étapes détaillées du téléchargement des données et les messages d'erreur venant du Rust.
+- **Ajouter une langue** : un fichier `app/src/i18n/<code>.ts`, une entrée dans `LANGUAGES` et `MESSAGES` (`i18n/index.tsx`), un `config/achievements.<code>.json`, et une ligne dans `ACHIEVEMENT_TRANSLATIONS` (`lib.rs`) et dans le test des traductions.
+
 ## 9. Fonctionnalités de collection
 
 - Vue par set avec **pourcentage de complétion** et cartes manquantes affichées en grisé.

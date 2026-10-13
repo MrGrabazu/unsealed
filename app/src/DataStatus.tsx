@@ -1,6 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef, useState } from "react";
 import { getDataStatus, type DataStatus } from "./api";
+import { useI18n } from "./i18n";
 
 /** Follows the background data refresh. `onRefreshed` runs when a refresh completes. */
 export function useDataStatus(onRefreshed?: () => void): DataStatus {
@@ -25,26 +26,22 @@ export function useDataStatus(onRefreshed?: () => void): DataStatus {
   return status;
 }
 
-/** Progress of the background data refresh, or its failure (never blocking). */
+/** Progress of the background data refresh, or its failure (never blocking). The step
+ * itself comes from the data builder, in English. */
 export function DataStatusBar({ status }: { status: DataStatus }) {
+  const { t } = useI18n();
   if (status.state === "updating") {
     return (
       <div className="data-status">
         <div className="progress">
           <div className="progress-bar" style={{ width: `${status.percent}%` }} />
         </div>
-        <p className="hint">
-          Updating card data and prices ({status.percent}%): {status.message}…
-        </p>
+        <p className="hint">{t("data.updating", { percent: status.percent, step: status.message })}</p>
       </div>
     );
   }
   if (status.state === "failed") {
-    return (
-      <p className="hint data-status">
-        Could not refresh card data ({status.message}). Playing with the data already downloaded.
-      </p>
-    );
+    return <p className="hint data-status">{t("data.failed", { reason: status.message })}</p>;
   }
   return null;
 }

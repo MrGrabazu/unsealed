@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { SetSummary, ShopItem, WalletView } from "./api";
 import { kindLabel, kindRank } from "./boosterKinds";
+import { useI18n } from "./i18n";
 import { useMoney } from "./money";
 import { PriceTrend } from "./PriceTrend";
 import { SetIcon } from "./SetIcon";
@@ -27,6 +28,7 @@ interface SetGroup {
 /** The shop: buy sealed boosters, and ask for help when truly stranded. */
 export function Boosterium({ shop, sets, wallet, onBuy, onBuyAndOpen, onClaimCharity, busy }: Props) {
   const money = useMoney();
+  const { t, plural } = useI18n();
   const [search, setSearch] = useState("");
   const [year, setYear] = useState("all");
   const [maxPrice, setMaxPrice] = useState(0);
@@ -59,31 +61,20 @@ export function Boosterium({ shop, sets, wallet, onBuy, onBuyAndOpen, onClaimCha
     <section>
       {wallet.charity.available && (
         <div className="charity">
-          <p>
-            You have no money, no unopened booster and no card worth selling. The Boosterium offers{" "}
-            <strong>{money(wallet.charity.amountCents)}</strong> — once per day, and only when you are really stranded.
-          </p>
+          <p>{t("shop.charity", { amount: money(wallet.charity.amountCents) })}</p>
           <button className="primary" onClick={onClaimCharity} disabled={busy}>
-            Accept {money(wallet.charity.amountCents)}
+            {t("shop.charityAccept", { amount: money(wallet.charity.amountCents) })}
           </button>
         </div>
       )}
 
       <h2>Boosterium</h2>
-      <p className="hint">
-        Buy sealed boosters, then open them. Prices follow the market value of the cards, so unopened boosters can
-        gain or lose value: sell them back, or open them. Sell cards from your collection to fund the next ones.
-      </p>
+      <p className="hint">{t("shop.intro")}</p>
 
       <div className="controls">
-        <input
-          type="search"
-          placeholder="Search a set (name or code)"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+        <input type="search" placeholder={t("shop.search")} value={search} onChange={(e) => setSearch(e.target.value)} />
         <select value={year} onChange={(e) => setYear(e.target.value)}>
-          <option value="all">All years</option>
+          <option value="all">{t("shop.allYears")}</option>
           {years.map((y) => (
             <option key={y} value={y}>
               {y}
@@ -93,14 +84,14 @@ export function Boosterium({ shop, sets, wallet, onBuy, onBuyAndOpen, onClaimCha
         <select value={maxPrice} onChange={(e) => setMaxPrice(Number(e.target.value))}>
           {PRICE_LIMITS.map((limit) => (
             <option key={limit} value={limit}>
-              {limit === 0 ? "Any price" : `Under ${money(limit)}`}
+              {limit === 0 ? t("shop.anyPrice") : t("shop.under", { amount: money(limit) })}
             </option>
           ))}
         </select>
       </div>
 
       <div className="shop">
-        {groups.length === 0 && <p className="hint">No booster matches these filters.</p>}
+        {groups.length === 0 && <p className="hint">{t("shop.noMatch")}</p>}
         {groups.map(({ set, products }) => {
           const expanded = open.has(set.code);
           const cheapest = Math.min(...products.map((p) => p.priceCents));
@@ -115,16 +106,16 @@ export function Boosterium({ shop, sets, wallet, onBuy, onBuyAndOpen, onClaimCha
                     <SetIcon url={set.iconUrl} name={set.name} /> {set.name}
                   </span>
                   <span className="hint">
-                    {set.code} · released {set.releaseDate} · {products.length} booster
-                    {products.length > 1 ? " types" : " type"}
+                    {set.code} · {t("shop.released", { date: set.releaseDate })} ·{" "}
+                    {plural("shop.boosterTypes", products.length)}
                   </span>
                   {set.art && (
                     <span className="shop-credit">
-                      Art: {set.art.cardName} by {set.art.artist} · © Wizards of the Coast
+                      {t("art.credit", { card: set.art.cardName, artist: set.art.artist })}
                     </span>
                   )}
                 </span>
-                <span className="shop-from">from {money(cheapest)}</span>
+                <span className="shop-from">{t("shop.from", { amount: money(cheapest) })}</span>
               </button>
 
               {expanded && (
@@ -132,26 +123,26 @@ export function Boosterium({ shop, sets, wallet, onBuy, onBuyAndOpen, onClaimCha
                   {products.map((item) => (
                     <div key={`${item.setCode}/${item.kind}`} className="shop-row">
                       <div>
-                        <div className="shop-name">{kindLabel(item.kind)}</div>
-                        <div className="hint">sells back for {money(item.sellBackCents)}</div>
+                        <div className="shop-name">{kindLabel(t, item.kind)}</div>
+                        <div className="hint">{t("shop.sellsBack", { amount: money(item.sellBackCents) })}</div>
                       </div>
                       <PriceTrend history={item.history} />
-                      <div className="shop-price" title="Follows the market value of the cards">
+                      <div className="shop-price" title={t("shop.priceTitle")}>
                         {money(item.priceCents)}
                       </div>
                       <div className="shop-actions">
                         <button onClick={() => onBuy(item, 1)} disabled={busy || !canAfford(item, 1)}>
-                          Buy 1
+                          {t("shop.buy", { count: 1 })}
                         </button>
                         <button onClick={() => onBuy(item, 10)} disabled={busy || !canAfford(item, 10)}>
-                          Buy 10
+                          {t("shop.buy", { count: 10 })}
                         </button>
                         <button
                           className="primary"
                           onClick={() => onBuyAndOpen(item)}
                           disabled={busy || !canAfford(item, 1)}
                         >
-                          Buy &amp; open
+                          {t("shop.buyAndOpen")}
                         </button>
                       </div>
                     </div>

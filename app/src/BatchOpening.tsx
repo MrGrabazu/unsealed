@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { OpenedCard } from "./api";
 import { Card } from "./Card";
+import { useI18n } from "./i18n";
 import { useMoney } from "./money";
 
 /** Time each ordinary booster stays on screen. */
@@ -18,9 +19,18 @@ export const isBigCard = (c: OpenedCard) =>
 
 const noop = () => {};
 
+/** Plural texts counting the cards of each rarity. */
+const RARITY_COUNTS: Record<string, "rarity.common" | "rarity.uncommon" | "rarity.rare" | "rarity.mythic"> = {
+  common: "rarity.common",
+  uncommon: "rarity.uncommon",
+  rare: "rarity.rare",
+  mythic: "rarity.mythic",
+};
+
 /** Plays an accelerated opening of many boosters, then shows a summary of the haul. */
 export function BatchOpening({ boosters }: { boosters: OpenedCard[][] }) {
   const money = useMoney();
+  const { t, plural } = useI18n();
   const [index, setIndex] = useState(0);
   const [faceUp, setFaceUp] = useState(false);
   const [skipped, setSkipped] = useState(false);
@@ -65,10 +75,8 @@ export function BatchOpening({ boosters }: { boosters: OpenedCard[][] }) {
     return (
       <section className="opening">
         <div className="opening-bar">
-          <span>
-            Booster {index + 1} / {boosters.length}
-          </span>
-          <button onClick={() => setSkipped(true)}>Skip to summary</button>
+          <span>{t("batch.progress", { current: index + 1, total: boosters.length })}</span>
+          <button onClick={() => setSkipped(true)}>{t("batch.skip")}</button>
         </div>
         <div className="cards compact" key={index}>
           {cards.map((card, i) => (
@@ -84,18 +92,16 @@ export function BatchOpening({ boosters }: { boosters: OpenedCard[][] }) {
   return (
     <section className="opening">
       <div className="opening-bar">
-        <strong>
-          {boosters.length} boosters opened · {summary.cardCount} cards
-        </strong>
-        <strong className="total">Total value: {money(summary.value)}</strong>
-        <span>{summary.newCount} new</span>
+        <strong>{t("batch.summary", { boosters: boosters.length, cards: summary.cardCount })}</strong>
+        <strong className="total">{t("batch.total", { amount: money(summary.value) })}</strong>
+        <span>{t("batch.newCards", { count: summary.newCount })}</span>
       </div>
       <p className="hint">
         {Object.entries(summary.rarities)
-          .map(([rarity, n]) => `${n} ${rarity}`)
+          .map(([rarity, n]) => plural(RARITY_COUNTS[rarity] ?? "rarity.other", n))
           .join(" · ")}
       </p>
-      <h3>Best pulls</h3>
+      <h3>{t("batch.bestPulls")}</h3>
       <div className="cards compact">
         {summary.best.map((card, i) => (
           <Card key={`${card.uuid}-${i}`} card={card} faceUp clickable={false} onReveal={noop} />

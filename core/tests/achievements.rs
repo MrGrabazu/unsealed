@@ -199,6 +199,33 @@ fn invalid_configs_are_rejected() {
 }
 
 #[test]
+fn every_shipped_translation_covers_exactly_the_shipped_achievements() {
+    let translations = [
+        ("fr", include_str!("../../config/achievements.fr.json")),
+        ("de", include_str!("../../config/achievements.de.json")),
+        ("es", include_str!("../../config/achievements.es.json")),
+        ("it", include_str!("../../config/achievements.it.json")),
+    ];
+    let engine = Engine::from_json(SHIPPED).unwrap();
+    let ids: Vec<&str> = engine.definitions().iter().map(|d| d.id.as_str()).collect();
+    for (lang, json) in translations {
+        let texts: serde_json::Map<String, serde_json::Value> = serde_json::from_str(json).expect(lang);
+        let translated: Vec<&str> = texts.keys().map(String::as_str).collect();
+        let mut expected = ids.clone();
+        expected.sort_unstable();
+        let mut got = translated.clone();
+        got.sort_unstable();
+        assert_eq!(got, expected, "{lang}: translated ids differ from the definitions");
+        for (id, text) in &texts {
+            for field in ["name", "description"] {
+                let value = text[field].as_str().unwrap_or_default();
+                assert!(!value.trim().is_empty(), "{lang}/{id}: empty {field}");
+            }
+        }
+    }
+}
+
+#[test]
 fn the_shipped_config_is_valid_and_well_balanced() {
     let e = Engine::from_json(SHIPPED).expect("shipped achievements config is valid");
     let defs = e.definitions();

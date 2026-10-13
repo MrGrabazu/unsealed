@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import type { OpenedCard } from "./api";
 import { Card } from "./Card";
+import { useI18n } from "./i18n";
 import { useMoney } from "./money";
 
 /** Reveals the cards of an opened booster one by one. */
 export function BoosterOpening({ cards }: { cards: OpenedCard[] }) {
   const money = useMoney();
+  const { t } = useI18n();
   const [revealed, setRevealed] = useState(0);
 
   // A new booster starts face down.
@@ -17,11 +19,9 @@ export function BoosterOpening({ cards }: { cards: OpenedCard[] }) {
   return (
     <section className="opening">
       <div className="opening-bar">
-        <span>
-          {revealed} / {cards.length} revealed
-        </span>
-        {!done && <button onClick={() => setRevealed(cards.length)}>Reveal all</button>}
-        {done && <strong className="total">Booster value: {money(total)}</strong>}
+        <span>{t("open.revealed", { revealed, total: cards.length })}</span>
+        {!done && <button onClick={() => setRevealed(cards.length)}>{t("open.revealAll")}</button>}
+        {done && <strong className="total">{t("open.boosterValue", { amount: money(total) })}</strong>}
       </div>
       <div className="cards">
         {cards.map((card, i) => (
@@ -34,7 +34,7 @@ export function BoosterOpening({ cards }: { cards: OpenedCard[] }) {
           />
         ))}
       </div>
-      {!done && <p className="hint">Click the highlighted card to reveal it.</p>}
+      {!done && <p className="hint">{t("open.clickToReveal")}</p>}
     </section>
   );
 }

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { deleteSave, listSaves, loadGame, newGame, renameSave, type SaveInfo } from "./api";
 import { DataStatusBar, useDataStatus } from "./DataStatus";
-import { FOOTER_NOTICE } from "./legal";
+import { Footer } from "./Footer";
+import { useI18n } from "./i18n";
 import { Loading } from "./Loading";
 
 type Panel = "menu" | "new" | "load";
@@ -16,11 +17,9 @@ interface Props {
   onAbout: () => void;
 }
 
-const formatDate = (seconds: number) =>
-  seconds > 0 ? new Date(seconds * 1000).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "—";
-
 /** The home screen: continue, start or load a game, options and about. */
 export function Home({ current, onPlay, onCurrentChanged, onOptions, onAbout }: Props) {
+  const { t, plural, formatDate } = useI18n();
   const [saves, setSaves] = useState<SaveInfo[] | null>(null);
   const [panel, setPanel] = useState<Panel>("menu");
   const [name, setName] = useState("");
@@ -52,6 +51,7 @@ export function Home({ current, onPlay, onCurrentChanged, onOptions, onAbout }: 
   }
 
   const play = (id: string) => act(async () => onPlay(await loadGame(id)));
+  const date = (seconds: number) => (seconds > 0 ? formatDate(seconds) : t("common.none"));
 
   // "Continue" resumes the open game, or else the last played one.
   const latest = current ?? saves?.[0] ?? null;
@@ -75,7 +75,7 @@ export function Home({ current, onPlay, onCurrentChanged, onOptions, onAbout }: 
               disabled={busy}
               onClick={() => (current ? onPlay(current) : void play(latest.id))}
             >
-              Continue
+              {t("home.continue")}
               <span className="home-sub">{latest.name}</span>
             </button>
           )}
@@ -83,22 +83,20 @@ export function Home({ current, onPlay, onCurrentChanged, onOptions, onAbout }: 
             className={latest ? "" : "primary"}
             disabled={busy}
             onClick={() => {
-              setName(`Game ${saves.length + 1}`);
+              setName(t("home.defaultName", { number: saves.length + 1 }));
               setPanel("new");
             }}
           >
-            New game
+            {t("home.newGame")}
           </button>
           {saves.length > 0 && (
             <button disabled={busy} onClick={() => setPanel("load")}>
-              Load a game
-              <span className="home-sub">
-                {saves.length} save{saves.length > 1 ? "s" : ""}
-              </span>
+              {t("home.loadGame")}
+              <span className="home-sub">{plural("home.saveCount", saves.length)}</span>
             </button>
           )}
-          <button onClick={onOptions}>Options</button>
-          <button onClick={onAbout}>About</button>
+          <button onClick={onOptions}>{t("home.options")}</button>
+          <button onClick={onAbout}>{t("home.about")}</button>
         </nav>
       )}
 
@@ -110,18 +108,21 @@ export function Home({ current, onPlay, onCurrentChanged, onOptions, onAbout }: 
             void act(async () => onPlay(await newGame(name)));
           }}
         >
-          <h2>New game</h2>
-          <p className="hint">
-            A new collection and wallet, starting from scratch. Your other games are kept: each player on this computer
-            can have their own.
-          </p>
-          <input autoFocus value={name} maxLength={60} onChange={(e) => setName(e.target.value)} placeholder="Name" />
+          <h2>{t("home.newTitle")}</h2>
+          <p className="hint">{t("home.newHint")}</p>
+          <input
+            autoFocus
+            value={name}
+            maxLength={60}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={t("home.namePlaceholder")}
+          />
           <div className="controls">
             <button type="button" onClick={() => setPanel("menu")}>
-              ← Back
+              {t("common.back")}
             </button>
             <button className="primary" type="submit" disabled={busy}>
-              Start
+              {t("home.start")}
             </button>
           </div>
         </form>
@@ -129,8 +130,8 @@ export function Home({ current, onPlay, onCurrentChanged, onOptions, onAbout }: 
 
       {panel === "load" && saves && (
         <div className="home-panel">
-          <h2>Load a game</h2>
-          <p className="hint">Games are saved automatically. Save points are copies you can come back to.</p>
+          <h2>{t("home.loadTitle")}</h2>
+          <p className="hint">{t("home.loadHint")}</p>
           <div className="save-list">
             {saves.map((s) => (
               <div key={s.id} className={`save-row ${current?.id === s.id ? "current" : ""}`}>
@@ -153,26 +154,31 @@ export function Home({ current, onPlay, onCurrentChanged, onOptions, onAbout }: 
                       maxLength={60}
                       onChange={(e) => setRenaming({ id: s.id, name: e.target.value })}
                     />
-                    <button type="submit">OK</button>
+                    <button type="submit">{t("common.ok")}</button>
                     <button type="button" onClick={() => setRenaming(null)}>
-                      Cancel
+                      {t("common.cancel")}
                     </button>
                   </form>
                 ) : (
                   <div className="save-name">
                     <strong>{s.name}</strong>
                     <span className="hint">
-                      {current?.id === s.id ? "playing now · " : ""}last played {formatDate(s.lastPlayedAt)} · created{" "}
-                      {formatDate(s.createdAt)}
+                      {[
+                        current?.id === s.id ? t("home.playingNow") : null,
+                        t("home.lastPlayed", { date: date(s.lastPlayedAt) }),
+                        t("home.created", { date: date(s.createdAt) }),
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </span>
                   </div>
                 )}
                 <div className="save-actions">
                   <button className="primary" disabled={busy} onClick={() => void play(s.id)}>
-                    Load
+                    {t("home.load")}
                   </button>
                   <button disabled={busy} onClick={() => setRenaming({ id: s.id, name: s.name })}>
-                    Rename
+                    {t("home.rename")}
                   </button>
                   <button
                     className={`sell ${confirmDelete === s.id ? "confirm" : ""}`}
@@ -191,19 +197,19 @@ export function Home({ current, onPlay, onCurrentChanged, onOptions, onAbout }: 
                       });
                     }}
                   >
-                    {confirmDelete === s.id ? "Delete for good?" : "Delete"}
+                    {confirmDelete === s.id ? t("home.deleteConfirm") : t("home.delete")}
                   </button>
                 </div>
               </div>
             ))}
           </div>
           <div className="controls">
-            <button onClick={() => setPanel("menu")}>← Back</button>
+            <button onClick={() => setPanel("menu")}>{t("common.back")}</button>
           </div>
         </div>
       )}
 
-      <footer>{FOOTER_NOTICE}</footer>
+      <Footer />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import type { OpenedCard } from "./api";
+import { useI18n } from "./i18n";
 import { useMoney } from "./money";
 
 interface Props {
@@ -12,6 +13,7 @@ interface Props {
 
 export function Card({ card, faceUp, clickable, onReveal }: Props) {
   const money = useMoney();
+  const { t } = useI18n();
   return (
     <div className="card-slot">
       <motion.div
@@ -27,7 +29,7 @@ export function Card({ card, faceUp, clickable, onReveal }: Props) {
         <div className="face front">
           <img src={card.imageUrl} alt={card.name} draggable={false} />
           {card.foil && <div className="foil-sheen" />}
-          {card.isNew && <span className="badge-new">NEW</span>}
+          {card.isNew && <span className="badge-new">{t("open.new")}</span>}
         </div>
       </motion.div>
       <div className={`card-caption ${faceUp ? "visible" : ""}`}>

@@ -1,5 +1,6 @@
 import { useId, type ReactNode } from "react";
 import type { AchievementView } from "./api";
+import { useI18n } from "./i18n";
 
 // Achievement cards are drawn here, in SVG, with Unsealed's own visual identity: a framed
 // medallion with a banner. They deliberately share nothing with the layout of any trading
@@ -250,14 +251,13 @@ export function AchievementCard({ item }: { item: AchievementView }) {
   const palette = PALETTES[item.palette] ?? PALETTES.onyx;
   const [frameLight, frameDark] = FRAMES[item.rarity];
   const emblem = EMBLEMS[item.emblem] ?? EMBLEMS.star;
+  const { t } = useI18n();
   const hidden = item.secret && !item.unlocked;
 
   const name = hidden ? "???" : item.name;
   // Bold capitals are about 0.72em wide, plus 1.5px of letter spacing; the banner holds ~470px.
   const nameSize = Math.max(24, Math.min(44, Math.floor((470 / name.length - 1.5) / 0.72)));
-  const text = hidden
-    ? "Secret achievement. Keep playing to discover it."
-    : (item.description ?? "");
+  const text = hidden ? t("achievements.secretText") : (item.description ?? "");
   const lines = wrap(text, 32, 3);
   const ratio = item.progress && item.progress.goal > 0 ? item.progress.current / item.progress.goal : 0;
 
@@ -266,7 +266,7 @@ export function AchievementCard({ item }: { item: AchievementView }) {
       viewBox="0 0 630 880"
       className={`ach-card ${item.unlocked ? "unlocked" : "locked"}`}
       role="img"
-      aria-label={`${name}${item.unlocked ? " (unlocked)" : " (locked)"}`}
+      aria-label={t(item.unlocked ? "achievements.cardLabelUnlocked" : "achievements.cardLabelLocked", { name })}
     >
       <defs>
         <linearGradient id={`${uid}f`} x1="0" y1="0" x2="1" y2="1">
@@ -307,7 +307,7 @@ export function AchievementCard({ item }: { item: AchievementView }) {
 
       {/* Card number and rarity */}
       <text x="96" y="92" fontSize="30" letterSpacing="3" fill={palette.accent} opacity="0.9">
-        {`No. ${String(item.number).padStart(2, "0")}`}
+        {t("achievements.cardNumber", { number: String(item.number).padStart(2, "0") })}
       </text>
       {Array.from({ length: PIPS[item.rarity] }, (_, i) => (
         <rect

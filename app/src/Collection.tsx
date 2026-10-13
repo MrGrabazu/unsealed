@@ -7,6 +7,7 @@ import {
   type CollectionView,
   type SetSummary,
 } from "./api";
+import { useI18n } from "./i18n";
 import { Loading } from "./Loading";
 import { useMoney } from "./money";
 
@@ -23,6 +24,7 @@ interface Props {
 /** Collection of one set: completion progress, missing cards greyed out, selling. */
 export function Collection({ sets, refreshKey, onChanged }: Props) {
   const money = useMoney();
+  const { t, plural } = useI18n();
   const [setCode, setSetCode] = useState("");
   const [view, setView] = useState<CollectionView | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
@@ -60,7 +62,7 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
     setPending(null);
     try {
       const result = await sellCards([{ uuid: card.uuid, foil, quantity: 1 }]);
-      setNotice(`Sold ${card.name} for ${money(result.totalCents)}.`);
+      setNotice(t("collection.sold", { card: card.name, amount: money(result.totalCents) }));
       await reload();
       onChanged();
     } catch (e) {
@@ -73,8 +75,8 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
       const result = await sellDuplicates(setCode);
       setNotice(
         result.soldCount === 0
-          ? "No duplicates to sell."
-          : `Sold ${result.soldCount} duplicate${result.soldCount > 1 ? "s" : ""} for ${money(result.totalCents)}.`,
+          ? t("collection.noDuplicates")
+          : plural("collection.soldDuplicates", result.soldCount, { amount: money(result.totalCents) }),
       );
       await reload();
       onChanged();
@@ -97,7 +99,7 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
         <div className="thumb">
           <img src={c.imageUrl} alt={c.name} loading="lazy" draggable={false} />
           {total > 1 && <span className="badge-qty">×{total}</span>}
-          {c.foilQuantity > 0 && <span className="badge-foil">FOIL</span>}
+          {c.foilQuantity > 0 && <span className="badge-foil">{t("collection.foilBadge")}</span>}
         </div>
         <div className="card-caption visible">
           <span className="name">
@@ -126,7 +128,9 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
         onClick={() => void sell(card, foil)}
         onMouseLeave={() => confirming && setPending(null)}
       >
-        {confirming ? `Sacrifice for ${money(value)}?` : `Sell${foil ? " foil" : ""} ${money(value)}`}
+        {confirming
+          ? t("collection.sacrifice", { amount: money(value) })
+          : t(foil ? "collection.sellFoil" : "collection.sell", { amount: money(value) })}
       </button>
     );
   }
@@ -142,30 +146,34 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
           ))}
         </select>
         <select value={filter} onChange={(e) => setFilter(e.target.value as Filter)}>
-          <option value="all">All cards</option>
-          <option value="owned">Owned</option>
-          <option value="missing">Missing</option>
+          <option value="all">{t("collection.allCards")}</option>
+          <option value="owned">{t("collection.owned")}</option>
+          <option value="missing">{t("collection.missing")}</option>
         </select>
-        <button onClick={() => void sellExtras()}>Sell all duplicates</button>
+        <button onClick={() => void sellExtras()}>{t("collection.sellDuplicates")}</button>
       </div>
 
       {error && <p className="error">{error}</p>}
       {notice && <p className="notice">{notice}</p>}
-      {!view && !error && <Loading label="Loading the collection…" />}
+      {!view && !error && <Loading label={t("collection.loading")} />}
       {view && (
         <>
           <div className="progress">
             <div className="progress-bar" style={{ width: `${view.completionPercent}%` }} />
           </div>
           <p className="progress-label">
-            {view.ownedCount} / {view.totalCount} cards ({view.completionPercent.toFixed(1)}%)
+            {t("collection.progress", {
+              owned: view.ownedCount,
+              total: view.totalCount,
+              percent: view.completionPercent.toFixed(1),
+            })}
           </p>
           <div className="collection-grid">{shown?.map(cardTile)}</div>
           {view.extras.length > 0 && (
             <>
-              <h3>Collector extras</h3>
+              <h3>{t("collection.extras")}</h3>
               <p className="progress-label">
-                {view.extrasOwned} / {view.extras.length} · only in collector boosters, not counted in completion
+                {t("collection.extrasProgress", { owned: view.extrasOwned, total: view.extras.length })}
               </p>
               <div className="collection-grid">{shownExtras?.map(cardTile)}</div>
             </>

@@ -122,7 +122,14 @@ export interface AchievementView {
   unlocked: boolean;
   unlockedAt: number | null;
   progress: { current: number; goal: number } | null;
-  reward: string | null;
+  reward: RewardView | null;
+}
+
+/** What an achievement pays, worded by the interface in its language. */
+export interface RewardView {
+  cashCents: number;
+  /** `setName` is null for "the newest set" when no data is available yet. */
+  sealed: { setName: string | null; kind: string; quantity: number } | null;
 }
 
 export interface AchievementsView {
@@ -213,8 +220,9 @@ export const renameSave = (id: string, name: string) => invoke<SaveInfo>("rename
 export const deleteSave = (id: string) => invoke<void>("delete_save", { id });
 export const getDataInfo = () => invoke<DataInfo>("get_data_info");
 export const getDataStatus = () => invoke<DataStatus>("get_data_status");
-export const getAchievements = () => invoke<AchievementsView>("get_achievements");
-export const takeUnlocks = () => invoke<AchievementView[]>("take_unlocks");
+/** `lang`: the interface language, for the achievements' names and descriptions. */
+export const getAchievements = (lang: string) => invoke<AchievementsView>("get_achievements", { lang });
+export const takeUnlocks = (lang: string) => invoke<AchievementView[]>("take_unlocks", { lang });
 export const listSets = () => invoke<SetSummary[]>("list_sets");
 export const getWallet = () => invoke<WalletView>("get_wallet");
 export const getShop = () => invoke<ShopItem[]>("get_shop");

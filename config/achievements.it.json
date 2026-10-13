@@ -1,0 +1,206 @@
+{
+  "open-1": {
+    "name": "Prima apertura",
+    "description": "Apri la tua prima busta."
+  },
+  "open-10": {
+    "name": "Si comincia",
+    "description": "Apri 10 buste."
+  },
+  "open-100": {
+    "name": "Drogato di buste",
+    "description": "Apri 100 buste."
+  },
+  "open-1000": {
+    "name": "Accumulatore",
+    "description": "Apri 1.000 buste."
+  },
+  "open-10000": {
+    "name": "Macchina da buste",
+    "description": "Apri 10.000 buste."
+  },
+  "open-100000": {
+    "name": "Leggenda Unsealed",
+    "description": "Apri 100.000 buste."
+  },
+  "value-100": {
+    "name": "Club dei cento",
+    "description": "Apri carte per un valore totale di 100 $."
+  },
+  "value-1000": {
+    "name": "Quattro cifre",
+    "description": "Apri carte per un valore totale di 1.000 $."
+  },
+  "value-10000": {
+    "name": "Cinque cifre",
+    "description": "Apri carte per un valore totale di 10.000 $."
+  },
+  "value-100000": {
+    "name": "Sei cifre",
+    "description": "Apri carte per un valore totale di 100.000 $."
+  },
+  "sold-10": {
+    "name": "Piccolo mercante",
+    "description": "Vendi 10 carte."
+  },
+  "sold-100": {
+    "name": "Habitué del mercato",
+    "description": "Vendi 100 carte."
+  },
+  "sold-1000": {
+    "name": "Barone dello sfuso",
+    "description": "Vendi 1.000 carte."
+  },
+  "explorer": {
+    "name": "Esploratore",
+    "description": "Apri buste di 3 espansioni diverse."
+  },
+  "halfway": {
+    "name": "A metà strada",
+    "description": "Possiedi metà delle carte di un'espansione."
+  },
+  "mythic-collector": {
+    "name": "Collezionista mitico",
+    "description": "Possiedi tutte le carte mitiche di un'espansione."
+  },
+  "rare-hunter": {
+    "name": "Cacciatore di rare",
+    "description": "Possiedi tutte le carte rare di un'espansione."
+  },
+  "set-complete": {
+    "name": "Espansione completa",
+    "description": "Possiedi tutte le carte di un'espansione."
+  },
+  "three-sets": {
+    "name": "Tripla corona",
+    "description": "Completa 3 espansioni diverse."
+  },
+  "fancy-pack": {
+    "name": "Busta di lusso",
+    "description": "Apri una busta da collezione."
+  },
+  "draft-night": {
+    "name": "Serata draft",
+    "description": "Apri una busta draft."
+  },
+  "world-traveler": {
+    "name": "Giramondo",
+    "description": "Apri buste di 10 espansioni diverse."
+  },
+  "foil-half": {
+    "name": "Lato brillante",
+    "description": "Possiedi metà delle carte di un'espansione in foil."
+  },
+  "foil-set": {
+    "name": "Tutto foil",
+    "description": "Possiedi tutte le carte di un'espansione in foil."
+  },
+  "extras-complete": {
+    "name": "Curatore di vetrine",
+    "description": "Possiedi tutti gli extra da collezione di un'espansione."
+  },
+  "year-complete": {
+    "name": "Un anno in rassegna",
+    "description": "Completa tutte le espansioni di uno stesso anno offerte dal Boosterium."
+  },
+  "shiny-mythic": {
+    "name": "Che brillio!",
+    "description": "Trova una carta mitica foil."
+  },
+  "double-mythic": {
+    "name": "Doppio guaio",
+    "description": "Trova due carte mitiche nella stessa busta."
+  },
+  "foil-frenzy": {
+    "name": "Febbre da foil",
+    "description": "Trova due carte foil nella stessa busta."
+  },
+  "chase-card": {
+    "name": "Carta ambita",
+    "description": "Trova una carta che vale 50 $ o più."
+  },
+  "high-roller": {
+    "name": "Pezzo grosso",
+    "description": "Trova una carta che vale 200 $ o più."
+  },
+  "jackpot-card": {
+    "name": "Jackpot",
+    "description": "Trova una carta che vale 1.000 $ o più."
+  },
+  "jackpot-pack": {
+    "name": "Busta d'oro",
+    "description": "Apri una busta le cui carte valgono 100 $ o più."
+  },
+  "profit-pack": {
+    "name": "Ripagato",
+    "description": "Apri una busta che, una volta venduta, rende 50 $ più di quanto l'hai pagata."
+  },
+  "bulk-buyer": {
+    "name": "All'ingrosso",
+    "description": "Compra 10 buste in una volta."
+  },
+  "speculator": {
+    "name": "Speculatore",
+    "description": "Vendi buste sigillate a 5 $ più di quanto le hai pagate."
+  },
+  "market-wizard": {
+    "name": "Mago della borsa",
+    "description": "Vendi buste sigillate a 50 $ più di quanto le hai pagate."
+  },
+  "sacrifice": {
+    "name": "Sacrificio necessario",
+    "description": "Vendi l'ultima copia di una carta che vale 20 $ o più."
+  },
+  "nest-egg": {
+    "name": "Gruzzoletto",
+    "description": "Possiedi 1.000 $ in una volta."
+  },
+  "tycoon": {
+    "name": "Magnate",
+    "description": "Possiedi 10.000 $ in una volta."
+  },
+  "dud": {
+    "name": "Fregatura",
+    "description": "Apri una busta le cui carte valgono meno di 1 $."
+  },
+  "drought": {
+    "name": "Siccità",
+    "description": "Apri 25 buste di fila senza una carta mitica."
+  },
+  "dry-spell": {
+    "name": "Niente di nuovo",
+    "description": "Apri 5 buste di fila senza nemmeno una carta nuova."
+  },
+  "wrong-card": {
+    "name": "Carta sbagliata",
+    "description": "Vendi la carta più preziosa che possiedi."
+  },
+  "rock-bottom": {
+    "name": "Toccare il fondo",
+    "description": "Arriva a un saldo di zero."
+  },
+  "charity-case": {
+    "name": "Mano tesa",
+    "description": "Accetta l'aiuto del Boosterium."
+  },
+  "bad-investment": {
+    "name": "Cattivo affare",
+    "description": "Vendi buste sigillate a 5 $ meno di quanto le hai pagate."
+  },
+  "bulk-sale": {
+    "name": "Svendita totale",
+    "description": "Vendi 50 carte in un'unica vendita."
+  },
+  "achiever": {
+    "name": "Realizzatore",
+    "description": "Sblocca 10 obiettivi."
+  },
+  "completionist": {
+    "name": "Completista",
+    "description": "Sblocca 25 obiettivi."
+  },
+  "unsealed": {
+    "name": "Unsealed",
+    "description": "Sblocca tutti gli altri obiettivi."
+  }
+}

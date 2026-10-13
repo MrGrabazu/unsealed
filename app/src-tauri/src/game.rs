@@ -2,7 +2,7 @@
 
 mod achievements;
 
-pub use achievements::{AchievementView, AchievementsView};
+pub use achievements::{AchievementTexts, AchievementView, AchievementsView};
 
 use crate::store::{OpeningCard, OpeningOrder, OpeningRow, Sale, Store};
 use rand::SeedableRng;
@@ -263,8 +263,9 @@ pub struct Game {
     store: Store,
     economy: EconomyConfig,
     engine: Engine,
-    /// Achievements unlocked and not yet shown to the player.
-    notifications: Vec<AchievementView>,
+    /// Ids of the achievements unlocked and not yet shown to the player.
+    notifications: Vec<String>,
+    achievement_texts: AchievementTexts,
     sets: HashMap<String, LoadedSet>,
     prices: Option<PriceFile>,
     /// Modification time of the prices file that `prices` was loaded from.
@@ -304,6 +305,7 @@ impl Game {
             economy,
             engine,
             notifications: Vec::new(),
+            achievement_texts: AchievementTexts::default(),
             sets: HashMap::new(),
             prices: None,
             prices_stamp: None,
@@ -1413,7 +1415,7 @@ mod tests {
     }
 
     fn unlocked_ids(g: &mut Game) -> Vec<String> {
-        g.take_unlocks().into_iter().map(|a| a.id).collect()
+        g.take_unlocks("en").into_iter().map(|a| a.id).collect()
     }
 
     const OPEN_ONCE: &str = r#"{ "id": "open-1", "name": "First Crack", "description": "Open a booster.",
@@ -1445,11 +1447,27 @@ mod tests {
 
         g.open_booster("TST", "play").unwrap();
         assert_eq!(unlocked_ids(&mut g), ["open-1"]);
-        assert!(g.take_unlocks().is_empty()); // notified once
+        assert!(g.take_unlocks("en").is_empty()); // notified once
 
-        let view = g.achievements().unwrap();
+        let view = g.achievements("en").unwrap();
         assert_eq!((view.total, view.unlocked_count, view.secret_remaining), (1, 1, 0));
         assert!(view.items[0].unlocked && view.items[0].unlocked_at.is_some());
+    }
+
+    #[test]
+    fn achievements_are_shown_in_the_requested_language_with_english_as_fallback() {
+        let (mut g, _) = game_with_engine("ach-lang", PRICES, achievements(OPEN_ONCE));
+        let mut texts = AchievementTexts::default();
+        texts
+            .add_language("fr", r#"{ "open-1": { "name": "Première ouverture", "description": "Ouvrir un booster." } }"#)
+            .unwrap();
+        g.set_achievement_texts(texts);
+        g.buy_boosters("TST", "play", 1).unwrap();
+        g.open_booster("TST", "play").unwrap();
+
+        let unlocked = g.take_unlocks("fr");
+        assert_eq!((unlocked[0].name.as_str(), unlocked[0].description.as_deref()), ("Première ouverture", Some("Ouvrir un booster.")));
+        assert_eq!(g.achievements("de").unwrap().items[0].name, "First Crack");
     }
 
     #[test]
@@ -1468,8 +1486,18 @@ mod tests {
         // The unopened bought booster (cost 400) plus the 2 free ones: two stacks merged.
         assert_eq!(w.sealed.len(), 1);
         assert_eq!((w.sealed[0].quantity, w.sealed[0].cost_cents), (3, 400));
-        let unlocked = g.take_unlocks();
-        assert_eq!(unlocked[0].reward.as_deref(), Some("+$5.00 + 2 × Test Set play boosters"));
+        let unlocked = g.take_unlocks("en");
+        assert_eq!(
+            unlocked[0].reward,
+            Some(achievements::RewardView {
+                cash_cents: 500,
+                sealed: Some(achievements::SealedRewardView {
+                    set_name: Some("Test Set".into()),
+                    kind: "play".into(),
+                    quantity: 2
+                }),
+            })
+        );
 
         // Opening again never pays the reward a second time.
         g.open_booster("TST", "play").unwrap();
@@ -1488,10 +1516,10 @@ mod tests {
         g.buy_boosters("TST", "play", 1).unwrap();
         g.open_booster("TST", "play").unwrap();
 
-        let hidden = g.achievements().unwrap();
+        let hidden = g.achievements("en").unwrap();
         assert_eq!(hidden.secret_remaining, 1);
         let item = &hidden.items[0];
-        assert_eq!((item.name.as_str(), item.emblem.as_str()), ("Secret achievement", "question"));
+        assert_eq!((item.name.as_str(), item.emblem.as_str()), ("", "question"));
         assert!(item.description.is_none() && item.progress.is_none() && item.reward.is_none());
         assert_eq!(item.rarity, "uncommon"); // the rarity is the only hint
 
@@ -1502,7 +1530,7 @@ mod tests {
         g.sell_cards(&[SaleRequest { uuid: "m1".into(), foil: false, quantity: 1 }]).unwrap();
         assert_eq!(unlocked_ids(&mut g), ["wrong-card"]);
 
-        let shown = g.achievements().unwrap();
+        let shown = g.achievements("en").unwrap();
         assert_eq!((shown.secret_remaining, shown.items[0].name.as_str()), (0, "Wrong Card"));
         assert!(shown.items[0].description.is_some());
     }
@@ -1558,7 +1586,7 @@ mod tests {
         g.open_booster("TST", "play").unwrap();
         // First booster: "First Crack"; the fixture mythic is a $10 card.
         assert!(unlocked_ids(&mut g).contains(&"open-1".to_string()));
-        let view = g.achievements().unwrap();
+        let view = g.achievements("en").unwrap();
         assert!(view.total >= 40 && view.unlocked_count >= 1);
         assert!(view.secret_remaining >= 5);
     }
@@ -1599,9 +1627,9 @@ mod tests {
             assert_eq!(view.owned_count, new_cards);
             assert!(view.owned_count > 0 && view.owned_count <= view.total_count);
         }
-        let view = g.achievements().unwrap();
+        let view = g.achievements("en").unwrap();
         println!("achievements: {}/{} unlocked", view.unlocked_count, view.total);
-        for a in g.take_unlocks() {
+        for a in g.take_unlocks("en") {
             println!("  unlocked: {} ({}) reward: {:?}", a.name, a.rarity, a.reward);
         }
         println!("balance after the session: {} cents", g.wallet().unwrap().balance_cents);

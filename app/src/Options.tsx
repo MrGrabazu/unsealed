@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { getDataInfo, type DataInfo } from "./api";
 import { DataStatusBar, useDataStatus } from "./DataStatus";
+import { LANGUAGES, useI18n, type Lang } from "./i18n";
 import { Loading } from "./Loading";
 
-/** Settings. For now, what the downloaded game data contains; options will come here. */
+/** Settings: the language, and what the downloaded game data contains. */
 export function Options({ onBack }: { onBack: () => void }) {
+  const { t, lang, setLang, formatDate, formatNumber } = useI18n();
   const [info, setInfo] = useState<DataInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const reload = () =>
@@ -20,33 +22,42 @@ export function Options({ onBack }: { onBack: () => void }) {
   return (
     <div className="page">
       <div className="controls">
-        <button onClick={onBack}>← Back</button>
+        <button onClick={onBack}>{t("common.back")}</button>
       </div>
-      <h2>Options</h2>
+      <h2>{t("options.title")}</h2>
 
-      <h3>Game data</h3>
+      <h3>{t("options.language")}</h3>
+      <select value={lang} onChange={(e) => setLang(e.target.value as Lang)} aria-label={t("options.language")}>
+        {LANGUAGES.map((l) => (
+          <option key={l.code} value={l.code}>
+            {l.name}
+          </option>
+        ))}
+      </select>
+      <p className="hint">{t("options.languageHint")}</p>
+
+      <h3>{t("options.data")}</h3>
       <DataStatusBar status={dataStatus} />
       {error && <p className="error">{error}</p>}
       {!info && !error && <Loading />}
       {info && (
         <dl className="info-list">
-          <dt>Sets</dt>
-          <dd>{info.setCount.toLocaleString()}</dd>
-          <dt>Booster types</dt>
-          <dd>{info.boosterCount.toLocaleString()}</dd>
-          <dt>Card prices from</dt>
-          <dd>{info.pricesUpdatedAt ? new Date(info.pricesUpdatedAt).toLocaleString() : "—"}</dd>
-          <dt>Last update</dt>
-          <dd>{info.builtAt ? new Date(info.builtAt * 1000).toLocaleString() : "never"}</dd>
+          <dt>{t("options.sets")}</dt>
+          <dd>{formatNumber(info.setCount)}</dd>
+          <dt>{t("options.boosterTypes")}</dt>
+          <dd>{formatNumber(info.boosterCount)}</dd>
+          <dt>{t("options.pricesFrom")}</dt>
+          <dd>
+            {info.pricesUpdatedAt ? formatDate(Date.parse(info.pricesUpdatedAt) / 1000) : t("common.none")}
+          </dd>
+          <dt>{t("options.lastUpdate")}</dt>
+          <dd>{info.builtAt ? formatDate(info.builtAt) : t("options.never")}</dd>
         </dl>
       )}
-      <p className="hint">
-        Card data and prices are downloaded in the background at launch and refreshed every day. Nothing to do on your
-        side.
-      </p>
+      <p className="hint">{t("options.dataHint")}</p>
 
-      <h3>More options</h3>
-      <p className="hint">More settings will appear here in future versions.</p>
+      <h3>{t("options.more")}</h3>
+      <p className="hint">{t("options.moreHint")}</p>
     </div>
   );
 }

@@ -1,0 +1,206 @@
+{
+  "open-1": {
+    "name": "Primera apertura",
+    "description": "Abre tu primer sobre."
+  },
+  "open-10": {
+    "name": "Calentando motores",
+    "description": "Abre 10 sobres."
+  },
+  "open-100": {
+    "name": "Adicto a los sobres",
+    "description": "Abre 100 sobres."
+  },
+  "open-1000": {
+    "name": "Acumulador",
+    "description": "Abre 1.000 sobres."
+  },
+  "open-10000": {
+    "name": "Máquina de abrir",
+    "description": "Abre 10.000 sobres."
+  },
+  "open-100000": {
+    "name": "Leyenda Unsealed",
+    "description": "Abre 100.000 sobres."
+  },
+  "value-100": {
+    "name": "Club de los cien",
+    "description": "Abre cartas por un valor total de 100 $."
+  },
+  "value-1000": {
+    "name": "Cuatro cifras",
+    "description": "Abre cartas por un valor total de 1.000 $."
+  },
+  "value-10000": {
+    "name": "Cinco cifras",
+    "description": "Abre cartas por un valor total de 10.000 $."
+  },
+  "value-100000": {
+    "name": "Seis cifras",
+    "description": "Abre cartas por un valor total de 100.000 $."
+  },
+  "sold-10": {
+    "name": "Pequeño comerciante",
+    "description": "Vende 10 cartas."
+  },
+  "sold-100": {
+    "name": "Habitual del mercado",
+    "description": "Vende 100 cartas."
+  },
+  "sold-1000": {
+    "name": "Barón del saldo",
+    "description": "Vende 1.000 cartas."
+  },
+  "explorer": {
+    "name": "Explorador",
+    "description": "Abre sobres de 3 ediciones distintas."
+  },
+  "halfway": {
+    "name": "A medio camino",
+    "description": "Consigue la mitad de las cartas de una edición."
+  },
+  "mythic-collector": {
+    "name": "Coleccionista mítico",
+    "description": "Consigue todas las cartas míticas de una edición."
+  },
+  "rare-hunter": {
+    "name": "Cazador de raras",
+    "description": "Consigue todas las cartas raras de una edición."
+  },
+  "set-complete": {
+    "name": "Edición completa",
+    "description": "Consigue todas las cartas de una edición."
+  },
+  "three-sets": {
+    "name": "Triple corona",
+    "description": "Completa 3 ediciones distintas."
+  },
+  "fancy-pack": {
+    "name": "Sobre de lujo",
+    "description": "Abre un sobre de coleccionista."
+  },
+  "draft-night": {
+    "name": "Noche de draft",
+    "description": "Abre un sobre de draft."
+  },
+  "world-traveler": {
+    "name": "Trotamundos",
+    "description": "Abre sobres de 10 ediciones distintas."
+  },
+  "foil-half": {
+    "name": "Lado brillante",
+    "description": "Consigue en foil la mitad de las cartas de una edición."
+  },
+  "foil-set": {
+    "name": "Todo foil",
+    "description": "Consigue en foil todas las cartas de una edición."
+  },
+  "extras-complete": {
+    "name": "Curador de vitrina",
+    "description": "Consigue todos los extras de coleccionista de una edición."
+  },
+  "year-complete": {
+    "name": "Resumen del año",
+    "description": "Completa todas las ediciones de un mismo año que ofrece el Boosterium."
+  },
+  "shiny-mythic": {
+    "name": "¡Qué brillo!",
+    "description": "Consigue una carta mítica foil."
+  },
+  "double-mythic": {
+    "name": "Doble problema",
+    "description": "Abre dos cartas míticas en el mismo sobre."
+  },
+  "foil-frenzy": {
+    "name": "Fiebre foil",
+    "description": "Abre dos cartas foil en el mismo sobre."
+  },
+  "chase-card": {
+    "name": "Carta codiciada",
+    "description": "Consigue una carta que valga 50 $ o más."
+  },
+  "high-roller": {
+    "name": "Gran apostador",
+    "description": "Consigue una carta que valga 200 $ o más."
+  },
+  "jackpot-card": {
+    "name": "Premio gordo",
+    "description": "Consigue una carta que valga 1.000 $ o más."
+  },
+  "jackpot-pack": {
+    "name": "Sobre de oro",
+    "description": "Abre un sobre cuyas cartas valgan 100 $ o más."
+  },
+  "profit-pack": {
+    "name": "Salió rentable",
+    "description": "Abre un sobre que, una vez vendido, te deje 50 $ más de lo que pagaste."
+  },
+  "bulk-buyer": {
+    "name": "Compra al por mayor",
+    "description": "Compra 10 sobres de una vez."
+  },
+  "speculator": {
+    "name": "Especulador",
+    "description": "Vende sobres sellados por 5 $ más de lo que pagaste."
+  },
+  "market-wizard": {
+    "name": "Mago del mercado",
+    "description": "Vende sobres sellados por 50 $ más de lo que pagaste."
+  },
+  "sacrifice": {
+    "name": "Sacrificio necesario",
+    "description": "Vende la última copia de una carta que valga 20 $ o más."
+  },
+  "nest-egg": {
+    "name": "Buen colchón",
+    "description": "Ten 1.000 $ a la vez."
+  },
+  "tycoon": {
+    "name": "Magnate",
+    "description": "Ten 10.000 $ a la vez."
+  },
+  "dud": {
+    "name": "Fiasco",
+    "description": "Abre un sobre cuyas cartas valgan menos de 1 $."
+  },
+  "drought": {
+    "name": "Sequía",
+    "description": "Abre 25 sobres seguidos sin ninguna carta mítica."
+  },
+  "dry-spell": {
+    "name": "Nada nuevo",
+    "description": "Abre 5 sobres seguidos sin ninguna carta nueva."
+  },
+  "wrong-card": {
+    "name": "Carta equivocada",
+    "description": "Vende la carta más valiosa que tienes."
+  },
+  "rock-bottom": {
+    "name": "Tocar fondo",
+    "description": "Llega a un saldo de cero."
+  },
+  "charity-case": {
+    "name": "Caso de caridad",
+    "description": "Acepta la ayuda del Boosterium."
+  },
+  "bad-investment": {
+    "name": "Mala inversión",
+    "description": "Vende sobres sellados por 5 $ menos de lo que pagaste."
+  },
+  "bulk-sale": {
+    "name": "Liquidación total",
+    "description": "Vende 50 cartas en una sola venta."
+  },
+  "achiever": {
+    "name": "Triunfador",
+    "description": "Desbloquea 10 logros."
+  },
+  "completionist": {
+    "name": "Completista",
+    "description": "Desbloquea 25 logros."
+  },
+  "unsealed": {
+    "name": "Unsealed",
+    "description": "Desbloquea todos los demás logros."
+  }
+}

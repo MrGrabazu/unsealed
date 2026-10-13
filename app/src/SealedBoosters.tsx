@@ -1,5 +1,6 @@
 import type { SealedStack, SetSummary } from "./api";
 import { kindLabel } from "./boosterKinds";
+import { useI18n } from "./i18n";
 import { useMoney } from "./money";
 import { PriceTrend } from "./PriceTrend";
 import { SetIcon } from "./SetIcon";
@@ -20,12 +21,13 @@ interface Props {
 /** The sealed boosters the player owns, to pick the next one to open. */
 export function SealedBoosters({ sealed, sets, busy, onOpen, onOpenMany, onSell, onGoShopping }: Props) {
   const money = useMoney();
+  const { t } = useI18n();
   if (sealed.length === 0) {
     return (
       <div className="empty-state">
-        <p>You have no sealed booster left.</p>
+        <p>{t("open.noSealed")}</p>
         <button className="primary" onClick={onGoShopping}>
-          Go to the Boosterium
+          {t("open.goShopping")}
         </button>
       </div>
     );
@@ -50,29 +52,26 @@ export function SealedBoosters({ sealed, sets, busy, onOpen, onOpenMany, onSell,
                 <span className="sealed-qty">×{s.quantity}</span>
               </div>
               <span className="hint">
-                {kindLabel(s.kind)} · paid {money(s.costCents)} · worth {money(s.quantity * s.sellValueCents)} if sold ·{" "}
+                {kindLabel(t, s.kind)} · {t("open.paid", { amount: money(s.costCents) })} ·{" "}
+                {t("open.worth", { amount: money(s.quantity * s.sellValueCents) })} ·{" "}
                 <span className={pnl >= 0 ? "gain" : "loss"}>
                   {pnl >= 0 ? "+" : "−"}
                   {money(Math.abs(pnl))}
                 </span>
               </span>
               <PriceTrend history={s.history} />
-              {art && (
-                <span className="shop-credit">
-                  Art: {art.cardName} by {art.artist} · © Wizards of the Coast
-                </span>
-              )}
+              {art && <span className="shop-credit">{t("art.credit", { card: art.cardName, artist: art.artist })}</span>}
               <div className="sealed-actions">
                 <button className="primary" disabled={busy} onClick={() => onOpen(s)}>
-                  Open one
+                  {t("open.openOne")}
                 </button>
                 {BATCH_SIZES.filter((n) => s.quantity >= n).map((n) => (
                   <button key={n} disabled={busy} onClick={() => onOpenMany(s, n)}>
-                    Open ×{n}
+                    {t("open.openMany", { count: n })}
                   </button>
                 ))}
                 <button disabled={busy} onClick={() => onSell(s)}>
-                  Sell one ({money(s.sellValueCents)})
+                  {t("open.sellOne", { amount: money(s.sellValueCents) })}
                 </button>
               </div>
             </div>

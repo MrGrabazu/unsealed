@@ -4,7 +4,7 @@
 
 use super::{err, Game, OpenedCard, SaleRequest, SetSummary};
 use crate::store::GrantedReward;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use unsealed_core::achievements::{AchievementDef, Event, Progress, Reward, SealedReward};
 
@@ -16,7 +16,8 @@ pub struct ProgressView {
 }
 
 /// An achievement card as the player may see it. A locked secret hides everything but
-/// its rarity: name, goal, reward and artwork stay unknown until it is unlocked.
+/// its rarity: name (empty), goal, reward and artwork stay unknown until it is unlocked.
+/// Name and description are in the requested language when translated, else in English.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct AchievementView {
@@ -32,7 +33,48 @@ pub struct AchievementView {
     pub unlocked: bool,
     pub unlocked_at: Option<i64>,
     pub progress: Option<ProgressView>,
-    pub reward: Option<String>,
+    /// Described as data, so the interface words it in its own language.
+    pub reward: Option<RewardView>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RewardView {
+    pub cash_cents: u32,
+    pub sealed: Option<SealedRewardView>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SealedRewardView {
+    /// `None` when the reward is "the newest set" and no data is available yet.
+    pub set_name: Option<String>,
+    pub kind: String,
+    pub quantity: u32,
+}
+
+/// Translated name and description of one achievement.
+#[derive(Debug, Clone, Deserialize)]
+pub struct AchievementText {
+    pub name: String,
+    pub description: String,
+}
+
+/// Translations of the achievements: language code -> achievement id -> texts. Like the
+/// definitions, they live in configuration files (`config/achievements.<lang>.json`).
+#[derive(Debug, Clone, Default)]
+pub struct AchievementTexts(HashMap<String, HashMap<String, AchievementText>>);
+
+impl AchievementTexts {
+    /// Adds a language from the JSON of its file (achievement id -> name and description).
+    pub fn add_language(&mut self, lang: &str, json: &str) -> Result<(), serde_json::Error> {
+        self.0.insert(lang.to_string(), serde_json::from_str(json)?);
+        Ok(())
+    }
+
+    fn get(&self, lang: &str, id: &str) -> Option<&AchievementText> {
+        self.0.get(lang)?.get(id)
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -51,7 +93,12 @@ pub(super) struct SaleContext {
 }
 
 impl Game {
-    pub fn achievements(&mut self) -> Result<AchievementsView, String> {
+    pub fn set_achievement_texts(&mut self, texts: AchievementTexts) {
+        self.achievement_texts = texts;
+    }
+
+    /// Every achievement, its texts in `lang` (English when not translated).
+    pub fn achievements(&mut self, lang: &str) -> Result<AchievementsView, String> {
         self.ensure_prices();
         let progress = self.store.load_progress().map_err(err)?;
         let sets = self.list_sets().unwrap_or_default();
@@ -60,7 +107,7 @@ impl Game {
             .definitions()
             .iter()
             .enumerate()
-            .map(|(i, def)| self.view_of(i + 1, def, &progress, &sets))
+            .map(|(i, def)| self.view_of(i + 1, def, &progress, &sets, lang))
             .collect();
         let unlocked_count = items.iter().filter(|a| a.unlocked).count();
         let secret_remaining = items.iter().filter(|a| a.secret && !a.unlocked).count();
@@ -68,8 +115,19 @@ impl Game {
     }
 
     /// Achievements unlocked since the last call, so the UI can celebrate them.
-    pub fn take_unlocks(&mut self) -> Vec<AchievementView> {
-        std::mem::take(&mut self.notifications)
+    pub fn take_unlocks(&mut self, lang: &str) -> Vec<AchievementView> {
+        let ids = std::mem::take(&mut self.notifications);
+        if ids.is_empty() {
+            return Vec::new();
+        }
+        let progress = self.store.load_progress().unwrap_or_default();
+        let sets = self.list_sets().unwrap_or_default();
+        ids.iter()
+            .filter_map(|id| {
+                let (i, def) = self.engine.definitions().iter().enumerate().find(|(_, d)| d.id == *id)?;
+                Some(self.view_of(i + 1, def, &progress, &sets, lang))
+            })
+            .collect()
     }
 
     // ---- events -------------------------------------------------------------------
@@ -100,14 +158,7 @@ impl Game {
         let sets = self.list_sets().unwrap_or_default();
         let rewards: Vec<GrantedReward> = unlocked.iter().filter_map(|id| self.resolve_reward(id, &sets)).collect();
         self.store.save_progress(&progress, &rewards, now).map_err(err)?;
-
-        for id in &unlocked {
-            let found = self.engine.definitions().iter().enumerate().find(|(_, d)| d.id == *id);
-            if let Some((i, def)) = found {
-                let view = self.view_of(i + 1, def, &progress, &sets);
-                self.notifications.push(view);
-            }
-        }
+        self.notifications.extend(unlocked);
         Ok(())
     }
 
@@ -275,14 +326,21 @@ impl Game {
         })
     }
 
-    fn view_of(&self, number: usize, def: &AchievementDef, progress: &Progress, sets: &[SetSummary]) -> AchievementView {
+    fn view_of(
+        &self,
+        number: usize,
+        def: &AchievementDef,
+        progress: &Progress,
+        sets: &[SetSummary],
+        lang: &str,
+    ) -> AchievementView {
         let unlocked_at = progress.unlocked.get(&def.id).copied();
         let unlocked = unlocked_at.is_some();
         if def.secret && !unlocked {
             return AchievementView {
                 id: def.id.clone(),
                 number,
-                name: "Secret achievement".to_string(),
+                name: String::new(),
                 description: None,
                 secret: true,
                 rarity: def.rarity.as_str().to_string(),
@@ -294,11 +352,12 @@ impl Game {
                 reward: None,
             };
         }
+        let text = self.achievement_texts.get(lang, &def.id);
         AchievementView {
             id: def.id.clone(),
             number,
-            name: def.name.clone(),
-            description: Some(def.description.clone()),
+            name: text.map_or(&def.name, |t| &t.name).clone(),
+            description: Some(text.map_or(&def.description, |t| &t.description).clone()),
             secret: def.secret,
             rarity: def.rarity.as_str().to_string(),
             emblem: def.emblem.clone(),
@@ -309,26 +368,18 @@ impl Game {
                 .engine
                 .progress_of(def, progress)
                 .map(|(current, goal)| ProgressView { current, goal }),
-            reward: self.reward_text(&def.reward, sets),
+            reward: reward_view(&def.reward, sets),
         }
     }
+}
 
-    fn reward_text(&self, reward: &Reward, sets: &[SetSummary]) -> Option<String> {
-        let mut parts = Vec::new();
-        if reward.cash_cents > 0 {
-            parts.push(format!("+{}", self.money_text(i64::from(reward.cash_cents))));
-        }
-        if let Some(sealed) = &reward.sealed {
-            let name = resolve_set(sealed, sets).map_or("newest set", |s| s.name.as_str());
-            let plural = if sealed.quantity > 1 { "s" } else { "" };
-            parts.push(format!("{} × {name} {} booster{plural}", sealed.quantity, sealed.kind));
-        }
-        (!parts.is_empty()).then(|| parts.join(" + "))
-    }
-
-    fn money_text(&self, cents: i64) -> String {
-        format!("{}{}.{:02}", self.economy.currency.symbol, cents / 100, cents % 100)
-    }
+fn reward_view(reward: &Reward, sets: &[SetSummary]) -> Option<RewardView> {
+    let sealed = reward.sealed.as_ref().map(|s| SealedRewardView {
+        set_name: resolve_set(s, sets).map(|set| set.name.clone()),
+        kind: s.kind.clone(),
+        quantity: s.quantity,
+    });
+    (reward.cash_cents > 0 || sealed.is_some()).then(|| RewardView { cash_cents: reward.cash_cents, sealed })
 }
 
 /// Share of `(total, owned)` that is owned, in thousandths.

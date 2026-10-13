@@ -7,7 +7,7 @@ mod store;
 mod updater;
 
 use game::{
-    AchievementView, AchievementsView, BoosterSaleResult, CollectionView, DataInfo, Game, OpenedCard, SaleRequest,
+    AchievementTexts, AchievementView, AchievementsView, BoosterSaleResult, CollectionView, DataInfo, Game, OpenedCard, SaleRequest,
     SaleResult, SetSummary, ShopItem, StatsView, WalletView,
 };
 use saves::{SaveInfo, Saves};
@@ -32,6 +32,15 @@ const DEFAULT_ACHIEVEMENTS: &str = include_str!("../../../config/achievements.js
 /// Which sets to download and how fresh they must be, overridable the same way.
 const DEFAULT_DATA: &str = include_str!("../../../config/data.json");
 
+/// Translations of the achievements (English lives in the definitions), overridable the
+/// same way with `achievements.<lang>.json`.
+const ACHIEVEMENT_TRANSLATIONS: &[(&str, &str)] = &[
+    ("fr", include_str!("../../../config/achievements.fr.json")),
+    ("de", include_str!("../../../config/achievements.de.json")),
+    ("es", include_str!("../../../config/achievements.es.json")),
+    ("it", include_str!("../../../config/achievements.it.json")),
+];
+
 /// What is running: the saves, and the game being played, if any (none on the home screen
 /// at launch).
 pub(crate) struct Session {
@@ -52,7 +61,8 @@ impl Session {
         let (info, store) = self.saves.open(id, now())?;
         let economy = load_economy(&self.data_dir).map_err(|e| e.to_string())?;
         let engine = load_achievements(&self.data_dir).map_err(|e| e.to_string())?;
-        let game = Game::new(self.data_dir.clone(), store, economy, engine)?;
+        let mut game = Game::new(self.data_dir.clone(), store, economy, engine)?;
+        game.set_achievement_texts(load_achievement_texts(&self.data_dir).map_err(|e| e.to_string())?);
         self.current = Some((info.clone(), game));
         Ok(info)
     }
@@ -207,15 +217,16 @@ fn claim_charity(state: State<'_, SessionState>) -> Result<(), String> {
     with_game(&state, |g| g.claim_charity())
 }
 
+/// Every achievement, with its texts in `lang` (a language code such as "fr").
 #[tauri::command]
-fn get_achievements(state: State<'_, SessionState>) -> Result<AchievementsView, String> {
-    with_game(&state, |g| g.achievements())
+fn get_achievements(state: State<'_, SessionState>, lang: String) -> Result<AchievementsView, String> {
+    with_game(&state, |g| g.achievements(&lang))
 }
 
-/// Achievements unlocked since the last call.
+/// Achievements unlocked since the last call, with their texts in `lang`.
 #[tauri::command]
-fn take_unlocks(state: State<'_, SessionState>) -> Result<Vec<AchievementView>, String> {
-    with_game(&state, |g| Ok(g.take_unlocks()))
+fn take_unlocks(state: State<'_, SessionState>, lang: String) -> Result<Vec<AchievementView>, String> {
+    with_game(&state, |g| Ok(g.take_unlocks(&lang)))
 }
 
 #[tauri::command]
@@ -269,6 +280,16 @@ fn load_achievements(data_dir: &Path) -> Result<Engine, Box<dyn Error>> {
     Ok(Engine::from_json(&json)?)
 }
 
+fn load_achievement_texts(data_dir: &Path) -> Result<AchievementTexts, Box<dyn Error>> {
+    let mut texts = AchievementTexts::default();
+    for (lang, shipped) in ACHIEVEMENT_TRANSLATIONS {
+        let json = fs::read_to_string(data_dir.join(format!("achievements.{lang}.json")))
+            .unwrap_or_else(|_| shipped.to_string());
+        texts.add_language(lang, &json).map_err(|e| format!("achievements.{lang}.json: {e}"))?;
+    }
+    Ok(texts)
+}
+
 fn load_data_config(data_dir: &Path) -> Result<DataConfig, Box<dyn Error>> {
     let json = fs::read_to_string(data_dir.join("data.json")).unwrap_or_else(|_| DEFAULT_DATA.to_string());
     Ok(DataConfig::from_json(&json)?)
@@ -289,6 +310,7 @@ pub fn run() {
             // Fail early on a broken configuration rather than when a game is loaded.
             load_economy(&data_dir)?;
             load_achievements(&data_dir)?;
+            load_achievement_texts(&data_dir)?;
             let data_config = load_data_config(&data_dir)?;
 
             let saves = Saves::new(resolve_saves_dir(app.handle())?)?;

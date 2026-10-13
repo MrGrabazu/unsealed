@@ -1,3 +1,4 @@
+import { useI18n } from "./i18n";
 import { useMoney } from "./money";
 
 const WIDTH = 90;
@@ -6,8 +7,9 @@ const HEIGHT = 26;
 /** Sparkline of a booster's recent prices with the change since the previous price update. */
 export function PriceTrend({ history }: { history: number[] }) {
   const money = useMoney();
+  const { t } = useI18n();
   if (history.length < 2) {
-    return <span className="hint trend">tracking since today</span>;
+    return <span className="hint trend">{t("trend.tracking")}</span>;
   }
   const last = history[history.length - 1];
   const previous = history[history.length - 2];
@@ -26,7 +28,7 @@ export function PriceTrend({ history }: { history: number[] }) {
   return (
     <span
       className="trend"
-      title={`Last ${history.length} prices, from ${money(history[0])} to ${money(last)}`}
+      title={t("trend.title", { count: history.length, first: money(history[0]), last: money(last) })}
     >
       <svg width={WIDTH} height={HEIGHT} viewBox={`0 0 ${WIDTH} ${HEIGHT}`} aria-hidden="true">
         <polyline points={points} fill="none" stroke="currentColor" strokeWidth="1.5" className={cls} />

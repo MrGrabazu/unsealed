@@ -23,8 +23,10 @@ import { BatchOpening } from "./BatchOpening";
 import { BoosterOpening } from "./BoosterOpening";
 import { Boosterium } from "./Boosterium";
 import { Collection } from "./Collection";
+import { rewardText } from "./boosterKinds";
 import { DataStatusBar, useDataStatus } from "./DataStatus";
-import { FOOTER_NOTICE } from "./legal";
+import { Footer } from "./Footer";
+import { useI18n } from "./i18n";
 import { Loading } from "./Loading";
 import { CurrencyContext, useMoney } from "./money";
 import { SealedBoosters } from "./SealedBoosters";
@@ -32,31 +34,25 @@ import { Stats } from "./Stats";
 
 type Tab = "boosterium" | "open" | "collection" | "achievements" | "stats";
 
-const TAB_LABELS: Record<Tab, string> = {
-  boosterium: "Boosterium",
-  open: "Open boosters",
-  collection: "Collection",
-  achievements: "Achievements",
-  stats: "Stats",
-};
+const TABS: Tab[] = ["boosterium", "open", "collection", "achievements", "stats"];
 
 /** How long a notification stays on screen. */
 const TOAST_MS = 8000;
 
 function WalletBar({ wallet }: { wallet: WalletView }) {
   const money = useMoney();
+  const { t } = useI18n();
   return (
-    <div className="wallet" title="Your balance">
+    <div className="wallet" title={t("game.balanceTitle")}>
       {money(wallet.balanceCents)}
     </div>
   );
 }
 
-const savePointName = (game: string) =>
-  `${game} — ${new Date().toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}`;
-
 /** The game being played: Boosterium, openings, collection, achievements and stats. */
 export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => void }) {
+  const i18n = useI18n();
+  const { t, lang } = i18n;
   const [notice, setNotice] = useState<string | null>(null);
   const [sets, setSets] = useState<SetSummary[]>([]);
   const [shop, setShop] = useState<ShopItem[]>([]);
@@ -83,7 +79,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   const refreshWallet = useCallback(async () => {
     try {
       setWallet(await getWallet());
-      const unlocked = await takeUnlocks();
+      const unlocked = await takeUnlocks(lang);
       if (unlocked.length > 0) {
         setToasts((current) => [...current, ...unlocked]);
         setUnlockCount((n) => n + unlocked.length);
@@ -94,7 +90,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     } catch (e) {
       setError(String(e));
     }
-  }, []);
+  }, [lang]);
 
   const loadAll = useCallback(() => {
     Promise.all([listSets(), getShop(), getWallet()])
@@ -157,8 +153,9 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
 
   async function saveNow() {
     try {
-      const point = await createSavePoint(savePointName(save.name));
-      setNotice(`Save point “${point.name}” created. Load it any time from the menu.`);
+      const name = t("game.savePointName", { game: save.name, date: i18n.formatDate(Date.now() / 1000) });
+      const point = await createSavePoint(name);
+      setNotice(t("game.savePointCreated", { name: point.name }));
     } catch (e) {
       setError(String(e));
     }
@@ -180,21 +177,21 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
         <header>
           <h1>Unsealed</h1>
           <p className="tagline">Crack &amp; Collect</p>
-          <span className="game-name" title="The game being played (saved automatically)">
+          <span className="game-name" title={t("game.nameTitle")}>
             {save.name}
           </span>
           {wallet && <WalletBar wallet={wallet} />}
-          <button onClick={() => void saveNow()} title="Every action is saved automatically. This keeps a copy to come back to.">
-            Save point
+          <button onClick={() => void saveNow()} title={t("game.savePointTitle")}>
+            {t("game.savePoint")}
           </button>
-          <button onClick={onMenu}>☰ Menu</button>
+          <button onClick={onMenu}>{t("game.menu")}</button>
         </header>
 
         <nav className="tabs">
-          {(Object.keys(TAB_LABELS) as Tab[]).map((t) => (
-            <button key={t} className={tab === t ? "active" : ""} onClick={() => switchTab(t)}>
-              {TAB_LABELS[t]}
-              {t === "open" && wallet && wallet.sealed.length > 0 && (
+          {TABS.map((each) => (
+            <button key={each} className={tab === each ? "active" : ""} onClick={() => switchTab(each)}>
+              {t(`tab.${each}`)}
+              {each === "open" && wallet && wallet.sealed.length > 0 && (
                 <span className="tab-count">{wallet.sealed.reduce((n, s) => n + s.quantity, 0)}</span>
               )}
             </button>
@@ -204,14 +201,12 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
         <DataStatusBar status={dataStatus} />
         {error && <p className="error">{error}</p>}
         {notice && <p className="notice">{notice}</p>}
-        {!wallet && !error && <Loading label="Loading your game…" />}
+        {!wallet && !error && <Loading label={t("game.loading")} />}
         {wallet &&
           !error &&
           sets.length === 0 &&
           dataStatus.state !== "updating" &&
-          dataStatus.state !== "checking" && (
-            <p className="hint">No card data yet. It is downloaded automatically when the app starts with a connection.</p>
-          )}
+          dataStatus.state !== "checking" && <p className="hint">{t("data.none")}</p>}
 
         {tab === "boosterium" && wallet && (
           <Boosterium
@@ -230,14 +225,14 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
             {cards || batch ? (
               <>
                 <div className="controls">
-                  <button onClick={closeOpening}>← Back to my boosters</button>
+                  <button onClick={closeOpening}>{t("open.back")}</button>
                   {remaining && (
                     <button
                       className="primary"
                       disabled={busy}
                       onClick={() => run(() => open(remaining.setCode, remaining.kind))}
                     >
-                      Open the next one ({remaining.quantity} left)
+                      {t("open.next", { count: remaining.quantity })}
                     </button>
                   )}
                 </div>
@@ -254,10 +249,11 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
                 onSell={(s) =>
                   run(async () => {
                     const sale = await sellBoosters(s.setCode, s.kind, 1);
+                    const amount = money(sale.totalCents);
                     setNotice(
-                      `Sold 1 ${s.setCode} booster for ${money(sale.totalCents)} (${
-                        sale.profitCents >= 0 ? "profit" : "loss"
-                      } ${money(Math.abs(sale.profitCents))}).`,
+                      sale.profitCents >= 0
+                        ? t("open.soldBooster", { set: s.setCode, amount, profit: money(sale.profitCents) })
+                        : t("open.soldBoosterLoss", { set: s.setCode, amount, loss: money(-sale.profitCents) }),
                     );
                   })
                 }
@@ -273,22 +269,26 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
 
         {tab === "stats" && <Stats refreshKey={`${openings}-${wallet?.balanceCents}`} />}
 
-        <footer>{FOOTER_NOTICE}</footer>
+        <Footer />
 
         <div className="toasts" aria-live="polite">
           {toasts.map((a) => (
             <button
               key={a.id}
               className="toast"
-              onClick={() => setToasts((current) => current.filter((t) => t.id !== a.id))}
+              onClick={() => setToasts((current) => current.filter((other) => other.id !== a.id))}
             >
               <div className="toast-card">
                 <AchievementCard item={a} />
               </div>
               <div className="toast-text">
-                <strong>Achievement unlocked!</strong>
+                <strong>{t("achievement.unlocked")}</strong>
                 <span>{a.name}</span>
-                {a.reward && <span className="gain">Reward: {a.reward}</span>}
+                {a.reward && (
+                  <span className="gain">
+                    {t("achievement.reward", { reward: rewardText(i18n, money, a.reward) })}
+                  </span>
+                )}
               </div>
             </button>
           ))}
