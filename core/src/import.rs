@@ -1,7 +1,7 @@
 //! Conversion of raw MTGJSON / Scryfall data into the compact catalog files.
 
 use crate::booster::{BoosterConfig, ConfigError};
-use crate::catalog::{CardEntry, FeaturedCard, PriceSet, SetFile};
+use crate::catalog::{CardEntry, FeaturedCard, ForeignCard, PriceSet, SetFile, FOREIGN_LANGUAGES};
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashSet};
 use std::io::BufRead;
@@ -36,6 +36,9 @@ pub struct RawSet {
     pub set_type: String,
     #[serde(default)]
     pub is_online_only: bool,
+    /// The set's name by MTGJSON language name; often missing (null).
+    #[serde(default)]
+    translations: BTreeMap<String, Option<String>>,
     cards: Vec<RawCard>,
     #[serde(default)]
     pub booster: BTreeMap<String, BoosterConfig>,
@@ -83,20 +86,46 @@ struct RawCard {
     #[serde(default)]
     artist: Option<String>,
     identifiers: RawIdentifiers,
+    #[serde(default)]
+    foreign_data: Vec<RawForeign>,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 struct RawIdentifiers {
     scryfall_id: Option<String>,
+}
+
+/// A translated printing of a card (MTGJSON `foreignData`).
+#[derive(Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct RawForeign {
+    language: String,
+    name: String,
+    #[serde(default)]
+    identifiers: RawIdentifiers,
+}
+
+/// The language code kept for an MTGJSON language name, if it is one of `FOREIGN_LANGUAGES`.
+fn language_code(name: &str) -> Option<&'static str> {
+    FOREIGN_LANGUAGES.iter().find(|(n, _)| *n == name).map(|(_, code)| *code)
 }
 
 fn to_entry(c: &RawCard) -> Result<CardEntry, ConfigError> {
     let scryfall_id = c.identifiers.scryfall_id.clone().ok_or_else(|| {
         ConfigError::Invalid(format!("card `{}` ({}) has no scryfallId", c.name, c.uuid))
     })?;
+    let foreign = c
+        .foreign_data
+        .iter()
+        .filter_map(|f| {
+            let code = language_code(&f.language)?;
+            Some((code.to_string(), ForeignCard { name: f.name.clone(), scryfall_id: f.identifiers.scryfall_id.clone() }))
+        })
+        .collect();
     let c = c.clone();
     Ok(CardEntry {
+        foreign,
         uuid: c.uuid,
         set_code: c.set_code,
         scryfall_id,
@@ -218,6 +247,11 @@ pub fn compact_set(raw: &RawSet, version: &str, kinds: &[&str], extra_sets: &[&R
         source_version: version.to_string(),
         cards: entries,
         boosters,
+        names: raw
+            .translations
+            .iter()
+            .filter_map(|(language, name)| Some((language_code(language)?.to_string(), name.clone()?)))
+            .collect(),
     })
 }
 

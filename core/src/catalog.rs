@@ -21,6 +21,28 @@ pub struct SetFile {
     pub cards: Vec<CardEntry>,
     /// Booster kind (e.g. "play") -> config.
     pub boosters: BTreeMap<String, BoosterConfig>,
+    /// The set's name in other languages (code -> name), when it was translated.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub names: BTreeMap<String, String>,
+}
+
+/// Bump when the compact files change in a way older data cannot satisfy: the app then
+/// rebuilds its data at the next launch.
+pub const DATA_FORMAT_VERSION: u32 = 2;
+
+/// Languages kept for card and set names, as (MTGJSON language name, code). Cards printed
+/// in other languages, or never translated, stay in English.
+pub const FOREIGN_LANGUAGES: &[(&str, &str)] =
+    &[("French", "fr"), ("German", "de"), ("Spanish", "es"), ("Italian", "it"), ("Japanese", "ja")];
+
+/// A card's printing in another language.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ForeignCard {
+    pub name: String,
+    /// The translated printing on Scryfall, for its image; `None` shows the English one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scryfall_id: Option<String>,
 }
 
 /// Booster kind whose exclusive cards are extras, outside a set's completion target.
@@ -54,6 +76,9 @@ pub struct CardEntry {
     /// Illustrator, to credit the art wherever it is shown.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub artist: Option<String>,
+    /// Translated printings, by language code (see `FOREIGN_LANGUAGES`).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub foreign: BTreeMap<String, ForeignCard>,
 }
 
 /// Prices in cents, as given by Scryfall.
@@ -110,6 +135,9 @@ pub struct Manifest {
     /// until the data is rebuilt for another reason.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub skipped: BTreeMap<String, String>,
+    /// `DATA_FORMAT_VERSION` of the build (0 for data older than the versioning).
+    #[serde(default)]
+    pub format_version: u32,
 }
 
 /// Which sets the game offers: an explicit list of codes, or `"all"` (every set of the
@@ -131,6 +159,9 @@ pub enum AllSets {
 #[serde(rename_all = "camelCase")]
 pub struct ManifestSet {
     pub name: String,
+    /// The name in other languages (code -> name), when it was translated.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub names: BTreeMap<String, String>,
     pub release_date: String,
     pub source_version: String,
     pub boosters: Vec<String>,

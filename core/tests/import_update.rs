@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 use std::io::Cursor;
-use unsealed_core::catalog::{AllSets, Manifest, ManifestSet, SetSelection};
+use unsealed_core::catalog::{AllSets, Manifest, ManifestSet, SetSelection, DATA_FORMAT_VERSION};
 use unsealed_core::import::{parse_cents, prices_from_scryfall_jsonl, set_from_mtgjson};
 use unsealed_core::update::{refresh_reason, DataConfig, RefreshReason};
 
@@ -105,6 +105,37 @@ fn the_featured_card_is_the_most_valuable_credited_card_of_the_main_boosters() {
 }
 
 #[test]
+fn keeps_translated_names_and_printings_of_the_wanted_languages() {
+    use unsealed_core::catalog::ForeignCard;
+    let json = raw_set("u1", r#""scryfallId": "s1""#)
+        .replace(
+            r#""layout": "normal","#,
+            r#""layout": "normal", "foreignData": [
+              { "language": "French", "name": "A fr", "identifiers": { "scryfallId": "s1-fr" } },
+              { "language": "Russian", "name": "A ru" },
+              { "language": "German", "name": "A de" } ],"#,
+        )
+        .replace(
+            r#""type": "expansion","#,
+            r#""type": "expansion", "translations": { "French": "Ensemble", "German": null, "Russian": "Nabor" },"#,
+        );
+    let set = set_from_mtgjson(&json, &["play"], &[]).unwrap();
+    let card = &set.cards[0];
+    // Russian is not kept; German has no translated printing on Scryfall.
+    assert_eq!(card.foreign.keys().collect::<Vec<_>>(), ["de", "fr"]);
+    assert_eq!(card.foreign["fr"], ForeignCard { name: "A fr".into(), scryfall_id: Some("s1-fr".into()) });
+    assert_eq!(card.foreign["de"].scryfall_id, None);
+    assert_eq!(set.names, BTreeMap::from([("fr".to_string(), "Ensemble".to_string())]));
+}
+
+#[test]
+fn data_built_in_an_older_format_is_rebuilt() {
+    let mut local = manifest("1000", &["BLB", "DSK"]);
+    local.format_version = DATA_FORMAT_VERSION - 1;
+    assert_eq!(refresh_reason(Some(&local), &data_config(), 1_100), Some(RefreshReason::FormatChanged));
+}
+
+#[test]
 fn rejects_a_set_without_any_wanted_kind() {
     assert!(set_from_mtgjson(&raw_set("u1", r#""scryfallId": "s1""#), &["collector"], &[]).is_err());
 }
@@ -143,6 +174,7 @@ fn manifest(generated_at: &str, sets: &[&str]) -> Manifest {
                     code.to_string(),
                     ManifestSet {
                         name: "Set".into(),
+                        names: BTreeMap::new(),
                         release_date: "2024-08-02".into(),
                         source_version: "v1".into(),
                         boosters: vec!["play".into()],
@@ -157,6 +189,7 @@ fn manifest(generated_at: &str, sets: &[&str]) -> Manifest {
         requested_sets: Some(SetSelection::List(vec!["BLB".into(), "DSK".into()])),
         set_types: Vec::new(),
         skipped: BTreeMap::new(),
+        format_version: DATA_FORMAT_VERSION,
     }
 }
 

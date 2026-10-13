@@ -5,7 +5,9 @@ import { invoke } from "@tauri-apps/api/core";
 
 export interface SetSummary {
   code: string;
+  /** In the card language when translated, else in English. */
   name: string;
+  englishName: string;
   releaseDate: string;
   boosters: string[];
   /** Art crop of the set's featured card. Must be shown unaltered, with its artist. */
@@ -219,6 +221,8 @@ export const createSavePoint = (name: string) => invoke<SaveInfo>("create_save_p
 export const renameSave = (id: string, name: string) => invoke<SaveInfo>("rename_save", { id, name });
 export const deleteSave = (id: string) => invoke<void>("delete_save", { id });
 export const getDataInfo = () => invoke<DataInfo>("get_data_info");
+/** Language of card names, card images and set names (English when not printed in it). */
+export const setCardLanguage = (lang: string) => invoke<void>("set_card_language", { lang });
 export const getDataStatus = () => invoke<DataStatus>("get_data_status");
 /** `lang`: the interface language, for the achievements' names and descriptions. */
 export const getAchievements = (lang: string) => invoke<AchievementsView>("get_achievements", { lang });

@@ -47,6 +47,8 @@ pub(crate) struct Session {
     data_dir: PathBuf,
     saves: Saves,
     current: Option<(SaveInfo, Game)>,
+    /// Language of card and set names (a setting of the app, not of a game).
+    card_lang: String,
 }
 
 impl Session {
@@ -63,6 +65,7 @@ impl Session {
         let engine = load_achievements(&self.data_dir).map_err(|e| e.to_string())?;
         let mut game = Game::new(self.data_dir.clone(), store, economy, engine)?;
         game.set_achievement_texts(load_achievement_texts(&self.data_dir).map_err(|e| e.to_string())?);
+        game.set_card_language(&self.card_lang);
         self.current = Some((info.clone(), game));
         Ok(info)
     }
@@ -152,7 +155,20 @@ fn get_data_info(state: State<'_, SessionState>) -> Result<DataInfo, String> {
 
 #[tauri::command]
 fn list_sets(state: State<'_, SessionState>) -> Result<Vec<SetSummary>, String> {
-    game::read_sets(&session(&state)?.data_dir)
+    let session = session(&state)?;
+    game::read_sets(&session.data_dir, &session.card_lang)
+}
+
+/// Language of card names, card images and set names. Unknown languages mean English.
+#[tauri::command]
+fn set_card_language(state: State<'_, SessionState>, lang: String) -> Result<(), String> {
+    let mut session = session(&state)?;
+    session.card_lang = if game::is_card_language(&lang) { lang } else { "en".to_string() };
+    let lang = session.card_lang.clone();
+    if let Some((_, game)) = session.current.as_mut() {
+        game.set_card_language(&lang);
+    }
+    Ok(())
 }
 
 // ---- the game being played ----------------------------------------------------------
@@ -317,7 +333,12 @@ pub fn run() {
             if let Some(adopted) = saves.adopt_legacy(&legacy_db_path(app.handle())?, now())? {
                 eprintln!("previous save adopted as game {}", adopted.id);
             }
-            app.manage(Mutex::new(Session { data_dir: data_dir.clone(), saves, current: None }));
+            app.manage(Mutex::new(Session {
+                data_dir: data_dir.clone(),
+                saves,
+                current: None,
+                card_lang: "en".to_string(),
+            }));
 
             let status: SharedStatus = Arc::new(Mutex::new(DataStatus::Checking));
             app.manage(status.clone());
@@ -339,6 +360,7 @@ pub fn run() {
             get_data_status,
             get_data_info,
             list_sets,
+            set_card_language,
             get_wallet,
             get_shop,
             sell_boosters,

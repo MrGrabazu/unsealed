@@ -157,8 +157,16 @@ h2 { margin: 24px 0 4px; }
 .shop-set-title { display: flex; flex-direction: column; flex: 1; }
 .shop-chevron { color: var(--accent); width: 12px; }
 .shop-from { color: var(--accent); font-weight: 600; }
-/* Natural aspect ratio: the art crop is never cropped further, blurred or recolored. */
-.shop-art { height: 64px; width: auto; border-radius: 6px; flex: none; }
+/* Set rows illustrated by their featured card. The art is never blurred, filtered or made
+   translucent: a fade of the panel colour over its left edge keeps the text readable. */
+.shop-set { overflow: hidden; }
+.shop-set-header { position: relative; }
+.shop-set-header.with-art { min-height: 92px; }
+.shop-set-header > :not(.shop-art-bg):not(.shop-fade) { position: relative; z-index: 2; }
+.shop-art-bg { position: absolute; top: 0; right: 0; height: 100%; width: 60%; object-fit: cover; object-position: center 35%; z-index: 0; }
+.shop-fade { position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: linear-gradient(90deg, var(--panel) 40%, rgba(27, 29, 40, 0.88) 50%, rgba(27, 29, 40, 0.35) 62%, rgba(27, 29, 40, 0) 78%); }
+.shop-set-header.with-art .shop-from { background: rgba(18, 19, 26, 0.88); padding: 5px 12px; border-radius: 999px; }
 .shop-credit { color: var(--muted); font-size: 11px; font-style: italic; }
 /* Expansion symbols are black SVGs: a light badge keeps them visible, unaltered. */
 .set-icon { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #e8e6df; vertical-align: middle; }

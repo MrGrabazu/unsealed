@@ -41,7 +41,13 @@ export function Boosterium({ shop, sets, wallet, onBuy, onBuyAndOpen, onClaimCha
   const query = search.trim().toLowerCase();
   const groups: SetGroup[] = sets
     .filter((set) => year === "all" || set.releaseDate.startsWith(year))
-    .filter((set) => !query || set.name.toLowerCase().includes(query) || set.code.toLowerCase() === query)
+    .filter(
+      (set) =>
+        !query ||
+        set.name.toLowerCase().includes(query) ||
+        set.englishName.toLowerCase().includes(query) ||
+        set.code.toLowerCase() === query,
+    )
     .map((set) => ({
       set,
       products: shop
@@ -97,10 +103,21 @@ export function Boosterium({ shop, sets, wallet, onBuy, onBuyAndOpen, onClaimCha
           const cheapest = Math.min(...products.map((p) => p.priceCents));
           return (
             <div key={set.code} className={`shop-set ${expanded ? "open" : ""}`}>
-              <button className="shop-set-header" onClick={() => toggle(set.code)} aria-expanded={expanded}>
+              <button
+                className={`shop-set-header ${set.art ? "with-art" : ""}`}
+                onClick={() => toggle(set.code)}
+                aria-expanded={expanded}
+              >
+                {/* Scryfall: an art crop is shown unaltered (no blur, no filter, full opacity), with
+                    its artist credited on the row. A fade of the panel colour covers its left edge so
+                    the text stays readable; the image itself is never recoloured. */}
+                {set.art && (
+                  <>
+                    <img className="shop-art-bg" src={set.art.imageUrl} alt="" aria-hidden="true" draggable={false} />
+                    <span className="shop-fade" aria-hidden="true" />
+                  </>
+                )}
                 <span className="shop-chevron">{expanded ? "▾" : "▸"}</span>
-                {/* Scryfall: an art crop is shown unaltered, with its artist credited next to it. */}
-                {set.art && <img className="shop-art" src={set.art.imageUrl} alt={set.art.cardName} draggable={false} />}
                 <span className="shop-set-title">
                   <span className="shop-name">
                     <SetIcon url={set.iconUrl} name={set.name} /> {set.name}

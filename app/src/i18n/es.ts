@@ -203,7 +203,11 @@ export const es: Messages = {
   // ---- options
   "options.title": "Opciones",
   "options.language": "Idioma",
-  "options.languageHint": "Los nombres e imágenes de las cartas siguen en inglés.",
+  "options.languageHint": "El idioma de los menús y textos.",
+  "options.cardLanguage": "Idioma de las cartas y ediciones",
+  "options.cardLanguageAuto": "Igual que la interfaz",
+  "options.cardLanguageHint":
+    "Nombres e imágenes de las cartas, y nombres de las ediciones, cuando se imprimieron en ese idioma. Todo lo demás se muestra en inglés, como en las ediciones más antiguas.",
   "options.data": "Datos del juego",
   "options.sets": "Ediciones",
   "options.boosterTypes": "Tipos de sobre",

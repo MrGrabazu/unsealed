@@ -13,7 +13,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use unsealed_core::achievements::{Engine, Event};
-use unsealed_core::catalog::{Manifest, PriceFile, SetFile};
+use unsealed_core::catalog::{CardEntry, Manifest, PriceFile, SetFile, FOREIGN_LANGUAGES};
 use unsealed_core::economy::{charity_available, EconomyConfig};
 use unsealed_core::{open_booster, ColorIndex};
 
@@ -24,7 +24,10 @@ const MAX_PURCHASE: u32 = 100;
 #[serde(rename_all = "camelCase")]
 pub struct SetSummary {
     pub code: String,
+    /// In the card language when the set's name was translated, else in English.
     pub name: String,
+    /// Always in English, so a search finds the set by either name.
+    pub english_name: String,
     pub release_date: String,
     pub boosters: Vec<String>,
     /// Art illustrating the set, with its credit.
@@ -266,6 +269,8 @@ pub struct Game {
     /// Ids of the achievements unlocked and not yet shown to the player.
     notifications: Vec<String>,
     achievement_texts: AchievementTexts,
+    /// See `set_card_language`.
+    card_lang: String,
     sets: HashMap<String, LoadedSet>,
     prices: Option<PriceFile>,
     /// Modification time of the prices file that `prices` was loaded from.
@@ -306,6 +311,7 @@ impl Game {
             engine,
             notifications: Vec::new(),
             achievement_texts: AchievementTexts::default(),
+            card_lang: "en".to_string(),
             sets: HashMap::new(),
             prices: None,
             prices_stamp: None,
@@ -322,7 +328,13 @@ impl Game {
     }
 
     pub fn list_sets(&self) -> Result<Vec<SetSummary>, String> {
-        read_sets(&self.data_dir)
+        read_sets(&self.data_dir, &self.card_lang)
+    }
+
+    /// Language of card names, card images and set names ("en", or one of
+    /// `FOREIGN_LANGUAGES`); anything not translated stays in English.
+    pub fn set_card_language(&mut self, lang: &str) {
+        self.card_lang = if is_card_language(lang) { lang.to_string() } else { "en".to_string() };
     }
 
     // ---- Boosterium: wallet, shop, charity -------------------------------------
@@ -487,7 +499,7 @@ impl Game {
     pub fn open_booster(&mut self, set_code: &str, kind: &str) -> Result<Vec<OpenedCard>, String> {
         self.ensure_loaded(set_code)?;
         self.ensure_prices();
-        let Self { sets, prices, rng, store, economy, clock, .. } = self;
+        let Self { sets, prices, rng, store, economy, clock, card_lang, .. } = self;
         let set = &sets[set_code];
         let cfg = set
             .file
@@ -504,10 +516,11 @@ impl Game {
                     .as_ref()
                     .and_then(|p| p.cards.get(&d.uuid))
                     .and_then(|p| economy.market_price_cents(p, d.foil));
+                let (name, image_url) = localized(card, card_lang);
                 OpenedCard {
-                    image_url: image_url(&card.scryfall_id),
+                    image_url,
                     uuid: d.uuid,
-                    name: card.name.clone(),
+                    name,
                     number: card.number.clone(),
                     rarity: card.rarity.clone(),
                     set_code: card.set_code.clone(),
@@ -572,12 +585,13 @@ impl Game {
                 .map(|&i| {
                     let c = &set.file.cards[i];
                     let have = owned.get(&c.uuid).copied().unwrap_or_default();
+                    let (name, image_url) = localized(c, &self.card_lang);
                     CollectionCard {
                         uuid: c.uuid.clone(),
-                        name: c.name.clone(),
+                        name,
                         number: c.number.clone(),
                         rarity: c.rarity.clone(),
-                        image_url: image_url(&c.scryfall_id),
+                        image_url,
                         quantity: have.normal,
                         foil_quantity: have.foil,
                         price_cents: self.market_price(&c.uuid, false),
@@ -597,7 +611,7 @@ impl Game {
             if total_count == 0 { 0.0 } else { owned_count as f64 * 100.0 / total_count as f64 };
         Ok(CollectionView {
             set_code: set.file.code.clone(),
-            set_name: set.file.name.clone(),
+            set_name: set.file.names.get(&self.card_lang).unwrap_or(&set.file.name).clone(),
             owned_count,
             total_count,
             completion_percent,
@@ -767,14 +781,15 @@ impl Game {
         self.ensure_loaded(booster_set).ok()?;
         let set = &self.sets[booster_set];
         let card = &set.file.cards[*set.index.get(uuid)?];
+        let (name, image_url) = localized(card, &self.card_lang);
         Some(OpenedCard {
             uuid: card.uuid.clone(),
-            name: card.name.clone(),
+            name,
             number: card.number.clone(),
             rarity: card.rarity.clone(),
             set_code: card.set_code.clone(),
             scryfall_id: card.scryfall_id.clone(),
-            image_url: image_url(&card.scryfall_id),
+            image_url,
             foil,
             sheet: String::new(),
             price_cents,
@@ -879,10 +894,15 @@ fn number_key(number: &str) -> (u32, String) {
     (digits.parse().unwrap_or(u32::MAX), number.to_string())
 }
 
-/// The sets the downloaded data offers, newest first. Needs no game: the home screen and
-/// the options read it too.
-pub fn read_sets(data_dir: &Path) -> Result<Vec<SetSummary>, String> {
-    Ok(read_manifest(data_dir)?.map(|m| sets_of(m)).unwrap_or_default())
+/// The sets the downloaded data offers, newest first, named in `lang` when translated.
+/// Needs no game: the home screen and the options read it too.
+pub fn read_sets(data_dir: &Path, lang: &str) -> Result<Vec<SetSummary>, String> {
+    Ok(read_manifest(data_dir)?.map(|m| sets_of(m, lang)).unwrap_or_default())
+}
+
+/// Languages cards and set names can be shown in (English, then `FOREIGN_LANGUAGES`).
+pub fn is_card_language(lang: &str) -> bool {
+    lang == "en" || FOREIGN_LANGUAGES.iter().any(|(_, code)| *code == lang)
 }
 
 /// What the downloaded data contains, for the options screen.
@@ -916,13 +936,14 @@ fn read_manifest(data_dir: &Path) -> Result<Option<Manifest>, String> {
     read_json(&path).map(Some)
 }
 
-fn sets_of(manifest: Manifest) -> Vec<SetSummary> {
+fn sets_of(manifest: Manifest, lang: &str) -> Vec<SetSummary> {
     let mut sets: Vec<SetSummary> = manifest
         .sets
         .into_iter()
         .map(|(code, s)| SetSummary {
             code,
-            name: s.name,
+            name: s.names.get(lang).unwrap_or(&s.name).clone(),
+            english_name: s.name,
             release_date: s.release_date,
             boosters: s.boosters,
             art: s.featured.map(|f| SetArt {
@@ -940,6 +961,15 @@ fn sets_of(manifest: Manifest) -> Vec<SetSummary> {
 fn read_json<T: serde::de::DeserializeOwned>(path: &std::path::Path) -> Result<T, String> {
     let text = fs::read_to_string(path).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
     serde_json::from_str(&text).map_err(|e| format!("invalid {}: {e}", path.display()))
+}
+
+/// A card's name and image in `lang`, or in English when it was not printed in that language.
+/// A translated name without a translated printing on Scryfall keeps the English image.
+fn localized(card: &CardEntry, lang: &str) -> (String, String) {
+    match card.foreign.get(lang) {
+        Some(f) => (f.name.clone(), image_url(f.scryfall_id.as_deref().unwrap_or(&card.scryfall_id))),
+        None => (card.name.clone(), image_url(&card.scryfall_id)),
+    }
 }
 
 /// Scryfall CDN image of a card (normal size). Double-faced back sides are not handled yet.
@@ -1130,6 +1160,37 @@ mod tests {
         format!(
             r#"{{ "updatedAt": "d{usd}", "cards": {{}}, "boosters": {{ "TST/play": {{ "usd": {usd}, "eur": 0 }} }} }}"#
         )
+    }
+
+    #[test]
+    fn cards_and_sets_follow_the_card_language_with_english_as_fallback() {
+        let mut g = game("card-lang");
+        // The common was printed in French (with its own image), the mythic was not.
+        let set = SET
+            .replace(
+                r#""name": "Common", "number": "10","#,
+                r#""name": "Common", "number": "10", "foreign": { "fr": { "name": "Commune", "scryfallId": "fr0001" } },"#,
+            )
+            .replace(r#""name": "Test Set","#, r#""name": "Test Set", "names": { "fr": "Jeu de test" },"#);
+        fs::write(g.data_dir.join("sets/TST.json"), set).unwrap();
+        fs::write(
+            g.data_dir.join("manifest.json"),
+            MANIFEST.replace(r#""name": "Test Set","#, r#""name": "Test Set", "names": { "fr": "Jeu de test" },"#),
+        )
+        .unwrap();
+
+        g.set_card_language("fr");
+        let view = g.collection("TST").unwrap();
+        assert_eq!(view.set_name, "Jeu de test");
+        let names: Vec<&str> = view.cards.iter().map(|c| c.name.as_str()).collect();
+        assert_eq!(names, ["Mythic", "Commune"]);
+        assert!(view.cards[1].image_url.contains("fr0001"));
+        let sets = g.list_sets().unwrap();
+        assert_eq!((sets[0].name.as_str(), sets[0].english_name.as_str()), ("Jeu de test", "Test Set"));
+
+        // An unknown language means English.
+        g.set_card_language("xx");
+        assert_eq!(g.collection("TST").unwrap().cards[1].name, "Common");
     }
 
     #[test]

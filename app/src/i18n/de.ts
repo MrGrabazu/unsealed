@@ -203,7 +203,11 @@ export const de: Messages = {
   // ---- options
   "options.title": "Optionen",
   "options.language": "Sprache",
-  "options.languageHint": "Kartennamen und -bilder bleiben auf Englisch.",
+  "options.languageHint": "Die Sprache der Menüs und Texte.",
+  "options.cardLanguage": "Sprache der Karten und Sets",
+  "options.cardLanguageAuto": "Wie die Oberfläche",
+  "options.cardLanguageHint":
+    "Kartennamen und -bilder sowie Setnamen, sofern sie in dieser Sprache gedruckt wurden. Alles andere bleibt auf Englisch, etwa bei den ältesten Sets.",
   "options.data": "Spieldaten",
   "options.sets": "Sets",
   "options.boosterTypes": "Booster-Typen",

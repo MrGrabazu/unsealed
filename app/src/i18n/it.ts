@@ -203,7 +203,11 @@ export const it: Messages = {
   // ---- options
   "options.title": "Opzioni",
   "options.language": "Lingua",
-  "options.languageHint": "Nomi e immagini delle carte restano in inglese.",
+  "options.languageHint": "La lingua dei menu e dei testi.",
+  "options.cardLanguage": "Lingua delle carte e delle espansioni",
+  "options.cardLanguageAuto": "Come l'interfaccia",
+  "options.cardLanguageHint":
+    "Nomi e immagini delle carte, e nomi delle espansioni, se sono stati stampati in quella lingua. Tutto il resto rimane in inglese, come per le espansioni più vecchie.",
   "options.data": "Dati di gioco",
   "options.sets": "Espansioni",
   "options.boosterTypes": "Tipi di busta",

@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { setCardLanguage } from "../api";
 import { de } from "./de";
 import { en, type MessageKey, type Messages } from "./en";
 import { es } from "./es";
@@ -19,6 +20,14 @@ export const LANGUAGES: { code: Lang; name: string }[] = [
 const MESSAGES: Record<Lang, Messages> = { en, fr, de, es, it };
 const STORAGE_KEY = "unsealed.language";
 
+/** Languages cards and set names can be shown in (when printed in them; see the Rust
+ * `FOREIGN_LANGUAGES`). Not all are interface languages. */
+export type CardLang = Lang | "ja";
+export const CARD_LANGUAGES: { code: CardLang; name: string }[] = [...LANGUAGES, { code: "ja", name: "日本語" }];
+/** The card language setting: "auto" follows the interface language. */
+export type CardLangSetting = CardLang | "auto";
+const CARD_STORAGE_KEY = "unsealed.cardLanguage";
+
 type Vars = Record<string, string | number>;
 /** Keys that have plural forms (`<base>_one` and `<base>_other`). */
 type PluralBase = { [K in MessageKey]: K extends `${infer Base}_one` ? Base : never }[MessageKey];
@@ -26,6 +35,8 @@ type PluralBase = { [K in MessageKey]: K extends `${infer Base}_one` ? Base : ne
 export interface I18n {
   lang: Lang;
   setLang: (lang: Lang) => void;
+  cardLangSetting: CardLangSetting;
+  setCardLangSetting: (setting: CardLangSetting) => void;
   /** The text of `key` in the current language, with its `{placeholders}` filled. */
   t: (key: MessageKey, vars?: Vars) => string;
   /** The plural form of `base` that fits `count` (also available as `{count}`). */
@@ -62,6 +73,21 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     setLangState(next);
   }, []);
 
+  const [cardLangSetting, setCardLangState] = useState<CardLangSetting>(() => {
+    const saved = localStorage.getItem(CARD_STORAGE_KEY);
+    return CARD_LANGUAGES.some((l) => l.code === saved) ? (saved as CardLang) : "auto";
+  });
+  const setCardLangSetting = useCallback((next: CardLangSetting) => {
+    localStorage.setItem(CARD_STORAGE_KEY, next);
+    setCardLangState(next);
+  }, []);
+
+  // Cards are named by the game itself: tell it the language to use.
+  const cardLang = cardLangSetting === "auto" ? lang : cardLangSetting;
+  useEffect(() => {
+    setCardLanguage(cardLang).catch(() => {});
+  }, [cardLang]);
+
   const value = useMemo<I18n>(() => {
     const messages = MESSAGES[lang];
     const rules = new Intl.PluralRules(lang);
@@ -71,6 +97,8 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     return {
       lang,
       setLang,
+      cardLangSetting,
+      setCardLangSetting,
       t,
       plural: (base, count, vars) => {
         const form = rules.select(count) === "one" ? "one" : "other";
@@ -79,7 +107,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       formatDate: (seconds) => dates.format(new Date(seconds * 1000)),
       formatNumber: (n) => numbers.format(n),
     };
-  }, [lang, setLang]);
+  }, [lang, setLang, cardLangSetting, setCardLangSetting]);
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }

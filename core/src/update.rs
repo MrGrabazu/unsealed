@@ -2,7 +2,7 @@
 //! data from MTGJSON and Scryfall (see `builder`), so the only state is the local manifest.
 //! Pure logic: no network, no clock access, so it is testable.
 
-use crate::catalog::{Manifest, SetSelection};
+use crate::catalog::{Manifest, SetSelection, DATA_FORMAT_VERSION};
 use serde::Deserialize;
 
 /// What to download and how fresh it must be (shipped as `config/data.json`).
@@ -56,6 +56,8 @@ pub enum RefreshReason {
     MissingSet(String),
     /// The configuration asks for other sets, set types or booster kinds than the data was built for.
     ConfigChanged,
+    /// The data was built in an older format (see `DATA_FORMAT_VERSION`).
+    FormatChanged,
     /// The data is older than the configured maximum age.
     Stale,
 }
@@ -63,6 +65,9 @@ pub enum RefreshReason {
 /// Whether the data must be rebuilt now. `now` is a Unix time in seconds.
 pub fn refresh_reason(local: Option<&Manifest>, cfg: &DataConfig, now: i64) -> Option<RefreshReason> {
     let Some(manifest) = local else { return Some(RefreshReason::NoData) };
+    if manifest.format_version != DATA_FORMAT_VERSION {
+        return Some(RefreshReason::FormatChanged);
+    }
     if let SetSelection::List(codes) = &cfg.sets {
         let installed = |c: &String| manifest.sets.contains_key(c) || manifest.skipped.contains_key(c);
         if let Some(code) = codes.iter().find(|c| !installed(c)) {

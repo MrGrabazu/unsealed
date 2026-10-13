@@ -4,7 +4,9 @@
 //! that cannot be built is left out (and listed in the manifest) instead of failing all.
 
 use crate::booster::BoosterConfig;
-use crate::catalog::{BoosterValue, Manifest, ManifestSet, PriceFile, PriceSet, SetFile, SetSelection};
+use crate::catalog::{
+    BoosterValue, Manifest, ManifestSet, PriceFile, PriceSet, SetFile, SetSelection, DATA_FORMAT_VERSION,
+};
 use crate::import::{compact_set, featured_card, prices_by_uuid, prices_from_scryfall_jsonl, read_all_printings, AllPrintings};
 use crate::sim::expected_value_cents;
 use crate::{simulate, ColorIndex};
@@ -285,6 +287,7 @@ pub fn build(opts: &BuildOptions, progress: Progress<'_>) -> Result<Manifest, Bu
             code.clone(),
             ManifestSet {
                 name: set.name.clone(),
+                names: set.names.clone(),
                 release_date: set.release_date.clone(),
                 source_version: set.source_version.clone(),
                 boosters: set.boosters.keys().cloned().collect(),
@@ -355,6 +358,7 @@ pub fn build(opts: &BuildOptions, progress: Progress<'_>) -> Result<Manifest, Bu
         requested_sets: Some(opts.sets.clone()),
         set_types: opts.set_types.clone(),
         skipped,
+        format_version: DATA_FORMAT_VERSION,
     };
     write_json(&opts.out.join("manifest.json"), &manifest)?;
 

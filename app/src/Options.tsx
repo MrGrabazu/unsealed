@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { getDataInfo, type DataInfo } from "./api";
 import { DataStatusBar, useDataStatus } from "./DataStatus";
-import { LANGUAGES, useI18n, type Lang } from "./i18n";
+import { CARD_LANGUAGES, LANGUAGES, useI18n, type CardLangSetting, type Lang } from "./i18n";
 import { Loading } from "./Loading";
 
 /** Settings: the language, and what the downloaded game data contains. */
 export function Options({ onBack }: { onBack: () => void }) {
-  const { t, lang, setLang, formatDate, formatNumber } = useI18n();
+  const { t, lang, setLang, cardLangSetting, setCardLangSetting, formatDate, formatNumber } = useI18n();
   const [info, setInfo] = useState<DataInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const reload = () =>
@@ -35,6 +35,21 @@ export function Options({ onBack }: { onBack: () => void }) {
         ))}
       </select>
       <p className="hint">{t("options.languageHint")}</p>
+
+      <h3>{t("options.cardLanguage")}</h3>
+      <select
+        value={cardLangSetting}
+        onChange={(e) => setCardLangSetting(e.target.value as CardLangSetting)}
+        aria-label={t("options.cardLanguage")}
+      >
+        <option value="auto">{t("options.cardLanguageAuto")}</option>
+        {CARD_LANGUAGES.map((l) => (
+          <option key={l.code} value={l.code}>
+            {l.name}
+          </option>
+        ))}
+      </select>
+      <p className="hint">{t("options.cardLanguageHint")}</p>
 
       <h3>{t("options.data")}</h3>
       <DataStatusBar status={dataStatus} />

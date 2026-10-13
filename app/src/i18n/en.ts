@@ -208,7 +208,11 @@ export const en = {
   // ---- options
   "options.title": "Options",
   "options.language": "Language",
-  "options.languageHint": "Card names and images stay in English.",
+  "options.languageHint": "The language of menus and texts.",
+  "options.cardLanguage": "Card and set language",
+  "options.cardLanguageAuto": "Same as the interface",
+  "options.cardLanguageHint":
+    "Card names and images, and set names, when they were printed in that language. Everything else stays in English, as with the oldest sets.",
   "options.data": "Game data",
   "options.sets": "Sets",
   "options.boosterTypes": "Booster types",
