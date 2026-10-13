@@ -88,7 +88,7 @@ export interface BoosterSaleResult {
 export interface WalletView {
   balanceCents: number;
   /** How amounts are shown (in Seals, see money.tsx). */
-  currency: { sealsPerCent: number; silverFrom: number; goldFrom: number };
+  currency: { sealsPerCent: number };
   charity: { amountCents: number; available: boolean };
   sealed: SealedStack[];
 }

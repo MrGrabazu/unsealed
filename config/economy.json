@@ -1,5 +1,5 @@
 {
-  "currency": { "market": "USD", "sealsPerCent": 1, "silverFrom": 100, "goldFrom": 10000 },
+  "currency": { "market": "USD", "sealsPerCent": 1 },
   "startingBalanceCents": 10000,
   "sellRatePercent": 80,
   "boosterSellRatePercent": 80,

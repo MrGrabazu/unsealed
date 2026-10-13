@@ -107,11 +107,9 @@ pub struct CollectionView {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-/// How the interface shows amounts: in Seals, with a bronze, silver or gold coin.
+/// How the interface shows amounts: in Seals.
 pub struct CurrencyView {
     pub seals_per_cent: f64,
-    pub silver_from: u64,
-    pub gold_from: u64,
 }
 
 #[derive(Debug, Serialize)]
@@ -398,11 +396,7 @@ impl Game {
             .collect();
         Ok(WalletView {
             balance_cents: balance,
-            currency: CurrencyView {
-                seals_per_cent: self.economy.currency.seals_per_cent,
-                silver_from: self.economy.currency.silver_from,
-                gold_from: self.economy.currency.gold_from,
-            },
+            currency: CurrencyView { seals_per_cent: self.economy.currency.seals_per_cent },
             charity: CharityStatus { amount_cents: self.economy.charity.amount_cents, available: charity_open },
             sealed,
         })
@@ -1165,7 +1159,7 @@ mod tests {
     fn a_new_player_has_the_starting_capital_and_no_help() {
         let mut g = game("wallet");
         let w = g.wallet().unwrap();
-        assert_eq!((w.balance_cents, w.currency.seals_per_cent, w.currency.gold_from), (10_000, 1.0, 10_000));
+        assert_eq!((w.balance_cents, w.currency.seals_per_cent), (10_000, 1.0));
         assert!(w.sealed.is_empty());
         assert!(!w.charity.available);
     }

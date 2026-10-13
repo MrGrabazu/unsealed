@@ -66,7 +66,6 @@ fn rejects_invalid_configs() {
     assert!(bad(r#""defaultCents": 750"#, r#""defaultCents": 0"#));
     assert!(bad(r#""boosterSellRatePercent": 80"#, r#""boosterSellRatePercent": 101"#));
     assert!(bad(r#""sealsPerCent": 1"#, r#""sealsPerCent": 0"#));
-    assert!(bad(r#""silverFrom": 100"#, r#""silverFrom": 20000"#));
 }
 
 #[test]
@@ -105,12 +104,12 @@ fn bad_cancellation(from: &str, to: &str) -> bool {
 }
 
 #[test]
-fn seals_default_to_one_per_cent_with_coin_tiers() {
+fn seals_default_to_one_per_cent() {
     let c = config();
-    assert_eq!((c.currency.seals_per_cent, c.currency.silver_from, c.currency.gold_from), (1.0, 100, 10_000));
+    assert_eq!(c.currency.seals_per_cent, 1.0);
     // An older config naming the market currency `code` still loads, with the defaults.
     let old = EconomyConfig::from_json(&CONFIG.replace(
-        r#""market": "USD", "sealsPerCent": 1, "silverFrom": 100, "goldFrom": 10000"#,
+        r#""market": "USD", "sealsPerCent": 1"#,
         r#""code": "USD", "symbol": "$""#,
     ))
     .unwrap();

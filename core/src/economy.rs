@@ -91,24 +91,10 @@ pub struct Currency {
     /// Seals shown for one cent of the market currency.
     #[serde(default = "one")]
     pub seals_per_cent: f64,
-    /// From this many Seals, an amount shows a silver coin (bronze below).
-    #[serde(default = "silver_from")]
-    pub silver_from: u64,
-    /// From this many Seals, an amount shows a gold coin.
-    #[serde(default = "gold_from")]
-    pub gold_from: u64,
 }
 
 fn one() -> f64 {
     1.0
-}
-
-fn silver_from() -> u64 {
-    100
-}
-
-fn gold_from() -> u64 {
-    10_000
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -154,9 +140,6 @@ impl EconomyConfig {
         }
         if !(self.currency.seals_per_cent > 0.0) {
             return Err(ConfigError::Invalid("currency.sealsPerCent must be positive".into()));
-        }
-        if self.currency.silver_from == 0 || self.currency.silver_from >= self.currency.gold_from {
-            return Err(ConfigError::Invalid("currency: 0 < silverFrom < goldFrom is required".into()));
         }
         if self.sell_rate_percent > 100 {
             return Err(ConfigError::Invalid("sellRatePercent must be between 0 and 100".into()));

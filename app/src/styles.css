@@ -226,18 +226,12 @@ button.sell.confirm { background: #7a1d1d; border-color: #c24040; color: #fff; }
 .history-table tr.undone td { opacity: 0.55; }
 .history-table tr.undone td:last-child { opacity: 1; }
 
-/* Seals: amounts with a bronze, silver or gold coin */
+/* Seals: every amount with the same golden coin */
 .money { display: inline-flex; align-items: center; gap: 0.22em; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .coin { width: 1.05em; height: 1.05em; flex: none; filter: drop-shadow(0 1px 1px #0008); }
-.coin .coin-edge { stroke-width: 0.8; }
-.coin .coin-face { fill: none; stroke-width: 1.1; }
-.coin .coin-mark { fill: none; stroke-width: 1.6; stroke-linecap: round; }
-.coin-bronze .coin-edge { fill: #c47a3a; stroke: #7d4a1e; }
-.coin-bronze .coin-face, .coin-bronze .coin-mark { stroke: #f0b07a; }
-.coin-silver .coin-edge { fill: #b9c1cc; stroke: #6c7480; }
-.coin-silver .coin-face, .coin-silver .coin-mark { stroke: #f4f7fb; }
-.coin-gold .coin-edge { fill: #e6b422; stroke: #8a6410; }
-.coin-gold .coin-face, .coin-gold .coin-mark { stroke: #fff1b8; }
+.coin .coin-edge { fill: #e6b422; stroke: #8a6410; stroke-width: 0.8; }
+.coin .coin-face { fill: none; stroke: #fff1b8; stroke-width: 1.1; }
+.coin .coin-mark { fill: none; stroke: #fff1b8; stroke-width: 1.6; stroke-linecap: round; }
 
 /* Turning double-faced cards over */
 .turnable { animation: turn 0.35s ease-out; }

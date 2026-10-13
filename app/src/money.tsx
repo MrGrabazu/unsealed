@@ -2,31 +2,23 @@ import { createContext, useContext, type ReactNode } from "react";
 import { useI18n } from "./i18n";
 
 // The game's currency: Seals. The Rust side counts in cents of the market currency; the
-// player only ever sees Seals, derived from them (see `economy.json`, `currency`), with a
-// bronze, silver or gold coin depending on the amount.
+// player only ever sees Seals, derived from them (see `economy.json`, `currency`), always
+// with the same coin, so every amount reads as one and the same currency.
 
 /** How cents become Seals, sent by the game with the wallet. */
 export interface CurrencyRules {
   sealsPerCent: number;
-  silverFrom: number;
-  goldFrom: number;
 }
 
-export const DEFAULT_CURRENCY: CurrencyRules = { sealsPerCent: 1, silverFrom: 100, goldFrom: 10_000 };
+export const DEFAULT_CURRENCY: CurrencyRules = { sealsPerCent: 1 };
 export const CurrencyContext = createContext<CurrencyRules>(DEFAULT_CURRENCY);
 
-type Tier = "bronze" | "silver" | "gold";
-
 const toSeals = (rules: CurrencyRules, cents: number) => Math.round(cents * rules.sealsPerCent);
-const tierOf = (rules: CurrencyRules, seals: number): Tier => {
-  const size = Math.abs(seals);
-  return size >= rules.goldFrom ? "gold" : size >= rules.silverFrom ? "silver" : "bronze";
-};
 
 /** A wax-seal coin, drawn for Unsealed. */
-function Coin({ tier }: { tier: Tier }) {
+function Coin() {
   return (
-    <svg className={`coin coin-${tier}`} viewBox="0 0 24 24" aria-hidden="true">
+    <svg className="coin" viewBox="0 0 24 24" aria-hidden="true">
       <path
         className="coin-edge"
         d="M12 1.5l2.1 1.6 2.6-.3 1.2 2.3 2.4 1.1-.2 2.6 1.6 2.1-1.6 2.1.2 2.6-2.4 1.1-1.2 2.3-2.6-.3L12 22.5l-2.1-1.6-2.6.3-1.2-2.3-2.4-1.1.2-2.6L2.3 13.1 3.9 11l-.2-2.6 2.4-1.1 1.2-2.3 2.6.3z"
@@ -45,7 +37,7 @@ export function Money({ cents }: { cents: number }) {
   return (
     <span className="money" title={plural("currency.amount", seals)}>
       {formatNumber(seals)}
-      <Coin tier={tierOf(rules, seals)} />
+      <Coin />
     </span>
   );
 }
