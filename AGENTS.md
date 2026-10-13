@@ -129,13 +129,14 @@ Le jeu est un client lourd : **il n'y a pas de serveur à héberger**. L'app con
 
 ### 8 bis. État actuel de l'implémentation
 
-- **Définitions** : `config/achievements.json` (44 achievements, dont 8 secrets). Un `achievements.json` dans le dossier de données le remplace.
+- **Définitions** : `config/achievements.json` (51 achievements, dont 8 secrets). Un `achievements.json` dans le dossier de données le remplace.
 - **Moteur** : `core/src/achievements.rs`. Des *métriques* (`sum`, `max`, `streak`, `distinct`) sont alimentées par les événements ; une *condition* débloque sur seuil de métrique, sur un événement filtré, ou `allOthers` (l'ultime). Un déblocage émet `AchievementUnlocked`, ce qui permet des méta-achievements.
-- **Événements émis par le jeu** (`app/src-tauri/src/game/achievements.rs`) : `BoosterOpened`, `CardAcquired`, `SetProgress`, `CardSold`, `SaleCompleted`, `BoosterBought`, `BoosterSold`, `CharityClaimed`, `BalanceChanged`. Ajouter un champ ou un événement demande du code ; ajouter un achievement n'en demande pas.
+- **Événements émis par le jeu** (`app/src-tauri/src/game/achievements.rs`) : `BoosterOpened`, `CardAcquired`, `SetProgress` (complétion globale, rares, mythiques, foil, collector extras), `YearProgress` (sets complets parmi ceux proposés de la même année), `CardSold`, `SaleCompleted`, `BoosterBought`, `BoosterSold`, `CharityClaimed`, `BalanceChanged`. Ajouter un champ ou un événement demande du code ; ajouter un achievement n'en demande pas.
 - **Récompenses** : `cashCents` et/ou boosters offerts (`setCode` explicite ou `"latest"`). Payées une seule fois, dans la même transaction que le déblocage.
 - **Cartes** : dessinées en SVG par `app/src/AchievementCard.tsx` (cadre, médaillon à fond procédural selon l'id, ruban). Look volontairement différent de toute mise en page de carte à jouer. Les listes `EMBLEMS` et `PALETTES` de `core/src/achievements.rs` doivent rester synchronisées avec celles du composant.
 - **Secrets** : tant qu'ils sont verrouillés, seuls la rareté et le numéro sont exposés (nom, objectif, récompense et visuel restent cachés, côté Rust).
-- **Pas encore fait** : complétion « tout en foil », « bloc ou année complète » (il faut ces données), illustrations personnalisées par achievement.
+- **Complétion foil** : ne compte que les cartes imprimées en foil (`finishes`). **Année complète** : tous les sets proposés de l'année, avec au moins 2 sets pour l'achievement livré.
+- **Pas encore fait** : complétion par bloc (aucun set proposé n'appartient à un bloc, les blocs ont disparu en 2019), illustrations personnalisées par achievement.
 
 ## 9. Fonctionnalités de collection
 

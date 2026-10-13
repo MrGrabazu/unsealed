@@ -157,33 +157,70 @@ impl Game {
         events
     }
 
-    /// How far the player is in a set: overall, and for rares and mythics.
+    /// How far the player is in a set: overall, for rares and mythics, in foil (cards
+    /// printed in foil only), and for the collector extras.
     fn set_progress_event(&self, set_code: &str) -> Option<Event> {
         let owned = self.store.owned_in_set(set_code).ok()?;
         let set = self.sets.get(set_code)?;
-        // (cards, owned) overall, for rares and for mythics.
-        let (mut all, mut rares, mut mythics) = ((0i64, 0i64), (0i64, 0i64), (0i64, 0i64));
+        // (cards, owned) overall, for rares, for mythics, in foil and for the extras.
+        let (mut all, mut rares, mut mythics, mut foils, mut extras) = Default::default();
+        let bump = |t: &mut (i64, i64), have: bool| {
+            t.0 += 1;
+            t.1 += i64::from(have);
+        };
         for &i in &set.obtainable {
             let card = &set.file.cards[i];
-            let have = owned.get(&card.uuid).is_some_and(|o| o.normal + o.foil > 0);
-            let bump = |t: &mut (i64, i64)| {
-                t.0 += 1;
-                t.1 += i64::from(have);
-            };
-            bump(&mut all);
+            let have = owned.get(&card.uuid).copied().unwrap_or_default();
+            bump(&mut all, have.normal + have.foil > 0);
             match card.rarity.as_str() {
-                "rare" => bump(&mut rares),
-                "mythic" => bump(&mut mythics),
+                "rare" => bump(&mut rares, have.normal + have.foil > 0),
+                "mythic" => bump(&mut mythics, have.normal + have.foil > 0),
                 _ => {}
             }
+            if card.finishes.iter().any(|f| f == "foil") {
+                bump(&mut foils, have.foil > 0);
+            }
         }
-        let permille = if all.0 == 0 { 0 } else { all.1 * 1000 / all.0 };
+        for &i in &set.extras {
+            bump(&mut extras, owned.get(&set.file.cards[i].uuid).is_some_and(|o| o.normal + o.foil > 0));
+        }
+        let all_owned = |t: (i64, i64)| t.0 > 0 && t.0 == t.1;
         Some(
             Event::new("SetProgress")
                 .with("setCode", set_code)
-                .with("completionPermille", permille)
-                .with("allRaresOwned", rares.0 > 0 && rares.0 == rares.1)
-                .with("allMythicsOwned", mythics.0 > 0 && mythics.0 == mythics.1),
+                .with("completionPermille", permille(all))
+                .with("allRaresOwned", all_owned(rares))
+                .with("allMythicsOwned", all_owned(mythics))
+                .with("foilCompletionPermille", permille(foils))
+                .with("extrasCompletionPermille", permille(extras)),
+        )
+    }
+
+    /// How many of the sets released the same year as `set_code` are complete.
+    pub(super) fn year_progress_event(&mut self, set_code: &str) -> Option<Event> {
+        let sets = self.list_sets().ok()?;
+        let year = sets.iter().find(|s| s.code == set_code)?.release_date.get(0..4)?.to_string();
+        let same_year: Vec<String> =
+            sets.into_iter().filter(|s| s.release_date.starts_with(&year)).map(|s| s.code).collect();
+        let mut completed = 0i64;
+        for code in &same_year {
+            self.ensure_loaded(code).ok()?;
+            let owned = self.store.owned_in_set(code).ok()?;
+            let set = &self.sets[code];
+            let complete = !set.obtainable.is_empty()
+                && set
+                    .obtainable
+                    .iter()
+                    .all(|&i| owned.get(&set.file.cards[i].uuid).is_some_and(|o| o.normal + o.foil > 0));
+            completed += i64::from(complete);
+        }
+        let set_count = same_year.len() as i64;
+        Some(
+            Event::new("YearProgress")
+                .with("year", year)
+                .with("setCount", set_count)
+                .with("completedSets", completed)
+                .with("complete", completed == set_count),
         )
     }
 
@@ -291,6 +328,15 @@ impl Game {
 
     fn money_text(&self, cents: i64) -> String {
         format!("{}{}.{:02}", self.economy.currency.symbol, cents / 100, cents % 100)
+    }
+}
+
+/// Share of `(total, owned)` that is owned, in thousandths.
+fn permille((total, owned): (i64, i64)) -> i64 {
+    if total == 0 {
+        0
+    } else {
+        owned * 1000 / total
     }
 }
 

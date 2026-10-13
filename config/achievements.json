@@ -20,6 +20,12 @@
       "op": "streak",
       "resetWhen": [{ "field": "newCardCount", "op": "gt", "value": 0 }]
     },
+    "years_completed": {
+      "event": "YearProgress",
+      "where": [{ "field": "complete", "op": "eq", "value": true }, { "field": "setCount", "op": "gte", "value": 2 }],
+      "op": "distinct",
+      "field": "year"
+    },
     "best_balance_cents": { "event": "BalanceChanged", "op": "max", "field": "balanceCents" },
     "achievements_unlocked": { "event": "AchievementUnlocked", "op": "sum" }
   },
@@ -140,6 +146,48 @@
       "rarity": "mythic", "emblem": "trophy", "palette": "gold",
       "condition": { "type": "metric", "metric": "sets_completed", "atLeast": 3 },
       "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 30 } }
+    },
+    {
+      "id": "fancy-pack", "name": "Fancy Pack", "description": "Open a collector booster.",
+      "rarity": "common", "emblem": "gem", "palette": "royal",
+      "condition": { "type": "event", "event": "BoosterOpened", "where": [{ "field": "kind", "op": "eq", "value": "collector" }] },
+      "reward": { "cashCents": 500 }
+    },
+    {
+      "id": "draft-night", "name": "Draft Night", "description": "Open a draft booster.",
+      "rarity": "common", "emblem": "cards", "palette": "forest",
+      "condition": { "type": "event", "event": "BoosterOpened", "where": [{ "field": "kind", "op": "eq", "value": "draft" }] },
+      "reward": { "cashCents": 300 }
+    },
+    {
+      "id": "world-traveler", "name": "World Traveler", "description": "Open boosters from 10 different sets.",
+      "rarity": "uncommon", "emblem": "pack", "palette": "ocean",
+      "condition": { "type": "metric", "metric": "sets_opened", "atLeast": 10 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "collector", "quantity": 1 } }
+    },
+    {
+      "id": "foil-half", "name": "Shiny Side Up", "description": "Own half of the cards of a set in foil.",
+      "rarity": "rare", "emblem": "star", "palette": "rose",
+      "condition": { "type": "event", "event": "SetProgress", "where": [{ "field": "foilCompletionPermille", "op": "gte", "value": 500 }] },
+      "reward": { "sealed": { "setCode": "latest", "kind": "collector", "quantity": 2 } }
+    },
+    {
+      "id": "foil-set", "name": "Full Foil Jacket", "description": "Own every card of a set in foil.",
+      "rarity": "mythic", "emblem": "gem", "palette": "ice",
+      "condition": { "type": "event", "event": "SetProgress", "where": [{ "field": "foilCompletionPermille", "op": "gte", "value": 1000 }] },
+      "reward": { "cashCents": 50000, "sealed": { "setCode": "latest", "kind": "collector", "quantity": 5 } }
+    },
+    {
+      "id": "extras-complete", "name": "Showcase Curator", "description": "Own every collector extra of a set.",
+      "rarity": "mythic", "emblem": "eye", "palette": "royal",
+      "condition": { "type": "event", "event": "SetProgress", "where": [{ "field": "extrasCompletionPermille", "op": "gte", "value": 1000 }] },
+      "reward": { "sealed": { "setCode": "latest", "kind": "collector", "quantity": 5 } }
+    },
+    {
+      "id": "year-complete", "name": "Year in Review", "description": "Complete every set the Boosterium offers from a single year.",
+      "rarity": "mythic", "emblem": "hourglass", "palette": "gold",
+      "condition": { "type": "metric", "metric": "years_completed", "atLeast": 1 },
+      "reward": { "cashCents": 25000, "sealed": { "setCode": "latest", "kind": "collector", "quantity": 5 } }
     },
 
     {

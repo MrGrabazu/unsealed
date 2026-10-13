@@ -538,7 +538,8 @@ impl Game {
             card.is_new = *is_new;
         }
 
-        let events = self.opening_events(set_code, kind, &cards, outcome.cost_cents);
+        let mut events = self.opening_events(set_code, kind, &cards, outcome.cost_cents);
+        events.extend(self.year_progress_event(set_code));
         self.emit(events);
         Ok(cards)
     }
@@ -1359,6 +1360,23 @@ mod tests {
     const OPEN_ONCE: &str = r#"{ "id": "open-1", "name": "First Crack", "description": "Open a booster.",
         "rarity": "common", "emblem": "pack", "palette": "ember",
         "condition": { "type": "metric", "metric": "opened", "atLeast": 1 } }"#;
+
+    #[test]
+    fn completing_every_set_of_a_year_unlocks_and_foil_needs_foil_cards() {
+        let defs = r#"
+            { "id": "year", "name": "Year", "description": "d", "rarity": "mythic", "emblem": "hourglass", "palette": "gold",
+              "condition": { "type": "event", "event": "YearProgress", "where": [
+                { "field": "complete", "op": "eq", "value": true }, { "field": "year", "op": "eq", "value": "2026" } ] } },
+            { "id": "foil", "name": "Foil", "description": "d", "rarity": "mythic", "emblem": "gem", "palette": "ice",
+              "condition": { "type": "event", "event": "SetProgress", "where": [
+                { "field": "foilCompletionPermille", "op": "gte", "value": 1000 } ] } }"#;
+        let (mut g, _) = game_with_engine("ach-year", PRICES, achievements(defs));
+        g.buy_boosters("TST", "play", 1).unwrap();
+        // The only set of 2026 is completed by its first booster (the mythic and the common).
+        g.open_booster("TST", "play").unwrap();
+        // No card of the test set exists in foil: the foil completion cannot be reached.
+        assert_eq!(unlocked_ids(&mut g), ["year"]);
+    }
 
     #[test]
     fn opening_unlocks_an_achievement_and_notifies_once() {
