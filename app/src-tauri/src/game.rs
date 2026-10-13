@@ -29,6 +29,8 @@ pub struct SetSummary {
     pub boosters: Vec<String>,
     /// Art illustrating the set, with its credit.
     pub art: Option<SetArt>,
+    /// The set's expansion symbol (black SVG, shown unaltered).
+    pub icon_url: Option<String>,
 }
 
 /// The art crop of a set's featured card. Scryfall requires the artist to be credited
@@ -337,6 +339,7 @@ impl Game {
                     card_name: f.name,
                     artist: f.artist,
                 }),
+                icon_url: s.icon_svg_uri,
             })
             .collect();
         sets.sort_by(|a, b| b.release_date.cmp(&a.release_date));

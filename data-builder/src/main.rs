@@ -39,7 +39,15 @@ fn parse_args() -> Result<BuildOptions, String> {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let opts = parse_args()?;
-    let manifest = build(&opts, &mut |line| println!("{line}")).map_err(|e| e.to_string())?;
+    // Print each step once, not every progress tick of a download.
+    let mut last = String::new();
+    let manifest = build(&opts, &mut |line, _| {
+        if line != last {
+            println!("{line}");
+            last = line.to_string();
+        }
+    })
+    .map_err(|e| e.to_string())?;
     println!("{} sets written to {}", manifest.sets.len(), opts.out.display());
     Ok(())
 }

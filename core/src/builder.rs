@@ -12,7 +12,7 @@ use rand_chacha::ChaCha8Rng;
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashSet};
 use std::fs::{self, File};
-use std::io::BufReader;
+use std::io::{BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
@@ -25,6 +25,15 @@ const MTGJSON_MAX_AGE: Duration = Duration::from_secs(7 * 24 * 3600);
 const MAX_Z: f64 = 5.0;
 
 pub type BuildError = Box<dyn std::error::Error + Send + Sync>;
+
+/// Receives a short human-readable status line and the overall progress, from 0 to 1.
+/// The progress is an estimate (fixed shares per step), but it never goes back.
+pub type Progress<'a> = &'a mut dyn FnMut(&str, f64);
+
+/// Share of the overall progress taken by the sets (download and validation).
+const SETS_SHARE: f64 = 0.5;
+/// Where the Scryfall bulk download ends in the overall progress.
+const BULK_END: f64 = 0.9;
 
 #[derive(Debug, Clone)]
 pub struct BuildOptions {
@@ -41,10 +50,32 @@ fn http_get(url: &str) -> Result<ureq::Response, BuildError> {
     Ok(ureq::get(url).set("User-Agent", USER_AGENT).set("Accept", ACCEPT).call()?)
 }
 
-fn download(url: &str, dest: &Path) -> Result<(), BuildError> {
-    let mut reader = http_get(url)?.into_reader();
+/// Downloads a file, reporting the fraction received (at most once per percent) when the
+/// server announces its size.
+fn download(url: &str, dest: &Path, on_fraction: &mut dyn FnMut(f64)) -> Result<(), BuildError> {
+    let response = http_get(url)?;
+    let total: Option<u64> = response.header("Content-Length").and_then(|v| v.parse().ok()).filter(|&t| t > 0);
+    let mut reader = response.into_reader();
     let tmp = dest.with_extension("part");
-    std::io::copy(&mut reader, &mut File::create(&tmp)?)?;
+    let mut file = File::create(&tmp)?;
+    let mut buffer = vec![0u8; 64 * 1024];
+    let (mut received, mut last_percent) = (0u64, None);
+    loop {
+        let n = reader.read(&mut buffer)?;
+        if n == 0 {
+            break;
+        }
+        file.write_all(&buffer[..n])?;
+        received += n as u64;
+        if let Some(total) = total {
+            let percent = received * 100 / total;
+            if last_percent != Some(percent) {
+                last_percent = Some(percent);
+                on_fraction((received as f64 / total as f64).min(1.0));
+            }
+        }
+    }
+    drop(file);
     fs::rename(&tmp, dest)?;
     Ok(())
 }
@@ -57,12 +88,16 @@ fn is_fresh(path: &Path, max_age: Duration) -> bool {
         .is_some_and(|age| age < max_age)
 }
 
-/// Returns the raw MTGJSON file of a set, downloading it when the cache is older than a day.
-fn read_mtgjson_set(cache: &Path, code: &str, progress: &mut dyn FnMut(&str)) -> Result<String, BuildError> {
+/// Returns the raw MTGJSON file of a set, downloading it when the cache is too old.
+/// The download advances the overall progress from `span.0` to `span.1`.
+fn read_mtgjson_set(cache: &Path, code: &str, progress: Progress<'_>, span: (f64, f64)) -> Result<String, BuildError> {
     let path = cache.join(format!("{code}.json"));
     if !is_fresh(&path, MTGJSON_MAX_AGE) {
-        progress(&format!("Downloading {code} from MTGJSON"));
-        download(&format!("https://mtgjson.com/api/v5/{code}.json"), &path)?;
+        let message = format!("Downloading {code} from MTGJSON");
+        progress(&message, span.0);
+        download(&format!("https://mtgjson.com/api/v5/{code}.json"), &path, &mut |f| {
+            progress(&message, span.0 + (span.1 - span.0) * f)
+        })?;
     }
     Ok(fs::read_to_string(&path)?)
 }
@@ -74,6 +109,35 @@ fn write_json<T: serde::Serialize>(path: &Path, value: &T) -> Result<u64, BuildE
     let size = fs::metadata(&tmp)?.len();
     fs::rename(&tmp, path)?;
     Ok(size)
+}
+
+#[derive(Deserialize)]
+struct ScryfallSetList {
+    data: Vec<ScryfallSet>,
+}
+
+#[derive(Deserialize)]
+struct ScryfallSet {
+    code: String,
+    icon_svg_uri: Option<String>,
+}
+
+/// Expansion symbol URL of every Scryfall set, by uppercase set code. The symbols are
+/// cosmetic: if Scryfall cannot be reached, the sets simply show none.
+fn set_icons() -> BTreeMap<String, String> {
+    let list: Result<ScryfallSetList, BuildError> =
+        http_get("https://api.scryfall.com/sets").and_then(|r| Ok(serde_json::from_reader(r.into_reader())?));
+    match list {
+        Ok(list) => list
+            .data
+            .into_iter()
+            .filter_map(|s| Some((s.code.to_uppercase(), s.icon_svg_uri?)))
+            .collect(),
+        Err(e) => {
+            eprintln!("set symbols unavailable: {e}");
+            BTreeMap::new()
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -89,9 +153,9 @@ struct BulkEntry {
     jsonl_download_uri: String,
 }
 
-/// Runs the whole build. `progress` receives short human-readable status lines.
-/// The manifest is written last, so an interrupted build never advertises missing files.
-pub fn build(opts: &BuildOptions, progress: &mut dyn FnMut(&str)) -> Result<Manifest, BuildError> {
+/// Runs the whole build, reporting its progress. The manifest is written last, so an
+/// interrupted build never advertises missing files.
+pub fn build(opts: &BuildOptions, progress: Progress<'_>) -> Result<Manifest, BuildError> {
     let sets_dir = opts.out.join("sets");
     fs::create_dir_all(&opts.cache)?;
     fs::create_dir_all(&sets_dir)?;
@@ -103,17 +167,25 @@ pub fn build(opts: &BuildOptions, progress: &mut dyn FnMut(&str)) -> Result<Mani
     let mut built_boosters = Vec::new();
     let mut built_sets = Vec::new();
 
-    for code in &opts.sets {
-        let json = read_mtgjson_set(&opts.cache, code, progress)?;
-        let extra_jsons = source_set_codes(&json, &kinds)
-            .map_err(|e| format!("{code}: {e}"))?
+    let set_count = opts.sets.len().max(1) as f64;
+    for (i, code) in opts.sets.iter().enumerate() {
+        // This set's slice of the progress: its file, then the sets it draws from, then validation.
+        let at = |f: f64| SETS_SHARE * (i as f64 + f) / set_count;
+        let json = read_mtgjson_set(&opts.cache, code, progress, (at(0.0), at(0.5)))?;
+        let extra_codes = source_set_codes(&json, &kinds).map_err(|e| format!("{code}: {e}"))?;
+        let extra_share = 0.3 / extra_codes.len().max(1) as f64;
+        let extra_jsons = extra_codes
             .iter()
-            .map(|c| read_mtgjson_set(&opts.cache, c, progress))
+            .enumerate()
+            .map(|(k, c)| {
+                let start = 0.5 + extra_share * k as f64;
+                read_mtgjson_set(&opts.cache, c, progress, (at(start), at(start + extra_share)))
+            })
             .collect::<Result<Vec<_>, _>>()?;
         let extra_refs: Vec<&str> = extra_jsons.iter().map(String::as_str).collect();
         let set = set_from_mtgjson(&json, &kinds, &extra_refs).map_err(|e| format!("{code}: {e}"))?;
 
-        progress(&format!("Validating {code} pull rates"));
+        progress(&format!("Validating {code} pull rates"), at(0.8));
         let colors = ColorIndex::from_cards(&set.cards);
         for (kind, cfg) in &set.boosters {
             built_boosters.push((format!("{code}/{kind}"), cfg.clone()));
@@ -135,6 +207,7 @@ pub fn build(opts: &BuildOptions, progress: &mut dyn FnMut(&str)) -> Result<Mani
                 source_version: set.source_version.clone(),
                 boosters: set.boosters.keys().cloned().collect(),
                 featured: None, // chosen once prices are known
+                icon_svg_uri: None,
             },
         );
         built_sets.push(set);
@@ -151,16 +224,21 @@ pub fn build(opts: &BuildOptions, progress: &mut dyn FnMut(&str)) -> Result<Mani
     let file_name = bulk.jsonl_download_uri.rsplit('/').next().unwrap_or("default-cards.jsonl.gz").to_string();
     let bulk_path = opts.cache.join(&file_name);
     if !bulk_path.exists() {
-        progress("Downloading Scryfall prices (large file)");
-        download(&bulk.jsonl_download_uri, &bulk_path)?;
+        let message = "Downloading Scryfall prices (large file)";
+        progress(message, SETS_SHARE);
+        download(&bulk.jsonl_download_uri, &bulk_path, &mut |f| {
+            progress(message, SETS_SHARE + (BULK_END - SETS_SHARE) * f)
+        })?;
     }
-    progress("Reading prices");
+    progress("Reading prices", BULK_END);
     let reader = BufReader::new(GzDecoder::new(BufReader::new(File::open(&bulk_path)?)));
     let by_scryfall_id = prices_from_scryfall_jsonl(reader, &wanted)?;
     let cards = prices_by_uuid(&by_scryfall_id, &all_cards);
+    let icons = set_icons();
     for set in &built_sets {
         if let Some(entry) = manifest_sets.get_mut(&set.code) {
             entry.featured = featured_card(set, &cards);
+            entry.icon_svg_uri = icons.get(&set.code).cloned();
         }
     }
 
@@ -180,6 +258,7 @@ pub fn build(opts: &BuildOptions, progress: &mut dyn FnMut(&str)) -> Result<Mani
     }
     write_json(&opts.out.join("prices.json"), &PriceFile { updated_at: bulk.updated_at.clone(), cards, boosters })?;
 
+    progress("Saving the game data", 0.98);
     let generated_at = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().to_string();
     let manifest = Manifest {
         generated_at,

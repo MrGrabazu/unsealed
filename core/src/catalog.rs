@@ -111,6 +111,9 @@ pub struct ManifestSet {
     /// The card whose art illustrates the set in the shop.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub featured: Option<FeaturedCard>,
+    /// Scryfall's SVG of the set's expansion symbol (black, to be shown unaltered).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon_svg_uri: Option<String>,
 }
 
 /// A card shown as the face of its set. Its art must be shown with its artist's name.

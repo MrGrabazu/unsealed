@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { SetSummary, ShopItem, WalletView } from "./api";
 import { useMoney } from "./money";
 import { PriceTrend } from "./PriceTrend";
+import { SetIcon } from "./SetIcon";
 
 interface Props {
   shop: ShopItem[];
@@ -108,7 +109,9 @@ export function Boosterium({ shop, sets, wallet, onBuy, onBuyAndOpen, onClaimCha
                 {/* Scryfall: an art crop is shown unaltered, with its artist credited next to it. */}
                 {set.art && <img className="shop-art" src={set.art.imageUrl} alt={set.art.cardName} draggable={false} />}
                 <span className="shop-set-title">
-                  <span className="shop-name">{set.name}</span>
+                  <span className="shop-name">
+                    <SetIcon url={set.iconUrl} name={set.name} /> {set.name}
+                  </span>
                   <span className="hint">
                     {set.code} · released {set.releaseDate} · {products.length} booster
                     {products.length > 1 ? " types" : " type"}

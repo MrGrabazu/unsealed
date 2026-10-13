@@ -147,6 +147,7 @@ fn manifest(generated_at: &str, sets: &[&str]) -> Manifest {
                         source_version: "v1".into(),
                         boosters: vec!["play".into()],
                         featured: None,
+                        icon_svg_uri: None,
                     },
                 )
             })

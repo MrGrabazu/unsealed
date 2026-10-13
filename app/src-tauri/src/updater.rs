@@ -22,7 +22,8 @@ pub enum DataStatus {
     /// The check has not finished yet.
     Checking,
     UpToDate,
-    Updating { message: String },
+    /// `percent` is an estimate of the overall progress (see `builder::Progress`).
+    Updating { message: String, percent: u8 },
     /// The refresh failed (offline, source down...). The game keeps using the data it has.
     Failed { message: String },
 }
@@ -53,7 +54,7 @@ pub fn spawn(app: AppHandle, status: SharedStatus, data_dir: PathBuf, cache_dir:
             return;
         };
         eprintln!("data refresh needed: {reason:?}");
-        set_status(&app, &status, DataStatus::Updating { message: "Starting".to_string() });
+        set_status(&app, &status, DataStatus::Updating { message: "Starting".to_string(), percent: 0 });
 
         let opts = BuildOptions {
             sets: cfg.sets.clone(),
@@ -62,8 +63,15 @@ pub fn spawn(app: AppHandle, status: SharedStatus, data_dir: PathBuf, cache_dir:
             cache: cache_dir,
             sim_boosters: cfg.sim_boosters,
         };
-        let result = build(&opts, &mut |line| {
-            set_status(&app, &status, DataStatus::Updating { message: line.to_string() });
+        let mut last: Option<DataStatus> = None;
+        let result = build(&opts, &mut |line, fraction| {
+            let percent = (fraction.clamp(0.0, 1.0) * 100.0).round() as u8;
+            let next = DataStatus::Updating { message: line.to_string(), percent };
+            // Downloads report every percent of each file: only forward actual changes.
+            if last.as_ref() != Some(&next) {
+                set_status(&app, &status, next.clone());
+                last = Some(next);
+            }
         });
         match result {
             Ok(_) => {

@@ -1,6 +1,7 @@
 import type { SealedStack, SetSummary } from "./api";
 import { useMoney } from "./money";
 import { PriceTrend } from "./PriceTrend";
+import { SetIcon } from "./SetIcon";
 
 /** Batch sizes offered next to "Open one". */
 const BATCH_SIZES = [10, 100];
@@ -32,7 +33,8 @@ export function SealedBoosters({ sealed, sets, busy, onOpen, onOpenMany, onSell,
   return (
     <div className="sealed-grid">
       {sealed.map((s) => {
-        const art = sets.find((set) => set.code === s.setCode)?.art;
+        const set = sets.find((candidate) => candidate.code === s.setCode);
+        const art = set?.art;
         // Profit if the whole stack were sold back today.
         const pnl = s.quantity * s.sellValueCents - s.costCents;
         return (
@@ -41,7 +43,9 @@ export function SealedBoosters({ sealed, sets, busy, onOpen, onOpenMany, onSell,
             {art && <img className="sealed-art" src={art.imageUrl} alt={art.cardName} draggable={false} />}
             <div className="sealed-body">
               <div className="sealed-title">
-                <strong>{s.setName}</strong>
+                <strong>
+                  <SetIcon url={set?.iconUrl ?? null} name={s.setName} /> {s.setName}
+                </strong>
                 <span className="sealed-qty">×{s.quantity}</span>
               </div>
               <span className="hint">

@@ -200,7 +200,14 @@ export function App() {
         </nav>
 
         {dataStatus.state === "updating" && (
-          <p className="hint data-status">Updating card data and prices: {dataStatus.message}…</p>
+          <div className="data-status">
+            <div className="progress">
+              <div className="progress-bar" style={{ width: `${dataStatus.percent}%` }} />
+            </div>
+            <p className="hint">
+              Updating card data and prices ({dataStatus.percent}%): {dataStatus.message}…
+            </p>
+          </div>
         )}
         {dataStatus.state === "failed" && (
           <p className="hint data-status">

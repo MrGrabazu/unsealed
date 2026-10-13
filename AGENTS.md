@@ -103,7 +103,8 @@ Le jeu est un client lourd : **il n'y a pas de serveur à héberger**. L'app con
 - **Revente** des cartes à un **pourcentage du prix marché** (type buylist). **Valeur actuelle : prix du marché actuel − 20 % (soit 80 %)**, à équilibrer et à garder configurable.
   - Objectif : comme dans la réalité, la plupart des ouvertures sont perdantes, et un gros tirage procure un vrai plaisir.
 - **Présentation** : une ligne par set (filtres par année et budget, prix « à partir de »), qui se déplie sur la liste de ses produits (types de booster, triés Play → Draft → Set → Collector). La vente de **boîtes de boosters** est prévue plus tard : elles s'ajouteront à cette liste de produits.
-- **Illustration des sets** : l'*art crop* Scryfall de la carte phare (la plus chère des boosters principaux, choisie au build : `featured` du manifest). Règles Scryfall : afficher l'artiste et le copyright à côté, ne jamais flouter, recadrer ni recolorer l'image. Pas de logo ni de symbole de set (marques de Wizards).
+- **Illustration des sets** : l'*art crop* Scryfall de la carte phare (la plus chère des boosters principaux, choisie au build : `featured` du manifest). Règles Scryfall : afficher l'artiste et le copyright à côté, ne jamais flouter, recadrer ni recolorer l'image.
+- **Symboles d'extension** : autorisés par décision du mainteneur (la Fan Content Policy ne les vise pas explicitement). Source : `icon_svg_uri` de l'API Scryfall des sets, enregistré au build dans le manifest. Affichés tels quels, sans modification ; le SVG étant noir, il est posé sur une pastille claire.
 - **Onglet d'ouverture** : grille des boosters possédés (vide avec un lien vers le Boosterium s'il n'y en a plus) ; une ouverture s'affiche une seule fois, quitter l'onglet la referme.
 - **Historique des prix des boosters** : à chaque nouveau `prices.json`, le prix de chaque booster est enregistré en SQLite (table `price_history`, un point par snapshot `updatedAt`). Le Boosterium et les boosters scellés affichent les 30 derniers points en sparkline, avec la variation depuis la mise à jour précédente (`PriceTrend.tsx`).
 - **Capital de départ** et **petit revenu quotidien** pour éviter un game over définitif.
@@ -176,7 +177,7 @@ Le jeu est un client lourd : **il n'y a pas de serveur à héberger**. L'app con
 ## 11. Règles pour l'agent
 
 - Ne jamais introduire de mécanique liée à de l'argent réel, de la publicité conditionnant l'accès, ou un échange de valeur réelle.
-- Ne jamais utiliser les logos ou marques de Wizards dans l'UI, les assets ou les noms.
+- Ne jamais utiliser les logos ou marques de Wizards dans l'UI, les assets ou les noms. Seules exceptions, par décision du mainteneur (usage courant des outils de deck) : les symboles d'extension des sets et les symboles de mana, non modifiés (voir section 7). Les logos Magic: The Gathering et Wizards of the Coast restent strictement interdits.
 - Garder la logique de tirage, d'économie et d'achievements en Rust, testée, avec RNG à seed.
 - Tout ce qui est équilibrage (taux, prix, pourcentage de revente, récompenses) doit vivre dans des fichiers de configuration.
 - Toute nouvelle config de set doit passer le test de simulation des taux avant d'être considérée comme valide.

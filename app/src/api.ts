@@ -10,6 +10,8 @@ export interface SetSummary {
   boosters: string[];
   /** Art crop of the set's featured card. Must be shown unaltered, with its artist. */
   art: { imageUrl: string; cardName: string; artist: string } | null;
+  /** Expansion symbol (black SVG), shown unaltered. */
+  iconUrl: string | null;
 }
 
 export interface OpenedCard {
@@ -182,7 +184,7 @@ export interface StatsView {
 export type DataStatus =
   | { state: "checking" }
   | { state: "upToDate" }
-  | { state: "updating"; message: string }
+  | { state: "updating"; message: string; /** Estimate, 0 to 100. */ percent: number }
   | { state: "failed"; message: string };
 
 export const getDataStatus = () => invoke<DataStatus>("get_data_status");

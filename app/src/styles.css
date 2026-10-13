@@ -139,6 +139,8 @@ header { align-items: center; }
 .tab-count { margin-left: 8px; background: var(--accent); color: #1a1405; border-radius: 10px; padding: 0 7px; font-size: 12px; font-weight: 700; }
 h2 { margin: 24px 0 4px; }
 .notice { color: var(--accent); }
+.data-status { margin: 14px 0 0; }
+.data-status .hint { margin: 6px 0 0; font-size: 13px; }
 
 .charity { border: 1px solid var(--accent); background: #e0a52614; border-radius: 10px; padding: 14px 18px; margin: 20px 0; }
 .charity p { margin: 0 0 10px; }
@@ -158,6 +160,9 @@ h2 { margin: 24px 0 4px; }
 /* Natural aspect ratio: the art crop is never cropped further, blurred or recolored. */
 .shop-art { height: 64px; width: auto; border-radius: 6px; flex: none; }
 .shop-credit { color: var(--muted); font-size: 11px; font-style: italic; }
+/* Expansion symbols are black SVGs: a light badge keeps them visible, unaltered. */
+.set-icon { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #e8e6df; vertical-align: middle; }
+.set-icon img { width: 16px; height: 16px; display: block; }
 
 /* Sealed boosters owned */
 .sealed-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; margin: 20px 0; }
