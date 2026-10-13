@@ -1,7 +1,7 @@
 //! Builds the game data into a directory (the app does the same itself at launch).
 //!
 //! Usage:
-//!   data-builder --sets BLB,FDN [--boosters play,collector] [--out dist] [--cache .cache] [--sim-boosters 50000]
+//!   data-builder --sets BLB,FDN [--boosters play,draft,set,collector] [--out dist] [--cache .cache] [--sim-boosters 50000]
 //!
 //! Output: `<out>/manifest.json`, `<out>/prices.json`, `<out>/sets/<CODE>.json`.
 
@@ -11,7 +11,7 @@ use unsealed_core::builder::{build, BuildOptions};
 fn parse_args() -> Result<BuildOptions, String> {
     let mut opts = BuildOptions {
         sets: Vec::new(),
-        boosters: vec!["play".to_string(), "collector".to_string()],
+        boosters: ["play", "draft", "set", "collector"].map(String::from).to_vec(),
         out: "dist".into(),
         cache: ".cache".into(),
         sim_boosters: 50_000,

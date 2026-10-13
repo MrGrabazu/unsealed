@@ -129,7 +129,7 @@ fn manifest(generated_at: &str, sets: &[&str]) -> Manifest {
                 )
             })
             .collect::<BTreeMap<_, _>>(),
-        booster_kinds: vec!["play".into(), "collector".into()],
+        booster_kinds: ["play", "draft", "set", "collector"].map(String::from).to_vec(),
     }
 }
 
@@ -140,7 +140,8 @@ fn data_config() -> DataConfig {
 #[test]
 fn data_config_applies_defaults() {
     let cfg = data_config();
-    assert_eq!((cfg.boosters, cfg.max_age_hours, cfg.sim_boosters), (vec!["play".to_string(), "collector".to_string()], 24, 20_000));
+    assert_eq!(cfg.boosters, ["play", "draft", "set", "collector"]);
+    assert_eq!((cfg.max_age_hours, cfg.sim_boosters), (24, 20_000));
 }
 
 #[test]

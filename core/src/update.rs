@@ -23,7 +23,7 @@ pub struct DataConfig {
 }
 
 fn default_boosters() -> Vec<String> {
-    vec!["play".to_string(), "collector".to_string()]
+    ["play", "draft", "set", "collector"].map(String::from).to_vec()
 }
 
 fn default_max_age_hours() -> i64 {

@@ -74,7 +74,7 @@ Le jeu est un client lourd : **il n'y a pas de serveur à héberger**. L'app con
    └── thread de fond (updater.rs)
          ├── lit le manifest local ; refresh_reason() décide : aucune donnée, set manquant, ou données plus vieilles que maxAgeHours (24 h)
          ├── si oui : core::builder::build()
-         │     ├── télécharge les sets MTGJSON voulus (cache 24 h) et le bulk Scryfall default_cards (cache par nom de fichier)
+         │     ├── télécharge les sets MTGJSON voulus et leurs sets annexes (cache 7 jours) et le bulk Scryfall default_cards (cache par nom de fichier)
          │     ├── valide chaque config de booster par simulation
          │     └── écrit sets/, prices.json, manifest.json (rename atomique, manifest en dernier)
          └── émet l'événement `data-status` ; l'UI se recharge à la fin
@@ -141,6 +141,7 @@ Le jeu est un client lourd : **il n'y a pas de serveur à héberger**. L'app con
 
 - Vue par set avec **pourcentage de complétion** et cartes manquantes affichées en grisé.
 - **Collector Boosters** : `data.json` liste les types de booster proposés (`play`, `collector`) ; chaque set garde ceux qu'il possède (le build n'échoue que si un set n'en a aucun). Changer cette liste déclenche un rebuild au lancement (`booster_kinds` du manifest). La complétion ne compte que les cartes des boosters principaux ; les cartes exclusives aux collectors (showcase, borderless, foils spéciaux) forment une section « Collector extras » à part.
+- **Sets proposés** : 3 sets à Play Boosters (BLB, DSK, FDN) et 7 sets 2022-2024 (DMU, BRO, ONE, MOM, WOE, LCI, MKM) avec Draft, Set et Collector Boosters (MKM : Play et Collector). Tous passent la simulation. Les sets 1993-2019 ne sont pas encore proposés.
 - Historique des ouvertures et des **meilleurs tirages**.
 - Statistiques personnelles (nombre de boosters ouverts, meilleure carte et sa valeur, etc.).
 - *Implémenté* : onglet **Stats** (`app/src/Stats.tsx`, `Game::stats`). Totaux d'ouverture, argent dépensé et gagné (agrégé depuis le `ledger`), rendement des boosters, valeur de la collection et patrimoine, meilleur et pire booster, 12 meilleurs tirages de tous les temps (au prix du tirage), tableau par booster et 20 dernières ouvertures. Tout est calculé à la demande depuis `openings` / `opening_cards` (index sur les prix, migration 6).
@@ -163,7 +164,7 @@ Le jeu est un client lourd : **il n'y a pas de serveur à héberger**. L'app con
 | `config/` | `economy.json` : devise, capital de départ, prix des boosters (suivent la valeur espérée × `evMarkupPercent`, surcharges fixes possibles), taux de revente (cartes et boosters scellés), aide quotidienne. `achievements.json` : voir 8 bis. `data.json` : sets à télécharger, types de boosters, âge maximal des données. Embarqués dans l'app ; un fichier du même nom dans le dossier de données les remplace |
 | `app/` | Frontend React/Vite ; `app/src-tauri/` = shell Tauri 2 (logique de jeu dans `game.rs`, testable sans Tauri) |
 
-- Données : `cargo run --release -p data-builder -- --sets BLB,DSK,FDN` (écrit `dist/`, cache dans `.cache/`)
+- Données : `cargo run --release -p data-builder -- --sets BLB,DSK,FDN,DMU,BRO,ONE,MOM,WOE,LCI,MKM` (écrit `dist/`, cache dans `.cache/`)
 - App en dev : `cd app && npm install && npm run tauri dev` (en debug elle lit `dist/` ; `UNSEALED_DATA_DIR` surcharge)
 - Tests : `cargo test --workspace` ; build du front : `cd app && npm run build`
 - Node : Vite 6 est utilisé car Node 21 est installé (Vite 7+ exige Node ≥ 20.19 / 22.12) ; passer à Node 22 LTS permettra de monter Vite.

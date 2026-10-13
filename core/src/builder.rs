@@ -18,8 +18,9 @@ use std::time::{Duration, SystemTime};
 
 const USER_AGENT: &str = "Unsealed/0.1 (unofficial fan project)";
 const ACCEPT: &str = "application/json;q=0.9,*/*;q=0.8";
-/// Raw MTGJSON set files are reused for this long.
-const MTGJSON_MAX_AGE: Duration = Duration::from_secs(24 * 3600);
+/// Raw MTGJSON set files are reused for this long. A set's content barely changes once
+/// released (prices, which move daily, come from Scryfall), and there are dozens of them.
+const MTGJSON_MAX_AGE: Duration = Duration::from_secs(7 * 24 * 3600);
 /// A config whose simulated rates deviate by more than this many standard deviations is rejected.
 const MAX_Z: f64 = 5.0;
 
