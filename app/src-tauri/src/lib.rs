@@ -7,7 +7,7 @@ mod updater;
 
 use game::{
     AchievementView, AchievementsView, BoosterSaleResult, CollectionView, Game, OpenedCard, SaleRequest, SaleResult,
-    SetSummary, ShopItem, WalletView,
+    SetSummary, ShopItem, StatsView, WalletView,
 };
 use std::error::Error;
 use std::fs;
@@ -126,6 +126,11 @@ fn take_unlocks(state: State<'_, GameState>) -> Result<Vec<AchievementView>, Str
     Ok(locked(&state)?.take_unlocks())
 }
 
+#[tauri::command]
+fn get_stats(state: State<'_, GameState>) -> Result<StatsView, String> {
+    locked(&state)?.stats()
+}
+
 /// Where the player's save lives. `UNSEALED_DB` overrides everything; debug builds
 /// use the repository's `.dev-data/` so development never touches a real save.
 fn resolve_db_path(app: &tauri::AppHandle) -> Result<PathBuf, Box<dyn Error>> {
@@ -212,6 +217,7 @@ pub fn run() {
             claim_charity,
             get_achievements,
             take_unlocks,
+            get_stats,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Unsealed");

@@ -184,3 +184,16 @@ button.sell.confirm { background: #7a1d1d; border-color: #c24040; color: #fff; }
 .trend svg { color: var(--muted); }
 .trend .gain { color: #6fcf7f; }
 .trend .loss { color: #ff7a7a; }
+
+/* Statistics */
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin: 20px 0; }
+.stat-tile, .stat-panel { display: flex; flex-direction: column; gap: 4px; background: var(--panel); border-radius: 10px; padding: 12px 16px; }
+.stat-label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+.stat-value { font-size: 22px; }
+.stat-sub { font-size: 14px; font-weight: 400; }
+.stat-panels { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; margin-bottom: 8px; }
+.stat-panel .stat-value { color: var(--accent); }
+.stat-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.stat-table th { text-align: left; color: var(--muted); font-weight: 600; padding: 6px 10px; border-bottom: 1px solid #2a2c3a; }
+.stat-table td { padding: 6px 10px; border-bottom: 1px solid #1f2130; }
+.stat-table td:not(:first-child), .stat-table th:not(:first-child) { text-align: right; }

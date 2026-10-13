@@ -27,14 +27,16 @@ import { Boosterium } from "./Boosterium";
 import { Collection } from "./Collection";
 import { CurrencyContext, useMoney } from "./money";
 import { PriceTrend } from "./PriceTrend";
+import { Stats } from "./Stats";
 
-type Tab = "boosterium" | "open" | "collection" | "achievements";
+type Tab = "boosterium" | "open" | "collection" | "achievements" | "stats";
 
 const TAB_LABELS: Record<Tab, string> = {
   boosterium: "Boosterium",
   open: "Open boosters",
   collection: "Collection",
   achievements: "Achievements",
+  stats: "Stats",
 };
 
 /** How long a notification stays on screen. */
@@ -282,6 +284,8 @@ export function App() {
         {tab === "collection" && <Collection sets={sets} refreshKey={openings} onChanged={refreshWallet} />}
 
         {tab === "achievements" && <Achievements refreshKey={unlockCount} />}
+
+        {tab === "stats" && <Stats refreshKey={`${openings}-${wallet?.balanceCents}`} />}
 
         <footer>{DISCLAIMER}</footer>
 

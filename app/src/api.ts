@@ -125,6 +125,55 @@ export interface AchievementsView {
   items: AchievementView[];
 }
 
+export interface OpeningView {
+  id: number;
+  /** Unix time, in seconds. */
+  openedAt: number;
+  setCode: string;
+  setName: string;
+  kind: string;
+  /** Market value of its cards when it was opened. */
+  valueCents: number;
+  /** Its most valuable card, priced when it was pulled. */
+  bestCard: OpenedCard | null;
+}
+
+export interface BoosterStatsView {
+  setCode: string;
+  setName: string;
+  kind: string;
+  boosters: number;
+  valueCents: number;
+  averageCents: number;
+  bestValueCents: number;
+}
+
+export interface StatsView {
+  boostersOpened: number;
+  cardsPulled: number;
+  foilsPulled: number;
+  /** Market value of every pulled card, when it was pulled. */
+  valuePulledCents: number;
+  spentOnBoostersCents: number;
+  earnedFromCardsCents: number;
+  earnedFromBoostersCents: number;
+  rewardsCents: number;
+  charityCents: number;
+  balanceCents: number;
+  /** Distinct cards owned (any finish). */
+  distinctCards: number;
+  /** Today's market value of the collection. */
+  collectionValueCents: number;
+  /** What the Boosterium would pay today for the sealed boosters. */
+  sealedValueCents: number;
+  bestBooster: OpeningView | null;
+  worstBooster: OpeningView | null;
+  recentOpenings: OpeningView[];
+  /** Cards priced when they were pulled. */
+  bestPulls: { card: OpenedCard; openedAt: number }[];
+  boosters: BoosterStatsView[];
+}
+
 export type DataStatus =
   | { state: "checking" }
   | { state: "upToDate" }
@@ -150,3 +199,4 @@ export const getCollection = (setCode: string) =>
 export const sellCards = (requests: SaleRequest[]) => invoke<SaleResult>("sell_cards", { requests });
 export const sellDuplicates = (setCode: string) => invoke<SaleResult>("sell_duplicates", { setCode });
 export const claimCharity = () => invoke<void>("claim_charity");
+export const getStats = () => invoke<StatsView>("get_stats");

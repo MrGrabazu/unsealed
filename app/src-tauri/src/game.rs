@@ -4,7 +4,7 @@ mod achievements;
 
 pub use achievements::{AchievementView, AchievementsView};
 
-use crate::store::{OpeningCard, Sale, Store};
+use crate::store::{OpeningCard, OpeningOrder, OpeningRow, Sale, Store};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
@@ -139,6 +139,69 @@ pub struct ShopItem {
     pub history: Vec<u32>,
 }
 
+/// One past opening.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpeningView {
+    pub id: i64,
+    pub opened_at: i64,
+    pub set_code: String,
+    pub set_name: String,
+    pub kind: String,
+    /// Market value of its cards when it was opened.
+    pub value_cents: i64,
+    /// Its most valuable card, priced when it was pulled.
+    pub best_card: Option<OpenedCard>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PullView {
+    /// Priced when it was pulled.
+    pub card: OpenedCard,
+    pub opened_at: i64,
+}
+
+/// Openings of one kind of booster.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BoosterStatsView {
+    pub set_code: String,
+    pub set_name: String,
+    pub kind: String,
+    pub boosters: u32,
+    pub value_cents: i64,
+    pub average_cents: i64,
+    pub best_value_cents: i64,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatsView {
+    pub boosters_opened: u32,
+    pub cards_pulled: u32,
+    pub foils_pulled: u32,
+    /// Market value of every pulled card, when it was pulled.
+    pub value_pulled_cents: i64,
+    pub spent_on_boosters_cents: i64,
+    pub earned_from_cards_cents: i64,
+    pub earned_from_boosters_cents: i64,
+    pub rewards_cents: i64,
+    pub charity_cents: i64,
+    pub balance_cents: i64,
+    /// Distinct cards owned (any finish).
+    pub distinct_cards: u32,
+    /// Today's market value of the collection.
+    pub collection_value_cents: i64,
+    /// What the Boosterium would pay today for the sealed boosters.
+    pub sealed_value_cents: i64,
+    pub best_booster: Option<OpeningView>,
+    pub worst_booster: Option<OpeningView>,
+    pub recent_openings: Vec<OpeningView>,
+    pub best_pulls: Vec<PullView>,
+    pub boosters: Vec<BoosterStatsView>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct SaleRequest {
     pub uuid: String,
@@ -192,6 +255,10 @@ pub struct Game {
 
 /// How many past prices the Boosterium shows per booster.
 const PRICE_HISTORY_POINTS: u32 = 30;
+/// How many openings the statistics list.
+const RECENT_OPENINGS: u32 = 20;
+/// How many of the best cards ever pulled the statistics show.
+const BEST_PULLS: u32 = 12;
 
 fn err<E: ToString>(e: E) -> String {
     e.to_string()
@@ -570,6 +637,139 @@ impl Game {
         self.sell_cards(&requests)
     }
 
+    // ---- statistics ------------------------------------------------------------------
+
+    /// Personal statistics: what was opened, spent and earned, and the best pulls.
+    pub fn stats(&mut self) -> Result<StatsView, String> {
+        self.ensure_prices();
+        let names: HashMap<String, String> = self
+            .list_sets()
+            .map(|sets| sets.into_iter().map(|s| (s.code, s.name)).collect())
+            .unwrap_or_default();
+        let set_name = |code: &str| names.get(code).cloned().unwrap_or_else(|| code.to_string());
+
+        let totals = self.store.opening_totals().map_err(err)?;
+        let ledger = self.store.ledger_totals().map_err(err)?;
+        let ledger_sum = |kind: &str| ledger.get(kind).copied().unwrap_or(0);
+
+        let owned = self.store.owned_cards().map_err(err)?;
+        let distinct_cards = owned.iter().map(|(uuid, _, _)| uuid).collect::<HashSet<_>>().len() as u32;
+        let collection_value_cents = owned
+            .iter()
+            .map(|(uuid, foil, quantity)| {
+                i64::from(self.market_price(uuid, *foil).unwrap_or(0)) * i64::from(*quantity)
+            })
+            .sum();
+        let sealed_value_cents = self
+            .store
+            .sealed_stacks()
+            .map_err(err)?
+            .iter()
+            .map(|s| {
+                let unit = self.economy.booster_sell_value_cents(self.booster_price(&s.set_code, &s.kind));
+                i64::from(unit) * i64::from(s.quantity)
+            })
+            .sum();
+
+        let best_booster = self.top_opening(OpeningOrder::MostValuable, &names)?;
+        let worst_booster = self.top_opening(OpeningOrder::LeastValuable, &names)?;
+        let recent_openings = self
+            .store
+            .openings(OpeningOrder::Latest, RECENT_OPENINGS)
+            .map_err(err)?
+            .into_iter()
+            .map(|row| self.opening_view(row, &names))
+            .collect();
+
+        let best_pulls = self
+            .store
+            .best_pulls(BEST_PULLS)
+            .map_err(err)?
+            .into_iter()
+            .filter_map(|p| {
+                let card = self.pulled_card(&p.booster_set, &p.uuid, p.foil, Some(p.price_cents))?;
+                Some(PullView { card, opened_at: p.opened_at })
+            })
+            .collect();
+
+        let boosters = self
+            .store
+            .openings_by_booster()
+            .map_err(err)?
+            .into_iter()
+            .map(|b| BoosterStatsView {
+                set_name: set_name(&b.set_code),
+                average_cents: b.value_cents / i64::from(b.boosters.max(1)),
+                set_code: b.set_code,
+                kind: b.kind,
+                boosters: b.boosters,
+                value_cents: b.value_cents,
+                best_value_cents: b.best_value_cents,
+            })
+            .collect();
+
+        Ok(StatsView {
+            boosters_opened: totals.boosters,
+            cards_pulled: totals.cards,
+            foils_pulled: totals.foils,
+            value_pulled_cents: totals.value_cents,
+            spent_on_boosters_cents: -ledger_sum("booster_purchase"),
+            earned_from_cards_cents: ledger_sum("card_sale"),
+            earned_from_boosters_cents: ledger_sum("booster_sale"),
+            rewards_cents: ledger_sum("achievement_reward"),
+            charity_cents: ledger_sum("charity"),
+            balance_cents: self.store.balance().map_err(err)?,
+            distinct_cards,
+            collection_value_cents,
+            sealed_value_cents,
+            best_booster,
+            worst_booster,
+            recent_openings,
+            best_pulls,
+            boosters,
+        })
+    }
+
+    fn top_opening(&mut self, order: OpeningOrder, names: &HashMap<String, String>) -> Result<Option<OpeningView>, String> {
+        let row = self.store.openings(order, 1).map_err(err)?.into_iter().next();
+        Ok(row.map(|row| self.opening_view(row, names)))
+    }
+
+    fn opening_view(&mut self, row: OpeningRow, names: &HashMap<String, String>) -> OpeningView {
+        let best_card = row
+            .best_card
+            .and_then(|b| self.pulled_card(&row.set_code, &b.uuid, b.foil, Some(b.price_cents)));
+        OpeningView {
+            set_name: names.get(&row.set_code).cloned().unwrap_or_else(|| row.set_code.clone()),
+            id: row.id,
+            opened_at: row.opened_at,
+            set_code: row.set_code,
+            kind: row.kind,
+            value_cents: row.value_cents,
+            best_card,
+        }
+    }
+
+    /// A card pulled from a booster of `booster_set`, or `None` if its data is no longer available.
+    fn pulled_card(&mut self, booster_set: &str, uuid: &str, foil: bool, price_cents: Option<u32>) -> Option<OpenedCard> {
+        self.ensure_loaded(booster_set).ok()?;
+        let set = &self.sets[booster_set];
+        let card = &set.file.cards[*set.index.get(uuid)?];
+        Some(OpenedCard {
+            uuid: card.uuid.clone(),
+            name: card.name.clone(),
+            number: card.number.clone(),
+            rarity: card.rarity.clone(),
+            set_code: card.set_code.clone(),
+            scryfall_id: card.scryfall_id.clone(),
+            image_url: image_url(&card.scryfall_id),
+            foil,
+            sheet: String::new(),
+            price_cents,
+            is_new: false,
+        })
+    }
+
     fn has_sellable_cards(&mut self) -> Result<bool, String> {
         self.ensure_prices();
         let owned = self.store.owned_cards().map_err(err)?;
@@ -843,6 +1043,47 @@ mod tests {
         format!(
             r#"{{ "updatedAt": "d{usd}", "cards": {{}}, "boosters": {{ "TST/play": {{ "usd": {usd}, "eur": 0 }} }} }}"#
         )
+    }
+
+    #[test]
+    fn stats_sum_up_openings_money_and_best_pulls() {
+        let mut g = game("stats");
+        let empty = g.stats().unwrap();
+        assert_eq!((empty.boosters_opened, empty.best_pulls.len()), (0, 0));
+        assert!(empty.best_booster.is_none());
+
+        g.buy_boosters("TST", "play", 2).unwrap();
+        g.open_booster("TST", "play").unwrap();
+        g.sell_duplicates("TST").unwrap();
+
+        let s = g.stats().unwrap();
+        // One booster: the $10.00 mythic and two $1.00 commons.
+        assert_eq!((s.boosters_opened, s.cards_pulled, s.foils_pulled, s.value_pulled_cents), (1, 3, 0, 1_200));
+        assert_eq!((s.spent_on_boosters_cents, s.earned_from_cards_cents), (800, 80));
+        assert_eq!((s.distinct_cards, s.collection_value_cents, s.sealed_value_cents), (2, 1_100, 320));
+        assert_eq!(s.balance_cents, 10_000 - 800 + 80);
+
+        let best = s.best_booster.unwrap();
+        assert_eq!((best.set_name.as_str(), best.value_cents), ("Test Set", 1_200));
+        let best_card = best.best_card.unwrap();
+        assert_eq!((best_card.name.as_str(), best_card.price_cents), ("Mythic", Some(1_000)));
+        assert_eq!(s.recent_openings.len(), 1);
+        assert_eq!(
+            s.best_pulls.iter().map(|p| p.card.name.as_str()).collect::<Vec<_>>(),
+            ["Mythic", "Common", "Common"]
+        );
+        assert_eq!(
+            s.boosters,
+            [BoosterStatsView {
+                set_code: "TST".into(),
+                set_name: "Test Set".into(),
+                kind: "play".into(),
+                boosters: 1,
+                value_cents: 1_200,
+                average_cents: 1_200,
+                best_value_cents: 1_200,
+            }]
+        );
     }
 
     #[test]

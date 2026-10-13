@@ -142,6 +142,7 @@ Le jeu est un client lourd : **il n'y a pas de serveur à héberger**. L'app con
 - Vue par set avec **pourcentage de complétion** et cartes manquantes affichées en grisé.
 - Historique des ouvertures et des **meilleurs tirages**.
 - Statistiques personnelles (nombre de boosters ouverts, meilleure carte et sa valeur, etc.).
+- *Implémenté* : onglet **Stats** (`app/src/Stats.tsx`, `Game::stats`). Totaux d'ouverture, argent dépensé et gagné (agrégé depuis le `ledger`), rendement des boosters, valeur de la collection et patrimoine, meilleur et pire booster, 12 meilleurs tirages de tous les temps (au prix du tirage), tableau par booster et 20 dernières ouvertures. Tout est calculé à la demande depuis `openings` / `opening_cards` (index sur les prix, migration 6).
 
 ## 10. Roadmap MVP
 

@@ -72,6 +72,9 @@ const MIGRATIONS: &[&str] = &[
         price_cents INTEGER NOT NULL,
         PRIMARY KEY (set_code, kind, snapshot)
     ) WITHOUT ROWID;",
+    // 6: indexes for the statistics (best pulls, best and worst boosters)
+    "CREATE INDEX opening_cards_price ON opening_cards (price_cents);
+    CREATE INDEX openings_value ON openings (value_cents);",
 ];
 
 #[derive(Debug, thiserror::Error)]
@@ -143,6 +146,65 @@ pub struct BoosterSale {
     pub total_cents: i64,
     /// Cost basis of the sold boosters.
     pub cost_cents: i64,
+}
+
+/// Totals over every booster ever opened.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct OpeningTotals {
+    pub boosters: u32,
+    pub cards: u32,
+    pub foils: u32,
+    /// Market value of the cards when they were pulled.
+    pub value_cents: i64,
+}
+
+/// One past opening and its most valuable card.
+#[derive(Debug, PartialEq, Eq)]
+pub struct OpeningRow {
+    pub id: i64,
+    pub opened_at: i64,
+    pub set_code: String,
+    pub kind: String,
+    pub value_cents: i64,
+    /// The most valuable card, if any card had a price.
+    pub best_card: Option<PullRef>,
+}
+
+/// A card of an opening, with its price when pulled.
+#[derive(Debug, PartialEq, Eq)]
+pub struct PullRef {
+    pub uuid: String,
+    pub foil: bool,
+    pub price_cents: u32,
+}
+
+/// A card pulled from a booster, with its price at the time.
+#[derive(Debug, PartialEq, Eq)]
+pub struct PullRow {
+    pub uuid: String,
+    pub foil: bool,
+    pub price_cents: u32,
+    pub opened_at: i64,
+    /// Set of the booster it came from (its card data lives in that set's file).
+    pub booster_set: String,
+}
+
+/// Openings of one kind of booster.
+#[derive(Debug, PartialEq, Eq)]
+pub struct BoosterKindTotals {
+    pub set_code: String,
+    pub kind: String,
+    pub boosters: u32,
+    pub value_cents: i64,
+    pub best_value_cents: i64,
+}
+
+/// Which openings to list.
+#[derive(Debug, Clone, Copy)]
+pub enum OpeningOrder {
+    Latest,
+    MostValuable,
+    LeastValuable,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -332,6 +394,99 @@ impl Store {
              ) ORDER BY at ASC, snapshot ASC",
         )?;
         let rows = stmt.query_map(params![set_code, kind, limit], |r| r.get(0))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    // ---- statistics -----------------------------------------------------------
+
+    pub fn opening_totals(&self) -> StoreResult<OpeningTotals> {
+        let (boosters, value_cents) = self.conn.query_row(
+            "SELECT COUNT(*), COALESCE(SUM(value_cents), 0) FROM openings",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
+        let (cards, foils) = self.conn.query_row(
+            "SELECT COUNT(*), COALESCE(SUM(foil), 0) FROM opening_cards",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
+        Ok(OpeningTotals { boosters, cards, foils, value_cents })
+    }
+
+    /// Sum of the ledger by kind of movement ("booster_purchase", "card_sale"...).
+    pub fn ledger_totals(&self) -> StoreResult<HashMap<String, i64>> {
+        let mut stmt = self.conn.prepare("SELECT kind, SUM(amount_cents) FROM ledger GROUP BY kind")?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    pub fn openings(&self, order: OpeningOrder, limit: u32) -> StoreResult<Vec<OpeningRow>> {
+        let order_by = match order {
+            OpeningOrder::Latest => "o.id DESC",
+            OpeningOrder::MostValuable => "o.value_cents DESC, o.id DESC",
+            OpeningOrder::LeastValuable => "o.value_cents ASC, o.id DESC",
+        };
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT o.id, o.opened_at, o.set_code, o.booster_kind, o.value_cents, c.card_uuid, c.foil, c.price_cents
+             FROM openings o
+             LEFT JOIN opening_cards c ON c.opening_id = o.id AND c.position = (
+                 SELECT b.position FROM opening_cards b WHERE b.opening_id = o.id AND b.price_cents IS NOT NULL
+                 ORDER BY b.price_cents DESC, b.position DESC LIMIT 1)
+             ORDER BY {order_by} LIMIT ?1"
+        ))?;
+        let rows = stmt.query_map([limit], |r| {
+            let uuid: Option<String> = r.get(5)?;
+            let best_card = match uuid {
+                Some(uuid) => Some(PullRef { uuid, foil: r.get(6)?, price_cents: r.get(7)? }),
+                None => None,
+            };
+            Ok(OpeningRow {
+                id: r.get(0)?,
+                opened_at: r.get(1)?,
+                set_code: r.get(2)?,
+                kind: r.get(3)?,
+                value_cents: r.get(4)?,
+                best_card,
+            })
+        })?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    /// The most valuable cards ever pulled, at their price when pulled.
+    pub fn best_pulls(&self, limit: u32) -> StoreResult<Vec<PullRow>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT c.card_uuid, c.foil, c.price_cents, o.opened_at, o.set_code
+             FROM opening_cards c JOIN openings o ON o.id = c.opening_id
+             WHERE c.price_cents IS NOT NULL
+             ORDER BY c.price_cents DESC, o.id DESC LIMIT ?1",
+        )?;
+        let rows = stmt.query_map([limit], |r| {
+            Ok(PullRow {
+                uuid: r.get(0)?,
+                foil: r.get(1)?,
+                price_cents: r.get(2)?,
+                opened_at: r.get(3)?,
+                booster_set: r.get(4)?,
+            })
+        })?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    /// Openings grouped by set and kind of booster, most opened first.
+    pub fn openings_by_booster(&self) -> StoreResult<Vec<BoosterKindTotals>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT set_code, booster_kind, COUNT(*), SUM(value_cents), MAX(value_cents)
+             FROM openings GROUP BY set_code, booster_kind ORDER BY COUNT(*) DESC, set_code, booster_kind",
+        )?;
+        let rows = stmt.query_map([], |r| {
+            Ok(BoosterKindTotals {
+                set_code: r.get(0)?,
+                kind: r.get(1)?,
+                boosters: r.get(2)?,
+                value_cents: r.get(3)?,
+                best_value_cents: r.get(4)?,
+            })
+        })?;
         Ok(rows.collect::<Result<_, _>>()?)
     }
 
@@ -528,6 +683,50 @@ mod tests {
             store.buy_boosters("TST", "play", boosters, 0, 0).unwrap();
         }
         store
+    }
+
+    #[test]
+    fn statistics_summarize_the_opening_history() {
+        let mut store = store_with(3);
+        store.open_sealed("TST", "play", &[card("a", false, Some(50)), card("b", true, Some(900))], 10).unwrap();
+        store.open_sealed("TST", "play", &[card("c", false, None)], 20).unwrap();
+        store.open_sealed("TST", "play", &[card("a", false, Some(50)), card("d", false, Some(300))], 30).unwrap();
+
+        assert_eq!(store.opening_totals().unwrap(), OpeningTotals { boosters: 3, cards: 5, foils: 1, value_cents: 1_300 });
+
+        let latest = store.openings(OpeningOrder::Latest, 2).unwrap();
+        assert_eq!(latest.iter().map(|o| o.opened_at).collect::<Vec<_>>(), [30, 20]);
+        assert_eq!(latest[0].best_card, Some(PullRef { uuid: "d".into(), foil: false, price_cents: 300 }));
+        assert_eq!(latest[1].best_card, None);
+        let best = &store.openings(OpeningOrder::MostValuable, 1).unwrap()[0];
+        assert_eq!(best.value_cents, 950);
+        assert_eq!(best.best_card, Some(PullRef { uuid: "b".into(), foil: true, price_cents: 900 }));
+        assert_eq!(store.openings(OpeningOrder::LeastValuable, 1).unwrap()[0].value_cents, 0);
+
+        let pulls = store.best_pulls(2).unwrap();
+        assert_eq!(pulls.iter().map(|p| (p.uuid.as_str(), p.price_cents)).collect::<Vec<_>>(), [("b", 900), ("d", 300)]);
+
+        assert_eq!(
+            store.openings_by_booster().unwrap(),
+            [BoosterKindTotals {
+                set_code: "TST".into(),
+                kind: "play".into(),
+                boosters: 3,
+                value_cents: 1_300,
+                best_value_cents: 950
+            }]
+        );
+        let ledger = store.ledger_totals().unwrap();
+        assert_eq!((ledger["starting_balance"], ledger["booster_purchase"]), (10_000, 0));
+    }
+
+    #[test]
+    fn statistics_of_a_new_player_are_empty() {
+        let store = store_with(0);
+        assert_eq!(store.opening_totals().unwrap(), OpeningTotals::default());
+        assert!(store.openings(OpeningOrder::Latest, 10).unwrap().is_empty());
+        assert!(store.best_pulls(10).unwrap().is_empty());
+        assert!(store.openings_by_booster().unwrap().is_empty());
     }
 
     #[test]
