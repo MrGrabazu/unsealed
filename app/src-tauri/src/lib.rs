@@ -162,7 +162,7 @@ fn get_data_info(state: State<'_, SessionState>) -> Result<DataInfo, String> {
 #[tauri::command]
 fn list_sets(state: State<'_, SessionState>) -> Result<Vec<SetSummary>, String> {
     let session = session(&state)?;
-    game::read_sets(&session.data_dir, &session.card_lang)
+    game::read_sets(&session.data_dir, &session.card_lang, &game::system_clock().day)
 }
 
 /// Language of card names, card images and set names. Unknown languages mean English.

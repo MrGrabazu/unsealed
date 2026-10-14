@@ -1,7 +1,13 @@
 {
   "serializedPrintRun": 500,
   "cards": [
-    { "set": "LTR", "number": "0", "name": "The One Ring (serialized 1/1)", "printRun": 1 }
+    { "set": "LTR", "number": "0", "name": "The One Ring (serialized 001/001, Collector Boosters)", "printRun": 1 },
+    { "set": "LTC", "number": "408z", "name": "Sol Ring, Elven (traditional foil, serialized)", "printRun": 300 },
+    { "set": "LTC", "number": "409z", "name": "Sol Ring, Dwarven (traditional foil, serialized)", "printRun": 700 },
+    { "set": "LTC", "number": "410z", "name": "Sol Ring, Human (traditional foil, serialized)", "printRun": 900 },
+    { "set": "LTC", "number": "408", "name": "Sol Ring, Elven (non-foil, not serialized)", "printRun": 3000 },
+    { "set": "LTC", "number": "409", "name": "Sol Ring, Dwarven (non-foil, not serialized)", "printRun": 7000 },
+    { "set": "LTC", "number": "410", "name": "Sol Ring, Human (non-foil, not serialized)", "printRun": 9000 }
   ],
   "estimateMultipliers": [
     { "printRunUpTo": 1, "multiplier": 2000 },

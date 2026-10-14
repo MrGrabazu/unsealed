@@ -5,7 +5,8 @@
 
 use crate::booster::BoosterConfig;
 use crate::catalog::{
-    BoosterValue, Manifest, ManifestSet, PriceFile, PriceSet, SetFile, SetSelection, DATA_FORMAT_VERSION,
+    BoosterValue, Manifest, ManifestSet, PriceFile, PriceSet, SetFile, SetSelection, COLLECTOR_KIND,
+    DATA_FORMAT_VERSION,
 };
 use crate::import::{add_token_slots, add_tokens_from, compact_set, featured_card, token_set_code, prices_by_uuid, prices_from_scryfall_jsonl, read_all_printings, AllPrintings};
 use crate::sim::expected_value_cents;
@@ -133,12 +134,28 @@ fn select_sets(all: &AllPrintings, opts: &BuildOptions, kinds: &[&str]) -> (Vec<
                 }
             }
         }
-        SetSelection::All(_) => selected.extend(
-            all.data
-                .values()
-                .filter(|s| !s.is_online_only && opts.set_types.contains(&s.set_type) && s.has_any_booster(kinds))
-                .map(|s| s.code.clone()),
-        ),
+        SetSelection::All(_) => {
+            for s in all.data.values().filter(|s| !s.is_online_only && opts.set_types.contains(&s.set_type)) {
+                let offered = || s.booster.keys().cloned().collect::<Vec<_>>().join(", ");
+                if !s.has_any_booster(kinds) {
+                    // A set with boosters of none of the kinds kept: maybe a new kind of main
+                    // booster (Wizards renames them now and then) that `data.json` should list.
+                    if !s.booster.is_empty() {
+                        skipped.insert(s.code.clone(), format!("no booster of a kind kept (MTGJSON has: {})", offered()));
+                    }
+                    continue;
+                }
+                // Only its collector boosters kept: its main booster is most likely of a kind
+                // not listed yet. The set is offered, but says so.
+                if kinds.iter().all(|k| *k == COLLECTOR_KIND || !s.booster.contains_key(*k)) {
+                    skipped.insert(
+                        format!("{}/main", s.code),
+                        format!("only collector boosters kept: a new kind of main booster? (MTGJSON has: {})", offered()),
+                    );
+                }
+                selected.push(s.code.clone());
+            }
+        }
     }
     (selected, skipped)
 }

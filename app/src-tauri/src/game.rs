@@ -372,7 +372,7 @@ impl Game {
     }
 
     pub fn list_sets(&self) -> Result<Vec<SetSummary>, String> {
-        read_sets(&self.data_dir, &self.card_lang)
+        read_sets(&self.data_dir, &self.card_lang, &(self.clock)().day)
     }
 
     /// Language of card names, card images and set names ("en", or one of
@@ -1025,10 +1025,12 @@ fn number_key(number: &str) -> (u32, String) {
     (digits.parse().unwrap_or(u32::MAX), number.to_string())
 }
 
-/// The sets the downloaded data offers, newest first, named in `lang` when translated.
-/// Needs no game: the home screen and the options read it too.
-pub fn read_sets(data_dir: &Path, lang: &str) -> Result<Vec<SetSummary>, String> {
-    Ok(read_manifest(data_dir)?.map(|m| sets_of(m, lang)).unwrap_or_default())
+/// The sets the downloaded data offers, newest first, named in `lang` when translated. A
+/// set appears on its release day (`today`, "YYYY-MM-DD"): MTGJSON lists sets ahead of their
+/// release, with unsteady prices. Needs no game: the home screen and the options read it too.
+pub fn read_sets(data_dir: &Path, lang: &str, today: &str) -> Result<Vec<SetSummary>, String> {
+    let sets = read_manifest(data_dir)?.map(|m| sets_of(m, lang)).unwrap_or_default();
+    Ok(sets.into_iter().filter(|s| s.release_date.as_str() <= today).collect())
 }
 
 /// Languages cards and set names can be shown in (English, then `FOREIGN_LANGUAGES`).
@@ -1317,6 +1319,14 @@ mod tests {
         let mut g = game(name);
         g.buy_boosters("TST", "play", 1).unwrap();
         g
+    }
+
+    #[test]
+    fn a_set_appears_on_its_release_day() {
+        // TST is released on 2026-01-01.
+        let dir = data_dir("release", PRICES);
+        assert!(read_sets(&dir, "en", "2025-12-31").unwrap().is_empty());
+        assert_eq!(read_sets(&dir, "en", "2026-01-01").unwrap().len(), 1);
     }
 
     #[test]
