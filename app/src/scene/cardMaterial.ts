@@ -66,16 +66,20 @@ void main() {
     if (uHasFront > 0.5) {
       c = texture2D(uFront, vUv);
       if (uFoil > 0.5) {
-        // The same foil as the CSS one (.foil-sheen): rainbow bands 18° off the vertical, one
-        // period every 60% of the gradient line (2.07 units), drifting a period every 6 s, laid
-        // in "overlay" at 75%, plus a white glint at half speed. The light (pointer) nudges it.
+        // The same foil as the CSS one (.foil-sheen): a faint rainbow (bands 18° off the
+        // vertical, one period every 2.07 units, drifting a period every 9 s) in "soft-light",
+        // alive only in a broad band of light, with a soft white glare. Here the light follows
+        // the pointer: tilting the card moves the band, as with a real one.
         vec2 p = vec2(vUv.x * ${CARD_W.toFixed(3)}, (1.0 - vUv.y) * ${CARD_H.toFixed(3)});
-        float along = dot(p, vec2(0.951, 0.309)) / 2.07 - uLight.x * 0.25 + uLight.y * 0.1;
-        vec3 rainbow = hue(fract(along - uTime / 6.0));
-        vec3 overlay = mix(2.0 * c.rgb * rainbow, 1.0 - 2.0 * (1.0 - c.rgb) * (1.0 - rainbow), step(0.5, c.rgb));
-        c.rgb = mix(c.rgb, overlay, 0.75);
-        float g = fract(along * 2.0 - uTime / 6.0);
-        c.rgb += vec3(0.25) * max(0.0, 1.0 - abs(g - 0.2) / 0.2);
+        float along = dot(p, vec2(0.951, 0.309));
+        vec3 rainbow = mix(vec3(0.5), hue(fract(along / 2.07 - uTime / 9.0)), 0.8);
+        // Soft light (W3C): darkens or lightens a little, keeps the card's own colours.
+        vec3 d = mix(sqrt(c.rgb), ((16.0 * c.rgb - 12.0) * c.rgb + 4.0) * c.rgb, step(c.rgb, vec3(0.25)));
+        vec3 soft = mix(c.rgb - (1.0 - 2.0 * rainbow) * c.rgb * (1.0 - c.rgb), c.rgb + (2.0 * rainbow - 1.0) * (d - c.rgb), step(0.5, rainbow));
+        float lightAt = 1.4 + uLight.x * 1.6 - uLight.y * 0.6 + sin(uTime * 0.6) * 0.3;
+        float band = exp(-pow((along - lightAt) / 0.7, 2.0));
+        c.rgb = mix(c.rgb, soft, 0.4 + 0.5 * band);
+        c.rgb += vec3(0.18) * band;
       }
     } else {
       c = texture2D(uBack, vUv);

@@ -88,35 +88,42 @@ code { background: var(--panel); padding: 2px 6px; border-radius: 4px; }
 .card[data-rarity="rare"] .front { box-shadow: 0 0 18px var(--rare); }
 .card[data-rarity="mythic"] .front { box-shadow: 0 0 22px var(--mythic); }
 
-/* The foil: rainbow bands 18° off the vertical, drifting without end, laid over the card in
-   "overlay" (colours pulled apart without washing the card out), with a fainter white glint.
+/* The foil, as a real one looks: the card stays readable under a faint rainbow (bands 18° off
+   the vertical, in "soft-light": tinted, never washed out); where the light catches it, a
+   broad band sweeping slowly across, the rainbow comes alive under a soft white glare.
    The 3D opening draws the same in its card shader (scene/cardMaterial.ts): keep them alike. */
 @property --foil-shift { syntax: "<percentage>"; inherits: false; initial-value: 0%; }
+@property --foil-light { syntax: "<percentage>"; inherits: false; initial-value: -60%; }
 .foil-sheen {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  /* "overlay", at a moderate strength: "soft-light" is too faint on a thumbnail. */
   mix-blend-mode: overlay;
-  opacity: 0.75;
+  opacity: 0.85;
   background: repeating-linear-gradient(108deg,
-    #ff2a2a calc(var(--foil-shift) + 0%), #ffd000 calc(var(--foil-shift) + 10%),
-    #2aff4a calc(var(--foil-shift) + 20%), #00e5ff calc(var(--foil-shift) + 30%),
-    #2a4bff calc(var(--foil-shift) + 40%), #ff2ad4 calc(var(--foil-shift) + 50%),
-    #ff2a2a calc(var(--foil-shift) + 60%));
-  animation: foil-drift 6s linear infinite;
+    #ff5a5a calc(var(--foil-shift) + 0%), #ffd84a calc(var(--foil-shift) + 10%),
+    #6aff7a calc(var(--foil-shift) + 20%), #4ae8ff calc(var(--foil-shift) + 30%),
+    #5a72ff calc(var(--foil-shift) + 40%), #ff5ae0 calc(var(--foil-shift) + 50%),
+    #ff5a5a calc(var(--foil-shift) + 60%));
+  /* Present everywhere (60%), full in the band of light. */
+  -webkit-mask-image: linear-gradient(108deg, #00000099 calc(var(--foil-light) - 25%), #000 var(--foil-light), #00000099 calc(var(--foil-light) + 25%));
+  mask-image: linear-gradient(108deg, #00000099 calc(var(--foil-light) - 25%), #000 var(--foil-light), #00000099 calc(var(--foil-light) + 25%));
+  animation: foil-drift 9s linear infinite, foil-light 5.5s ease-in-out infinite;
 }
+/* The glare of the light itself, soft and wide. */
 .foil-sheen::after {
   content: "";
   position: absolute;
   inset: 0;
   mix-blend-mode: screen;
-  background: repeating-linear-gradient(108deg,
-    transparent calc(var(--foil-shift) * 0.5 + 0%), #ffffff40 calc(var(--foil-shift) * 0.5 + 6%),
-    transparent calc(var(--foil-shift) * 0.5 + 12%), transparent calc(var(--foil-shift) * 0.5 + 30%));
-  animation: inherit;
+  background: linear-gradient(108deg, transparent calc(var(--foil-light) - 18%), #ffffff45 var(--foil-light), transparent calc(var(--foil-light) + 18%));
+  animation: foil-light 5.5s ease-in-out infinite;
 }
 /* One period of the bands: the loop is seamless. */
 @keyframes foil-drift { to { --foil-shift: 60%; } }
+/* The light crosses the card and back, as a hand would tilt it. */
+@keyframes foil-light { 0%, 100% { --foil-light: -20%; } 50% { --foil-light: 120%; } }
 /* A light halo around a foil, slowly going through the rainbow, so that it stands out in a list. */
 @property --foil-hue { syntax: "<number>"; inherits: false; initial-value: 0; }
 .thumb:has(> .foil-sheen), .card .front:has(> .foil-sheen) {

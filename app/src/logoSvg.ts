@@ -76,6 +76,10 @@ export const LOGO_SVG = /*svg*/ `<svg xmlns="http://www.w3.org/2000/svg" viewBox
   </g>
 </svg>`;
 
+/** The wax seal's outline (centred on 0,0, about 130 units wide), for other drawings of
+ * the seal (the booster wrapper, the app icon). Taken from the logo: one drawing only. */
+export const SEAL_PATH = /fill="url\(#\{\{id\}\}wax\)"[^>]* d="([^"]+)"/.exec(LOGO_SVG)![1];
+
 /** The logo's markup, its gradient ids made unique with `id`. */
 export function logoSvg(id: string): string {
   return LOGO_SVG.replaceAll("{{id}}", id);

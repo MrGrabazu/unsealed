@@ -4,12 +4,15 @@ import { DataStatusBar, useDataStatus } from "./DataStatus";
 import { CARD_LANGUAGES, LANGUAGES, useI18n, type CardLangSetting, type Lang } from "./i18n";
 import { Loading } from "./Loading";
 import { getOpening3d, setOpening3d } from "./settings";
+import { getSoundOn, getVolume, setSoundOn, setVolume, sounds } from "./sound";
 
 /** Settings: the language, and what the downloaded game data contains. */
 export function Options({ onBack }: { onBack: () => void }) {
   const { t, lang, setLang, cardLangSetting, setCardLangSetting, formatDate, formatNumber } = useI18n();
   const [info, setInfo] = useState<DataInfo | null>(null);
   const [opening3d, setOpening3dState] = useState(getOpening3d);
+  const [soundOn, setSoundOnState] = useState(getSoundOn);
+  const [volume, setVolumeState] = useState(getVolume);
   const [error, setError] = useState<string | null>(null);
   const reload = () =>
     getDataInfo()
@@ -66,6 +69,37 @@ export function Options({ onBack }: { onBack: () => void }) {
         {t("options.opening3d")}
       </label>
       <p className="hint">{t("options.opening3dHint")}</p>
+
+      <h3>{t("options.sound")}</h3>
+      <label className="checkbox">
+        <input
+          type="checkbox"
+          checked={soundOn}
+          onChange={(e) => {
+            setSoundOn(e.target.checked);
+            setSoundOnState(e.target.checked);
+            if (e.target.checked) sounds.coins();
+          }}
+        />
+        {t("options.soundOn")}
+      </label>
+      <label className="checkbox volume">
+        {t("options.volume")}
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={Math.round(volume * 100)}
+          disabled={!soundOn}
+          onChange={(e) => setVolumeState(Number(e.target.value) / 100)}
+          // Played once the slider is let go, at the new volume.
+          onPointerUp={() => {
+            setVolume(volume);
+            sounds.coins();
+          }}
+          onKeyUp={() => setVolume(volume)}
+        />
+      </label>
 
       <h3>{t("options.data")}</h3>
       <DataStatusBar status={dataStatus} />

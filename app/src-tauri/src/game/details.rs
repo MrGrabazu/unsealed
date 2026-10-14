@@ -1,7 +1,7 @@
 //! A card's detail view: what the game knows locally (images, prices, copies owned), then
 //! what Scryfall adds when it can be reached (rules text of each face, every printing).
 
-use super::{err, localized, Game};
+use super::{localized, Game};
 use serde::Serialize;
 use std::collections::HashMap;
 use unsealed_core::import::parse_cents;

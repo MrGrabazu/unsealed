@@ -23,6 +23,7 @@ import { Achievements } from "./Achievements";
 import { BatchOpening } from "./BatchOpening";
 import { CardDetails } from "./CardDetails";
 import { Logo } from "./Logo";
+import { sounds } from "./sound";
 import { PackOpening } from "./PackOpening";
 import { canUseWebGL, getOpening3d } from "./settings";
 
@@ -95,6 +96,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
 
   const showToasts = useCallback((unlocked: AchievementView[]) => {
     if (unlocked.length === 0) return;
+    sounds.seal();
     setToasts((current) => [...current, ...unlocked]);
     setUnlockCount((n) => n + unlocked.length);
     for (const a of unlocked) {
@@ -228,10 +230,14 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   const remaining = last && wallet?.sealed.find((s) => s.setCode === last.setCode && s.kind === last.kind);
 
   const buy = (item: ShopItem, quantity: number) =>
-    run(() => buyBoosters(item.setCode, item.kind, quantity));
+    run(async () => {
+      await buyBoosters(item.setCode, item.kind, quantity);
+      sounds.coins();
+    });
   const buyAndOpen = (item: ShopItem) =>
     run(async () => {
       await buyBoosters(item.setCode, item.kind, 1);
+      sounds.coins();
       open(item.setCode, item.kind);
     });
 
@@ -339,6 +345,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
                 onSell={(s) =>
                   run(async () => {
                     const sale = await sellBoosters(s.setCode, s.kind, 1);
+                    sounds.coins();
                     const amount = money(sale.totalCents);
                     setNotice(
                       sale.profitCents >= 0

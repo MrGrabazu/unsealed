@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { OpenedCard } from "../api";
 import { isBigCard } from "../BatchOpening";
+import { revealSound, sounds } from "../sound";
 import { CARD_H, CARD_W, createCardGeometry, createCardMaterials } from "./cardMaterial";
 import { cardBackTexture, glowTexture, loadCardTexture, packTexture, stripTexture, type PackLook } from "./textures";
 
@@ -106,7 +107,7 @@ function Pack({ look, onTorn, leaving }: { look: PackLook; onTorn: () => void; l
   const shake = useRef({ target: new THREE.Vector2(), pos: new THREE.Vector2(), vel: new THREE.Vector2() });
   // Tear: started from one side (`dir`), the tear front runs along the strip. `auto` when a
   // click tore it: the front then runs on its own.
-  const tear = useRef({ dir: 0, front: 0, offAt: null as number | null, auto: false });
+  const tear = useRef({ dir: 0, front: 0, offAt: null as number | null, auto: false, sounded: false });
   const clock = useRef(0);
   const leftAt = useRef<number | null>(null);
 
@@ -179,6 +180,11 @@ function Pack({ look, onTorn, leaving }: { look: PackLook; onTorn: () => void; l
     // The strip: behind the tear front it peels back, curling more the further from the front.
     const t = tear.current;
     if (t.auto) t.front = Math.max(t.front, 0.4) + delta * PACK_W * 1.8;
+    // The rip sounds as the strip starts giving way.
+    if (t.dir !== 0 && t.front > 0.15 && !t.sounded) {
+      t.sounded = true;
+      sounds.tear();
+    }
     if (t.front >= PACK_W && t.offAt === null) {
       t.offAt = clock.current;
       onTorn();
@@ -218,6 +224,9 @@ function Pack({ look, onTorn, leaving }: { look: PackLook; onTorn: () => void; l
     <group ref={group}>
       <mesh geometry={bodyGeometry} onPointerDown={startShake}>
         <meshStandardMaterial
+          // A new material once the print is ready: three.js compiles a material's shader
+          // once, so a map added to a material already drawn without one never shows.
+          key={body ? "printed" : "plain"}
           ref={bodyMaterial}
           map={body}
           color={body ? "#ffffff" : `hsl(${look.hue}, 65%, 40%)`}
@@ -349,6 +358,7 @@ function Cards({
   // The first card counts as on top once the pile has settled.
   const topSince = useRef(SETTLED);
   const finishing = useRef(false);
+  const firstShown = useRef(false);
   // The card on top, moved on as soon as one leaves: waiting for React to pass the new `top`
   // would show the card that left back on the pile for a frame or two.
   const current = useRef(top);
@@ -395,6 +405,7 @@ function Cards({
   function sendOff(direction: THREE.Vector2, duration: number) {
     const dir = direction.lengthSq() > 1e-6 ? direction.clone().normalize() : new THREE.Vector2(1, 0.35).normalize();
     leaving.current = true;
+    sounds.slide();
     animateTo(offset.current.clone().add(dir.multiplyScalar(8)), duration, () => {
       slide.current = { kind: "idle" };
       offset.current.set(0, 0);
@@ -406,6 +417,7 @@ function Cards({
       } else {
         current.current += 1;
         topSince.current = clock.current;
+        revealSound(cards[current.current]);
         onNext();
       }
     });
@@ -450,6 +462,11 @@ function Cards({
     clock.current += delta;
     appearedAt.current ??= clock.current;
     const since = clock.current - appearedAt.current;
+    // The first card shows once the pile has settled.
+    if (!firstShown.current && since >= SETTLED) {
+      firstShown.current = true;
+      revealSound(cards[0]);
+    }
 
     // The whole pile tilts together with the pointer: no card reveals another by itself. While
     // in the wrapper, it tilts as much as the wrapper does, to stay inside it.

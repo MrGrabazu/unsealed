@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { SEAL_PATH } from "../logoSvg";
 
 // Textures of the 3D opening, drawn on canvases: the original wrapper (with the set's art
 // in a window, the art itself left unaltered), its tear-off strip, the cards' back, and the
@@ -105,14 +106,91 @@ async function drawArtFallback(g: CanvasRenderingContext2D, look: PackLook, win:
     g.fillStyle = `hsl(${hue} 60% 22%)`;
     g.textAlign = "center";
     g.textBaseline = "middle";
-    g.font = "800 72px system-ui, 'Segoe UI', sans-serif";
+    g.font = `900 64px ${TITLE_FONT}`;
     g.fillText(look.setCode.toUpperCase(), cx, cy + 4, radius * 1.7);
     g.textBaseline = "alphabetic";
   }
   g.restore();
 }
 
-/** The wrapper's body: metallic background, set name, art window, booster kind, brand. */
+const TITLE_FONT = "Cinzel, Georgia, serif";
+
+/** A gold gradient running down `y0`..`y1`, like the logo's gilding. */
+function gold(g: CanvasRenderingContext2D, y0: number, y1: number) {
+  const gradient = g.createLinearGradient(0, y0, 0, y1);
+  gradient.addColorStop(0, "#fff4c8");
+  gradient.addColorStop(0.35, "#f0c35e");
+  gradient.addColorStop(0.55, "#a8742a");
+  gradient.addColorStop(0.65, "#e9c271");
+  gradient.addColorStop(1, "#6d4512");
+  return gradient;
+}
+
+/** A gilded frame inside the wrapper's edges, with a flourish in each corner. */
+function drawFrame(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
+  g.save();
+  g.strokeStyle = gold(g, y, y + h);
+  g.lineWidth = 4;
+  g.strokeRect(x, y, w, h);
+  g.lineWidth = 1.5;
+  g.globalAlpha = 0.7;
+  g.strokeRect(x + 9, y + 9, w - 18, h - 18);
+  g.globalAlpha = 1;
+  for (const [cx, cy, sx, sy] of [[x, y, 1, 1], [x + w, y, -1, 1], [x, y + h, 1, -1], [x + w, y + h, -1, -1]]) {
+    g.save();
+    g.translate(cx, cy);
+    g.scale(sx, sy);
+    g.lineWidth = 3;
+    g.beginPath();
+    g.moveTo(0, 46);
+    g.quadraticCurveTo(0, 0, 46, 0);
+    g.moveTo(14, 30);
+    g.quadraticCurveTo(14, 14, 30, 14);
+    g.stroke();
+    g.fillStyle = "#f5d68a";
+    g.beginPath();
+    g.arc(20, 20, 4.5, 0, Math.PI * 2);
+    g.fill();
+    g.restore();
+  }
+  g.restore();
+}
+
+/** The logo's wax seal, a U pressed in it, at `cx`, `cy`, `size` wide. */
+function drawSeal(g: CanvasRenderingContext2D, cx: number, cy: number, size: number) {
+  const outline = new Path2D(SEAL_PATH);
+  g.save();
+  g.translate(cx, cy);
+  g.scale(size / 130, size / 130);
+  g.save();
+  g.translate(2, 6);
+  g.fillStyle = "#1b0f05aa";
+  g.fill(outline);
+  g.restore();
+  const wax = g.createRadialGradient(-20, -25, 5, 0, 0, 80);
+  wax.addColorStop(0, "#e2545a");
+  wax.addColorStop(0.45, "#a61f28");
+  wax.addColorStop(1, "#4f080e");
+  g.fillStyle = wax;
+  g.fill(outline);
+  g.strokeStyle = "#3d060b";
+  g.lineWidth = 2.5;
+  g.stroke(outline);
+  g.beginPath();
+  g.arc(0, 0, 45, 0, Math.PI * 2);
+  g.strokeStyle = gold(g, -45, 45);
+  g.lineWidth = 3;
+  g.stroke();
+  g.font = `900 84px ${TITLE_FONT}`;
+  g.textAlign = "center";
+  g.fillStyle = gold(g, -30, 30);
+  g.fillText("U", 0, 29);
+  g.restore();
+}
+
+/** The wrapper's body, in the game's Grimoire style: foil in the set's colour inside a gilded
+ * frame, the set's name engraved, its art set in gold, the booster kind on a leather ribbon,
+ * and the logo's wax seal. */
 export async function packTexture(look: PackLook): Promise<THREE.CanvasTexture> {
   const w = 512;
   const h = 860;
@@ -121,6 +199,8 @@ export async function packTexture(look: PackLook): Promise<THREE.CanvasTexture> 
   canvas.height = h;
   const g = canvas.getContext("2d")!;
   const { hue } = look;
+  // Canvas text only uses fonts already loaded.
+  await Promise.all([document.fonts.load(`700 34px Cinzel`), document.fonts.load(`900 84px Cinzel`)]).catch(() => {});
 
   const bg = g.createLinearGradient(0, 0, w, h);
   bg.addColorStop(0, `hsl(${hue} 70% 46%)`);
@@ -150,15 +230,32 @@ export async function packTexture(look: PackLook): Promise<THREE.CanvasTexture> 
     g.fillRect(x, h - 46, 8, 46);
   }
 
+  drawFrame(g, 14, 14, w - 28, h - 74);
+
   g.textAlign = "center";
-  g.fillStyle = "#fff";
   g.shadowColor = "#000";
-  g.shadowBlur = 8;
-  g.font = "700 34px system-ui, 'Segoe UI', sans-serif";
-  g.fillText(look.setName, w / 2, 70, w - 60);
+  g.shadowBlur = 6;
+  g.shadowOffsetY = 2;
+  // The set's name: one line, or two smaller ones when it is long.
+  const nameWidth = w - 120;
+  g.font = `700 30px ${TITLE_FONT}`;
+  if (g.measureText(look.setName).width <= nameWidth) {
+    g.fillStyle = gold(g, 48, 80);
+    g.fillText(look.setName, w / 2, 76, nameWidth);
+  } else {
+    g.font = `700 22px ${TITLE_FONT}`;
+    const words = look.setName.split(" ");
+    let first = words.shift() ?? "";
+    while (words.length > 0 && g.measureText(`${first} ${words[0]}`).width <= nameWidth) first += ` ${words.shift()}`;
+    g.fillStyle = gold(g, 44, 66);
+    g.fillText(first, w / 2, 62, nameWidth);
+    g.fillStyle = gold(g, 70, 92);
+    g.fillText(words.join(" "), w / 2, 88, nameWidth);
+  }
+  g.shadowOffsetY = 0;
 
   // The art window.
-  const win = { x: 34, y: 100, w: w - 68, h: 520 };
+  const win = { x: 44, y: 100, w: w - 88, h: 500 };
   g.shadowBlur = 0;
   g.fillStyle = "#000";
   g.fillRect(win.x, win.y, win.w, win.h);
@@ -172,24 +269,49 @@ export async function packTexture(look: PackLook): Promise<THREE.CanvasTexture> 
   } else {
     await drawArtFallback(g, look, win);
   }
-  g.strokeStyle = `hsl(${hue} 50% 72%)`;
-  g.lineWidth = 6;
+  // The art set in gold (framed only: the art itself is never altered).
+  g.strokeStyle = "#1b0f05";
+  g.lineWidth = 10;
   g.strokeRect(win.x, win.y, win.w, win.h);
+  g.strokeStyle = gold(g, win.y, win.y + win.h);
+  g.lineWidth = 5;
+  g.strokeRect(win.x - 1, win.y - 1, win.w + 2, win.h + 2);
 
-  g.fillStyle = "#0009";
-  g.fillRect(w / 2 - 150, 650, 300, 46);
-  g.fillStyle = "#fff";
-  g.font = "700 26px system-ui, 'Segoe UI', sans-serif";
-  g.fillText(look.kindLabel.toUpperCase(), w / 2, 682, 280);
-
-  g.fillStyle = `hsl(${hue} 70% 86%)`;
+  // The booster kind on a leather ribbon with swallowtail ends.
+  const ribbon = { y: 618, h: 48, half: 170 };
+  g.beginPath();
+  g.moveTo(w / 2 - ribbon.half - 24, ribbon.y);
+  g.lineTo(w / 2 + ribbon.half + 24, ribbon.y);
+  g.lineTo(w / 2 + ribbon.half + 8, ribbon.y + ribbon.h / 2);
+  g.lineTo(w / 2 + ribbon.half + 24, ribbon.y + ribbon.h);
+  g.lineTo(w / 2 - ribbon.half - 24, ribbon.y + ribbon.h);
+  g.lineTo(w / 2 - ribbon.half - 8, ribbon.y + ribbon.h / 2);
+  g.closePath();
+  const leather = g.createLinearGradient(0, ribbon.y, 0, ribbon.y + ribbon.h);
+  leather.addColorStop(0, "#4a2f1b");
+  leather.addColorStop(1, "#24160c");
+  g.fillStyle = leather;
+  g.shadowColor = "#000";
   g.shadowBlur = 10;
-  g.font = "800 46px system-ui, 'Segoe UI', sans-serif";
-  g.fillText("UNSEALED", w / 2, 770);
+  g.fill();
+  g.shadowBlur = 0;
+  g.strokeStyle = gold(g, ribbon.y, ribbon.y + ribbon.h);
+  g.lineWidth = 2.5;
+  g.stroke();
+  g.font = `700 24px ${TITLE_FONT}`;
+  g.fillStyle = gold(g, ribbon.y + 12, ribbon.y + 40);
+  g.fillText(look.kindLabel.toUpperCase(), w / 2, ribbon.y + 34, ribbon.half * 2 - 20);
+
+  // The seal, and the game's name.
+  drawSeal(g, w / 2, 712, 66);
+  g.font = `700 19px ${TITLE_FONT}`;
+  g.fillStyle = gold(g, 752, 770);
+  g.fillText("U N S E A L E D", w / 2, 768);
   return canvasTexture(canvas);
 }
 
-/** The crimped strip at the top of the wrapper, torn off to open it. */
+/** The crimped strip at the top of the wrapper, torn off to open it: the set's colour,
+ * crimped, with a gilded seam along its lower edge. */
 export function stripTexture(hue: number): THREE.CanvasTexture {
   const canvas = document.createElement("canvas");
   canvas.width = 512;
@@ -199,6 +321,8 @@ export function stripTexture(hue: number): THREE.CanvasTexture {
     g.fillStyle = x % 16 === 0 ? `hsl(${hue} 35% 64%)` : `hsl(${hue} 40% 40%)`;
     g.fillRect(x, 0, 8, 48);
   }
+  g.fillStyle = gold(g, 36, 44);
+  g.fillRect(0, 38, 512, 5);
   return canvasTexture(canvas);
 }
 

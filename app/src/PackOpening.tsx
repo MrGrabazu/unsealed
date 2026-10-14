@@ -6,6 +6,7 @@ import { CardImage } from "./CardImage";
 import { useI18n } from "./i18n";
 import { Money, useMoney } from "./money";
 import { Pack } from "./Pack";
+import { revealSound, sounds } from "./sound";
 
 interface Props {
   setCode: string;
@@ -76,9 +77,11 @@ export function PackOpening({ setCode, set, kind, cards, onTear, onReveal, busy,
     if (!cards || done) return;
     if (!topFaceUp) {
       setTopFaceUp(true);
+      revealSound(cards[aside]);
       onReveal(aside + 1);
     } else {
       setTopFaceUp(false);
+      sounds.slide();
       setAside((n) => n + 1);
     }
   }
@@ -105,6 +108,7 @@ export function PackOpening({ setCode, set, kind, cards, onTear, onReveal, busy,
         disabled={busy}
         onTear={() => {
           setTorn(true);
+          sounds.tear();
           // If the draw fails, the pack is whole again (the error is shown above it).
           void onTear().then((ok) => !ok && setTorn(false));
         }}

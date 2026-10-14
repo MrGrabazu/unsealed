@@ -262,7 +262,7 @@ pub fn featured_card(set: &SetFile, prices: &BTreeMap<String, PriceSet>) -> Opti
     let candidates = set
         .cards
         .iter()
-        .filter(|c| c.set_code == set.code && c.artist.is_some() && in_main.contains(c.uuid.as_str()));
+        .filter(|c| c.set_code == set.code && !c.token && c.artist.is_some() && in_main.contains(c.uuid.as_str()));
     // Highest price, then highest rarity, then lowest collector number.
     let best = candidates.min_by(|a, b| {
         (price(b), rank(b))

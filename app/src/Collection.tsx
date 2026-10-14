@@ -12,8 +12,10 @@ import { CardDetails } from "./CardDetails";
 import { CardImage } from "./CardImage";
 import { useI18n } from "./i18n";
 import { Loading } from "./Loading";
+import { duplicatesOf, SaleModal, type SoldLine } from "./SaleModal";
 import { Money, useMoney, useMoneyText } from "./money";
 import { getCollectionLayout, setCollectionLayout, type CollectionLayout } from "./settings";
+import { sounds } from "./sound";
 
 type Filter = "all" | "owned" | "missing";
 
@@ -29,7 +31,7 @@ interface Props {
 export function Collection({ sets, refreshKey, onChanged }: Props) {
   const money = useMoney();
   const moneyText = useMoneyText();
-  const { t, tx, plural } = useI18n();
+  const { t, tx } = useI18n();
   const [setCode, setSetCode] = useState("");
   const [view, setView] = useState<CollectionView | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
@@ -40,6 +42,10 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
   // The card whose details are open.
   const [detailsOf, setDetailsOf] = useState<string | null>(null);
   const [layout, setLayout] = useState<CollectionLayout>(getCollectionLayout);
+  // The last bulk sale, shown in its own window.
+  const [sale, setSale] = useState<{ soldCount: number; totalCents: number; lines: SoldLine[] } | null>(null);
+  // The binder's section on show (index in `binderSections`).
+  const [binderSection, setBinderSection] = useState(0);
 
   useEffect(() => {
     if (!setCode && sets.length > 0) setSetCode(sets[0].code);
@@ -70,6 +76,7 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
     setPending(null);
     try {
       const result = await sellCards([{ uuid: card.uuid, foil, quantity: 1 }]);
+      sounds.coins();
       setNotice(t("collection.sold", { card: card.name, amount: moneyText(result.totalCents) }));
       await reload();
       onChanged();
@@ -80,12 +87,16 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
 
   async function sellExtras() {
     try {
+      // What is about to go, read before the collection changes (shown in the sale's window).
+      const lines = view ? duplicatesOf([...view.cards, ...view.extras, ...view.tokens]) : [];
       const result = await sellDuplicates(setCode);
-      setNotice(
-        result.soldCount === 0
-          ? t("collection.noDuplicates")
-          : plural("collection.soldDuplicates", result.soldCount, { amount: moneyText(result.totalCents) }),
-      );
+      if (result.soldCount > 0) {
+        sounds.coins();
+        setNotice(null);
+        setSale({ soldCount: result.soldCount, totalCents: result.totalCents, lines });
+      } else {
+        setNotice(t("collection.noDuplicates"));
+      }
       await reload();
       onChanged();
     } catch (e) {
@@ -113,6 +124,18 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
         : [],
     [view, t],
   );
+
+  // In the binder, the completion shown is that of the section open (cards, extras, tokens):
+  // tokens and extras are collected too, and the main bar would say nothing of them.
+  const section = layout === "binder" ? binderSections[Math.min(binderSection, binderSections.length - 1)] : undefined;
+  const progress =
+    section && section.title !== null
+      ? (() => {
+          const owned = section.cards.filter((c) => c.quantity + c.foilQuantity > 0).length;
+          const total = section.cards.length;
+          return { label: section.title, owned, total, percent: total === 0 ? 0 : (owned * 100) / total };
+        })()
+      : view && { label: null, owned: view.ownedCount, total: view.totalCount, percent: view.completionPercent };
 
   function changeLayout(next: CollectionLayout) {
     setLayout(next);
@@ -203,18 +226,30 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
       {!view && !error && <Loading label={t("collection.loading")} />}
       {view && (
         <>
-          <div className="progress">
-            <div className="progress-bar" style={{ width: `${view.completionPercent}%` }} />
-          </div>
-          <p className="progress-label">
-            {t("collection.progress", {
-              owned: view.ownedCount,
-              total: view.totalCount,
-              percent: view.completionPercent.toFixed(1),
-            })}
-          </p>
+          {progress && (
+            <>
+              <div className="progress">
+                <div className="progress-bar" style={{ width: `${progress.percent}%` }} />
+              </div>
+              <p className="progress-label">
+                {progress.label && <strong className="progress-section">{progress.label} · </strong>}
+                {t(progress.label ? "collection.sectionProgress" : "collection.progress", {
+                  owned: progress.owned,
+                  total: progress.total,
+                  percent: progress.percent.toFixed(1),
+                })}
+              </p>
+            </>
+          )}
           {layout === "binder" ? (
-            <Binder key={view.setCode} setCode={view.setCode} sections={binderSections} onOpen={setDetailsOf} active={!detailsOf} />
+            <Binder
+              key={view.setCode}
+              setCode={view.setCode}
+              sections={binderSections}
+              onOpen={setDetailsOf}
+              active={!detailsOf}
+              onSection={setBinderSection}
+            />
           ) : (
             <>
               <div className="collection-grid">{shown?.map(cardTile)}</div>
@@ -240,6 +275,7 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
           )}
         </>
       )}
+      {sale && <SaleModal {...sale} onClose={() => setSale(null)} />}
       {view && detailsOf && (
         <CardDetails setCode={view.setCode} uuid={detailsOf} onClose={() => setDetailsOf(null)} />
       )}

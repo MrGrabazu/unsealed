@@ -995,7 +995,8 @@ fn obtainable_cards(file: &SetFile) -> (Vec<usize>, Vec<usize>) {
             .cards
             .iter()
             .enumerate()
-            .filter(|(_, c)| c.set_code == file.code && keep(&c.uuid))
+            // Tokens often bear the set's own code, and are in every booster: kept apart.
+            .filter(|(_, c)| c.set_code == file.code && !c.token && keep(&c.uuid))
             .map(|(i, _)| i)
             .collect();
         indices.sort_by_key(|&i| number_key(&file.cards[i].number));
@@ -1169,6 +1170,8 @@ mod tests {
         { "uuid": "x1", "setCode": "TST", "scryfallId": "999999", "name": "Not in boosters", "number": "3",
           "rarity": "rare", "finishes": ["nonfoil"], "layout": "normal" },
         { "uuid": "t1", "setCode": "TTST", "scryfallId": "777777", "name": "Soldier", "number": "1",
+          "rarity": "token", "finishes": ["nonfoil"], "layout": "token", "token": true },
+        { "uuid": "t2", "setCode": "TST", "scryfallId": "888888", "name": "Spirit", "number": "2",
           "rarity": "token", "finishes": ["nonfoil"], "layout": "token", "token": true }
       ],
       "boosters": { "play": {
@@ -1176,7 +1179,8 @@ mod tests {
         "boostersTotalWeight": 1,
         "sheets": {
           "common": { "allowDuplicates": true, "cards": { "c1": 1 }, "foil": false, "totalWeight": 1 },
-          "mythic": { "cards": { "m1": 1 }, "foil": false, "totalWeight": 1 }
+          "mythic": { "cards": { "m1": 1 }, "foil": false, "totalWeight": 1 },
+          "unsealedToken": { "cards": { "t2": 1 }, "foil": false, "totalWeight": 1 }
         },
         "sourceSetCodes": ["TST"] } } }"#;
 
@@ -1265,10 +1269,13 @@ mod tests {
             )
             .unwrap();
         let view = g.collection("TST").unwrap();
-        assert_eq!(view.tokens.iter().map(|c| (c.uuid.as_str(), c.quantity)).collect::<Vec<_>>(), [("t1", 1)]);
+        let tokens: Vec<(&str, u32)> = view.tokens.iter().map(|c| (c.uuid.as_str(), c.quantity)).collect();
+        assert_eq!(tokens, [("t1", 1), ("t2", 0)]);
         assert_eq!(view.tokens_owned, 1);
-        // Tokens do not count toward completion.
-        assert!(view.cards.iter().all(|c| c.uuid != "t1"));
+        // Tokens do not count toward completion, even one bearing the set's own code and
+        // found in its boosters' sheets.
+        assert!(view.cards.iter().all(|c| !c.uuid.starts_with('t')));
+        assert_eq!(view.total_count, 2);
     }
 
     #[test]

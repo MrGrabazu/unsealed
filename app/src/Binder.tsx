@@ -3,6 +3,7 @@ import type { CollectionCard } from "./api";
 import { CardImage } from "./CardImage";
 import { useI18n } from "./i18n";
 import { Money } from "./money";
+import { sounds } from "./sound";
 
 /** Cards per binder page: 3 rows of 3, like a real binder page. */
 const PER_PAGE = 9;
@@ -34,12 +35,14 @@ interface Props {
   onOpen: (uuid: string) => void;
   /** False while something covers the binder (card details): the arrow keys are theirs. */
   active: boolean;
+  /** Called with the index (in `sections`) of the section shown, when it changes. */
+  onSection?: (section: number) => void;
 }
 
 /** A set's collection as a binder: pages of 9 pockets, two facing pages at a time, every
  * card in its place (missing ones greyed out). Each section starts on a new page; nothing
  * is written on the pages, as in a real binder: a card's name and price show on hover. */
-export function Binder({ setCode, sections, onOpen, active }: Props) {
+export function Binder({ setCode, sections, onOpen, active, onSection }: Props) {
   const { t } = useI18n();
   const cover = coverOf(setCode);
   const pages = useMemo(() => {
@@ -53,7 +56,12 @@ export function Binder({ setCode, sections, onOpen, active }: Props) {
   }, [sections]);
   const spreads = Math.max(1, Math.ceil(pages.length / 2));
   const [spread, setSpread] = useState(0);
-  const go = (to: number) => setSpread(Math.min(spreads - 1, Math.max(0, to)));
+  const go = (to: number) => {
+    const target = Math.min(spreads - 1, Math.max(0, to));
+    if (target === spread) return;
+    sounds.page();
+    setSpread(target);
+  };
 
   useEffect(() => {
     if (!active) return;
@@ -64,6 +72,12 @@ export function Binder({ setCode, sections, onOpen, active }: Props) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
+
+  // The section shown: the left page's, or the right one's where a new section starts on
+  // the right (as a jump to that section's tab shows it).
+  const [leftPage, rightPage] = [pages[spread * 2], pages[spread * 2 + 1]];
+  const shownSection = leftPage && rightPage && rightPage.section !== leftPage.section ? rightPage.section : (leftPage?.section ?? 0);
+  useEffect(() => onSection?.(shownSection), [shownSection]);
 
   // Tabs to jump to a section (the main cards, collector extras, tokens).
   const firstSpreadOf = (section: number) => Math.floor(pages.findIndex((p) => p.section === section) / 2);
