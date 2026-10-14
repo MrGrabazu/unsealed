@@ -6,6 +6,9 @@ resolver = "2"
 # unoptimized, and the app runs it in the background even in debug builds.
 [profile.dev.package.unsealed-core]
 opt-level = 3
+# Optimized and incremental, rustc sometimes leaves the core's library with unresolved
+# `anon.*.llvm.*` symbols after an edit (link errors until a `cargo clean`).
+incremental = false
 [profile.dev.package.serde_json]
 opt-level = 3
 [profile.dev.package.flate2]

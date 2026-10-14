@@ -1,7 +1,7 @@
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
-use std::collections::HashMap;
-use unsealed_core::{open_booster, simulate, BoosterConfig, ColorIndex};
+use std::collections::{HashMap, HashSet};
+use unsealed_core::{open_booster, open_booster_excluding, simulate, BoosterConfig, ColorIndex};
 
 const FIXTURE: &str = include_str!("fixtures/mini_set.json");
 
@@ -241,4 +241,62 @@ fn observed_rates_match_expected_over_100k_boosters() {
     let report = simulate(&c, &no_colors(), 100_000, &mut ChaCha8Rng::seed_from_u64(2024)).unwrap();
     let dev = report.max_abs_deviation();
     assert!(dev < 0.01, "max deviation {dev} too large: {report:#?}");
+}
+
+/// Like LTR's collector booster: a rare variant holds a sheet with a single 1-of-1 card ("ring")
+/// on top of the usual slots.
+fn one_of_one_config() -> BoosterConfig {
+    serde_json::from_str(
+        r#"{ "boosters": [
+               { "contents": { "rare": 1 }, "weight": 1 },
+               { "contents": { "rare": 1, "theOneRing": 1 }, "weight": 1 } ],
+             "boostersTotalWeight": 2,
+             "sheets": {
+               "rare": { "cards": { "r1": 1, "r2": 1, "r3": 1 }, "foil": false, "totalWeight": 3 },
+               "theOneRing": { "cards": { "ring": 1 }, "foil": false, "totalWeight": 1 } },
+             "sourceSetCodes": [] }"#,
+    )
+    .unwrap()
+}
+
+#[test]
+fn nothing_exhausted_draws_exactly_like_open_booster() {
+    let c = cfg();
+    for seed in 0..50 {
+        let plain = open_booster(&c, &no_colors(), &mut ChaCha8Rng::seed_from_u64(seed)).unwrap();
+        let excluding =
+            open_booster_excluding(&c, &no_colors(), &mut ChaCha8Rng::seed_from_u64(seed), &HashSet::new()).unwrap();
+        assert_eq!(plain, excluding);
+    }
+}
+
+#[test]
+fn an_exhausted_card_is_never_drawn_again_nor_the_packs_that_held_it() {
+    let c = one_of_one_config();
+    let mut rng = ChaCha8Rng::seed_from_u64(7);
+    // Before: the ring comes out about once every two packs.
+    let found = (0..1_000)
+        .filter(|_| open_booster(&c, &no_colors(), &mut rng).unwrap().iter().any(|d| d.uuid == "ring"))
+        .count();
+    assert!((400..600).contains(&found), "{found}");
+
+    // After it was pulled: never again, and every pack is the plain variant (one card).
+    let exhausted = HashSet::from(["ring".to_string()]);
+    for _ in 0..10_000 {
+        let pack = open_booster_excluding(&c, &no_colors(), &mut rng, &exhausted).unwrap();
+        assert_eq!(pack.len(), 1);
+        assert_ne!(pack[0].uuid, "ring");
+    }
+}
+
+#[test]
+fn an_exhausted_card_leaves_the_rest_of_its_sheet() {
+    let c = one_of_one_config();
+    let mut rng = ChaCha8Rng::seed_from_u64(3);
+    let exhausted = HashSet::from(["r2".to_string()]);
+    for _ in 0..2_000 {
+        let pack = open_booster_excluding(&c, &no_colors(), &mut rng, &exhausted).unwrap();
+        assert!(pack.iter().all(|d| d.uuid != "r2"));
+        assert!(pack.iter().any(|d| d.sheet == "rare"));
+    }
 }

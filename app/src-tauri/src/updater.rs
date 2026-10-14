@@ -63,6 +63,7 @@ pub fn spawn(app: AppHandle, status: SharedStatus, data_dir: PathBuf, cache_dir:
             out: data_dir,
             cache: cache_dir,
             sim_boosters: cfg.sim_boosters,
+            token_foil_one_in: cfg.token_foil_one_in,
         };
         let mut last: Option<DataStatus> = None;
         let result = build(&opts, &mut |line, fraction| {

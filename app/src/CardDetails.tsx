@@ -4,7 +4,7 @@ import { CardImage } from "./CardImage";
 import { CARD_LANGUAGES, useI18n, type I18n } from "./i18n";
 import { Loading } from "./Loading";
 import { ManaText } from "./ManaText";
-import { useMoney } from "./money";
+import { Money, useMoney } from "./money";
 
 interface Props {
   setCode: string;
@@ -22,6 +22,8 @@ const rarityName = (t: I18n["t"], rarity: string) => {
       return t("rarityName.rare");
     case "mythic":
       return t("rarityName.mythic");
+    case "token":
+      return t("rarityName.token");
     default:
       return t("rarityName.special");
   }
@@ -47,7 +49,8 @@ export function CardDetails({ setCode, uuid, onClose }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const price = (cents: number | null) => (cents == null ? t("common.none") : money(cents));
+  const price = (cents: number | null) =>
+    cents == null ? t("common.none") : <Money cents={cents} estimated={details?.priceEstimated} />;
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -109,6 +112,7 @@ export function CardDetails({ setCode, uuid, onClose }: Props) {
                 </div>
               ))}
               {details.artist && <p className="hint">{t("details.artist", { artist: details.artist })}</p>}
+              {details.priceEstimated && <p className="hint">{t("details.estimated")}</p>}
 
               <dl className="info-list">
                 {details.canBeNonfoil && (

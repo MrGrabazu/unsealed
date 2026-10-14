@@ -7,7 +7,7 @@ use crate::booster::BoosterConfig;
 use crate::catalog::{
     BoosterValue, Manifest, ManifestSet, PriceFile, PriceSet, SetFile, SetSelection, DATA_FORMAT_VERSION,
 };
-use crate::import::{compact_set, featured_card, prices_by_uuid, prices_from_scryfall_jsonl, read_all_printings, AllPrintings};
+use crate::import::{add_token_slots, add_tokens_from, compact_set, featured_card, token_set_code, prices_by_uuid, prices_from_scryfall_jsonl, read_all_printings, AllPrintings};
 use crate::sim::expected_value_cents;
 use crate::{simulate, ColorIndex};
 use flate2::read::GzDecoder;
@@ -56,6 +56,8 @@ pub struct BuildOptions {
     /// Downloaded raw files (large: the Scryfall bulk file is several hundred MB).
     pub cache: PathBuf,
     pub sim_boosters: u64,
+    /// See `DataConfig::token_foil_one_in`.
+    pub token_foil_one_in: u64,
 }
 
 /// A GET with the headers Scryfall and MTGJSON ask for (shared with `scryfall`).
@@ -150,6 +152,7 @@ fn build_set(
     code: &str,
     kinds: &[&str],
     sim_boosters: u64,
+    token_foil_one_in: u64,
     validated: &mut BTreeMap<String, String>,
     dropped: &mut BTreeMap<String, String>,
 ) -> Result<SetFile, BuildError> {
@@ -160,6 +163,10 @@ fn build_set(
         .map(|c| all.data.get(c).ok_or_else(|| format!("source set {c} not found")))
         .collect::<Result<Vec<_>, _>>()?;
     let mut set = compact_set(raw, &all.meta.version, kinds, &extras)?;
+    if let Some(token_set) = all.data.get(&token_set_code(raw)) {
+        add_tokens_from(&mut set, token_set);
+    }
+    add_token_slots(&mut set, token_foil_one_in);
     let colors = ColorIndex::from_cards(&set.cards);
     let mut failed = Vec::new();
     for (kind, cfg) in &set.boosters {
@@ -270,7 +277,7 @@ pub fn build(opts: &BuildOptions, progress: Progress<'_>) -> Result<Manifest, Bu
     for (i, code) in codes.iter().enumerate() {
         let at = MTGJSON_READ_END + (SETS_END - MTGJSON_READ_END) * i as f64 / codes.len().max(1) as f64;
         progress(&format!("Preparing {} ({}/{})", all.data[code].name, i + 1, codes.len()), at);
-        let set = match build_set(&all, code, &kinds, opts.sim_boosters, &mut validated, &mut skipped) {
+        let set = match build_set(&all, code, &kinds, opts.sim_boosters, opts.token_foil_one_in, &mut validated, &mut skipped) {
             Ok(set) => set,
             Err(e) => {
                 eprintln!("{code} left out: {e}");

@@ -3,11 +3,13 @@ import { getDataInfo, type DataInfo } from "./api";
 import { DataStatusBar, useDataStatus } from "./DataStatus";
 import { CARD_LANGUAGES, LANGUAGES, useI18n, type CardLangSetting, type Lang } from "./i18n";
 import { Loading } from "./Loading";
+import { getOpening3d, setOpening3d } from "./settings";
 
 /** Settings: the language, and what the downloaded game data contains. */
 export function Options({ onBack }: { onBack: () => void }) {
   const { t, lang, setLang, cardLangSetting, setCardLangSetting, formatDate, formatNumber } = useI18n();
   const [info, setInfo] = useState<DataInfo | null>(null);
+  const [opening3d, setOpening3dState] = useState(getOpening3d);
   const [error, setError] = useState<string | null>(null);
   const reload = () =>
     getDataInfo()
@@ -50,6 +52,20 @@ export function Options({ onBack }: { onBack: () => void }) {
         ))}
       </select>
       <p className="hint">{t("options.cardLanguageHint")}</p>
+
+      <h3>{t("options.opening")}</h3>
+      <label className="checkbox">
+        <input
+          type="checkbox"
+          checked={opening3d}
+          onChange={(e) => {
+            setOpening3d(e.target.checked);
+            setOpening3dState(e.target.checked);
+          }}
+        />
+        {t("options.opening3d")}
+      </label>
+      <p className="hint">{t("options.opening3dHint")}</p>
 
       <h3>{t("options.data")}</h3>
       <DataStatusBar status={dataStatus} />

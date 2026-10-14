@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   getCollection,
   sellCards,
@@ -7,11 +7,13 @@ import {
   type CollectionView,
   type SetSummary,
 } from "./api";
+import { Binder, type BinderSection } from "./Binder";
 import { CardDetails } from "./CardDetails";
 import { CardImage } from "./CardImage";
 import { useI18n } from "./i18n";
 import { Loading } from "./Loading";
-import { useMoney, useMoneyText } from "./money";
+import { Money, useMoney, useMoneyText } from "./money";
+import { getCollectionLayout, setCollectionLayout, type CollectionLayout } from "./settings";
 
 type Filter = "all" | "owned" | "missing";
 
@@ -37,6 +39,7 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
   const [pending, setPending] = useState<string | null>(null);
   // The card whose details are open.
   const [detailsOf, setDetailsOf] = useState<string | null>(null);
+  const [layout, setLayout] = useState<CollectionLayout>(getCollectionLayout);
 
   useEffect(() => {
     if (!setCode && sets.length > 0) setSetCode(sets[0].code);
@@ -96,6 +99,25 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
   };
   const shown = view?.cards.filter(matches);
   const shownExtras = view?.extras.filter(matches);
+  const shownTokens = view?.tokens.filter(matches);
+
+  // The binder keeps every card in its place: no filter, sections one after the other.
+  const binderSections = useMemo<BinderSection[]>(
+    () =>
+      view
+        ? [
+            { title: null, cards: view.cards },
+            { title: t("collection.extras"), cards: view.extras },
+            { title: t("collection.tokens"), cards: view.tokens },
+          ].filter((s) => s.cards.length > 0)
+        : [],
+    [view, t],
+  );
+
+  function changeLayout(next: CollectionLayout) {
+    setLayout(next);
+    setCollectionLayout(next);
+  }
 
   function cardTile(c: CollectionCard) {
     const total = c.quantity + c.foilQuantity;
@@ -110,6 +132,7 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
           onKeyDown={(e) => e.key === "Enter" && setDetailsOf(c.uuid)}
         >
           <CardImage front={c.imageUrl} back={c.backImageUrl} alt={c.name} lazy />
+          {c.foilQuantity > 0 && <div className="foil-sheen" />}
           {total > 1 && <span className="badge-qty">×{total}</span>}
           {c.foilQuantity > 0 && <span className="badge-foil">{t("collection.foilBadge")}</span>}
         </div>
@@ -117,7 +140,7 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
           <span className="name">
             #{c.number} {c.name}
           </span>
-          <span className="price">{c.priceCents == null ? "—" : money(c.priceCents)}</span>
+          <span className="price">{c.priceCents == null ? "—" : <Money cents={c.priceCents} estimated={c.priceEstimated} />}</span>
         </div>
         <div className="sell-row">
           {sellButton(c, false)}
@@ -157,12 +180,22 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
             </option>
           ))}
         </select>
-        <select value={filter} onChange={(e) => setFilter(e.target.value as Filter)}>
-          <option value="all">{t("collection.allCards")}</option>
-          <option value="owned">{t("collection.owned")}</option>
-          <option value="missing">{t("collection.missing")}</option>
-        </select>
+        {layout === "grid" && (
+          <select value={filter} onChange={(e) => setFilter(e.target.value as Filter)}>
+            <option value="all">{t("collection.allCards")}</option>
+            <option value="owned">{t("collection.owned")}</option>
+            <option value="missing">{t("collection.missing")}</option>
+          </select>
+        )}
         <button onClick={() => void sellExtras()}>{t("collection.sellDuplicates")}</button>
+        <div className="segmented" role="group" aria-label={t("collection.layout")}>
+          <button className={layout === "binder" ? "active" : ""} onClick={() => changeLayout("binder")}>
+            {t("collection.layoutBinder")}
+          </button>
+          <button className={layout === "grid" ? "active" : ""} onClick={() => changeLayout("grid")}>
+            {t("collection.layoutGrid")}
+          </button>
+        </div>
       </div>
 
       {error && <p className="error">{error}</p>}
@@ -180,14 +213,29 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
               percent: view.completionPercent.toFixed(1),
             })}
           </p>
-          <div className="collection-grid">{shown?.map(cardTile)}</div>
-          {view.extras.length > 0 && (
+          {layout === "binder" ? (
+            <Binder key={view.setCode} setCode={view.setCode} sections={binderSections} onOpen={setDetailsOf} active={!detailsOf} />
+          ) : (
             <>
-              <h3>{t("collection.extras")}</h3>
-              <p className="progress-label">
-                {t("collection.extrasProgress", { owned: view.extrasOwned, total: view.extras.length })}
-              </p>
-              <div className="collection-grid">{shownExtras?.map(cardTile)}</div>
+              <div className="collection-grid">{shown?.map(cardTile)}</div>
+              {view.extras.length > 0 && (
+                <>
+                  <h3>{t("collection.extras")}</h3>
+                  <p className="progress-label">
+                    {t("collection.extrasProgress", { owned: view.extrasOwned, total: view.extras.length })}
+                  </p>
+                  <div className="collection-grid">{shownExtras?.map(cardTile)}</div>
+                </>
+              )}
+              {view.tokens.length > 0 && (
+                <>
+                  <h3>{t("collection.tokens")}</h3>
+                  <p className="progress-label">
+                    {t("collection.tokensProgress", { owned: view.tokensOwned, total: view.tokens.length })}
+                  </p>
+                  <div className="collection-grid">{shownTokens?.map(cardTile)}</div>
+                </>
+              )}
             </>
           )}
         </>

@@ -30,6 +30,8 @@ export interface OpenedCard {
   backImageUrl: string | null;
   /** Market price, if known. */
   priceCents: number | null;
+  /** The card has no market price of its own: the price is estimated. */
+  priceEstimated: boolean;
   /** First time the player owns this card (in any finish). */
   isNew: boolean;
 }
@@ -46,6 +48,7 @@ export interface CollectionCard {
   foilQuantity: number;
   priceCents: number | null;
   foilPriceCents: number | null;
+  priceEstimated: boolean;
   /** What the Boosterium pays for one copy (0 = cannot be sold). */
   sellValueCents: number;
   foilSellValueCents: number;
@@ -61,6 +64,9 @@ export interface CollectionView {
   /** Cards only collector boosters give; they do not count toward completion. */
   extras: CollectionCard[];
   extrasOwned: number;
+  /** The set's tokens (one in every booster): outside the completion target. */
+  tokens: CollectionCard[];
+  tokensOwned: number;
 }
 
 export interface SealedStack {
@@ -212,6 +218,7 @@ export interface CardDetailsView {
   canBeNonfoil: boolean;
   priceCents: number | null;
   foilPriceCents: number | null;
+  priceEstimated: boolean;
   sellValueCents: number;
   foilSellValueCents: number;
   owned: number;

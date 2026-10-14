@@ -1,0 +1,11 @@
+{
+  "serializedPrintRun": 500,
+  "cards": [
+    { "set": "LTR", "number": "0", "name": "The One Ring (serialized 1/1)", "printRun": 1 }
+  ],
+  "estimateMultipliers": [
+    { "printRunUpTo": 1, "multiplier": 2000 },
+    { "printRunUpTo": 100, "multiplier": 50 },
+    { "printRunUpTo": 500, "multiplier": 20 }
+  ]
+}

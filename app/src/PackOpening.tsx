@@ -4,7 +4,7 @@ import type { OpenedCard, SetSummary } from "./api";
 import { isBigCard } from "./BatchOpening";
 import { CardImage } from "./CardImage";
 import { useI18n } from "./i18n";
-import { useMoney } from "./money";
+import { Money, useMoney } from "./money";
 import { Pack } from "./Pack";
 
 interface Props {
@@ -189,7 +189,7 @@ export function PackOpening({ setCode, set, kind, cards, onTear, onReveal, busy,
                 <FlipCard card={card} faceUp />
                 <span className="card-caption visible">
                   <span className="name">{card.name}</span>
-                  <span className="price">{card.priceCents == null ? t("common.none") : money(card.priceCents)}</span>
+                  <span className="price">{card.priceCents == null ? t("common.none") : <Money cents={card.priceCents} estimated={card.priceEstimated} />}</span>
                 </span>
               </motion.div>
             ))}

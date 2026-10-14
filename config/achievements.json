@@ -27,7 +27,19 @@
       "field": "year"
     },
     "best_balance_cents": { "event": "BalanceChanged", "op": "max", "field": "balanceCents" },
-    "achievements_unlocked": { "event": "AchievementUnlocked", "op": "sum" }
+    "achievements_unlocked": { "event": "AchievementUnlocked", "op": "sum" },
+    "cards_discovered": { "event": "CardAcquired", "op": "distinct", "field": "uuid" },
+    "foils_pulled": { "event": "CardAcquired", "where": [{ "field": "foil", "op": "eq", "value": true }], "op": "sum" },
+    "mythics_pulled": { "event": "CardAcquired", "where": [{ "field": "rarity", "op": "eq", "value": "mythic" }], "op": "sum" },
+    "mythic_kinds": {
+      "event": "CardAcquired",
+      "where": [{ "field": "rarity", "op": "eq", "value": "mythic" }],
+      "op": "distinct",
+      "field": "uuid"
+    },
+    "tokens_pulled": { "event": "CardAcquired", "where": [{ "field": "rarity", "op": "eq", "value": "token" }], "op": "sum" },
+    "boosters_bought": { "event": "BoosterBought", "op": "sum", "field": "quantity" },
+    "charity_claims": { "event": "CharityClaimed", "op": "sum" }
   },
 
   "achievements": [
@@ -279,6 +291,171 @@
     },
 
     {
+      "id": "open-50", "name": "Regular Customer", "description": "Open 50 boosters.",
+      "rarity": "common", "emblem": "pack", "palette": "ember",
+      "condition": { "type": "metric", "metric": "boosters_opened", "atLeast": 50 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 2 } }
+    },
+    {
+      "id": "open-500", "name": "Pack Collector", "description": "Open 500 boosters.",
+      "rarity": "rare", "emblem": "pack", "palette": "royal",
+      "condition": { "type": "metric", "metric": "boosters_opened", "atLeast": 500 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 5 } }
+    },
+    {
+      "id": "open-play", "name": "Play Time", "description": "Open a play booster.",
+      "rarity": "common", "emblem": "pack", "palette": "forest",
+      "condition": { "type": "event", "event": "BoosterOpened", "where": [{ "field": "kind", "op": "eq", "value": "play" }] },
+      "reward": { "cashCents": 300 }
+    },
+    {
+      "id": "open-set", "name": "Set Piece", "description": "Open a set booster.",
+      "rarity": "common", "emblem": "cards", "palette": "ocean",
+      "condition": { "type": "event", "event": "BoosterOpened", "where": [{ "field": "kind", "op": "eq", "value": "set" }] },
+      "reward": { "cashCents": 300 }
+    },
+    {
+      "id": "old-school", "name": "Old School", "description": "Open a booster from the very first sets, before draft boosters existed.",
+      "rarity": "uncommon", "emblem": "hourglass", "palette": "gold",
+      "condition": { "type": "event", "event": "BoosterOpened", "where": [{ "field": "kind", "op": "eq", "value": "default" }] },
+      "reward": { "cashCents": 1000 }
+    },
+    {
+      "id": "sold-10000", "name": "Liquidator", "description": "Sell 10,000 cards.",
+      "rarity": "mythic", "emblem": "scale", "palette": "forest",
+      "condition": { "type": "metric", "metric": "cards_sold", "atLeast": 10000 },
+      "reward": { "cashCents": 50000 }
+    },
+    {
+      "id": "globetrotter", "name": "Globetrotter", "description": "Open boosters from 25 different sets.",
+      "rarity": "rare", "emblem": "book", "palette": "ocean",
+      "condition": { "type": "metric", "metric": "sets_opened", "atLeast": 25 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "collector", "quantity": 1 } }
+    },
+    {
+      "id": "multiverse", "name": "Multiverse Tourist", "description": "Open boosters from 50 different sets.",
+      "rarity": "rare", "emblem": "book", "palette": "royal",
+      "condition": { "type": "metric", "metric": "sets_opened", "atLeast": 50 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "collector", "quantity": 3 } }
+    },
+    {
+      "id": "archivist", "name": "Archivist", "description": "Complete 10 different sets.",
+      "rarity": "mythic", "emblem": "trophy", "palette": "royal",
+      "condition": { "type": "metric", "metric": "sets_completed", "atLeast": 10 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 50 } }
+    },
+    {
+      "id": "discover-1000", "name": "Card Catalog", "description": "Pull 1,000 different cards.",
+      "rarity": "uncommon", "emblem": "book", "palette": "ice",
+      "condition": { "type": "metric", "metric": "cards_discovered", "atLeast": 1000 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 3 } }
+    },
+    {
+      "id": "discover-10000", "name": "Living Library", "description": "Pull 10,000 different cards.",
+      "rarity": "mythic", "emblem": "book", "palette": "gold",
+      "condition": { "type": "metric", "metric": "cards_discovered", "atLeast": 10000 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "collector", "quantity": 5 } }
+    },
+    {
+      "id": "foils-100", "name": "Glitter Box", "description": "Pull 100 foil cards.",
+      "rarity": "uncommon", "emblem": "star", "palette": "ice",
+      "condition": { "type": "metric", "metric": "foils_pulled", "atLeast": 100 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 3 } }
+    },
+    {
+      "id": "foils-1000", "name": "Mirror Ball", "description": "Pull 1,000 foil cards.",
+      "rarity": "rare", "emblem": "star", "palette": "rose",
+      "condition": { "type": "metric", "metric": "foils_pulled", "atLeast": 1000 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "collector", "quantity": 2 } }
+    },
+    {
+      "id": "mythics-100", "name": "Mythic Mine", "description": "Pull 100 mythic cards.",
+      "rarity": "rare", "emblem": "crown", "palette": "ember",
+      "condition": { "type": "metric", "metric": "mythics_pulled", "atLeast": 100 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 10 } }
+    },
+    {
+      "id": "mythic-kinds-50", "name": "Mythic Menagerie", "description": "Pull 50 different mythic cards.",
+      "rarity": "rare", "emblem": "crown", "palette": "royal",
+      "condition": { "type": "metric", "metric": "mythic_kinds", "atLeast": 50 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 5 } }
+    },
+    {
+      "id": "token-foil", "name": "Token Gesture", "description": "Pull a foil token.",
+      "rarity": "common", "emblem": "star", "palette": "ice",
+      "condition": { "type": "event", "event": "CardAcquired", "where": [
+        { "field": "rarity", "op": "eq", "value": "token" }, { "field": "foil", "op": "eq", "value": true }
+      ] },
+      "reward": { "cashCents": 500 }
+    },
+    {
+      "id": "tokens-500", "name": "Token Hoarder", "description": "Pull 500 tokens.",
+      "rarity": "common", "emblem": "cards", "palette": "ice",
+      "condition": { "type": "metric", "metric": "tokens_pulled", "atLeast": 500 },
+      "reward": { "cashCents": 1000 }
+    },
+    {
+      "id": "triple-foil", "name": "Triple Shine", "description": "Open three foil cards in the same booster.",
+      "rarity": "rare", "emblem": "star", "palette": "rose",
+      "condition": { "type": "event", "event": "BoosterOpened", "where": [{ "field": "foilCount", "op": "gte", "value": 3 }] },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 3 } }
+    },
+    {
+      "id": "rare-rain", "name": "Rare Rain", "description": "Open three rare cards in the same booster.",
+      "rarity": "uncommon", "emblem": "gem", "palette": "ocean",
+      "condition": { "type": "event", "event": "BoosterOpened", "where": [{ "field": "rareCount", "op": "gte", "value": 3 }] },
+      "reward": { "cashCents": 1000 }
+    },
+    {
+      "id": "fresh-batch", "name": "Fresh Batch", "description": "Open a booster holding 10 cards you did not have yet.",
+      "rarity": "common", "emblem": "cards", "palette": "forest",
+      "condition": { "type": "event", "event": "BoosterOpened", "where": [{ "field": "newCardCount", "op": "gte", "value": 10 }] },
+      "reward": { "cashCents": 300 }
+    },
+    {
+      "id": "grail", "name": "Holy Grail", "description": "Pull a card worth {cents:1000000} or more.",
+      "rarity": "mythic", "emblem": "gem", "palette": "gold",
+      "condition": { "type": "event", "event": "CardAcquired", "where": [{ "field": "priceCents", "op": "gte", "value": 1000000 }] },
+      "reward": { "sealed": { "setCode": "latest", "kind": "collector", "quantity": 5 } }
+    },
+    {
+      "id": "platinum-pack", "name": "Platinum Pack", "description": "Open a booster whose cards are worth {cents:50000} or more.",
+      "rarity": "rare", "emblem": "bolt", "palette": "gold",
+      "condition": { "type": "event", "event": "BoosterOpened", "where": [{ "field": "valueCents", "op": "gte", "value": 50000 }] },
+      "reward": { "sealed": { "setCode": "latest", "kind": "collector", "quantity": 3 } }
+    },
+    {
+      "id": "big-win", "name": "Big Win", "description": "Open a booster that pays back {cents:25000} more than you paid, once sold.",
+      "rarity": "rare", "emblem": "chart", "palette": "gold",
+      "condition": { "type": "event", "event": "BoosterOpened", "where": [{ "field": "profitCents", "op": "gte", "value": 25000 }] },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 5 } }
+    },
+    {
+      "id": "wholesale", "name": "Wholesale", "description": "Buy 100 boosters at once.",
+      "rarity": "common", "emblem": "coin", "palette": "ocean",
+      "condition": { "type": "event", "event": "BoosterBought", "where": [{ "field": "quantity", "op": "gte", "value": 100 }] },
+      "reward": { "cashCents": 2000 }
+    },
+    {
+      "id": "loyal-customer", "name": "Loyal Customer", "description": "Buy 1,000 boosters in total.",
+      "rarity": "rare", "emblem": "coin", "palette": "gold",
+      "condition": { "type": "metric", "metric": "boosters_bought", "atLeast": 1000 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 10 } }
+    },
+    {
+      "id": "big-sale", "name": "Big Sale", "description": "Earn {cents:100000} in a single sale.",
+      "rarity": "rare", "emblem": "scale", "palette": "gold",
+      "condition": { "type": "event", "event": "SaleCompleted", "where": [{ "field": "totalCents", "op": "gte", "value": 100000 }] },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 3 } }
+    },
+    {
+      "id": "magnate", "name": "Seal Magnate", "description": "Hold {cents:10000000} at once.",
+      "rarity": "mythic", "emblem": "crown", "palette": "gold",
+      "condition": { "type": "metric", "metric": "best_balance_cents", "atLeast": 10000000 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 50 } }
+    },
+
+    {
       "id": "dud", "name": "Dud", "secret": true, "description": "Open a booster whose cards are worth less than {cents:100}.",
       "rarity": "common", "emblem": "skull", "palette": "onyx",
       "condition": { "type": "event", "event": "BoosterOpened", "where": [{ "field": "valueCents", "op": "lt", "value": 100 }] },
@@ -325,6 +502,18 @@
       "condition": { "type": "event", "event": "SaleCompleted", "where": [{ "field": "cardCount", "op": "gte", "value": 50 }] },
       "reward": { "cashCents": 1000 }
     },
+    {
+      "id": "desert", "name": "Desert", "secret": true, "description": "Open 100 boosters in a row without a mythic card.",
+      "rarity": "rare", "emblem": "hourglass", "palette": "onyx",
+      "condition": { "type": "metric", "metric": "no_mythic_streak", "atLeast": 100 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 10 } }
+    },
+    {
+      "id": "frequent-visitor", "name": "Frequent Visitor", "secret": true, "description": "Accept the Boosterium's help 10 times.",
+      "rarity": "uncommon", "emblem": "key", "palette": "onyx",
+      "condition": { "type": "metric", "metric": "charity_claims", "atLeast": 10 },
+      "reward": { "cashCents": 500 }
+    },
 
     {
       "id": "achiever", "name": "Achiever", "description": "Unlock 10 achievements.",
@@ -337,6 +526,12 @@
       "rarity": "rare", "emblem": "trophy", "palette": "royal",
       "condition": { "type": "metric", "metric": "achievements_unlocked", "atLeast": 25 },
       "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 10 } }
+    },
+    {
+      "id": "overachiever", "name": "Overachiever", "description": "Unlock 50 achievements.",
+      "rarity": "mythic", "emblem": "trophy", "palette": "gold",
+      "condition": { "type": "metric", "metric": "achievements_unlocked", "atLeast": 50 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "collector", "quantity": 5 } }
     },
     {
       "id": "unsealed", "name": "Unsealed", "description": "Unlock every other achievement.",

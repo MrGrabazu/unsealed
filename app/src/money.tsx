@@ -29,13 +29,16 @@ function Coin() {
   );
 }
 
-/** An amount in Seals with its coin. `cents` are cents of the market currency. */
-export function Money({ cents }: { cents: number }) {
+/** An amount in Seals with its coin. `cents` are cents of the market currency. An
+ * `estimated` price (a card without a market price of its own) is marked "≈". */
+export function Money({ cents, estimated = false }: { cents: number; estimated?: boolean }) {
   const rules = useContext(CurrencyContext);
-  const { formatNumber, plural } = useI18n();
+  const { formatNumber, plural, t } = useI18n();
   const seals = toSeals(rules, cents);
+  const amount = plural("currency.amount", seals);
   return (
-    <span className="money" title={plural("currency.amount", seals)}>
+    <span className="money" title={estimated ? t("price.estimated", { amount }) : amount}>
+      {estimated && <span className="estimated">≈</span>}
       {formatNumber(seals)}
       <Coin />
     </span>

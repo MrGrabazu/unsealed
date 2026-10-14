@@ -28,7 +28,7 @@ pub struct SetFile {
 
 /// Bump when the compact files change in a way older data cannot satisfy: the app then
 /// rebuilds its data at the next launch.
-pub const DATA_FORMAT_VERSION: u32 = 2;
+pub const DATA_FORMAT_VERSION: u32 = 4;
 
 /// Languages kept for card and set names, as (MTGJSON language name, code). Cards printed
 /// in other languages, or never translated, stay in English.
@@ -79,6 +79,13 @@ pub struct CardEntry {
     /// Translated printings, by language code (see `FOREIGN_LANGUAGES`).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub foreign: BTreeMap<String, ForeignCard>,
+    /// A serialized printing (MTGJSON promo type "serialized"): numbered copies, a limited
+    /// print run (see `LimitedConfig`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub serialized: bool,
+    /// One of the set's tokens (its own set code, e.g. "TLTR"; rarity "token").
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub token: bool,
 }
 
 /// Prices in cents, as given by Scryfall.
@@ -92,6 +99,44 @@ pub struct PriceSet {
     pub eur: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub eur_foil: Option<u32>,
+    /// The printing has no price of its own: these are the best prices of the other
+    /// printings of the same card (see `prices_from_scryfall_jsonl`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub estimated: bool,
+}
+
+impl PriceSet {
+    pub fn is_empty(&self) -> bool {
+        self.usd.is_none() && self.usd_foil.is_none() && self.eur.is_none() && self.eur_foil.is_none()
+    }
+
+    /// The highest of both, price by price.
+    fn max(self, other: Self) -> Self {
+        let max = |a: Option<u32>, b: Option<u32>| a.max(b);
+        Self {
+            usd: max(self.usd, other.usd),
+            usd_foil: max(self.usd_foil, other.usd_foil),
+            eur: max(self.eur, other.eur),
+            eur_foil: max(self.eur_foil, other.eur_foil),
+            estimated: false,
+        }
+    }
+
+    /// An estimate from the best prices of the other printings of a card. A finish they
+    /// have no price for takes the other finish's (better than no price at all).
+    pub fn estimate_from(best: Self) -> Self {
+        Self {
+            usd: best.usd.or(best.usd_foil),
+            usd_foil: best.usd_foil.or(best.usd),
+            eur: best.eur.or(best.eur_foil),
+            eur_foil: best.eur_foil.or(best.eur),
+            estimated: true,
+        }
+    }
+
+    pub fn merge_best(&mut self, other: &Self) {
+        *self = self.max(*other);
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

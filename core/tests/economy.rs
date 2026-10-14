@@ -51,7 +51,7 @@ fn sell_value_is_a_rounded_down_share_of_the_market_price() {
 
 #[test]
 fn market_price_follows_the_currency_and_finish() {
-    let p = PriceSet { usd: Some(100), usd_foil: Some(300), eur: Some(90), eur_foil: None };
+    let p = PriceSet { usd: Some(100), usd_foil: Some(300), eur: Some(90), eur_foil: None, estimated: false };
     let mut c = config();
     assert_eq!((c.market_price_cents(&p, false), c.market_price_cents(&p, true)), (Some(100), Some(300)));
     c.currency.market = "EUR".into();
@@ -148,6 +148,8 @@ fn prices_are_rekeyed_by_uuid_including_double_faced_cards() {
         side: None,
         artist: None,
         foreign: Default::default(),
+        serialized: false,
+        token: false,
     };
     let by_scryfall = [("s1".to_string(), PriceSet { usd: Some(25), ..Default::default() })].into();
     let cards = [card("front", "s1"), card("back", "s1"), card("other", "s2")];

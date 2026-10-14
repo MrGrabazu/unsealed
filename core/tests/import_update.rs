@@ -1,7 +1,12 @@
 use std::collections::{BTreeMap, HashSet};
 use std::io::Cursor;
 use unsealed_core::catalog::{AllSets, Manifest, ManifestSet, SetSelection, DATA_FORMAT_VERSION};
-use unsealed_core::import::{parse_cents, prices_from_scryfall_jsonl, set_from_mtgjson};
+use rand::SeedableRng;
+use rand_chacha::ChaCha8Rng;
+use unsealed_core::import::{
+    add_token_slots, add_tokens_from, parse_cents, prices_from_scryfall_jsonl, read_all_printings, set_from_mtgjson,
+};
+use unsealed_core::{open_booster, ColorIndex};
 use unsealed_core::update::{refresh_reason, DataConfig, RefreshReason};
 
 fn raw_set(sheet_card: &str, scryfall_id: &str) -> String {
@@ -36,6 +41,93 @@ fn converts_a_valid_set() {
     assert_eq!(set.cards[0].scryfall_id, "s1");
     assert_eq!(set.cards[0].set_code, "TST");
     assert!(set.boosters.contains_key("play"));
+}
+
+/// A set with a play and a collector booster, and two tokens: one printed in both
+/// finishes, one non-foil only, and one Scryfall does not know (left out).
+const SET_WITH_TOKENS: &str = r#"{
+  "meta": { "version": "5.3.0+test" },
+  "data": {
+    "code": "TST", "name": "Test Set", "releaseDate": "2026-01-01", "type": "expansion",
+    "cards": [
+      { "uuid": "u1", "setCode": "TST", "name": "A", "number": "1", "rarity": "common",
+        "finishes": ["nonfoil", "foil"], "layout": "normal", "identifiers": { "scryfallId": "s1" } }
+    ],
+    "tokens": [
+      { "uuid": "t1", "setCode": "TTST", "name": "Soldier", "number": "1",
+        "finishes": ["nonfoil", "foil"], "layout": "token", "identifiers": { "scryfallId": "st1" } },
+      { "uuid": "t2", "setCode": "TTST", "name": "Spirit", "number": "2",
+        "finishes": ["nonfoil"], "layout": "token", "identifiers": { "scryfallId": "st2" } },
+      { "uuid": "t3", "setCode": "TTST", "name": "Unknown", "number": "3",
+        "finishes": ["nonfoil"], "layout": "token", "identifiers": {} }
+    ],
+    "booster": {
+      "play": {
+        "boosters": [ { "contents": { "common": 1 }, "weight": 3 } ],
+        "boostersTotalWeight": 3,
+        "sheets": { "common": { "cards": { "u1": 1 }, "foil": false, "totalWeight": 1 } },
+        "sourceSetCodes": ["TST"]
+      },
+      "collector": {
+        "boosters": [ { "contents": { "common": 1 }, "weight": 1 } ],
+        "boostersTotalWeight": 1,
+        "sheets": { "common": { "cards": { "u1": 1 }, "foil": true, "totalWeight": 1 } },
+        "sourceSetCodes": ["TST"]
+      }
+    }
+  }
+}"#;
+
+#[test]
+fn every_booster_gets_a_token_foil_in_collector_boosters() {
+    let mut set = set_from_mtgjson(SET_WITH_TOKENS, &["play", "collector"], &[]).unwrap();
+    let tokens: Vec<_> = set.cards.iter().filter(|c| c.token).collect();
+    assert_eq!(tokens.iter().map(|t| t.uuid.as_str()).collect::<Vec<_>>(), ["t1", "t2"]);
+    assert!(tokens.iter().all(|t| t.rarity == "token" && t.set_code == "TTST"));
+
+    add_token_slots(&mut set, 15);
+    let play = &set.boosters["play"];
+    play.validate().unwrap();
+    // One pack in 15 has a foil token (only t1 exists in foil), the others a plain one.
+    let weights: Vec<(u64, bool)> = play
+        .boosters
+        .iter()
+        .map(|p| (p.weight, p.contents.keys().any(|k| play.sheets[k].foil && k != "common")))
+        .collect();
+    assert_eq!(weights, [(42, false), (3, true)]);
+    assert_eq!(play.boosters_total_weight, 45);
+    let foil_sheet = play.sheets.values().find(|s| s.foil).unwrap();
+    assert_eq!(foil_sheet.cards.keys().collect::<Vec<_>>(), ["t1"]);
+
+    let collector = &set.boosters["collector"];
+    collector.validate().unwrap();
+    let mut rng = ChaCha8Rng::seed_from_u64(1);
+    for _ in 0..200 {
+        let pack = open_booster(collector, &ColorIndex::default(), &mut rng).unwrap();
+        let token = pack.iter().find(|d| d.uuid.starts_with('t')).expect("a token in every pack");
+        assert!(token.foil);
+    }
+}
+
+#[test]
+fn tokens_kept_in_the_token_sub_set_join_the_set() {
+    // TTST holds the set's tokens: one also in the parent's list (t1), one only there (t9).
+    let all = read_all_printings(
+        r#"{ "meta": { "version": "v" }, "data": { "TTST": {
+          "code": "TTST", "name": "Test Set Tokens", "releaseDate": "2026-01-01", "type": "token",
+          "cards": [],
+          "tokens": [
+            { "uuid": "t1", "setCode": "TTST", "name": "Soldier", "number": "1",
+              "finishes": ["nonfoil", "foil"], "layout": "token", "identifiers": { "scryfallId": "st1" } },
+            { "uuid": "t9", "setCode": "TTST", "name": "Emblem", "number": "9",
+              "finishes": ["nonfoil"], "layout": "emblem", "identifiers": { "scryfallId": "st9" } } ] } } }"#
+            .as_bytes(),
+    )
+    .unwrap();
+    let mut set = set_from_mtgjson(SET_WITH_TOKENS, &["play"], &[]).unwrap();
+    add_tokens_from(&mut set, &all.data["TTST"]);
+    let tokens: Vec<&str> = set.cards.iter().filter(|c| c.token).map(|c| c.uuid.as_str()).collect();
+    assert_eq!(tokens, ["t1", "t2", "t9"]);
 }
 
 #[test]
@@ -161,6 +253,35 @@ fn extracts_only_wanted_prices() {
     assert_eq!(prices.len(), 1);
     let p = prices["s1"];
     assert_eq!((p.usd, p.usd_foil, p.eur, p.eur_foil), (Some(25), None, Some(20), Some(110)));
+}
+
+#[test]
+fn a_printing_without_price_is_estimated_from_the_other_printings() {
+    let jsonl = concat!(
+        // The serialized printing: no price at all.
+        r#"{"id":"ring0","oracle_id":"ring","prices":{"usd":null,"usd_foil":null}}"#, "\n",
+        r#"{"id":"ring1","oracle_id":"ring","prices":{"usd":"40.00","usd_foil":"55.00","eur":"35.00"}}"#, "\n",
+        r#"{"id":"ring2","oracle_id":"ring","prices":{"usd":"60.00","eur":null,"eur_foil":"50.00"}}"#, "\n",
+        // Another serialized printing: its scarcity price is not a base.
+        r#"{"id":"ring3","oracle_id":"ring","promo_types":["serialized"],"prices":{"usd":"9000.00"}}"#, "\n",
+        // Reversible cards carry the oracle id on their faces.
+        r#"{"id":"rev","card_faces":[{"oracle_id":"rv"},{"oracle_id":"rv"}],"prices":{}}"#, "\n",
+        r#"{"id":"rev2","oracle_id":"rv","prices":{"usd":"1.00"}}"#, "\n",
+        r#"{"id":"alone","oracle_id":"x","prices":{}}"#, "\n",
+    );
+    let wanted: HashSet<String> = ["ring0", "ring1", "rev", "alone"].map(String::from).into();
+    let prices = prices_from_scryfall_jsonl(Cursor::new(jsonl), &wanted).unwrap();
+
+    // Best of each price over the other printings; a missing finish takes the other one.
+    let ring = prices["ring0"];
+    assert!(ring.estimated);
+    assert_eq!((ring.usd, ring.usd_foil, ring.eur, ring.eur_foil), (Some(6000), Some(5500), Some(3500), Some(5000)));
+    // A printing with a price of its own keeps it.
+    assert!(!prices["ring1"].estimated);
+    assert_eq!(prices["ring1"].usd, Some(4000));
+    assert_eq!((prices["rev"].usd, prices["rev"].estimated), (Some(100), true));
+    // Nothing to estimate from: no price.
+    assert!(!prices.contains_key("alone"));
 }
 
 fn manifest(generated_at: &str, sets: &[&str]) -> Manifest {

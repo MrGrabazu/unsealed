@@ -431,11 +431,43 @@ fn permille((total, owned): (i64, i64)) -> i64 {
     }
 }
 
-/// The set a sealed reward refers to: "latest" is the newest available set.
+/// The set a sealed reward refers to: "latest" is the newest set offering that booster kind
+/// (the newest of all may have other kinds only, e.g. a draft-only special set).
 fn resolve_set<'a>(reward: &SealedReward, sets: &'a [SetSummary]) -> Option<&'a SetSummary> {
     if reward.set_code == "latest" {
-        sets.first() // `list_sets` sorts the newest set first
+        // `list_sets` sorts the newest set first.
+        sets.iter().find(|s| s.boosters.contains(&reward.kind))
     } else {
         sets.iter().find(|s| s.code == reward.set_code)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn set(code: &str, boosters: &[&str]) -> SetSummary {
+        SetSummary {
+            code: code.into(),
+            name: code.into(),
+            english_name: code.into(),
+            release_date: String::new(),
+            boosters: boosters.iter().map(|b| b.to_string()).collect(),
+            art: None,
+            icon_url: None,
+        }
+    }
+
+    #[test]
+    fn latest_is_the_newest_set_offering_the_kind() {
+        // Newest first, as `list_sets` returns them: the newest set has draft boosters only.
+        let sets = [set("MBC", &["draft"]), set("FRA", &["collector", "play"]), set("OLD", &["play"])];
+        let latest = |kind: &str| {
+            let reward = SealedReward { set_code: "latest".into(), kind: kind.into(), quantity: 1 };
+            resolve_set(&reward, &sets).map(|s| s.code.as_str())
+        };
+        assert_eq!(latest("play"), Some("FRA"));
+        assert_eq!(latest("draft"), Some("MBC"));
+        assert_eq!(latest("set"), None);
     }
 }

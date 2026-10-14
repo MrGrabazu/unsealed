@@ -3,5 +3,6 @@
   "setTypes": ["core", "expansion", "masters", "draft_innovation", "funny", "starter"],
   "boosters": ["play", "draft", "set", "default", "collector"],
   "maxAgeHours": 24,
-  "simBoosters": 20000
+  "simBoosters": 20000,
+  "tokenFoilOneIn": 15
 }

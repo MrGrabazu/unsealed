@@ -1,9 +1,9 @@
 //! Conversion of raw MTGJSON / Scryfall data into the compact catalog files.
 
-use crate::booster::{BoosterConfig, ConfigError};
-use crate::catalog::{CardEntry, FeaturedCard, ForeignCard, PriceSet, SetFile, FOREIGN_LANGUAGES};
+use crate::booster::{BoosterConfig, BoosterPack, BoosterSheet, ConfigError};
+use crate::catalog::{CardEntry, FeaturedCard, ForeignCard, PriceSet, SetFile, COLLECTOR_KIND, FOREIGN_LANGUAGES};
 use serde::Deserialize;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::BufRead;
 
 /// A single-set MTGJSON file (`<CODE>.json`).
@@ -40,6 +40,12 @@ pub struct RawSet {
     #[serde(default)]
     translations: BTreeMap<String, Option<String>>,
     cards: Vec<RawCard>,
+    /// The set's tokens (MTGJSON lists them apart; no booster sheet holds them).
+    #[serde(default)]
+    tokens: Vec<RawCard>,
+    /// The sub-set holding the set's tokens ("TLTR" for "LTR"), when there is one.
+    #[serde(default)]
+    pub token_set_code: Option<String>,
     #[serde(default)]
     pub booster: BTreeMap<String, BoosterConfig>,
 }
@@ -77,6 +83,8 @@ struct RawCard {
     set_code: String,
     name: String,
     number: String,
+    /// Tokens have none.
+    #[serde(default)]
     rarity: String,
     #[serde(default)]
     colors: Vec<String>,
@@ -88,6 +96,8 @@ struct RawCard {
     identifiers: RawIdentifiers,
     #[serde(default)]
     foreign_data: Vec<RawForeign>,
+    #[serde(default)]
+    promo_types: Vec<String>,
 }
 
 #[derive(Deserialize, Clone, Default)]
@@ -137,7 +147,98 @@ fn to_entry(c: &RawCard) -> Result<CardEntry, ConfigError> {
         layout: c.layout,
         side: c.side,
         artist: c.artist,
+        serialized: c.promo_types.iter().any(|p| p == "serialized"),
+        token: false,
     })
+}
+
+/// A token's entry (rarity "token"). Tokens Scryfall does not know are left out.
+fn to_token_entry(c: &RawCard) -> Option<CardEntry> {
+    let entry = to_entry(c).ok()?;
+    Some(CardEntry { rarity: TOKEN_RARITY.to_string(), token: true, ..entry })
+}
+
+/// The sub-set holding a set's tokens: MTGJSON's `tokenSetCode`, else "T" + the code.
+pub fn token_set_code(raw: &RawSet) -> String {
+    raw.token_set_code.clone().unwrap_or_else(|| format!("T{}", raw.code))
+}
+
+/// Adds the tokens of a set's token sub-set (its `tokens` and `cards`: everything in a
+/// token set is a token, an emblem or a helper card) that the set does not have yet. The
+/// parent's own `tokens` list is sometimes empty or partial, the sub-set is not.
+pub fn add_tokens_from(set: &mut SetFile, token_set: &RawSet) {
+    let known: HashSet<String> = set.cards.iter().map(|c| c.uuid.clone()).collect();
+    let mut seen = HashSet::new();
+    let added: Vec<CardEntry> = token_set
+        .tokens
+        .iter()
+        .chain(&token_set.cards)
+        .filter(|c| !known.contains(&c.uuid) && seen.insert(c.uuid.clone()))
+        .filter_map(to_token_entry)
+        .collect();
+    set.cards.extend(added);
+}
+
+/// Rarity given to tokens.
+pub const TOKEN_RARITY: &str = "token";
+
+/// Sheets of the token slot added to every booster (MTGJSON describes none).
+const TOKEN_SHEET: &str = "unsealedToken";
+const TOKEN_FOIL_SHEET: &str = "unsealedTokenFoil";
+
+/// Gives every booster of the set one of its tokens, like real boosters (where tokens share
+/// a slot with ad and art cards, which the game leaves out). A collector booster's token is
+/// always foil; elsewhere one in `foil_one_in` is. Each pack variant is split in two (plain
+/// and foil token), so the odds stay exact and the simulation checks them like any other.
+/// A set without tokens is left as it is.
+pub fn add_token_slots(set: &mut SetFile, foil_one_in: u64) {
+    let sheet = |foil: bool| {
+        let finish = if foil { "foil" } else { "nonfoil" };
+        let cards: BTreeMap<String, u64> = set
+            .cards
+            .iter()
+            .filter(|c| c.token && c.finishes.iter().any(|f| f == finish))
+            .map(|c| (c.uuid.clone(), 1))
+            .collect();
+        (!cards.is_empty()).then(|| BoosterSheet {
+            allow_duplicates: false,
+            balance_colors: false,
+            total_weight: cards.len() as u64,
+            cards,
+            fixed: false,
+            foil,
+        })
+    };
+    let (plain, foil) = (sheet(false), sheet(true));
+    let foil_one_in = foil_one_in.max(1);
+    for (kind, cfg) in set.boosters.iter_mut() {
+        // (sheet, share of the packs)
+        let slots: Vec<(&str, u64)> = match (&plain, &foil) {
+            (None, None) => return,
+            (_, Some(_)) if kind == COLLECTOR_KIND => vec![(TOKEN_FOIL_SHEET, 1)],
+            (Some(_), None) => vec![(TOKEN_SHEET, 1)],
+            (None, Some(_)) => vec![(TOKEN_FOIL_SHEET, 1)],
+            (Some(_), Some(_)) => vec![(TOKEN_SHEET, foil_one_in - 1), (TOKEN_FOIL_SHEET, 1)],
+        };
+        let slots: Vec<(&str, u64)> = slots.into_iter().filter(|&(_, share)| share > 0).collect();
+        for &(name, _) in &slots {
+            let source = if name == TOKEN_SHEET { &plain } else { &foil };
+            cfg.sheets.insert(name.to_string(), source.clone().expect("sheet checked above"));
+        }
+        let total: u64 = slots.iter().map(|&(_, share)| share).sum();
+        cfg.boosters = cfg
+            .boosters
+            .iter()
+            .flat_map(|pack| {
+                slots.iter().map(move |&(name, share)| {
+                    let mut contents = pack.contents.clone();
+                    contents.insert(name.to_string(), 1);
+                    BoosterPack { contents, weight: pack.weight * share }
+                })
+            })
+            .collect();
+        cfg.boosters_total_weight *= total;
+    }
 }
 
 /// The set's chase card: its most valuable own card from its main boosters (the
@@ -238,6 +339,7 @@ pub fn compact_set(raw: &RawSet, version: &str, kinds: &[&str], extra_sets: &[&R
     if let Some((uuid, place)) = foreign_needed.into_iter().next() {
         return Err(ConfigError::Invalid(format!("{place} references unknown card {uuid}")));
     }
+    entries.extend(raw.tokens.iter().filter_map(to_token_entry));
 
     Ok(SetFile {
         code: code.clone(),
@@ -283,8 +385,27 @@ pub fn prices_by_uuid(
 #[derive(Deserialize)]
 struct ScryfallCard {
     id: String,
+    /// The card across all its printings (on the faces only, for reversible cards).
+    #[serde(default)]
+    oracle_id: Option<String>,
+    #[serde(default)]
+    card_faces: Vec<ScryfallFace>,
     #[serde(default)]
     prices: ScryfallPrices,
+    #[serde(default)]
+    promo_types: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct ScryfallFace {
+    #[serde(default)]
+    oracle_id: Option<String>,
+}
+
+impl ScryfallCard {
+    fn oracle_id(&self) -> Option<&str> {
+        self.oracle_id.as_deref().or_else(|| self.card_faces.iter().find_map(|f| f.oracle_id.as_deref()))
+    }
 }
 
 #[derive(Deserialize, Default)]
@@ -295,13 +416,18 @@ struct ScryfallPrices {
     eur_foil: Option<String>,
 }
 
-/// Reads a Scryfall bulk file (one JSON card per line) and returns the prices
-/// of the wanted card ids only.
+/// Reads a Scryfall bulk file (one JSON card per line) and returns the prices of the wanted
+/// card ids only. A wanted printing without any price (a serialized card, a rare promo...)
+/// gets an estimate instead: the best prices of the other printings of the same card,
+/// marked `estimated`.
 pub fn prices_from_scryfall_jsonl<R: BufRead>(
     reader: R,
     wanted: &HashSet<String>,
 ) -> Result<BTreeMap<String, PriceSet>, ConfigError> {
     let mut out = BTreeMap::new();
+    // Best prices of each card over all its printings, and the card of each wanted printing.
+    let mut best: HashMap<String, PriceSet> = HashMap::new();
+    let mut oracle_of: HashMap<String, String> = HashMap::new();
     for line in reader.lines() {
         let line = line?;
         let line = line.trim();
@@ -309,20 +435,34 @@ pub fn prices_from_scryfall_jsonl<R: BufRead>(
             continue;
         }
         let card: ScryfallCard = serde_json::from_str(line)?;
-        if !wanted.contains(&card.id) {
-            continue;
-        }
-        let p = card.prices;
+        let p = &card.prices;
         let cents = |v: &Option<String>| v.as_deref().and_then(parse_cents);
-        out.insert(
-            card.id,
-            PriceSet {
-                usd: cents(&p.usd),
-                usd_foil: cents(&p.usd_foil),
-                eur: cents(&p.eur),
-                eur_foil: cents(&p.eur_foil),
-            },
-        );
+        let prices = PriceSet {
+            usd: cents(&p.usd),
+            usd_foil: cents(&p.usd_foil),
+            eur: cents(&p.eur),
+            eur_foil: cents(&p.eur_foil),
+            estimated: false,
+        };
+        if let Some(oracle) = card.oracle_id() {
+            // Serialized printings already carry their scarcity in their price: the base of
+            // an estimate is the ordinary printings (the game multiplies it for scarce cards).
+            if !prices.is_empty() && !card.promo_types.iter().any(|p| p == "serialized") {
+                best.entry(oracle.to_string()).or_default().merge_best(&prices);
+            }
+            if wanted.contains(&card.id) {
+                oracle_of.insert(card.id.clone(), oracle.to_string());
+            }
+        }
+        if wanted.contains(&card.id) {
+            out.insert(card.id, prices);
+        }
     }
+    for (id, prices) in out.iter_mut() {
+        if let Some(best) = prices.is_empty().then(|| oracle_of.get(id).and_then(|o| best.get(o))).flatten() {
+            *prices = PriceSet::estimate_from(*best);
+        }
+    }
+    out.retain(|_, p| !p.is_empty());
     Ok(out)
 }

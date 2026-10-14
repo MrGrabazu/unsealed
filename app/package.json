@@ -9,15 +9,18 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@react-three/fiber": "^9.8.1",
     "@tauri-apps/api": "^2",
     "framer-motion": "^14",
     "react": "^19",
-    "react-dom": "^19"
+    "react-dom": "^19",
+    "three": "^0.186.1"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/three": "^0.186.0",
     "@vitejs/plugin-react": "^4",
     "typescript": "~5.9",
     "vite": "^6"

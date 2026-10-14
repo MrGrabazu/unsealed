@@ -89,6 +89,8 @@ const MIGRATIONS: &[&str] = &[
         undone_at INTEGER,
         undo_cents INTEGER
     );",
+    // 9: copies pulled of each card of a limited print run; never decreases (see `limited`)
+    "CREATE TABLE limited_pulls (uuid TEXT PRIMARY KEY, pulled INTEGER NOT NULL) WITHOUT ROWID;",
 ];
 
 #[derive(Debug, thiserror::Error)]
@@ -154,6 +156,8 @@ pub struct OpeningCard<'a> {
     pub set_code: &'a str,
     pub foil: bool,
     pub price_cents: Option<u32>,
+    /// Of a limited print run: counted in `limited_pulls`.
+    pub limited: bool,
 }
 
 /// Copies of one card sold at a fixed unit price.
@@ -624,9 +628,23 @@ impl Store {
                  VALUES (?1, ?2, ?3, ?4, ?5)",
                 params![opening_id, position as i64, c.uuid, c.foil, c.price_cents],
             )?;
+            if c.limited {
+                tx.execute(
+                    "INSERT INTO limited_pulls (uuid, pulled) VALUES (?1, 1)
+                     ON CONFLICT (uuid) DO UPDATE SET pulled = pulled + 1",
+                    [c.uuid],
+                )?;
+            }
         }
         tx.commit()?;
         Ok(OpenOutcome { is_new, cost_cents })
+    }
+
+    /// Copies ever pulled of each card of a limited print run, by uuid.
+    pub fn limited_pulls(&self) -> StoreResult<HashMap<String, u32>> {
+        let mut stmt = self.conn.prepare("SELECT uuid, pulled FROM limited_pulls")?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
     }
 
     /// Owned quantities of the cards belonging to a set, by card uuid.
@@ -884,7 +902,20 @@ mod tests {
     }
 
     fn card<'a>(uuid: &'a str, foil: bool, price: Option<u32>) -> OpeningCard<'a> {
-        OpeningCard { uuid, set_code: "TST", foil, price_cents: price }
+        OpeningCard { uuid, set_code: "TST", foil, price_cents: price, limited: false }
+    }
+
+    #[test]
+    fn limited_pulls_only_ever_grow() {
+        let mut store = store_with(2);
+        let ring = OpeningCard { limited: true, ..card("ring", false, None) };
+        store.open_sealed("TST", "play", &[card("a", false, Some(10)), ring], 1).unwrap();
+        assert_eq!(store.limited_pulls().unwrap(), HashMap::from([("ring".to_string(), 1)]));
+        // Selling it changes nothing: it was pulled.
+        store.sell_cards(&[Sale { uuid: "ring", foil: false, quantity: 1, unit_cents: 0 }], 2).unwrap();
+        let ring = OpeningCard { limited: true, ..card("ring", false, None) };
+        store.open_sealed("TST", "play", &[ring], 3).unwrap();
+        assert_eq!(store.limited_pulls().unwrap()["ring"], 2);
     }
 
     /// A store with $100.00 and `boosters` free sealed boosters of TST/play.

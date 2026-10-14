@@ -9,7 +9,7 @@ use achievements::{OpeningEvents, PendingReveal};
 pub use details::CardDetailsView;
 pub use history::HistoryView;
 
-use crate::store::{OpeningCard, OpeningOrder, OpeningRow, Sale, Store};
+use crate::store::{OpeningCard, OpeningOrder, OpeningRow, Owned, Sale, Store};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
@@ -20,7 +20,8 @@ use std::time::SystemTime;
 use unsealed_core::achievements::{Engine, Event};
 use unsealed_core::catalog::{CardEntry, Manifest, PriceFile, SetFile, FOREIGN_LANGUAGES};
 use unsealed_core::economy::{charity_available, EconomyConfig};
-use unsealed_core::{open_booster, ColorIndex};
+use unsealed_core::limited::LimitedConfig;
+use unsealed_core::{open_booster_excluding, ColorIndex};
 
 /// Largest number of boosters bought in one purchase.
 const MAX_PURCHASE: u32 = 100;
@@ -67,6 +68,8 @@ pub struct OpenedCard {
     pub back_image_url: Option<String>,
     /// Market price in the game currency (cents), if known.
     pub price_cents: Option<u32>,
+    /// The card has no market price of its own: `price_cents` is estimated.
+    pub price_estimated: bool,
     /// First time the player owns this card (in any finish).
     pub is_new: bool,
 }
@@ -85,6 +88,8 @@ pub struct CollectionCard {
     pub foil_quantity: u32,
     pub price_cents: Option<u32>,
     pub foil_price_cents: Option<u32>,
+    /// Both prices are estimated (see `OpenedCard::price_estimated`).
+    pub price_estimated: bool,
     /// What the Boosterium pays for one copy (0 = cannot be sold).
     pub sell_value_cents: u32,
     pub foil_sell_value_cents: u32,
@@ -104,6 +109,9 @@ pub struct CollectionView {
     /// Cards only collector boosters give; they do not count toward completion.
     pub extras: Vec<CollectionCard>,
     pub extras_owned: usize,
+    /// The set's tokens (one in each booster); they do not count toward completion.
+    pub tokens: Vec<CollectionCard>,
+    pub tokens_owned: usize,
 }
 
 #[derive(Debug, Serialize)]
@@ -268,6 +276,8 @@ struct LoadedSet {
     /// The set's own cards that only collector boosters give (showcase, borderless,
     /// special foils...): collectible, but outside the completion target.
     extras: Vec<usize>,
+    /// The set's tokens: outside the completion target too.
+    tokens: Vec<usize>,
 }
 
 pub struct Game {
@@ -283,6 +293,10 @@ pub struct Game {
     /// The booster being revealed, whose achievement events wait (see `reveal_cards`).
     pending_reveal: Option<PendingReveal>,
     sets: HashMap<String, LoadedSet>,
+    /// See `set_limited`.
+    limited: LimitedConfig,
+    /// Print run of each limited card of the loaded sets, by uuid.
+    print_runs: HashMap<String, u32>,
     prices: Option<PriceFile>,
     /// Modification time of the prices file that `prices` was loaded from.
     prices_stamp: Option<SystemTime>,
@@ -332,6 +346,8 @@ impl Game {
             card_lang: "en".to_string(),
             pending_reveal: None,
             sets: HashMap::new(),
+            limited: LimitedConfig::default(),
+            print_runs: HashMap::new(),
             prices: None,
             prices_stamp: None,
             rng,
@@ -342,8 +358,17 @@ impl Game {
     /// Forgets everything loaded from the data directory; called after a background refresh.
     pub fn reload_data(&mut self) {
         self.sets.clear();
+        self.print_runs.clear();
         self.prices = None;
         self.prices_stamp = None;
+    }
+
+    /// The cards of a limited print run: no more copies of them can be pulled in this game
+    /// than were printed.
+    pub fn set_limited(&mut self, limited: LimitedConfig) {
+        self.limited = limited;
+        self.sets.clear();
+        self.print_runs.clear();
     }
 
     pub fn list_sets(&self) -> Result<Vec<SetSummary>, String> {
@@ -527,23 +552,30 @@ impl Game {
     fn open_one(&mut self, set_code: &str, kind: &str) -> Result<(Vec<OpenedCard>, OpeningEvents), String> {
         self.ensure_loaded(set_code)?;
         self.ensure_prices();
-        let Self { sets, prices, rng, store, economy, clock, card_lang, .. } = self;
+        // Cards of a limited print run whose every copy was pulled in this game.
+        let exhausted: HashSet<String> = self
+            .store
+            .limited_pulls()
+            .map_err(err)?
+            .into_iter()
+            .filter(|(uuid, pulled)| self.print_runs.get(uuid).is_some_and(|run| pulled >= run))
+            .map(|(uuid, _)| uuid)
+            .collect();
+        let Self { sets, prices, rng, store, economy, clock, card_lang, print_runs, limited, .. } = self;
         let set = &sets[set_code];
         let cfg = set
             .file
             .boosters
             .get(kind)
             .ok_or_else(|| format!("set {set_code} has no `{kind}` booster"))?;
-        let drawn = open_booster(cfg, &set.colors, rng).map_err(err)?;
+        let drawn = open_booster_excluding(cfg, &set.colors, rng, &exhausted).map_err(err)?;
 
         let mut cards: Vec<OpenedCard> = drawn
             .into_iter()
             .map(|d| {
                 let card = &set.file.cards[set.index[&d.uuid]];
-                let price = prices
-                    .as_ref()
-                    .and_then(|p| p.cards.get(&d.uuid))
-                    .and_then(|p| economy.market_price_cents(p, d.foil));
+                let price = market_price(prices.as_ref(), economy, limited, print_runs, &d.uuid, d.foil);
+                let price_estimated = prices.as_ref().and_then(|p| p.cards.get(&d.uuid)).is_some_and(|p| p.estimated);
                 let shown = localized(card, card_lang);
                 OpenedCard {
                     image_url: shown.image_url,
@@ -557,6 +589,7 @@ impl Game {
                     foil: d.foil,
                     sheet: d.sheet,
                     price_cents: price,
+                    price_estimated,
                     is_new: false,
                 }
             })
@@ -571,6 +604,7 @@ impl Game {
                     set_code: &c.set_code,
                     foil: c.foil,
                     price_cents: c.price_cents,
+                    limited: print_runs.contains_key(&c.uuid),
                 })
                 .collect();
             store.open_sealed(set_code, kind, &records, clock().now).map_err(err)?
@@ -608,7 +642,7 @@ impl Game {
     pub fn collection(&mut self, set_code: &str) -> Result<CollectionView, String> {
         self.ensure_loaded(set_code)?;
         self.ensure_prices();
-        let owned = self.store.owned_in_set(set_code).map_err(err)?;
+        let owned = self.owned_with_tokens(set_code)?;
         let set = &self.sets[set_code];
 
         let view = |indices: &[usize]| -> Vec<CollectionCard> {
@@ -629,6 +663,7 @@ impl Game {
                         foil_quantity: have.foil,
                         price_cents: self.market_price(&c.uuid, false),
                         foil_price_cents: self.market_price(&c.uuid, true),
+                        price_estimated: self.price_estimated(&c.uuid),
                         sell_value_cents: self.sale_value(&c.uuid, false),
                         foil_sell_value_cents: self.sale_value(&c.uuid, true),
                     }
@@ -638,6 +673,7 @@ impl Game {
         let owned_in = |cards: &[CollectionCard]| cards.iter().filter(|c| c.quantity + c.foil_quantity > 0).count();
         let cards = view(&set.obtainable);
         let extras = view(&set.extras);
+        let tokens = view(&set.tokens);
         let owned_count = owned_in(&cards);
         let total_count = cards.len();
         let completion_percent =
@@ -649,8 +685,10 @@ impl Game {
             total_count,
             completion_percent,
             extras_owned: owned_in(&extras),
+            tokens_owned: owned_in(&tokens),
             cards,
             extras,
+            tokens,
         })
     }
 
@@ -679,10 +717,23 @@ impl Game {
         Ok(SaleResult { sold_count, total_cents })
     }
 
-    /// Sells every copy beyond the first of each card and finish in a set.
+    /// Owned copies of a loaded set's cards, its tokens included: the collection files each
+    /// card under its own set, and tokens have theirs ("TLTR" for "LTR").
+    fn owned_with_tokens(&self, set_code: &str) -> Result<HashMap<String, Owned>, String> {
+        let mut owned = self.store.owned_in_set(set_code).map_err(err)?;
+        let set = &self.sets[set_code];
+        let token_sets: HashSet<&str> =
+            set.tokens.iter().map(|&i| set.file.cards[i].set_code.as_str()).filter(|c| *c != set_code).collect();
+        for code in token_sets {
+            owned.extend(self.store.owned_in_set(code).map_err(err)?);
+        }
+        Ok(owned)
+    }
+
+    /// Sells every copy beyond the first of each card and finish in a set (and its tokens).
     pub fn sell_duplicates(&mut self, set_code: &str) -> Result<SaleResult, String> {
         self.ensure_loaded(set_code)?;
-        let owned = self.store.owned_in_set(set_code).map_err(err)?;
+        let owned = self.owned_with_tokens(set_code)?;
         let mut requests = Vec::new();
         for (uuid, have) in owned {
             for (foil, quantity) in [(false, have.normal), (true, have.foil)] {
@@ -828,6 +879,8 @@ impl Game {
             foil,
             sheet: String::new(),
             price_cents,
+            // A pull keeps the price it had when pulled, estimated or not.
+            price_estimated: false,
             is_new: false,
         })
     }
@@ -839,8 +892,12 @@ impl Game {
     }
 
     fn market_price(&self, uuid: &str, foil: bool) -> Option<u32> {
-        let prices = self.prices.as_ref()?.cards.get(uuid)?;
-        self.economy.market_price_cents(prices, foil)
+        market_price(self.prices.as_ref(), &self.economy, &self.limited, &self.print_runs, uuid, foil)
+    }
+
+    /// Whether a card's price is an estimate (it has none of its own).
+    fn price_estimated(&self, uuid: &str) -> bool {
+        self.prices.as_ref().and_then(|p| p.cards.get(uuid)).is_some_and(|p| p.estimated)
     }
 
     /// What the Boosterium pays for one copy; 0 when the card has no market price.
@@ -862,7 +919,13 @@ impl Game {
         let colors = ColorIndex::from_cards(&file.cards);
         let index = file.cards.iter().enumerate().map(|(i, c)| (c.uuid.clone(), i)).collect();
         let (obtainable, extras) = obtainable_cards(&file);
-        self.sets.insert(code.to_string(), LoadedSet { file, colors, index, obtainable, extras });
+        let tokens = token_cards(&file);
+        for card in &file.cards {
+            if let Some(run) = self.limited.print_run_of(card) {
+                self.print_runs.insert(card.uuid.clone(), run);
+            }
+        }
+        self.sets.insert(code.to_string(), LoadedSet { file, colors, index, obtainable, extras, tokens });
         Ok(())
     }
 
@@ -897,6 +960,24 @@ impl Game {
     }
 }
 
+/// A card's market price. An estimated one (the card has no price of its own) is
+/// multiplied for a card of a limited print run: it is based on the ordinary printings.
+fn market_price(
+    prices: Option<&PriceFile>,
+    economy: &EconomyConfig,
+    limited: &LimitedConfig,
+    print_runs: &HashMap<String, u32>,
+    uuid: &str,
+    foil: bool,
+) -> Option<u32> {
+    let card = prices?.cards.get(uuid)?;
+    let price = economy.market_price_cents(card, foil)?;
+    Some(match print_runs.get(uuid) {
+        Some(&run) if card.estimated => price.saturating_mul(limited.estimate_multiplier(run)),
+        _ => price,
+    })
+}
+
 /// The set's own cards given by its main boosters, then those only collector boosters
 /// give (see `SetFile::is_main_booster`), both in collector number order.
 fn obtainable_cards(file: &SetFile) -> (Vec<usize>, Vec<usize>) {
@@ -921,6 +1002,13 @@ fn obtainable_cards(file: &SetFile) -> (Vec<usize>, Vec<usize>) {
         indices
     };
     (pick(&|u| main.contains(u)), pick(&|u| collector.contains(u) && !main.contains(u)))
+}
+
+/// The set's tokens (each booster holds one), in collector number order.
+fn token_cards(file: &SetFile) -> Vec<usize> {
+    let mut indices: Vec<usize> = file.cards.iter().enumerate().filter(|(_, c)| c.token).map(|(i, _)| i).collect();
+    indices.sort_by_key(|&i| number_key(&file.cards[i].number));
+    indices
 }
 
 /// Sort key for collector numbers such as "12", "12★" or "A-12": leading digits first.
@@ -1050,13 +1138,15 @@ fn scryfall_image_face(scryfall_id: &str, version: &str, face: &str) -> String {
     }
 }
 
+/// Reveal order: the token first, the best card last.
 fn rarity_rank(rarity: &str) -> u8 {
     match rarity {
-        "common" => 0,
-        "uncommon" => 1,
-        "rare" => 2,
-        "mythic" => 3,
-        _ => 1,
+        "token" => 0,
+        "common" => 1,
+        "uncommon" => 2,
+        "rare" => 3,
+        "mythic" => 4,
+        _ => 2,
     }
 }
 
@@ -1077,7 +1167,9 @@ mod tests {
         { "uuid": "m1", "setCode": "TST", "scryfallId": "123456", "name": "Mythic", "number": "2",
           "rarity": "mythic", "finishes": ["nonfoil"], "layout": "normal" },
         { "uuid": "x1", "setCode": "TST", "scryfallId": "999999", "name": "Not in boosters", "number": "3",
-          "rarity": "rare", "finishes": ["nonfoil"], "layout": "normal" }
+          "rarity": "rare", "finishes": ["nonfoil"], "layout": "normal" },
+        { "uuid": "t1", "setCode": "TTST", "scryfallId": "777777", "name": "Soldier", "number": "1",
+          "rarity": "token", "finishes": ["nonfoil"], "layout": "token", "token": true }
       ],
       "boosters": { "play": {
         "boosters": [ { "contents": { "mythic": 1, "common": 2 }, "weight": 1 } ],
@@ -1158,6 +1250,61 @@ mod tests {
         let mut g = game(name);
         g.buy_boosters("TST", "play", 1).unwrap();
         g
+    }
+
+    #[test]
+    fn a_set_shows_its_tokens_filed_under_their_own_set() {
+        let mut g = game_with_booster("tokens");
+        // The booster has no token slot here: the token is acquired as if pulled.
+        g.store
+            .open_sealed(
+                "TST",
+                "play",
+                &[OpeningCard { uuid: "t1", set_code: "TTST", foil: false, price_cents: None, limited: false }],
+                0,
+            )
+            .unwrap();
+        let view = g.collection("TST").unwrap();
+        assert_eq!(view.tokens.iter().map(|c| (c.uuid.as_str(), c.quantity)).collect::<Vec<_>>(), [("t1", 1)]);
+        assert_eq!(view.tokens_owned, 1);
+        // Tokens do not count toward completion.
+        assert!(view.cards.iter().all(|c| c.uuid != "t1"));
+    }
+
+    #[test]
+    fn a_card_of_a_limited_print_run_is_never_pulled_beyond_it() {
+        let (mut g, _) = game_with("limited", PRICES);
+        // The mythic (TST #2) exists in 2 copies; every TST booster holds it.
+        g.set_limited(LimitedConfig::from_json(r#"{ "cards": [ { "set": "TST", "number": "2", "printRun": 2 } ] }"#).unwrap());
+        g.buy_boosters("TST", "play", 3).unwrap();
+        for _ in 0..2 {
+            assert!(g.open_booster("TST", "play").unwrap().iter().any(|c| c.uuid == "m1"));
+        }
+        // Selling them gives nothing back: both copies were pulled.
+        g.sell_cards(&[SaleRequest { uuid: "m1".into(), foil: false, quantity: 2 }]).unwrap();
+        // No booster can hold it any more (here, none at all): the third stays sealed.
+        assert!(g.open_booster("TST", "play").is_err());
+        assert_eq!(g.wallet().unwrap().sealed[0].quantity, 1);
+    }
+
+    #[test]
+    fn an_estimated_price_is_multiplied_for_a_limited_card_only() {
+        // The mythic has no price of its own: $10.00 estimated from its other printings.
+        let prices = r#"{ "updatedAt": "d", "cards": { "c1": { "usd": 100, "estimated": true },
+                                                      "m1": { "usd": 1000, "estimated": true } } }"#;
+        let (mut g, _) = game_with("estimated", prices);
+        g.set_limited(
+            LimitedConfig::from_json(
+                r#"{ "cards": [ { "set": "TST", "number": "2", "printRun": 1 } ],
+                     "estimateMultipliers": [ { "printRunUpTo": 1, "multiplier": 1000 } ] }"#,
+            )
+            .unwrap(),
+        );
+        g.buy_boosters("TST", "play", 1).unwrap();
+        let cards = g.open_booster("TST", "play").unwrap();
+        let price = |uuid: &str| cards.iter().find(|c| c.uuid == uuid).map(|c| (c.price_cents, c.price_estimated));
+        assert_eq!(price("m1"), Some((Some(1_000_000), true)));
+        assert_eq!(price("c1"), Some((Some(100), true)));
     }
 
     fn balance(g: &mut Game) -> i64 {

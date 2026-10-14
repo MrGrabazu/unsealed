@@ -88,23 +88,43 @@ code { background: var(--panel); padding: 2px 6px; border-radius: 4px; }
 .card[data-rarity="rare"] .front { box-shadow: 0 0 18px var(--rare); }
 .card[data-rarity="mythic"] .front { box-shadow: 0 0 22px var(--mythic); }
 
+/* The foil: rainbow bands 18° off the vertical, drifting without end, laid over the card in
+   "overlay" (colours pulled apart without washing the card out), with a fainter white glint.
+   The 3D opening draws the same in its card shader (scene/cardMaterial.ts): keep them alike. */
+@property --foil-shift { syntax: "<percentage>"; inherits: false; initial-value: 0%; }
 .foil-sheen {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  mix-blend-mode: color-dodge;
-  opacity: 0.45;
-  /* A narrow band in a wide, non-repeating image: it crosses the card and leaves it entirely,
-     so restarting the loop happens off-card and never shows. */
-  background: linear-gradient(115deg, transparent 43%, #ff7bd0 46.5%, #7bd0ff 50%, #b6ff7b 53.5%, transparent 57%) no-repeat;
-  background-size: 600% 100%;
-  animation: sheen-sweep 3.5s ease-in-out infinite;
+  mix-blend-mode: overlay;
+  opacity: 0.75;
+  background: repeating-linear-gradient(108deg,
+    #ff2a2a calc(var(--foil-shift) + 0%), #ffd000 calc(var(--foil-shift) + 10%),
+    #2aff4a calc(var(--foil-shift) + 20%), #00e5ff calc(var(--foil-shift) + 30%),
+    #2a4bff calc(var(--foil-shift) + 40%), #ff2ad4 calc(var(--foil-shift) + 50%),
+    #ff2a2a calc(var(--foil-shift) + 60%));
+  animation: foil-drift 6s linear infinite;
 }
-/* The band enters on the left and leaves on the right, then rests off-card. */
-@keyframes sheen-sweep {
-  0% { background-position: 100% 0; }
-  65%, 100% { background-position: 0% 0; }
+.foil-sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  mix-blend-mode: screen;
+  background: repeating-linear-gradient(108deg,
+    transparent calc(var(--foil-shift) * 0.5 + 0%), #ffffff40 calc(var(--foil-shift) * 0.5 + 6%),
+    transparent calc(var(--foil-shift) * 0.5 + 12%), transparent calc(var(--foil-shift) * 0.5 + 30%));
+  animation: inherit;
 }
+/* One period of the bands: the loop is seamless. */
+@keyframes foil-drift { to { --foil-shift: 60%; } }
+/* A light halo around a foil, slowly going through the rainbow, so that it stands out in a list. */
+@property --foil-hue { syntax: "<number>"; inherits: false; initial-value: 0; }
+.thumb:has(> .foil-sheen), .card .front:has(> .foil-sheen) {
+  box-shadow: 0 0 8px 1px hsl(calc(var(--foil-hue) * 1deg) 100% 65% / 0.7),
+    0 0 20px 4px hsl(calc((var(--foil-hue) + 60) * 1deg) 100% 60% / 0.3);
+  animation: foil-halo 6s linear infinite;
+}
+@keyframes foil-halo { to { --foil-hue: 360; } }
 
 .card-caption { display: flex; justify-content: space-between; width: 100%; font-size: 13px; opacity: 0; transition: opacity 0.4s 0.3s; }
 .card-caption.visible { opacity: 1; }
@@ -139,6 +159,86 @@ footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #2a2c3a; col
 .collection-card.missing .thumb img { filter: grayscale(1) brightness(0.35); }
 .collection-card.missing .card-caption { opacity: 0.45; }
 .collection-card .card-caption { margin-top: 6px; }
+
+.segmented { display: inline-flex; margin-left: auto; }
+.segmented button { border-radius: 0; }
+.segmented button:first-child { border-radius: 8px 0 0 8px; }
+.segmented button:last-child { border-radius: 0 8px 8px 0; margin-left: -1px; }
+.segmented button.active { border-color: var(--accent); color: var(--accent); position: relative; }
+
+/* Binder: two facing pages of 9 sleeved pockets, a spine between them. */
+.binder-bar { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.binder-tab { font-size: 13px; }
+.binder-tab.active { border-color: var(--accent); color: var(--accent); }
+.binder-frame { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; gap: 10px; align-items: stretch; }
+/* Tall, quiet turners along the binder's edges; they light up on hover. */
+.binder-turn { padding: 0; border-radius: 12px; font-size: 40px; line-height: 1; color: var(--muted);
+  background: #ffffff08; border: 1px solid #ffffff12; transition: background 0.15s, color 0.15s; }
+.binder-turn:hover:not(:disabled) { background: #ffffff14; color: var(--accent); }
+.binder-turn:disabled { opacity: 0.25; cursor: default; }
+.binder-pages { text-align: center; margin: 10px 0 0; }
+/* minmax(0, 1fr): a track's minimum would otherwise be its content's width, and an image
+   arriving at its natural size (Scryfall's are 488 px wide) would blow the layout up. */
+.binder-spread { --cover-h: 25; --cover: hsl(var(--cover-h) 38% 24%); --cover-dark: hsl(var(--cover-h) 40% 12%);
+  --cover-light: hsl(var(--cover-h) 35% 34%);
+  position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 18px minmax(0, 1fr); padding: 14px; border-radius: 16px;
+  background-color: var(--cover); box-shadow: inset 0 0 0 2px var(--cover-light), inset 0 0 30px #0007, 0 16px 40px #0008; }
+.binder-spine { background: linear-gradient(90deg, var(--cover-dark), var(--cover) 50%, var(--cover-dark)); border-radius: 4px; }
+/* Cover materials, one per set (Binder's coverOf). Leather: fine grain and a stitched edge. */
+.binder-spread[data-cover="leather"] {
+  background-image: radial-gradient(#0000002e 0.6px, transparent 1.2px), radial-gradient(#ffffff0d 0.6px, transparent 1.2px),
+    linear-gradient(160deg, var(--cover-light), var(--cover) 45%, var(--cover-dark));
+  background-size: 4px 4px, 5px 5px, 100% 100%; background-position: 0 0, 2px 3px, 0 0; }
+.binder-spread[data-cover="leather"]::before { content: ""; position: absolute; inset: 6px; border-radius: 11px; pointer-events: none;
+  border: 1.5px dashed hsl(var(--cover-h) 30% 62% / 0.55); }
+/* Canvas: a woven cloth. */
+.binder-spread[data-cover="canvas"] {
+  --cover: hsl(var(--cover-h) 30% 30%); --cover-light: hsl(var(--cover-h) 28% 40%);
+  background-image: repeating-linear-gradient(0deg, #ffffff0c 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, #0000001f 0 1px, transparent 1px 3px), linear-gradient(180deg, var(--cover-light), var(--cover-dark)); }
+/* Vinyl: smooth and glossy, a light sweeping across. */
+.binder-spread[data-cover="vinyl"] {
+  --cover: hsl(var(--cover-h) 55% 26%); --cover-light: hsl(var(--cover-h) 50% 40%);
+  background-image: linear-gradient(115deg, transparent 20%, #ffffff1f 32%, transparent 44%),
+    linear-gradient(180deg, var(--cover-light), var(--cover) 50%, var(--cover-dark)); }
+/* Suede: matte and velvety, a soft nap. */
+.binder-spread[data-cover="suede"] {
+  --cover: hsl(var(--cover-h) 32% 28%); --cover-light: hsl(var(--cover-h) 26% 36%);
+  background-image: radial-gradient(ellipse at 30% 20%, #ffffff12, transparent 60%), radial-gradient(#0000001a 1px, transparent 1.6px),
+    linear-gradient(200deg, var(--cover-light), var(--cover-dark));
+  background-size: 100% 100%, 3px 3px, 100% 100%; }
+.binder-page { min-width: 0; padding: 14px; border-radius: 8px; background: linear-gradient(180deg, #2b2e3d, #23252f);
+  box-shadow: inset 0 0 18px #0007; }
+.binder-page.left { border-radius: 8px 2px 2px 8px; }
+.binder-page.right { border-radius: 2px 8px 8px 2px; }
+.binder-pockets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 10px; }
+.pocket { position: relative; min-width: 0; cursor: pointer; }
+.pocket .thumb { position: relative; aspect-ratio: 63 / 88; border-radius: 4.5%; overflow: hidden; background: #0006; }
+.pocket .thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
+/* The plastic sleeve: a faint glare over the card, and an outline even when empty. */
+.pocket .thumb::after, .pocket.empty::after { content: ""; position: absolute; inset: 0; border-radius: 4.5%; pointer-events: none;
+  background: linear-gradient(125deg, #ffffff14 0%, transparent 30%, transparent 70%, #ffffff0a 100%); box-shadow: inset 0 0 0 1px #ffffff1c; }
+.pocket.empty { aspect-ratio: 63 / 88; border-radius: 4.5%; background: #0000001f; cursor: default; }
+/* A missing card: an empty sleeve holding a scrap of paper written by hand (Placeholder). */
+.pocket.missing .thumb { background: #00000026; container-type: inline-size; }
+.paper { position: absolute; left: 50%; top: 50%; width: var(--paper-width); height: var(--paper-height);
+  transform: translate(calc(-50% + var(--paper-x)), calc(-50% + var(--paper-y))) rotate(var(--paper-tilt));
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2cqw; padding: 4cqw;
+  box-sizing: border-box; text-align: center; color: var(--ink);
+  background: linear-gradient(170deg, #fbf8ef, #f1ecdf 60%, #e9e2d0), repeating-linear-gradient(0deg, transparent 0 7px, #00000006 7px 8px);
+  background-blend-mode: multiply; box-shadow: 0 1px 3px #0006;
+  font-family: "Ink Free", "Segoe Print", "Bradley Hand", "Marker Felt", "Comic Sans MS", cursive; }
+.paper span { transform: rotate(var(--ink-tilt)); line-height: 1.1; }
+.paper-name { font-size: calc(10.5cqw * var(--ink-size)); overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.paper-number { font-size: calc(9cqw * var(--ink-size)); opacity: 0.8; }
+.pocket:hover .thumb, .pocket:focus-visible .thumb { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Nothing written on the pages: a card's number, name and price show over it on hover. */
+.pocket-hover { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; display: flex; justify-content: space-between;
+  align-items: flex-end; gap: 6px; padding: 18px 8px 7px; font-size: 12px; color: #fff; pointer-events: none;
+  background: linear-gradient(transparent, #000c 45%); opacity: 0; transition: opacity 0.15s; }
+.pocket-hover .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pocket:hover .pocket-hover, .pocket:focus-visible .pocket-hover { opacity: 1; }
 
 header { align-items: center; }
 .wallet { margin-left: auto; font-size: 22px; font-weight: 700; color: var(--accent); background: var(--panel); border: 1px solid #343748; border-radius: 10px; padding: 6px 16px; }
@@ -204,7 +304,15 @@ button.sell.confirm { background: #7a1d1d; border-color: #c24040; color: #fff; }
 .ach-item { display: flex; flex-direction: column; gap: 6px; }
 .ach-card { width: 100%; height: auto; display: block; filter: drop-shadow(0 6px 14px #0008); }
 .ach-card.locked { filter: grayscale(0.85) brightness(0.55) drop-shadow(0 6px 14px #0008); }
-.ach-caption { display: flex; flex-direction: column; gap: 2px; font-size: 12px; text-align: center; min-height: 32px; }
+.ach-caption { display: flex; flex-direction: column; gap: 2px; font-size: 12px; text-align: center; min-height: 18px; }
+.ach-item { cursor: pointer; border-radius: 12px; transition: transform 0.15s; }
+.ach-item:hover, .ach-item:focus-visible { transform: translateY(-3px); }
+.ach-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+/* The details of an achievement, laid out like a card's (.details-layout): card left, text right. */
+.modal.ach-details { width: min(820px, 100%); }
+.ach-details-card { align-self: start; }
+.ach-details-info h3 { margin: 18px 0 6px; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.ach-goal { font-size: 18px; line-height: 1.4; margin: 0; }
 
 .toasts { position: fixed; right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 12px; z-index: 50; }
 .toast { display: flex; align-items: center; gap: 14px; text-align: left; background: var(--panel); border: 1px solid var(--accent); border-radius: 12px; padding: 10px 16px 10px 10px; box-shadow: 0 10px 30px #000a; animation: toast-in 0.35s ease-out; }
@@ -259,7 +367,6 @@ button.sell.confirm { background: #7a1d1d; border-color: #c24040; color: #fff; }
 .pile-card.face-up .front { box-shadow: 0 0 24px #fff3; }
 .hit-rare .front { box-shadow: 0 0 28px var(--rare), 0 0 60px #e0c15a55 !important; }
 .hit-mythic .front { box-shadow: 0 0 34px var(--mythic), 0 0 80px #e2682c88 !important; }
-.hit-foil .front { box-shadow: 0 0 24px #7bd0ff88 !important; }
 .pile-card.face-up.hit-mythic { animation: hit-shake 0.5s 0.45s; }
 @keyframes hit-shake {
   0%, 100% { translate: 0 0; } 20% { translate: -4px 0; } 40% { translate: 4px 0; } 60% { translate: -3px 0; } 80% { translate: 2px 0; }
@@ -267,6 +374,20 @@ button.sell.confirm { background: #7a1d1d; border-color: #c24040; color: #fff; }
 .revealed-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 14px 10px; perspective: 1400px; }
 .revealed-card { display: flex; flex-direction: column; gap: 6px; cursor: pointer; }
 .revealed-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 8px; }
+
+/* 3D opening */
+.scene-frame { height: 580px; margin: 8px 0; border-radius: 14px; overflow: hidden; touch-action: none;
+  background: radial-gradient(ellipse at 50% 40%, #232740 0%, #12131a 70%); }
+.scene-frame canvas { cursor: grab; }
+.scene-frame canvas:active { cursor: grabbing; }
+.scene-hint { text-align: center; }
+.revealed-card .thumb { position: relative; aspect-ratio: 63 / 88; border-radius: 4.5%; overflow: hidden; background: #000; }
+.revealed-card .thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.revealed-row.final { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); margin-top: 8px; }
+.revealed-row.final .revealed-card { animation: card-in 0.35s ease-out backwards; animation-delay: calc(var(--i, 0) * 30ms); }
+@keyframes card-in { from { opacity: 0; transform: translateY(14px) scale(0.96); } }
+.money .estimated { margin-right: 2px; opacity: 0.75; }
+label.checkbox { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
 
 /* History */
 .history-table td { vertical-align: top; }

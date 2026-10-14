@@ -19,6 +19,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{Manager, State};
 use unsealed_core::achievements::Engine;
 use unsealed_core::economy::EconomyConfig;
+use unsealed_core::limited::LimitedConfig;
 use unsealed_core::scryfall;
 use unsealed_core::update::DataConfig;
 use updater::{DataStatus, SharedStatus};
@@ -32,6 +33,9 @@ const DEFAULT_ACHIEVEMENTS: &str = include_str!("../../../config/achievements.js
 
 /// Which sets to download and how fresh they must be, overridable the same way.
 const DEFAULT_DATA: &str = include_str!("../../../config/data.json");
+
+/// Print runs of the cards that exist in few copies (serialized), overridable the same way.
+const DEFAULT_LIMITED: &str = include_str!("../../../config/limited.json");
 
 /// Translations of the achievements (English lives in the definitions), overridable the
 /// same way with `achievements.<lang>.json`.
@@ -66,6 +70,7 @@ impl Session {
         let engine = load_achievements(&self.data_dir).map_err(|e| e.to_string())?;
         let mut game = Game::new(self.data_dir.clone(), store, economy, engine)?;
         game.set_achievement_texts(load_achievement_texts(&self.data_dir).map_err(|e| e.to_string())?);
+        game.set_limited(load_limited(&self.data_dir).map_err(|e| e.to_string())?);
         game.set_card_language(&self.card_lang);
         self.current = Some((info.clone(), game));
         Ok(info)
@@ -347,6 +352,11 @@ fn load_achievements(data_dir: &Path) -> Result<Engine, Box<dyn Error>> {
     Ok(Engine::from_json(&json)?)
 }
 
+fn load_limited(data_dir: &Path) -> Result<LimitedConfig, Box<dyn Error>> {
+    let json = fs::read_to_string(data_dir.join("limited.json")).unwrap_or_else(|_| DEFAULT_LIMITED.to_string());
+    Ok(LimitedConfig::from_json(&json)?)
+}
+
 fn load_achievement_texts(data_dir: &Path) -> Result<AchievementTexts, Box<dyn Error>> {
     let mut texts = AchievementTexts::default();
     for (lang, shipped) in ACHIEVEMENT_TRANSLATIONS {
@@ -378,6 +388,7 @@ pub fn run() {
             load_economy(&data_dir)?;
             load_achievements(&data_dir)?;
             load_achievement_texts(&data_dir)?;
+            load_limited(&data_dir)?;
             let data_config = load_data_config(&data_dir)?;
 
             let saves = Saves::new(resolve_saves_dir(app.handle())?)?;

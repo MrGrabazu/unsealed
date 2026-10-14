@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import type { OpenedCard } from "./api";
 import { CardImage } from "./CardImage";
 import { useI18n } from "./i18n";
-import { useMoney } from "./money";
+import { Money } from "./money";
 
 interface Props {
   card: OpenedCard;
@@ -13,7 +13,6 @@ interface Props {
 }
 
 export function Card({ card, faceUp, clickable, onReveal }: Props) {
-  const money = useMoney();
   const { t } = useI18n();
   return (
     <div className="card-slot">
@@ -36,7 +35,7 @@ export function Card({ card, faceUp, clickable, onReveal }: Props) {
       </motion.div>
       <div className={`card-caption ${faceUp ? "visible" : ""}`}>
         <span className="name">{card.name}</span>
-        <span className="price">{card.priceCents == null ? "—" : money(card.priceCents)}</span>
+        <span className="price">{card.priceCents == null ? "—" : <Money cents={card.priceCents} estimated={card.priceEstimated} />}</span>
       </div>
     </div>
   );

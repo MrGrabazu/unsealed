@@ -14,12 +14,12 @@
 //! frequencies to match exactly (colorless cards come out less often than their weight
 //! suggests). Balanced sheets are therefore validated by invariant, not by card rates.
 
-use crate::booster::{BoosterConfig, BoosterSheet};
+use crate::booster::{BoosterConfig, BoosterPack, BoosterSheet};
 use crate::catalog::CardEntry;
 use rand::distributions::{Distribution, WeightedIndex};
 use rand::seq::SliceRandom;
 use rand::Rng;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Color symbols in WUBRG order; the position is the bit index in the mask.
 pub const COLORS: [&str; 5] = ["W", "U", "B", "R", "G"];
@@ -71,12 +71,44 @@ pub fn open_booster<R: Rng + ?Sized>(
     colors: &ColorIndex,
     rng: &mut R,
 ) -> Result<Vec<DrawnCard>, DrawError> {
-    let variants = WeightedIndex::new(cfg.boosters.iter().map(|b| b.weight))?;
-    let pack = &cfg.boosters[variants.sample(rng)];
+    open_booster_excluding(cfg, colors, rng, &HashSet::new())
+}
+
+/// Opens a booster in which the `exhausted` cards can no longer be found (cards of a limited
+/// print run whose every copy was pulled). A pack variant that needs more cards from a sheet
+/// than it has left is gone too: once the only copy of a card is found, the packs that would
+/// have held it no longer exist. With nothing exhausted, the draw is exactly `open_booster`'s.
+pub fn open_booster_excluding<R: Rng + ?Sized>(
+    cfg: &BoosterConfig,
+    colors: &ColorIndex,
+    rng: &mut R,
+    exhausted: &HashSet<String>,
+) -> Result<Vec<DrawnCard>, DrawError> {
+    let possible = |pack: &BoosterPack| {
+        pack.contents.iter().all(|(slot, &count)| {
+            let sheet = &cfg.sheets[slot];
+            let gone = exhausted.iter().filter(|u| sheet.cards.get(*u).is_some_and(|&w| w > 0)).count();
+            if gone == 0 || sheet.fixed {
+                return true;
+            }
+            let left = sheet.cards.values().filter(|&&w| w > 0).count() - gone;
+            if sheet.allow_duplicates {
+                left > 0
+            } else {
+                left >= count as usize
+            }
+        })
+    };
+    let weights: Vec<u64> = cfg
+        .boosters
+        .iter()
+        .map(|b| if exhausted.is_empty() || possible(b) { b.weight } else { 0 })
+        .collect();
+    let pack = &cfg.boosters[WeightedIndex::new(&weights)?.sample(rng)];
     let mut out = Vec::new();
     for (slot, &count) in &pack.contents {
         let sheet = &cfg.sheets[slot];
-        draw_from_sheet(slot, sheet, count as usize, colors, rng, &mut out)?;
+        draw_from_sheet(slot, sheet, count as usize, colors, exhausted, rng, &mut out)?;
     }
     Ok(out)
 }
@@ -86,6 +118,7 @@ fn draw_from_sheet<R: Rng + ?Sized>(
     sheet: &BoosterSheet,
     count: usize,
     colors: &ColorIndex,
+    exhausted: &HashSet<String>,
     rng: &mut R,
     out: &mut Vec<DrawnCard>,
 ) -> Result<(), DrawError> {
@@ -94,11 +127,15 @@ fn draw_from_sheet<R: Rng + ?Sized>(
     };
     // "fixed" sheet (Jumpstart-style): every card is guaranteed.
     if sheet.fixed {
-        sheet.cards.keys().for_each(|u| push(u, out));
+        sheet.cards.keys().filter(|u| !exhausted.contains(*u)).for_each(|u| push(u, out));
         return Ok(());
     }
     let uuids: Vec<&String> = sheet.cards.keys().collect();
-    let mut weights: Vec<u64> = sheet.cards.values().copied().collect();
+    let mut weights: Vec<u64> = sheet
+        .cards
+        .iter()
+        .map(|(u, &w)| if exhausted.contains(u) { 0 } else { w })
+        .collect();
     let mut picked: Vec<usize> = Vec::with_capacity(count);
 
     if sheet.balance_colors {

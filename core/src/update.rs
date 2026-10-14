@@ -23,6 +23,14 @@ pub struct DataConfig {
     /// Boosters simulated per kept config to validate its rates.
     #[serde(default = "default_sim_boosters")]
     pub sim_boosters: u64,
+    /// Every booster gets a token; outside collector boosters (always foil), one in this
+    /// many is foil.
+    #[serde(default = "default_token_foil_one_in")]
+    pub token_foil_one_in: u64,
+}
+
+pub fn default_token_foil_one_in() -> u64 {
+    15
 }
 
 fn default_boosters() -> Vec<String> {

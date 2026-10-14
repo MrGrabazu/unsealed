@@ -252,15 +252,17 @@ export function AchievementCard({ item }: { item: AchievementView }) {
   const palette = PALETTES[item.palette] ?? PALETTES.onyx;
   const [frameLight, frameDark] = FRAMES[item.rarity];
   const emblem = EMBLEMS[item.emblem] ?? EMBLEMS.star;
-  const { t } = useI18n();
+  const { t, formatNumber } = useI18n();
   const amountsInText = useAmountsInText();
   const hidden = item.secret && !item.unlocked;
+  const showProgress = !item.unlocked && item.progress != null;
 
   const name = hidden ? "???" : item.name;
   // Bold capitals are about 0.72em wide, plus 1.5px of letter spacing; the banner holds ~470px.
   const nameSize = Math.max(24, Math.min(44, Math.floor((470 / name.length - 1.5) / 0.72)));
   const text = hidden ? t("achievements.secretText") : amountsInText(item.description ?? "");
-  const lines = wrap(text, 32, 3);
+  // The progress (count and bar) takes the place of a third line.
+  const lines = wrap(text, 32, showProgress ? 2 : 3);
   const ratio = item.progress && item.progress.goal > 0 ? item.progress.current / item.progress.goal : 0;
 
   return (
@@ -358,8 +360,11 @@ export function AchievementCard({ item }: { item: AchievementView }) {
             {line}
           </text>
         ))}
-        {!item.unlocked && item.progress && (
+        {showProgress && item.progress && (
           <>
+            <text x={CX} y="816" fontSize="20" textAnchor="middle" fill="#fff6e6" opacity="0.8" letterSpacing="1">
+              {formatNumber(item.progress.current)} / {formatNumber(item.progress.goal)}
+            </text>
             <rect x="130" y="826" width="370" height="12" rx="6" fill={palette.bg1} stroke={frameLight} strokeWidth="1.5" />
             <rect x="130" y="826" width={370 * ratio} height="12" rx="6" fill={palette.accent} />
           </>

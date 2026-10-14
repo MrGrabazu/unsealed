@@ -142,7 +142,7 @@ pub struct Reward {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SealedReward {
-    /// A set code, or "latest" for the most recent set available.
+    /// A set code, or "latest" for the most recent set offering `kind`.
     pub set_code: String,
     pub kind: String,
     pub quantity: u32,

@@ -26,6 +26,8 @@ pub struct CardDetailsView {
     pub can_be_nonfoil: bool,
     pub price_cents: Option<u32>,
     pub foil_price_cents: Option<u32>,
+    /// The card has no market price of its own: its prices are estimated.
+    pub price_estimated: bool,
     pub sell_value_cents: u32,
     pub foil_sell_value_cents: u32,
     pub owned: u32,
@@ -83,7 +85,7 @@ impl Game {
     pub fn card_details_local(&mut self, set_code: &str, uuid: &str) -> Result<(CardDetailsView, DetailsQuery), String> {
         self.ensure_loaded(set_code)?;
         self.ensure_prices();
-        let owned = self.store.owned_in_set(set_code).map_err(err)?;
+        let owned = self.owned_with_tokens(set_code)?;
         let set = &self.sets[set_code];
         let card = &set.file.cards[*set.index.get(uuid).ok_or_else(|| format!("card {uuid} not in {set_code}"))?];
         let shown = localized(card, &self.card_lang);
@@ -107,6 +109,7 @@ impl Game {
             can_be_nonfoil: card.finishes.iter().any(|f| f == "nonfoil"),
             price_cents: self.market_price(uuid, false),
             foil_price_cents: self.market_price(uuid, true),
+            price_estimated: self.price_estimated(uuid),
             sell_value_cents: self.sale_value(uuid, false),
             foil_sell_value_cents: self.sale_value(uuid, true),
             owned: have.normal,

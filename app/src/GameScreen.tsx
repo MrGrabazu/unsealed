@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import {
   buyBoosters,
   claimCharity,
@@ -23,6 +23,10 @@ import { Achievements } from "./Achievements";
 import { BatchOpening } from "./BatchOpening";
 import { CardDetails } from "./CardDetails";
 import { PackOpening } from "./PackOpening";
+import { canUseWebGL, getOpening3d } from "./settings";
+
+// The 3D opening brings three.js along: loaded the first time a booster is opened.
+const PackOpening3D = lazy(() => import("./PackOpening3D").then((m) => ({ default: m.PackOpening3D })));
 import { Boosterium } from "./Boosterium";
 import { Collection } from "./Collection";
 import { rewardText } from "./boosterKinds";
@@ -66,6 +70,8 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   const [pack, setPack] = useState<{ setCode: string; kind: string } | null>(null);
   // The card whose details are open.
   const [detailsOf, setDetailsOf] = useState<{ setCode: string; uuid: string } | null>(null);
+  // The 3D opening, unless turned off in the options or impossible on this machine.
+  const [opening3d] = useState(() => getOpening3d() && canUseWebGL());
   // The booster kind shown in the opening view, to offer the next one.
   const [last, setLast] = useState<{ setCode: string; kind: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -290,7 +296,20 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
                     </button>
                   )}
                 </div>
-                {pack && (
+                {pack && opening3d && (
+                  <Suspense fallback={<Loading />}>
+                    <PackOpening3D
+                      setCode={pack.setCode}
+                      set={sets.find((s) => s.code === pack.setCode)}
+                      kind={pack.kind}
+                      cards={cards}
+                      onTear={tear}
+                      onReveal={(count) => void reveal(count)}
+                      onDetails={(card) => setDetailsOf({ setCode: pack.setCode, uuid: card.uuid })}
+                    />
+                  </Suspense>
+                )}
+                {pack && !opening3d && (
                   <PackOpening
                     setCode={pack.setCode}
                     set={sets.find((s) => s.code === pack.setCode)}
