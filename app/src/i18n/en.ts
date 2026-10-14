@@ -287,6 +287,8 @@ export const en = {
   "about.title": "About Unsealed",
   "about.version": "version {version}",
   "about.gameTitle": "The game",
+  "about.community": "The players' community: share your best pulls, ideas and feedback.",
+  "about.joinDiscord": "Join us on Discord",
   "about.game1":
     "Unsealed recreates the thrill of opening trading card boosters, without spending a cent. Buy virtual boosters in the Boosterium, crack them open card by card, build your collection, complete sets and unlock achievements.",
   "about.game2":

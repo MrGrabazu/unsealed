@@ -282,6 +282,8 @@ export const es: Messages = {
   "about.title": "Acerca de Unsealed",
   "about.version": "versión {version}",
   "about.gameTitle": "El juego",
+  "about.community": "La comunidad de jugadores: comparte tus mejores aperturas, ideas y opiniones.",
+  "about.joinDiscord": "Únete a nosotros en Discord",
   "about.game1":
     "Unsealed recrea la emoción de abrir sobres de cartas coleccionables sin gastar ni un céntimo. Compra sobres virtuales en el Boosterium, ábrelos carta a carta, construye tu colección, completa ediciones y desbloquea logros.",
   "about.game2":

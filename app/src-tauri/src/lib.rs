@@ -426,6 +426,8 @@ fn resolve_cache_dir(app: &tauri::AppHandle) -> Result<PathBuf, Box<dyn Error>> 
 
 pub fn run() {
     tauri::Builder::default()
+        // Opens links (the community's Discord) in the player's browser.
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let data_dir = resolve_data_dir(app.handle())?;
             // Fail early on a broken configuration rather than when a game is loaded.

@@ -1,7 +1,11 @@
 import { getVersion } from "@tauri-apps/api/app";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useState } from "react";
 import { useI18n } from "./i18n";
 import { FAN_CONTENT_NOTICE } from "./legal";
+
+/** The players' community, "The Boosterium", on Discord. */
+const DISCORD_URL = "https://discord.gg/B5P3NJYke";
 
 /** What the game is, what it is not, and the notices its sources require. */
 export function About({ onBack }: { onBack: () => void }) {
@@ -23,6 +27,16 @@ export function About({ onBack }: { onBack: () => void }) {
       <p className="tagline">
         Crack &amp; Collect{version && <span className="hint"> · {t("about.version", { version })}</span>}
       </p>
+
+      <div className="community">
+        <div>
+          <strong>The Boosterium</strong>
+          <p className="hint">{t("about.community")}</p>
+        </div>
+        <button className="primary" onClick={() => void openUrl(DISCORD_URL)}>
+          {t("about.joinDiscord")}
+        </button>
+      </div>
 
       <h3>{t("about.gameTitle")}</h3>
       <p>{t("about.game1")}</p>
