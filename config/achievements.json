@@ -40,6 +40,23 @@
     "tokens_pulled": { "event": "CardAcquired", "where": [{ "field": "rarity", "op": "eq", "value": "token" }], "op": "sum" },
     "boosters_bought": { "event": "BoosterBought", "op": "sum", "field": "quantity" },
     "charity_claims": { "event": "CharityClaimed", "op": "sum" },
+    "token_kinds": {
+      "event": "CardAcquired",
+      "where": [{ "field": "rarity", "op": "eq", "value": "token" }],
+      "op": "distinct",
+      "field": "uuid"
+    },
+    "art_kinds": {
+      "event": "CardAcquired",
+      "where": [{ "field": "rarity", "op": "eq", "value": "art" }],
+      "op": "distinct",
+      "field": "uuid"
+    },
+    "signed_arts_pulled": {
+      "event": "CardAcquired",
+      "where": [{ "field": "rarity", "op": "eq", "value": "art" }, { "field": "foil", "op": "eq", "value": true }],
+      "op": "sum"
+    },
     "boosters_watched": { "event": "BoosterOpened", "where": [{ "field": "animated", "op": "eq", "value": true }], "op": "sum" },
     "boosters_rushed": { "event": "BoosterOpened", "where": [{ "field": "animated", "op": "eq", "value": false }], "op": "sum" }
   },
@@ -395,6 +412,56 @@
       "rarity": "common", "emblem": "cards", "palette": "ice",
       "condition": { "type": "metric", "metric": "tokens_pulled", "atLeast": 500 },
       "reward": { "cashCents": 1000 }
+    },
+    {
+      "id": "art-first", "name": "Brushstroke", "description": "Pull an art card.",
+      "rarity": "common", "emblem": "eye", "palette": "ocean",
+      "condition": { "type": "event", "event": "CardAcquired", "where": [{ "field": "rarity", "op": "eq", "value": "art" }] },
+      "reward": { "cashCents": 300 }
+    },
+    {
+      "id": "art-signed", "name": "Autograph", "description": "Pull an art card with a gold signature.",
+      "rarity": "uncommon", "emblem": "star", "palette": "gold",
+      "condition": { "type": "event", "event": "CardAcquired", "where": [
+        { "field": "rarity", "op": "eq", "value": "art" }, { "field": "foil", "op": "eq", "value": true }
+      ] },
+      "reward": { "cashCents": 1000 }
+    },
+    {
+      "id": "token-set", "name": "Token Keeper", "description": "Own every token of a set.",
+      "rarity": "rare", "emblem": "cards", "palette": "ice",
+      "condition": { "type": "event", "event": "SetProgress", "where": [{ "field": "tokensCompletionPermille", "op": "gte", "value": 1000 }] },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 5 } }
+    },
+    {
+      "id": "art-set", "name": "Gallery", "description": "Own every art card of a set.",
+      "rarity": "rare", "emblem": "book", "palette": "royal",
+      "condition": { "type": "event", "event": "SetProgress", "where": [{ "field": "artsCompletionPermille", "op": "gte", "value": 1000 }] },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 5 } }
+    },
+    {
+      "id": "tokens-100-kinds", "name": "Token Archive", "description": "Pull 100 different tokens.",
+      "rarity": "rare", "emblem": "cards", "palette": "forest",
+      "condition": { "type": "metric", "metric": "token_kinds", "atLeast": 100 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 5 } }
+    },
+    {
+      "id": "arts-100-kinds", "name": "Curator", "description": "Pull 100 different art cards.",
+      "rarity": "rare", "emblem": "eye", "palette": "rose",
+      "condition": { "type": "metric", "metric": "art_kinds", "atLeast": 100 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "collector", "quantity": 1 } }
+    },
+    {
+      "id": "signed-10", "name": "Autograph Book", "description": "Pull 10 art cards with a gold signature.",
+      "rarity": "rare", "emblem": "star", "palette": "gold",
+      "condition": { "type": "metric", "metric": "signed_arts_pulled", "atLeast": 10 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "collector", "quantity": 1 } }
+    },
+    {
+      "id": "signed-set", "name": "Hall of Fame", "description": "Own every art card of a set with its gold signature.",
+      "rarity": "mythic", "emblem": "crown", "palette": "gold",
+      "condition": { "type": "event", "event": "SetProgress", "where": [{ "field": "signedArtsCompletionPermille", "op": "gte", "value": 1000 }] },
+      "reward": { "sealed": { "setCode": "latest", "kind": "collector", "quantity": 5 } }
     },
     {
       "id": "triple-foil", "name": "Triple Shine", "description": "Open three foil cards in the same booster.",

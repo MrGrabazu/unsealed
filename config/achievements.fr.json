@@ -82,6 +82,14 @@
   "savor-1000": { "name": "Fin connaisseur", "description": "Ouvrez 1 000 boosters en prenant le temps, carte après carte." },
   "rush-500": { "name": "Pressé", "description": "Ouvrez 500 boosters sans l'animation." },
   "rush-1000": { "name": "Pas une seconde à perdre", "description": "Ouvrez 1 000 boosters sans l'animation." },
+  "art-first": { "name": "Coup de pinceau", "description": "Tirez une carte d'art." },
+  "art-signed": { "name": "Autographe", "description": "Tirez une carte d'art à signature dorée." },
+  "token-set": { "name": "Gardien des jetons", "description": "Possédez tous les jetons d'un set." },
+  "art-set": { "name": "Galerie", "description": "Possédez toutes les cartes d'art d'un set." },
+  "tokens-100-kinds": { "name": "Archives des jetons", "description": "Tirez 100 jetons différents." },
+  "arts-100-kinds": { "name": "Conservateur", "description": "Tirez 100 cartes d'art différentes." },
+  "signed-10": { "name": "Carnet d'autographes", "description": "Tirez 10 cartes d'art à signature dorée." },
+  "signed-set": { "name": "Panthéon", "description": "Possédez toutes les cartes d'art d'un set avec leur signature dorée." },
   "frequent-visitor": { "name": "Habitué", "description": "Acceptez l'aide du Boosterium 10 fois." },
   "overachiever": { "name": "Bourreau de travail", "description": "Débloquez 50 succès." }
 }

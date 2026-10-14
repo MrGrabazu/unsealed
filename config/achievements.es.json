@@ -235,6 +235,14 @@
   "savor-1000": { "name": "Entendido", "description": "Abre 1.000 sobres con calma, carta a carta." },
   "rush-500": { "name": "Con prisa", "description": "Abre 500 sobres sin la animación." },
   "rush-1000": { "name": "Ni un segundo que perder", "description": "Abre 1.000 sobres sin la animación." },
+  "art-first": { "name": "Pincelada", "description": "Consigue una carta de arte." },
+  "art-signed": { "name": "Autógrafo", "description": "Consigue una carta de arte con firma dorada." },
+  "token-set": { "name": "Guardián de fichas", "description": "Ten todas las fichas de una edición." },
+  "art-set": { "name": "Galería", "description": "Ten todas las cartas de arte de una edición." },
+  "tokens-100-kinds": { "name": "Archivo de fichas", "description": "Consigue 100 fichas distintas." },
+  "arts-100-kinds": { "name": "Conservador", "description": "Consigue 100 cartas de arte distintas." },
+  "signed-10": { "name": "Libro de autógrafos", "description": "Consigue 10 cartas de arte con firma dorada." },
+  "signed-set": { "name": "Salón de la fama", "description": "Ten todas las cartas de arte de una edición con su firma dorada." },
   "frequent-visitor": { "name": "Visitante asiduo", "description": "Acepta la ayuda del Boosterium 10 veces." },
   "overachiever": { "name": "Superdotado", "description": "Desbloquea 50 logros." }
 }

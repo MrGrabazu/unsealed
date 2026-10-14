@@ -252,12 +252,15 @@ pub(super) struct PendingReveal {
 impl Game {
 
     /// How far the player is in a set: overall, for rares and mythics, in foil (cards
-    /// printed in foil only), and for the collector extras.
+    /// printed in foil only), for the collector extras, the tokens and the art cards (and
+    /// their gold signed versions).
     fn set_progress_event(&self, set_code: &str) -> Option<Event> {
-        let owned = self.store.owned_in_set(set_code).ok()?;
         let set = self.sets.get(set_code)?;
+        // Tokens and art cards may be filed under their own set codes.
+        let owned = self.owned_with_tokens(set_code).ok()?;
         // (cards, owned) overall, for rares, for mythics, in foil and for the extras.
         let (mut all, mut rares, mut mythics, mut foils, mut extras) = Default::default();
+        let (mut tokens, mut arts, mut signed): ((i64, i64), (i64, i64), (i64, i64)) = Default::default();
         let bump = |t: &mut (i64, i64), have: bool| {
             t.0 += 1;
             t.1 += i64::from(have);
@@ -278,6 +281,17 @@ impl Game {
         for &i in &set.extras {
             bump(&mut extras, owned.get(&set.file.cards[i].uuid).is_some_and(|o| o.normal + o.foil > 0));
         }
+        for &i in &set.tokens {
+            bump(&mut tokens, owned.get(&set.file.cards[i].uuid).is_some_and(|o| o.normal + o.foil > 0));
+        }
+        for &i in &set.arts {
+            let card = &set.file.cards[i];
+            let have = owned.get(&card.uuid).copied().unwrap_or_default();
+            bump(&mut arts, have.normal + have.foil > 0);
+            if card.finishes.iter().any(|f| f == "foil") {
+                bump(&mut signed, have.foil > 0);
+            }
+        }
         let all_owned = |t: (i64, i64)| t.0 > 0 && t.0 == t.1;
         Some(
             Event::new("SetProgress")
@@ -286,7 +300,10 @@ impl Game {
                 .with("allRaresOwned", all_owned(rares))
                 .with("allMythicsOwned", all_owned(mythics))
                 .with("foilCompletionPermille", permille(foils))
-                .with("extrasCompletionPermille", permille(extras)),
+                .with("extrasCompletionPermille", permille(extras))
+                .with("tokensCompletionPermille", permille(tokens))
+                .with("artsCompletionPermille", permille(arts))
+                .with("signedArtsCompletionPermille", permille(signed)),
         )
     }
 

@@ -1558,6 +1558,28 @@ mod tests {
     }
 
     #[test]
+    fn set_progress_counts_the_tokens_wherever_they_are_filed() {
+        let half = r#"{ "id": "half-tokens", "name": "Half", "description": "Own half the tokens of a set.",
+            "rarity": "common", "emblem": "cards", "palette": "ice",
+            "condition": { "type": "event", "event": "SetProgress",
+              "where": [{ "field": "tokensCompletionPermille", "op": "gte", "value": 500 }] } }"#;
+        let (mut g, _) = game_with_engine("token-progress", PRICES, achievements(half));
+        g.buy_boosters("TST", "play", 2).unwrap();
+        // One of the two tokens (filed under TTST), acquired as if pulled.
+        g.store
+            .open_sealed(
+                "TST",
+                "play",
+                &[OpeningCard { uuid: "t1", set_code: "TTST", foil: false, price_cents: None, limited: false }],
+                0,
+            )
+            .unwrap();
+        g.open_booster("TST", "play").unwrap();
+        g.reveal_cards(usize::MAX);
+        assert_eq!(g.take_unlocks("en").iter().map(|a| a.id.as_str()).collect::<Vec<_>>(), ["half-tokens"]);
+    }
+
+    #[test]
     fn a_set_shows_its_tokens_filed_under_their_own_set() {
         let mut g = game_with_booster("tokens");
         // The booster has no token slot here: the token is acquired as if pulled.

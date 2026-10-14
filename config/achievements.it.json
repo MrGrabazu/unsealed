@@ -235,6 +235,14 @@
   "savor-1000": { "name": "Intenditore", "description": "Apri 1.000 buste con calma, carta dopo carta." },
   "rush-500": { "name": "Di fretta", "description": "Apri 500 buste senza l'animazione." },
   "rush-1000": { "name": "Nemmeno un secondo da perdere", "description": "Apri 1.000 buste senza l'animazione." },
+  "art-first": { "name": "Pennellata", "description": "Trova una carta illustrazione." },
+  "art-signed": { "name": "Autografo", "description": "Trova una carta illustrazione con firma dorata." },
+  "token-set": { "name": "Custode delle pedine", "description": "Possiedi tutte le pedine di un set." },
+  "art-set": { "name": "Galleria", "description": "Possiedi tutte le carte illustrazione di un set." },
+  "tokens-100-kinds": { "name": "Archivio delle pedine", "description": "Trova 100 pedine diverse." },
+  "arts-100-kinds": { "name": "Curatore", "description": "Trova 100 carte illustrazione diverse." },
+  "signed-10": { "name": "Libro degli autografi", "description": "Trova 10 carte illustrazione con firma dorata." },
+  "signed-set": { "name": "Albo d'oro", "description": "Possiedi tutte le carte illustrazione di un set con la loro firma dorata." },
   "frequent-visitor": { "name": "Visitatore assiduo", "description": "Accetta l'aiuto del Boosterium 10 volte." },
   "overachiever": { "name": "Primo della classe", "description": "Sblocca 50 obiettivi." }
 }

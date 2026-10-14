@@ -82,6 +82,14 @@
   "savor-1000": { "name": "Kenner", "description": "Öffne 1.000 Booster in aller Ruhe, Karte für Karte." },
   "rush-500": { "name": "In Eile", "description": "Öffne 500 Booster ohne Animation." },
   "rush-1000": { "name": "Keine Sekunde zu verlieren", "description": "Öffne 1.000 Booster ohne Animation." },
+  "art-first": { "name": "Pinselstrich", "description": "Ziehe eine Kunstkarte." },
+  "art-signed": { "name": "Autogramm", "description": "Ziehe eine Kunstkarte mit goldener Signatur." },
+  "token-set": { "name": "Spielstein-Hüter", "description": "Besitze alle Spielsteine eines Sets." },
+  "art-set": { "name": "Galerie", "description": "Besitze alle Kunstkarten eines Sets." },
+  "tokens-100-kinds": { "name": "Spielstein-Archiv", "description": "Ziehe 100 verschiedene Spielsteine." },
+  "arts-100-kinds": { "name": "Kurator", "description": "Ziehe 100 verschiedene Kunstkarten." },
+  "signed-10": { "name": "Autogrammbuch", "description": "Ziehe 10 Kunstkarten mit goldener Signatur." },
+  "signed-set": { "name": "Ruhmeshalle", "description": "Besitze alle Kunstkarten eines Sets mit ihrer goldenen Signatur." },
   "frequent-visitor": { "name": "Stammgast", "description": "Nimm 10-mal die Hilfe des Boosteriums an." },
   "overachiever": { "name": "Streber", "description": "Schalte 50 Erfolge frei." }
 }
