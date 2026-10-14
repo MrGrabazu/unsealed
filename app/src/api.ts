@@ -371,7 +371,9 @@ export const getCollection = (setCode: string) =>
 /** Asks which translated images of a set are good scans (the others show in English);
  * returns how many good ones were found (0 when nothing was left to check). */
 export const checkSetImages = (setCode: string) => invoke<number>("check_set_images", { setCode });
-export const listArtists =() => invoke<ArtistSummary[]>("list_artists");
+/** Every card owned, across the sets, with the set it comes from. */
+export const getOwnedCards = () => invoke<ArtistCard[]>("get_owned_cards");
+export const listArtists = () => invoke<ArtistSummary[]>("list_artists");
 export const getArtistCollection = (name: string) => invoke<ArtistView>("get_artist_collection", { name });
 export const getHistory =(limit: number, offset: number) => invoke<HistoryView>("get_history", { limit, offset });
 /** Returns the money moved (negative: what undoing a sale cost). */

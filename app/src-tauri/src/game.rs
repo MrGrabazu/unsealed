@@ -5,7 +5,7 @@ mod artists;
 mod details;
 mod history;
 
-pub use artists::{ArtistSummary, ArtistView};
+pub use artists::{ArtistCardView, ArtistSummary, ArtistView};
 
 pub use achievements::{AchievementTexts, AchievementView, AchievementsView};
 use achievements::{OpeningEvents, PendingReveal};
@@ -1555,6 +1555,28 @@ mod tests {
         g.open_booster_as("TST", "play", false).unwrap();
         g.reveal_cards(usize::MAX);
         assert_eq!(g.take_unlocks("en").len(), 1);
+    }
+
+    #[test]
+    fn every_owned_card_is_listed_with_the_set_it_comes_from() {
+        let mut g = game_with_booster("owned-everywhere");
+        g.buy_boosters("TST", "play", 1).unwrap();
+        g.open_booster("TST", "play").unwrap(); // c1 (twice) and m1
+        // A token filed under TTST, from a TST booster: found in the TST file.
+        g.store
+            .open_sealed("TST", "play", &[OpeningCard { uuid: "t1", set_code: "TTST", foil: false, price_cents: None, limited: false }], 0)
+            .unwrap();
+        let mut owned: Vec<(String, String, u32)> = g
+            .owned_everywhere()
+            .unwrap()
+            .into_iter()
+            .map(|c| (c.card.uuid, c.set_code, c.card.quantity))
+            .collect();
+        owned.sort();
+        assert_eq!(
+            owned,
+            [("c1".into(), "TST".into(), 2), ("m1".into(), "TST".into(), 1), ("t1".into(), "TST".into(), 1)]
+        );
     }
 
     #[test]

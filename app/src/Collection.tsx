@@ -3,6 +3,7 @@ import {
   checkSetImages,
   getArtistCollection,
   getCollection,
+  getOwnedCards,
   listArtists,
   sellCards,
   sellDuplicates,
@@ -16,6 +17,40 @@ import {
 
 /** The collection shown: one set's, or one artist's across the sets. */
 type Source = "sets" | "artists";
+
+/** In the set list: every card owned, across the sets (a grid to sort, to pick what to sell). */
+const ALL_SETS = "*";
+
+type Sort = "priceDesc" | "priceAsc" | "rarity" | "name" | "set" | "quantity";
+
+/** What a card owned is worth: the market price of the finest finish owned. */
+const ownedValue = (c: CollectionCard) =>
+  Math.max(c.quantity > 0 ? (c.priceCents ?? 0) : 0, c.foilQuantity > 0 ? (c.foilPriceCents ?? 0) : 0);
+
+const RARITY_ORDER = ["mythic", "rare", "special", "bonus", "uncommon", "common", "art", "token"];
+const rarityRank = (rarity: string) => {
+  const i = RARITY_ORDER.indexOf(rarity);
+  return i < 0 ? RARITY_ORDER.length : i;
+};
+
+function sortCards(cards: ArtistCard[], sort: Sort): ArtistCard[] {
+  const sorted = [...cards];
+  const byName = (a: ArtistCard, b: ArtistCard) => a.name.localeCompare(b.name);
+  switch (sort) {
+    case "priceDesc":
+      return sorted.sort((a, b) => ownedValue(b) - ownedValue(a) || byName(a, b));
+    case "priceAsc":
+      return sorted.sort((a, b) => ownedValue(a) - ownedValue(b) || byName(a, b));
+    case "rarity":
+      return sorted.sort((a, b) => rarityRank(a.rarity) - rarityRank(b.rarity) || ownedValue(b) - ownedValue(a));
+    case "name":
+      return sorted.sort(byName);
+    case "set":
+      return sorted.sort((a, b) => b.releaseDate.localeCompare(a.releaseDate) || a.setName.localeCompare(b.setName) || byName(a, b));
+    case "quantity":
+      return sorted.sort((a, b) => b.quantity + b.foilQuantity - (a.quantity + a.foilQuantity) || ownedValue(b) - ownedValue(a));
+  }
+}
 
 /** For a search: lower case, without accents ("Magali Villeneuve" ~ "magali villeneuve"). */
 const fold = (text: string) => text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
@@ -65,6 +100,9 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
   const [artist, setArtist] = useState("");
   const [artistSearch, setArtistSearch] = useState("");
   const [artistView, setArtistView] = useState<ArtistView | null>(null);
+  // "All sets": every card owned.
+  const [ownedAll, setOwnedAll] = useState<ArtistCard[] | null>(null);
+  const [sort, setSort] = useState<Sort>("priceDesc");
 
   useEffect(() => {
     if (!setCode && sets.length > 0) setSetCode(sets[0].code);
@@ -86,6 +124,8 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
     try {
       if (source === "artists") {
         if (artist) setArtistView(await getArtistCollection(artist));
+      } else if (setCode === ALL_SETS) {
+        setOwnedAll(await getOwnedCards());
       } else if (setCode) {
         setView(await getCollection(setCode));
         // Translated images: shown once known as good scans (checked once per card).
@@ -150,6 +190,9 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
   const shownArts = view?.arts.filter(matches);
 
   const byArtist = source === "artists";
+  // Every card owned: a sortable grid only.
+  const allSets = !byArtist && setCode === ALL_SETS;
+  const sortedOwned = useMemo(() => (ownedAll ? sortCards(ownedAll, sort) : []), [ownedAll, sort]);
 
   // The binder keeps every card in its place: no filter, sections one after the other (an
   // artist's binder is one section, oldest card first).
@@ -189,7 +232,11 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
       : view && { label: null, owned: view.ownedCount, total: view.totalCount, percent: view.completionPercent };
 
   // The set file holding the card whose details are open (an artist's cards span sets).
-  const detailsSet = byArtist ? artistView?.cards.find((c) => c.uuid === detailsOf)?.setCode : view?.setCode;
+  const detailsSet = byArtist
+    ? artistView?.cards.find((c) => c.uuid === detailsOf)?.setCode
+    : allSets
+      ? ownedAll?.find((c) => c.uuid === detailsOf)?.setCode
+      : view?.setCode;
   const shownArtists = useMemo(() => {
     const query = fold(artistSearch.trim());
     return (artists ?? []).filter((a) => !query || fold(a.name).includes(query)).slice(0, 300);
@@ -269,6 +316,7 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
         </div>
         {!byArtist && (
           <select value={setCode} onChange={(e) => setSetCode(e.target.value)}>
+            <option value={ALL_SETS}>{t("collection.allSets")}</option>
             {sets.map((s) => (
               <option key={s.code} value={s.code}>
                 {s.name} ({s.code})
@@ -293,27 +341,37 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
             </select>
           </>
         )}
-        {layout === "grid" && (
+        {allSets && (
+          <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label={t("collection.sort")}>
+            <option value="priceDesc">{t("collection.sortPriceDesc")}</option>
+            <option value="priceAsc">{t("collection.sortPriceAsc")}</option>
+            <option value="rarity">{t("collection.sortRarity")}</option>
+            <option value="name">{t("collection.sortName")}</option>
+            <option value="set">{t("collection.sortSet")}</option>
+            <option value="quantity">{t("collection.sortQuantity")}</option>
+          </select>
+        )}
+        {layout === "grid" && !allSets && (
           <select value={filter} onChange={(e) => setFilter(e.target.value as Filter)}>
             <option value="all">{t("collection.allCards")}</option>
             <option value="owned">{t("collection.owned")}</option>
             <option value="missing">{t("collection.missing")}</option>
           </select>
         )}
-        {!byArtist && <button onClick={() => void sellExtras()}>{t("collection.sellDuplicates")}</button>}
-        <div className="segmented" role="group" aria-label={t("collection.layout")}>
+        {!byArtist && !allSets && <button onClick={() => void sellExtras()}>{t("collection.sellDuplicates")}</button>}
+        {!allSets && <div className="segmented" role="group" aria-label={t("collection.layout")}>
           <button className={layout === "binder" ? "active" : ""} onClick={() => changeLayout("binder")}>
             {t("collection.layoutBinder")}
           </button>
           <button className={layout === "grid" ? "active" : ""} onClick={() => changeLayout("grid")}>
             {t("collection.layoutGrid")}
           </button>
-        </div>
+        </div>}
       </div>
 
       {error && <p className="error">{error}</p>}
       {notice && <p className="notice">{notice}</p>}
-      {!(byArtist ? artistView : view) && !error && <Loading label={t("collection.loading")} />}
+      {!(byArtist ? artistView : allSets ? ownedAll : view) && !error && <Loading label={t("collection.loading")} />}
       {byArtist && artistView && (
         <>
           {progress && (
@@ -345,7 +403,22 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
           )}
         </>
       )}
-      {!byArtist && view && (
+      {allSets && ownedAll && (
+        <>
+          <p className="progress-label">
+            {t("collection.ownedSummary", {
+              cards: ownedAll.length,
+              copies: ownedAll.reduce((n, c) => n + c.quantity + c.foilQuantity, 0),
+            })}
+          </p>
+          {ownedAll.length === 0 ? (
+            <p className="hint">{t("collection.noneOwned")}</p>
+          ) : (
+            <div className="collection-grid">{sortedOwned.map(cardTile)}</div>
+          )}
+        </>
+      )}
+      {!byArtist && !allSets && view && (
         <>
           {progress && (
             <>

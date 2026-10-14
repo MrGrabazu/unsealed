@@ -87,6 +87,33 @@ impl Game {
             .collect())
     }
 
+    /// Every card owned, across the sets, with the set it comes from (to sort and sell them
+    /// in one list). A card is found in the file of the set whose booster gave it, else in its
+    /// own set's, else in its parent set's ("TLTR", "ALTR": "LTR").
+    pub fn owned_everywhere(&mut self) -> Result<Vec<ArtistCardView>, String> {
+        self.ensure_prices();
+        let sources = self.store.owned_card_sources().map_err(err)?;
+        let owned = self.owned_by_uuid()?;
+        let mut cards = Vec::new();
+        for (uuid, card_set, booster_set) in sources {
+            let parent = card_set.get(1..).map(str::to_string);
+            let file = [booster_set, Some(card_set), parent]
+                .into_iter()
+                .flatten()
+                .find(|code| self.ensure_loaded(code).is_ok() && self.sets[code].index.contains_key(&uuid));
+            let Some(file) = file else { continue };
+            let set = &self.sets[&file];
+            let card = &set.file.cards[set.index[&uuid]];
+            cards.push(ArtistCardView {
+                card: self.collection_card(card, owned.get(&uuid).copied().unwrap_or_default()),
+                set_code: file.clone(),
+                set_name: set.file.names.get(&self.card_lang).unwrap_or(&set.file.name).clone(),
+                release_date: set.file.release_date.clone(),
+            });
+        }
+        Ok(cards)
+    }
+
     /// The collection of one artist: their cards in the sets offered, oldest first.
     pub fn artist_collection(&mut self, name: &str) -> Result<ArtistView, String> {
         self.ensure_prices();

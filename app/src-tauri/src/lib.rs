@@ -262,6 +262,12 @@ async fn check_set_images(
     with_game(&state, |g| Ok(g.record_image_quality(&ids, &statuses)))
 }
 
+/// Every card owned, across the sets (the collection's "all sets" list).
+#[tauri::command]
+fn get_owned_cards(state: State<'_, SessionState>) -> Result<Vec<game::ArtistCardView>, String> {
+    with_game(&state, |g| g.owned_everywhere())
+}
+
 #[tauri::command]
 fn list_artists(state: State<'_, SessionState>) -> Result<Vec<game::ArtistSummary>, String> {
     with_game(&state, |g| g.artists())
@@ -474,6 +480,7 @@ pub fn run() {
             list_artists,
             get_artist_collection,
             check_set_images,
+            get_owned_cards,
             sell_cards,
             sell_duplicates,
             claim_charity,

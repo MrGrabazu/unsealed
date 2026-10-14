@@ -666,6 +666,22 @@ impl Store {
     }
 
     /// Every owned card, as (uuid, foil, quantity).
+    /// Where each owned card came from: (uuid, its own set code, the set of a booster that
+    /// gave it, if any). Tokens, art cards and Special Guests bear another code than the
+    /// booster's set, whose file holds them.
+    pub fn owned_card_sources(&self) -> StoreResult<Vec<(String, String, Option<String>)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT c.card_uuid, MIN(c.set_code), MIN(o.set_code)
+             FROM collection c
+             LEFT JOIN opening_cards oc ON oc.card_uuid = c.card_uuid
+             LEFT JOIN openings o ON o.id = oc.opening_id
+             WHERE c.quantity > 0
+             GROUP BY c.card_uuid",
+        )?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
     pub fn owned_cards(&self) -> StoreResult<Vec<(String, bool, u32)>> {
         let mut stmt = self.conn.prepare("SELECT card_uuid, foil, quantity FROM collection")?;
         let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
