@@ -97,6 +97,7 @@ mod tests {
             foreign: Default::default(),
             serialized,
             token: false,
+            art: false,
         }
     }
 

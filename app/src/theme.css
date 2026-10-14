@@ -140,6 +140,7 @@ button.shop-set-header .shop-name { font-family: var(--font-title); font-size: 1
 .progress { background: #0f0905; border: 1px solid #3d2b1b; }
 .progress-bar { background: linear-gradient(180deg, var(--gold-hi), var(--accent) 50%, var(--gold-lo)); }
 .progress-label { color: var(--muted); }
+.collection-card .card-set { font-size: 12px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .progress-section { color: var(--gold-hi); font-family: var(--font-title); font-weight: 700; }
 
 /* Badges. */
@@ -162,6 +163,14 @@ footer { border-top-color: var(--edge); font-family: var(--font-text); }
 label.volume { margin-top: 10px; }
 input[type="range"] { accent-color: var(--accent); padding: 0; box-shadow: none; background: none; border: none; width: 220px; }
 input[type="checkbox"] { accent-color: var(--accent); box-shadow: none; }
+
+/* An art card's gold signed version: no rainbow, a glint of gold sweeping across, a gold halo. */
+.foil-sheen.signed { mix-blend-mode: screen; opacity: 1; -webkit-mask-image: none; mask-image: none;
+  background: linear-gradient(108deg, transparent calc(var(--foil-light) - 12%), #ffd76a66 var(--foil-light), transparent calc(var(--foil-light) + 12%));
+  animation: foil-light 5.5s ease-in-out infinite; }
+.foil-sheen.signed::after { display: none; }
+.thumb:has(> .foil-sheen.signed), .card .front:has(> .foil-sheen.signed) { box-shadow: 0 0 8px 1px #f5d68aaa, 0 0 18px 3px #d9a44155; animation: none; }
+.badge-foil.signed { background: linear-gradient(180deg, var(--gold-hi), var(--accent) 55%, var(--gold-lo)); color: #2a1606; }
 
 /* A sale concluded: the total large, then each card sold. */
 .modal.sale-modal { width: min(560px, 100%); text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 28px 28px 24px; }

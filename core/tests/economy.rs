@@ -150,6 +150,7 @@ fn prices_are_rekeyed_by_uuid_including_double_faced_cards() {
         foreign: Default::default(),
         serialized: false,
         token: false,
+        art: false,
     };
     let by_scryfall = [("s1".to_string(), PriceSet { usd: Some(25), ..Default::default() })].into();
     let cards = [card("front", "s1"), card("back", "s1"), card("other", "s2")];

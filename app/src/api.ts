@@ -67,6 +67,32 @@ export interface CollectionView {
   /** The set's tokens (one in every booster): outside the completion target. */
   tokens: CollectionCard[];
   tokensOwned: number;
+  /** The set's art cards (`foilQuantity`: their gold signed version): outside completion. */
+  arts: CollectionCard[];
+  artsOwned: number;
+}
+
+/** An artist with cards in the sets offered. */
+export interface ArtistSummary {
+  name: string;
+  cardCount: number;
+  ownedCount: number;
+}
+
+/** One of an artist's cards, with the set it comes from. */
+export interface ArtistCard extends CollectionCard {
+  setCode: string;
+  setName: string;
+  releaseDate: string;
+}
+
+/** An artist's collection, oldest card first. */
+export interface ArtistView {
+  name: string;
+  ownedCount: number;
+  totalCount: number;
+  completionPercent: number;
+  cards: ArtistCard[];
 }
 
 export interface SealedStack {
@@ -342,7 +368,12 @@ export const openBoosters = (setCode: string, kind: string, quantity: number) =>
 export const revealCards = (count: number) => invoke<void>("reveal_cards", { count });
 export const getCollection = (setCode: string) =>
   invoke<CollectionView>("get_collection", { setCode });
-export const getHistory = (limit: number, offset: number) => invoke<HistoryView>("get_history", { limit, offset });
+/** Asks which translated images of a set are good scans (the others show in English);
+ * returns how many good ones were found (0 when nothing was left to check). */
+export const checkSetImages = (setCode: string) => invoke<number>("check_set_images", { setCode });
+export const listArtists =() => invoke<ArtistSummary[]>("list_artists");
+export const getArtistCollection = (name: string) => invoke<ArtistView>("get_artist_collection", { name });
+export const getHistory =(limit: number, offset: number) => invoke<HistoryView>("get_history", { limit, offset });
 /** Returns the money moved (negative: what undoing a sale cost). */
 export const undoTransaction = (id: number) => invoke<number>("undo_transaction", { id });
 export const getCardDetails =(setCode: string, uuid: string) =>

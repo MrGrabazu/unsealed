@@ -4,5 +4,14 @@
   "boosters": ["play", "draft", "set", "default", "collector"],
   "maxAgeHours": 24,
   "simBoosters": 20000,
-  "tokenFoilOneIn": 15
+  "tokenFoilOneIn": 15,
+  "artCards": {
+    "setSignedOneIn": 20,
+    "playPercent": 30,
+    "playSignedPercent": 5,
+    "playUntil": "2025-02-14",
+    "collectorPercent": 45,
+    "collectorSignedPercent": 5,
+    "collectorFrom": "2025-02-14"
+  }
 }

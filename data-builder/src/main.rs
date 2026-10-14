@@ -26,6 +26,7 @@ fn parse_args() -> Result<BuildOptions, String> {
         cache: ".cache".into(),
         sim_boosters: 50_000,
         token_foil_one_in: defaults.token_foil_one_in,
+        art_cards: defaults.art_cards,
     };
     let mut args = std::env::args().skip(1);
     while let Some(flag) = args.next() {

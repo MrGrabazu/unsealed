@@ -1,8 +1,11 @@
 //! Game logic exposed to the UI. Independent from Tauri so it can be unit tested.
 
 mod achievements;
+mod artists;
 mod details;
 mod history;
+
+pub use artists::{ArtistSummary, ArtistView};
 
 pub use achievements::{AchievementTexts, AchievementView, AchievementsView};
 use achievements::{OpeningEvents, PendingReveal};
@@ -19,6 +22,7 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use unsealed_core::achievements::{Engine, Event};
 use unsealed_core::catalog::{CardEntry, Manifest, PriceFile, SetFile, COLLECTOR_KIND, FOREIGN_LANGUAGES};
+use unsealed_core::import::ART_RARITY;
 use unsealed_core::economy::{charity_available, EconomyConfig};
 use unsealed_core::limited::LimitedConfig;
 use unsealed_core::{open_booster_excluding, ColorIndex};
@@ -112,6 +116,9 @@ pub struct CollectionView {
     /// The set's tokens (one in each booster); they do not count toward completion.
     pub tokens: Vec<CollectionCard>,
     pub tokens_owned: usize,
+    /// The set's art cards (`foil_quantity`: their gold signed version); outside completion.
+    pub arts: Vec<CollectionCard>,
+    pub arts_owned: usize,
 }
 
 #[derive(Debug, Serialize)]
@@ -278,6 +285,8 @@ struct LoadedSet {
     extras: Vec<usize>,
     /// The set's tokens: outside the completion target too.
     tokens: Vec<usize>,
+    /// The set's art cards (its art series): outside the completion target too.
+    arts: Vec<usize>,
 }
 
 pub struct Game {
@@ -297,6 +306,10 @@ pub struct Game {
     limited: LimitedConfig,
     /// Print run of each limited card of the loaded sets, by uuid.
     print_runs: HashMap<String, u32>,
+    /// The collections by artist (see `artists`), read when first needed.
+    artists: Option<unsealed_core::catalog::ArtistIndex>,
+    /// Whether each translated printing checked has a good scan (see `localized`).
+    image_quality: HashMap<String, bool>,
     prices: Option<PriceFile>,
     /// Modification time of the prices file that `prices` was loaded from.
     prices_stamp: Option<SystemTime>,
@@ -336,6 +349,7 @@ impl Game {
         clock: ClockFn,
     ) -> Result<Self, String> {
         store.ensure_starting_balance(economy.starting_balance_cents, clock().now).map_err(err)?;
+        let image_quality = read_json(&data_dir.join(IMAGE_QUALITY_FILE)).unwrap_or_default();
         Ok(Self {
             data_dir,
             store,
@@ -348,6 +362,8 @@ impl Game {
             sets: HashMap::new(),
             limited: LimitedConfig::default(),
             print_runs: HashMap::new(),
+            artists: None,
+            image_quality,
             prices: None,
             prices_stamp: None,
             rng,
@@ -359,6 +375,7 @@ impl Game {
     pub fn reload_data(&mut self) {
         self.sets.clear();
         self.print_runs.clear();
+        self.artists = None;
         self.prices = None;
         self.prices_stamp = None;
     }
@@ -541,6 +558,7 @@ impl Game {
     /// Opens one sealed booster the player owns and adds its cards to the collection.
     /// Cards come back in reveal order: the best card last. Their achievement events wait
     /// for the cards to be revealed (`reveal_cards`).
+    #[cfg(test)]
     pub fn open_booster(&mut self, set_code: &str, kind: &str) -> Result<Vec<OpenedCard>, String> {
         self.open_booster_as(set_code, kind, true)
     }
@@ -567,7 +585,7 @@ impl Game {
             .filter(|(uuid, pulled)| self.print_runs.get(uuid).is_some_and(|run| pulled >= run))
             .map(|(uuid, _)| uuid)
             .collect();
-        let Self { sets, prices, rng, store, economy, clock, card_lang, print_runs, limited, .. } = self;
+        let Self { sets, prices, rng, store, economy, clock, card_lang, print_runs, limited, image_quality, .. } = self;
         let set = &sets[set_code];
         let cfg = set
             .file
@@ -582,7 +600,7 @@ impl Game {
                 let card = &set.file.cards[set.index[&d.uuid]];
                 let price = market_price(prices.as_ref(), economy, limited, print_runs, &d.uuid, d.foil);
                 let price_estimated = prices.as_ref().and_then(|p| p.cards.get(&d.uuid)).is_some_and(|p| p.estimated);
-                let shown = localized(card, card_lang);
+                let shown = localized(card, card_lang, image_quality);
                 OpenedCard {
                     image_url: shown.image_url,
                     back_image_url: shown.back_image_url,
@@ -657,23 +675,7 @@ impl Game {
                 .iter()
                 .map(|&i| {
                     let c = &set.file.cards[i];
-                    let have = owned.get(&c.uuid).copied().unwrap_or_default();
-                    let shown = localized(c, &self.card_lang);
-                    CollectionCard {
-                        uuid: c.uuid.clone(),
-                        name: shown.name,
-                        number: c.number.clone(),
-                        rarity: c.rarity.clone(),
-                        image_url: shown.image_url,
-                        back_image_url: shown.back_image_url,
-                        quantity: have.normal,
-                        foil_quantity: have.foil,
-                        price_cents: self.market_price(&c.uuid, false),
-                        foil_price_cents: self.market_price(&c.uuid, true),
-                        price_estimated: self.price_estimated(&c.uuid),
-                        sell_value_cents: self.sale_value(&c.uuid, false),
-                        foil_sell_value_cents: self.sale_value(&c.uuid, true),
-                    }
+                    self.collection_card(c, owned.get(&c.uuid).copied().unwrap_or_default())
                 })
                 .collect()
         };
@@ -681,6 +683,7 @@ impl Game {
         let cards = view(&set.obtainable);
         let extras = view(&set.extras);
         let tokens = view(&set.tokens);
+        let arts = view(&set.arts);
         let owned_count = owned_in(&cards);
         let total_count = cards.len();
         let completion_percent =
@@ -693,10 +696,69 @@ impl Game {
             completion_percent,
             extras_owned: owned_in(&extras),
             tokens_owned: owned_in(&tokens),
+            arts_owned: owned_in(&arts),
             cards,
             extras,
             tokens,
+            arts,
         })
+    }
+
+    /// The translated printings of a set (in the card language) whose image quality is not
+    /// known yet: to ask Scryfall (`record_image_quality`). None in English.
+    pub fn unchecked_images(&mut self, set_code: &str) -> Result<Vec<String>, String> {
+        if self.card_lang == "en" {
+            return Ok(Vec::new());
+        }
+        self.ensure_loaded(set_code)?;
+        let lang = self.card_lang.clone();
+        let mut ids: Vec<String> = self.sets[set_code]
+            .file
+            .cards
+            .iter()
+            .filter_map(|c| c.foreign.get(&lang)?.scryfall_id.clone())
+            .filter(|id| !self.image_quality.contains_key(id))
+            .collect();
+        ids.sort();
+        ids.dedup();
+        Ok(ids)
+    }
+
+    /// Records Scryfall's `image_status` of translated printings (a good scan: "highres_scan"),
+    /// and keeps them for the next games. Ids Scryfall did not answer for count as without a
+    /// good image. Returns how many have one.
+    pub fn record_image_quality(&mut self, asked: &[String], statuses: &HashMap<String, String>) -> usize {
+        let mut good = 0;
+        for id in asked {
+            let ok = statuses.get(id).is_some_and(|s| s == "highres_scan");
+            good += usize::from(ok);
+            self.image_quality.insert(id.clone(), ok);
+        }
+        if let Ok(json) = serde_json::to_string(&self.image_quality) {
+            // A convenience: if it cannot be saved, the check happens again next time.
+            let _ = fs::write(self.data_dir.join(IMAGE_QUALITY_FILE), json);
+        }
+        good
+    }
+
+    /// A card as the collection shows it: in the card language, with its copies and prices.
+    fn collection_card(&self, c: &CardEntry, have: Owned) -> CollectionCard {
+        let shown = localized(c, &self.card_lang, &self.image_quality);
+        CollectionCard {
+            uuid: c.uuid.clone(),
+            name: shown.name,
+            number: c.number.clone(),
+            rarity: c.rarity.clone(),
+            image_url: shown.image_url,
+            back_image_url: shown.back_image_url,
+            quantity: have.normal,
+            foil_quantity: have.foil,
+            price_cents: self.market_price(&c.uuid, false),
+            foil_price_cents: self.market_price(&c.uuid, true),
+            price_estimated: self.price_estimated(&c.uuid),
+            sell_value_cents: self.sale_value(&c.uuid, false),
+            foil_sell_value_cents: self.sale_value(&c.uuid, true),
+        }
     }
 
     /// Sells cards at the Boosterium's price. Nothing is sold if any request is invalid.
@@ -724,13 +786,18 @@ impl Game {
         Ok(SaleResult { sold_count, total_cents })
     }
 
-    /// Owned copies of a loaded set's cards, its tokens included: the collection files each
-    /// card under its own set, and tokens have theirs ("TLTR" for "LTR").
+    /// Owned copies of a loaded set's cards, its tokens and art cards included: the collection
+    /// files each card under its own set, and those may have theirs ("TLTR", "ALTR").
     fn owned_with_tokens(&self, set_code: &str) -> Result<HashMap<String, Owned>, String> {
         let mut owned = self.store.owned_in_set(set_code).map_err(err)?;
         let set = &self.sets[set_code];
-        let token_sets: HashSet<&str> =
-            set.tokens.iter().map(|&i| set.file.cards[i].set_code.as_str()).filter(|c| *c != set_code).collect();
+        let token_sets: HashSet<&str> = set
+            .tokens
+            .iter()
+            .chain(&set.arts)
+            .map(|&i| set.file.cards[i].set_code.as_str())
+            .filter(|c| *c != set_code)
+            .collect();
         for code in token_sets {
             owned.extend(self.store.owned_in_set(code).map_err(err)?);
         }
@@ -873,7 +940,7 @@ impl Game {
         self.ensure_loaded(booster_set).ok()?;
         let set = &self.sets[booster_set];
         let card = &set.file.cards[*set.index.get(uuid)?];
-        let shown = localized(card, &self.card_lang);
+        let shown = localized(card, &self.card_lang, &self.image_quality);
         Some(OpenedCard {
             uuid: card.uuid.clone(),
             name: shown.name,
@@ -926,13 +993,14 @@ impl Game {
         let colors = ColorIndex::from_cards(&file.cards);
         let index = file.cards.iter().enumerate().map(|(i, c)| (c.uuid.clone(), i)).collect();
         let (obtainable, extras) = obtainable_cards(&file);
-        let tokens = token_cards(&file);
+        let tokens = cards_where(&file, |c| c.token);
+        let arts = cards_where(&file, |c| c.art);
         for card in &file.cards {
             if let Some(run) = self.limited.print_run_of(card) {
                 self.print_runs.insert(card.uuid.clone(), run);
             }
         }
-        self.sets.insert(code.to_string(), LoadedSet { file, colors, index, obtainable, extras, tokens });
+        self.sets.insert(code.to_string(), LoadedSet { file, colors, index, obtainable, extras, tokens, arts });
         Ok(())
     }
 
@@ -1003,7 +1071,7 @@ fn obtainable_cards(file: &SetFile) -> (Vec<usize>, Vec<usize>) {
             .iter()
             .enumerate()
             // Tokens often bear the set's own code, and are in every booster: kept apart.
-            .filter(|(_, c)| c.set_code == file.code && !c.token && keep(&c.uuid))
+            .filter(|(_, c)| c.set_code == file.code && !c.token && !c.art && keep(&c.uuid))
             .map(|(i, _)| i)
             .collect();
         indices.sort_by_key(|&i| number_key(&file.cards[i].number));
@@ -1012,9 +1080,10 @@ fn obtainable_cards(file: &SetFile) -> (Vec<usize>, Vec<usize>) {
     (pick(&|u| main.contains(u)), pick(&|u| collector.contains(u) && !main.contains(u)))
 }
 
-/// The set's tokens (each booster holds one), in collector number order.
-fn token_cards(file: &SetFile) -> Vec<usize> {
-    let mut indices: Vec<usize> = file.cards.iter().enumerate().filter(|(_, c)| c.token).map(|(i, _)| i).collect();
+/// The set's cards of a kind apart (`keep`: its tokens, its art cards), in collector number
+/// order.
+fn cards_where(file: &SetFile, keep: impl Fn(&CardEntry) -> bool) -> Vec<usize> {
+    let mut indices: Vec<usize> = file.cards.iter().enumerate().filter(|(_, c)| keep(c)).map(|(i, _)| i).collect();
     indices.sort_by_key(|&i| number_key(&file.cards[i].number));
     indices
 }
@@ -1112,20 +1181,30 @@ struct Shown {
 }
 
 /// A card's name and images in `lang`, or in English when it was not printed in that language.
-/// A translated name without a translated printing on Scryfall keeps the English images.
-fn localized(card: &CardEntry, lang: &str) -> Shown {
+/// A translated name without a translated printing on Scryfall keeps the English images, and
+/// so does a translated printing whose image is not known as a good scan (`image_quality`:
+/// many have only a small scan, or none at all): the name stays translated.
+fn localized(card: &CardEntry, lang: &str, image_quality: &HashMap<String, bool>) -> Shown {
     let foreign = card.foreign.get(lang);
     let scryfall_id = foreign.and_then(|f| f.scryfall_id.clone()).unwrap_or_else(|| card.scryfall_id.clone());
+    let image_id = if scryfall_id == card.scryfall_id || image_quality.get(&scryfall_id) == Some(&true) {
+        &scryfall_id
+    } else {
+        &card.scryfall_id
+    };
     Shown {
         name: foreign.map_or(&card.name, |f| &f.name).clone(),
-        image_url: image_url(&scryfall_id),
+        image_url: image_url(image_id),
         back_image_url: DOUBLE_FACED
             .contains(&card.layout.as_str())
-            .then(|| scryfall_image_face(&scryfall_id, "normal", "back")),
+            .then(|| scryfall_image_face(image_id, "normal", "back")),
         scryfall_id,
         lang: if foreign.is_some() { lang.to_string() } else { "en".to_string() },
     }
 }
+
+/// Where the quality of translated images is remembered (see `localized`).
+const IMAGE_QUALITY_FILE: &str = "image-quality.json";
 
 /// Scryfall CDN image of a card (normal size). Double-faced back sides are not handled yet.
 fn image_url(scryfall_id: &str) -> String {
@@ -1160,9 +1239,15 @@ fn scryfall_image_face(scryfall_id: &str, version: &str, face: &str) -> String {
 /// - Collector boosters (nearly all foil): by rarity only, commons first, rares last.
 /// - Draft boosters and the oldest ones: commons, uncommons, the rare or mythic, the foil,
 ///   the basic land.
+///
+/// An art card opens a Set booster (its first chapter); elsewhere it shares the token's
+/// slot, at the end, just before the token.
 fn reveal_rank(kind: &str, card: &OpenedCard) -> u8 {
     if card.rarity == "token" {
         return 99;
+    }
+    if card.rarity == ART_RARITY {
+        return if kind == "set" { 0 } else { 98 };
     }
     let sheet = card.sheet.to_lowercase();
     let land = (sheet.contains("land") || sheet.contains("basic")) && !sheet.contains("orbasic");
@@ -1176,19 +1261,19 @@ fn reveal_rank(kind: &str, card: &OpenedCard) -> u8 {
         "set" => {
             let rare = !matches!(card.rarity.as_str(), "common" | "uncommon");
             if land {
-                0
-            } else if sheet.contains("thelist") {
-                6
-            } else if card.foil {
-                5
-            } else if sheet.contains("wildcard") {
-                3
-            } else if rare {
-                4
-            } else if sheet.contains("showcase") {
-                2
-            } else {
                 1
+            } else if sheet.contains("thelist") {
+                7
+            } else if card.foil {
+                6
+            } else if sheet.contains("wildcard") {
+                4
+            } else if rare {
+                5
+            } else if sheet.contains("showcase") {
+                3
+            } else {
+                2
             }
         }
         "play" => {
@@ -1322,6 +1407,55 @@ mod tests {
     }
 
     #[test]
+    fn an_artist_collection_gathers_their_cards_across_sets() {
+        let mut g = game_with_booster("artists");
+        fs::write(
+            g.data_dir.join(unsealed_core::catalog::ARTISTS_FILE),
+            r#"{ "artists": { "Alice": [ { "uuid": "c1", "set": "TST" }, { "uuid": "m1", "set": "TST" } ],
+                              "Bob": [ { "uuid": "x1", "set": "TST" } ],
+                              "Ghost": [ { "uuid": "z9", "set": "NOPE" } ] } }"#,
+        )
+        .unwrap();
+        g.open_booster("TST", "play").unwrap(); // gives c1 and m1
+
+        let artists = g.artists().unwrap();
+        let summary: Vec<(&str, usize, usize)> =
+            artists.iter().map(|a| (a.name.as_str(), a.card_count, a.owned_count)).collect();
+        // Ghost's card is in no set offered.
+        assert_eq!(summary, [("Alice", 2, 2), ("Bob", 1, 0)]);
+
+        let alice = g.artist_collection("Alice").unwrap();
+        // By collector number within the set: #2 (m1) before #10 (c1).
+        let order: Vec<&str> = alice.cards.iter().map(|c| c.card.uuid.as_str()).collect();
+        assert_eq!(order, ["m1", "c1"]);
+        assert_eq!((alice.owned_count, alice.total_count), (2, 2));
+        assert_eq!(alice.cards[0].set_code, "TST");
+    }
+
+    #[test]
+    fn a_translated_image_shows_only_when_it_is_a_good_scan() {
+        let card: CardEntry = serde_json::from_str(
+            r#"{ "uuid": "u", "setCode": "TST", "scryfallId": "aaaaaa", "name": "Get Out", "number": "60",
+                 "rarity": "uncommon", "finishes": ["nonfoil"], "layout": "normal",
+                 "foreign": { "fr": { "name": "Sortir", "scryfallId": "ffffff" } } }"#,
+        )
+        .unwrap();
+        let mut quality = HashMap::new();
+        // Not checked yet, then a small scan: the English image, the French name.
+        for known in [None, Some(false)] {
+            if let Some(ok) = known {
+                quality.insert("ffffff".to_string(), ok);
+            }
+            let shown = localized(&card, "fr", &quality);
+            assert_eq!((shown.name.as_str(), shown.image_url.contains("aaaaaa")), ("Sortir", true));
+            // The text still comes from the French printing.
+            assert_eq!(shown.scryfall_id, "ffffff");
+        }
+        quality.insert("ffffff".to_string(), true);
+        assert!(localized(&card, "fr", &quality).image_url.contains("ffffff"));
+    }
+
+    #[test]
     fn a_set_appears_on_its_release_day() {
         // TST is released on 2026-01-01.
         let dir = data_dir("release", PRICES);
@@ -1363,9 +1497,11 @@ mod tests {
         ];
         assert_eq!(order("draft", draft), ["c1", "c2", "u1", "mythic", "foil", "land", "token"]);
 
-        // Play: commons, Special Guest, uncommons, wildcard, rare, land, foil wildcard, token.
+        // Play: commons, Special Guest, uncommons, wildcard, rare, land, foil wildcard, art
+        // card and token (sharing a slot).
         let play = vec![
             card("token", "token", false, "unsealedToken"),
+            card("art", "art", true, "unsealedArtSigned"),
             card("foil", "uncommon", true, "foil"),
             card("land", "common", true, "foilLand"),
             card("rare", "rare", false, "rareMythic"),
@@ -1374,11 +1510,12 @@ mod tests {
             card("guest", "mythic", false, "specialGuest"),
             card("c1", "common", false, "common"),
         ];
-        assert_eq!(order("play", play), ["c1", "guest", "u1", "wild", "rare", "land", "foil", "token"]);
+        assert_eq!(order("play", play), ["c1", "guest", "u1", "wild", "rare", "land", "foil", "art", "token"]);
 
-        // Set: land, commons/uncommons, showcase, wildcard, rare, foil, The List, token.
+        // Set: art card, land, commons/uncommons, showcase, wildcard, rare, foil, The List, token.
         let set = vec![
             card("token", "token", false, "unsealedToken"),
+            card("art", "art", false, "unsealedArt"),
             card("list", "rare", false, "theList"),
             card("foil", "common", true, "foilWithShowcase"),
             card("rare", "mythic", false, "rareMythic"),
@@ -1388,7 +1525,7 @@ mod tests {
             card("c1", "common", false, "common"),
             card("land", "common", true, "foilBasic"),
         ];
-        assert_eq!(order("set", set), ["land", "u1", "c1", "showcase", "wild", "rare", "foil", "list", "token"]);
+        assert_eq!(order("set", set), ["art", "land", "u1", "c1", "showcase", "wild", "rare", "foil", "list", "token"]);
 
         // Collector: by rarity, foil or not.
         let collector = vec![
@@ -1657,7 +1794,12 @@ mod tests {
         assert_eq!(view.set_name, "Jeu de test");
         let names: Vec<&str> = view.cards.iter().map(|c| c.name.as_str()).collect();
         assert_eq!(names, ["Mythic", "Commune"]);
-        assert!(view.cards[1].image_url.contains("fr0001"));
+        // Its French image, once known as a good scan (the English one until then).
+        assert!(!view.cards[1].image_url.contains("fr0001"));
+        assert_eq!(g.unchecked_images("TST").unwrap(), ["fr0001"]);
+        g.record_image_quality(&["fr0001".to_string()], &HashMap::from([("fr0001".to_string(), "highres_scan".to_string())]));
+        assert!(g.unchecked_images("TST").unwrap().is_empty());
+        assert!(g.collection("TST").unwrap().cards[1].image_url.contains("fr0001"));
         let sets = g.list_sets().unwrap();
         assert_eq!((sets[0].name.as_str(), sets[0].english_name.as_str()), ("Jeu de test", "Test Set"));
 

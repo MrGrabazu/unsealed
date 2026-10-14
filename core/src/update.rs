@@ -3,6 +3,7 @@
 //! Pure logic: no network, no clock access, so it is testable.
 
 use crate::catalog::{Manifest, SetSelection, DATA_FORMAT_VERSION};
+pub use crate::import::ArtCardOdds;
 use serde::Deserialize;
 
 /// What to download and how fresh it must be (shipped as `config/data.json`).
@@ -27,6 +28,9 @@ pub struct DataConfig {
     /// many is foil.
     #[serde(default = "default_token_foil_one_in")]
     pub token_foil_one_in: u64,
+    /// How often boosters hold an art card.
+    #[serde(default)]
+    pub art_cards: ArtCardOdds,
 }
 
 pub fn default_token_foil_one_in() -> u64 {

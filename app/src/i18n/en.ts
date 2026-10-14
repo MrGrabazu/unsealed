@@ -168,6 +168,13 @@ export const en = {
   "collection.extras": "Collector extras",
   "collection.extrasProgress": "{owned} / {total} · only in collector boosters, not counted in completion",
   "collection.tokens": "Tokens",
+  "collection.arts": "Art cards",
+  "collection.source": "Collection",
+  "collection.bySet": "By set",
+  "collection.byArtist": "By artist",
+  "collection.artistSearch": "Find an artist",
+  "collection.artsProgress": "{owned} / {total} · from Set boosters (and some Play or Collector ones), not counted in completion",
+  "collection.signedBadge": "Signed",
   "collection.tokensProgress": "{owned} / {total} · one in every booster, not counted in completion",
   "collection.layout": "Layout",
   "collection.layoutGrid": "Grid",
@@ -348,6 +355,7 @@ export const en = {
   "rarityName.mythic": "Mythic rare",
   "rarityName.special": "Special",
   "rarityName.token": "Token",
+  "rarityName.art": "Art card",
 
   // ---- footer
   "footer.sources": "Card images and prices are provided by Scryfall.",

@@ -25,6 +25,8 @@ const rarityName = (t: I18n["t"], rarity: string) => {
       return t("rarityName.mythic");
     case "token":
       return t("rarityName.token");
+    case "art":
+      return t("rarityName.art");
     default:
       return t("rarityName.special");
   }

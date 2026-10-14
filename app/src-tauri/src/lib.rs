@@ -240,6 +240,38 @@ fn get_collection(state: State<'_, SessionState>, set_code: String) -> Result<Co
     with_game(&state, |g| g.collection(&set_code))
 }
 
+/// Asks Scryfall which translated printings of a set have a good image (many have only a
+/// small scan, or none), so the game shows those and the English image of the others.
+/// Returns how many good ones were found; 0 in English or when all are known already.
+#[tauri::command]
+async fn check_set_images(
+    state: State<'_, SessionState>,
+    scryfall: State<'_, Arc<scryfall::Client>>,
+    set_code: String,
+) -> Result<usize, String> {
+    let ids = with_game(&state, |g| g.unchecked_images(&set_code))?;
+    if ids.is_empty() {
+        return Ok(0);
+    }
+    let client = scryfall.inner().clone();
+    let asked = ids.clone();
+    let statuses = tauri::async_runtime::spawn_blocking(move || client.image_statuses(&asked))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())?;
+    with_game(&state, |g| Ok(g.record_image_quality(&ids, &statuses)))
+}
+
+#[tauri::command]
+fn list_artists(state: State<'_, SessionState>) -> Result<Vec<game::ArtistSummary>, String> {
+    with_game(&state, |g| g.artists())
+}
+
+#[tauri::command]
+fn get_artist_collection(state: State<'_, SessionState>, name: String) -> Result<game::ArtistView, String> {
+    with_game(&state, |g| g.artist_collection(&name))
+}
+
 #[tauri::command]
 fn sell_cards(state: State<'_, SessionState>, requests: Vec<SaleRequest>) -> Result<SaleResult, String> {
     with_game(&state, |g| g.sell_cards(&requests))
@@ -439,6 +471,9 @@ pub fn run() {
             open_boosters,
             reveal_cards,
             get_collection,
+            list_artists,
+            get_artist_collection,
+            check_set_images,
             sell_cards,
             sell_duplicates,
             claim_charity,

@@ -163,6 +163,13 @@ export const fr: Messages = {
   "collection.extras": "Extras collector",
   "collection.extrasProgress": "{owned} / {total} · uniquement dans les boosters collector, hors complétion",
   "collection.tokens": "Jetons",
+  "collection.arts": "Cartes d'art",
+  "collection.source": "Collection",
+  "collection.bySet": "Par set",
+  "collection.byArtist": "Par artiste",
+  "collection.artistSearch": "Chercher un artiste",
+  "collection.artsProgress": "{owned} / {total} · dans les Set Boosters (et certains Play ou Collector), hors complétion",
+  "collection.signedBadge": "Signée",
   "collection.tokensProgress": "{owned} / {total} · un dans chaque booster, hors complétion",
   "collection.layout": "Affichage",
   "collection.layoutGrid": "Grille",
@@ -343,6 +350,7 @@ export const fr: Messages = {
   "rarityName.mythic": "Rare mythique",
   "rarityName.special": "Spéciale",
   "rarityName.token": "Jeton",
+  "rarityName.art": "Carte d'art",
 
   // ---- footer
   "footer.sources": "Images et prix des cartes fournis par Scryfall.",

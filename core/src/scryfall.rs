@@ -5,7 +5,7 @@
 //! Scryfall asks for at most 10 requests per second and the `User-Agent` / `Accept` headers
 //! (sent by `builder::http_get`): requests are spaced by `MIN_INTERVAL`.
 
-use crate::builder::{http_get, BuildError};
+use crate::builder::{http_get, http_post_json, BuildError};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -144,14 +144,47 @@ impl Client {
         Ok(prints)
     }
 
-    fn get<T: serde::de::DeserializeOwned>(&self, url: &str) -> Result<T, BuildError> {
-        {
-            let mut last = self.last_request.lock().map_err(|_| "rate limiter poisoned")?;
-            if let Some(wait) = last.map(|t| MIN_INTERVAL.saturating_sub(t.elapsed())) {
-                std::thread::sleep(wait);
-            }
-            *last = Some(Instant::now());
+    /// Whether the images of printings are good scans: Scryfall's `image_status` by id
+    /// ("highres_scan", or "lowres", "placeholder", "missing": many translated printings
+    /// only have a small scan, or none). Asked in batches (`/cards/collection`, 75 ids each);
+    /// ids Scryfall does not know are left out.
+    pub fn image_statuses(&self, ids: &[String]) -> Result<HashMap<String, String>, BuildError> {
+        #[derive(Deserialize)]
+        struct Page {
+            data: Vec<Status>,
         }
+        #[derive(Deserialize)]
+        struct Status {
+            id: String,
+            #[serde(default)]
+            image_status: Option<String>,
+        }
+        let mut statuses = HashMap::new();
+        for chunk in ids.chunks(COLLECTION_BATCH) {
+            let identifiers: Vec<_> = chunk.iter().map(|id| serde_json::json!({ "id": id })).collect();
+            let body = serde_json::json!({ "identifiers": identifiers }).to_string();
+            self.wait_turn()?;
+            let page: Page = serde_json::from_reader(http_post_json(&format!("{API}/cards/collection"), &body)?.into_reader())?;
+            statuses.extend(page.data.into_iter().map(|s| (s.id, s.image_status.unwrap_or_default())));
+        }
+        Ok(statuses)
+    }
+
+    fn get<T: serde::de::DeserializeOwned>(&self, url: &str) -> Result<T, BuildError> {
+        self.wait_turn()?;
         Ok(serde_json::from_reader(http_get(url)?.into_reader())?)
     }
+
+    /// Spaces requests by `MIN_INTERVAL`, as Scryfall asks.
+    fn wait_turn(&self) -> Result<(), BuildError> {
+        let mut last = self.last_request.lock().map_err(|_| "rate limiter poisoned")?;
+        if let Some(wait) = last.map(|t| MIN_INTERVAL.saturating_sub(t.elapsed())) {
+            std::thread::sleep(wait);
+        }
+        *last = Some(Instant::now());
+        Ok(())
+    }
 }
+
+/// Ids per `/cards/collection` request (Scryfall's maximum).
+const COLLECTION_BATCH: usize = 75;

@@ -4,7 +4,8 @@ use unsealed_core::catalog::{AllSets, Manifest, ManifestSet, SetSelection, DATA_
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use unsealed_core::import::{
-    add_token_slots, add_tokens_from, parse_cents, prices_from_scryfall_jsonl, read_all_printings, set_from_mtgjson,
+    add_art_cards_from, add_art_slots, add_token_slots, artist_index, add_tokens_from, parse_cents, prices_from_scryfall_jsonl,
+    read_all_printings, set_from_mtgjson, ArtCardOdds,
 };
 use unsealed_core::{open_booster, ColorIndex};
 use unsealed_core::update::{refresh_reason, DataConfig, RefreshReason};
@@ -128,6 +129,71 @@ fn tokens_kept_in_the_token_sub_set_join_the_set() {
     add_tokens_from(&mut set, &all.data["TTST"]);
     let tokens: Vec<&str> = set.cards.iter().filter(|c| c.token).map(|c| c.uuid.as_str()).collect();
     assert_eq!(tokens, ["t1", "t2", "t9"]);
+}
+
+#[test]
+fn art_cards_join_the_set_and_the_boosters_of_their_time() {
+    // The art series lists each card's two faces; the first comes with its signed version.
+    let all = read_all_printings(
+        r#"{ "meta": { "version": "v" }, "data": { "ATST": {
+          "code": "ATST", "name": "Test Set Art Series", "releaseDate": "2026-01-01", "type": "memorabilia",
+          "cards": [],
+          "tokens": [
+            { "uuid": "a1", "setCode": "ATST", "name": "Dragon // Dragon", "number": "1", "side": "a",
+              "finishes": ["nonfoil", "signed"], "layout": "art_series", "identifiers": { "scryfallId": "sa1" } },
+            { "uuid": "a1b", "setCode": "ATST", "name": "Dragon // Dragon", "number": "1", "side": "b",
+              "finishes": ["nonfoil", "signed"], "layout": "art_series", "identifiers": { "scryfallId": "sa1" } },
+            { "uuid": "a2", "setCode": "ATST", "name": "Forest // Forest", "number": "2", "side": "a",
+              "finishes": ["nonfoil"], "layout": "art_series", "identifiers": { "scryfallId": "sa2" } } ] } } }"#
+            .as_bytes(),
+    )
+    .unwrap();
+    let mut set = set_from_mtgjson(SET_WITH_TOKENS, &["play", "collector"], &[]).unwrap();
+    add_art_cards_from(&mut set, &all.data["ATST"]);
+    let arts: Vec<(&str, &str, &Vec<String>)> =
+        set.cards.iter().filter(|c| c.art).map(|c| (c.uuid.as_str(), c.name.as_str(), &c.finishes)).collect();
+    assert_eq!(arts.len(), 2);
+    assert_eq!((arts[0].0, arts[0].1), ("a1", "Dragon"));
+    assert_eq!(arts[0].2, &vec!["nonfoil".to_string(), "foil".to_string()]);
+    assert!(set.cards.iter().filter(|c| c.art).all(|c| c.rarity == "art"));
+
+    // Released in 2026: art cards in collector boosters (45% + 5% signed), not in play ones.
+    let play_before = set.boosters["play"].boosters.clone();
+    add_art_slots(&mut set, &ArtCardOdds::default());
+    assert_eq!(set.boosters["play"].boosters.len(), play_before.len());
+    let collector = &set.boosters["collector"];
+    collector.validate().unwrap();
+    let share = |sheet: &str| -> u64 {
+        collector.boosters.iter().filter(|p| p.contents.contains_key(sheet)).map(|p| p.weight).sum::<u64>() * 100
+            / collector.boosters_total_weight
+    };
+    assert_eq!((share("unsealedArt"), share("unsealedArtSigned")), (45, 5));
+    assert_eq!(collector.sheets["unsealedArtSigned"].cards.keys().collect::<Vec<_>>(), ["a1"]);
+}
+
+#[test]
+fn artists_list_the_cards_boosters_give_under_each_of_their_artists() {
+    let raw = r#"{ "meta": { "version": "v" }, "data": {
+      "code": "TST", "name": "Test Set", "releaseDate": "2026-01-01", "type": "expansion",
+      "cards": [
+        { "uuid": "u1", "setCode": "TST", "name": "A", "number": "1", "rarity": "common", "artist": "Alice",
+          "finishes": ["nonfoil"], "layout": "normal", "identifiers": { "scryfallId": "s1" } },
+        { "uuid": "u2", "setCode": "TST", "name": "B", "number": "2", "rarity": "common", "artist": "Bob & Alice",
+          "finishes": ["nonfoil"], "layout": "normal", "identifiers": { "scryfallId": "s2" } },
+        { "uuid": "u3", "setCode": "TST", "name": "C", "number": "3", "rarity": "rare", "artist": "Carol",
+          "finishes": ["nonfoil"], "layout": "normal", "identifiers": { "scryfallId": "s3" } } ],
+      "booster": { "play": {
+        "boosters": [ { "contents": { "common": 1 }, "weight": 1 } ], "boostersTotalWeight": 1,
+        "sheets": { "common": { "cards": { "u1": 1, "u2": 1 }, "foil": false, "totalWeight": 2 } },
+        "sourceSetCodes": ["TST"] } } } }"#;
+    let set = set_from_mtgjson(raw, &["play"], &[]).unwrap();
+    // The same set twice: each card is listed once.
+    let index = artist_index(&[set.clone(), set]);
+    let names: Vec<&str> = index.artists.keys().map(String::as_str).collect();
+    assert_eq!(names, ["Alice", "Bob"]); // Carol's card is in no booster
+    let alice: Vec<&str> = index.artists["Alice"].iter().map(|c| c.uuid.as_str()).collect();
+    assert_eq!(alice, ["u1", "u2"]);
+    assert_eq!(index.artists["Bob"][0].set, "TST");
 }
 
 #[test]

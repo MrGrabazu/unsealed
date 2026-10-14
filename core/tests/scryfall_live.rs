@@ -21,3 +21,21 @@ fn fetches_a_double_faced_card_and_its_printings() {
     // Served from the cache the second time.
     assert_eq!(client.card(&card.id).unwrap().name, card.name);
 }
+
+#[test]
+#[ignore = "needs a connection to api.scryfall.com"]
+fn tells_the_quality_of_translated_images() {
+    let client = Client::default();
+    // French printings of Duskmourn cards: Get Out (no image) and Disorienting Choice (a
+    // small scan); an English one, well scanned.
+    let ids = [
+        "a6e1af02-3c08-4dda-9006-70bfbb089429",
+        "9309b66a-2f13-4fed-b63d-57c205d6909b",
+        "5d9471c8-2db9-4ce3-a1e5-42b85134cb8e",
+    ]
+    .map(String::from);
+    let statuses = client.image_statuses(&ids).unwrap();
+    assert_eq!(statuses[&ids[0]], "missing");
+    assert_eq!(statuses[&ids[1]], "lowres");
+    assert_eq!(statuses[&ids[2]], "highres_scan");
+}

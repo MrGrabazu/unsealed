@@ -28,7 +28,7 @@ pub struct SetFile {
 
 /// Bump when the compact files change in a way older data cannot satisfy: the app then
 /// rebuilds its data at the next launch.
-pub const DATA_FORMAT_VERSION: u32 = 4;
+pub const DATA_FORMAT_VERSION: u32 = 5;
 
 /// Languages kept for card and set names, as (MTGJSON language name, code). Cards printed
 /// in other languages, or never translated, stay in English.
@@ -43,6 +43,24 @@ pub struct ForeignCard {
     /// The translated printing on Scryfall, for its image; `None` shows the English one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scryfall_id: Option<String>,
+}
+
+/// Name of the artist index in the data directory.
+pub const ARTISTS_FILE: &str = "artists.json";
+
+/// The cards of each artist across the sets offered (`artists.json`, built with the sets):
+/// the collections by artist. Each card is listed once, with the set file holding it (a card
+/// can come from another set's boosters, e.g. a Special Guest).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ArtistIndex {
+    pub artists: BTreeMap<String, Vec<ArtistCard>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ArtistCard {
+    pub uuid: String,
+    /// The set file (`sets/<set>.json`) the card was found in.
+    pub set: String,
 }
 
 /// Booster kind whose exclusive cards are extras, outside a set's completion target.
@@ -86,6 +104,10 @@ pub struct CardEntry {
     /// One of the set's tokens (its own set code, e.g. "TLTR"; rarity "token").
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub token: bool,
+    /// One of the set's art cards (its art series, e.g. "ALTR"; rarity "art"). Its gold
+    /// signed version is drawn as its "foil" finish.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub art: bool,
 }
 
 /// Prices in cents, as given by Scryfall.

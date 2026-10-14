@@ -1,7 +1,9 @@
 //! Conversion of raw MTGJSON / Scryfall data into the compact catalog files.
 
 use crate::booster::{BoosterConfig, BoosterPack, BoosterSheet, ConfigError};
-use crate::catalog::{CardEntry, FeaturedCard, ForeignCard, PriceSet, SetFile, COLLECTOR_KIND, FOREIGN_LANGUAGES};
+use crate::catalog::{
+    ArtistCard, ArtistIndex, CardEntry, FeaturedCard, ForeignCard, PriceSet, SetFile, COLLECTOR_KIND, FOREIGN_LANGUAGES,
+};
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::BufRead;
@@ -149,6 +151,7 @@ fn to_entry(c: &RawCard) -> Result<CardEntry, ConfigError> {
         artist: c.artist,
         serialized: c.promo_types.iter().any(|p| p == "serialized"),
         token: false,
+        art: false,
     })
 }
 
@@ -214,30 +217,193 @@ pub fn add_token_slots(set: &mut SetFile, foil_one_in: u64) {
     for (kind, cfg) in set.boosters.iter_mut() {
         // (sheet, share of the packs)
         let slots: Vec<(&str, u64)> = match (&plain, &foil) {
+            // (MTGJSON describes neither tokens nor art cards in boosters.)
             (None, None) => return,
             (_, Some(_)) if kind == COLLECTOR_KIND => vec![(TOKEN_FOIL_SHEET, 1)],
             (Some(_), None) => vec![(TOKEN_SHEET, 1)],
             (None, Some(_)) => vec![(TOKEN_FOIL_SHEET, 1)],
             (Some(_), Some(_)) => vec![(TOKEN_SHEET, foil_one_in - 1), (TOKEN_FOIL_SHEET, 1)],
         };
-        let slots: Vec<(&str, u64)> = slots.into_iter().filter(|&(_, share)| share > 0).collect();
+        let slots: Vec<(Option<&str>, u64)> = slots.into_iter().map(|(name, share)| (Some(name), share)).collect();
         for &(name, _) in &slots {
+            let name = name.expect("every token share has a sheet");
             let source = if name == TOKEN_SHEET { &plain } else { &foil };
             cfg.sheets.insert(name.to_string(), source.clone().expect("sheet checked above"));
         }
-        let total: u64 = slots.iter().map(|&(_, share)| share).sum();
-        cfg.boosters = cfg
-            .boosters
-            .iter()
-            .flat_map(|pack| {
-                slots.iter().map(move |&(name, share)| {
-                    let mut contents = pack.contents.clone();
+        split_variants(cfg, &slots);
+    }
+}
+
+/// Splits every pack variant of a booster by `slots` (sheet, share of the packs): each share
+/// gets a copy of the variant with one card more from its sheet (none for `None`), weighted
+/// by its share. The odds stay exact, and the simulation checks them like any other.
+fn split_variants(cfg: &mut BoosterConfig, slots: &[(Option<&str>, u64)]) {
+    let slots: Vec<(Option<&str>, u64)> = slots.iter().copied().filter(|&(_, share)| share > 0).collect();
+    let total: u64 = slots.iter().map(|&(_, share)| share).sum();
+    if total == 0 {
+        return;
+    }
+    cfg.boosters = cfg
+        .boosters
+        .iter()
+        .flat_map(|pack| {
+            slots.iter().map(move |&(name, share)| {
+                let mut contents = pack.contents.clone();
+                if let Some(name) = name {
                     contents.insert(name.to_string(), 1);
-                    BoosterPack { contents, weight: pack.weight * share }
-                })
+                }
+                BoosterPack { contents, weight: pack.weight * share }
             })
+        })
+        .collect();
+    cfg.boosters_total_weight *= total;
+}
+
+/// The collections by artist: every card the sets' boosters can give (tokens and art cards
+/// included), filed under each of its artists ("A & B" counts for both), once.
+pub fn artist_index(sets: &[SetFile]) -> ArtistIndex {
+    let mut index = ArtistIndex::default();
+    let mut seen = HashSet::new();
+    for set in sets {
+        let in_boosters: HashSet<&str> = set
+            .boosters
+            .values()
+            .flat_map(|cfg| cfg.sheets.values())
+            .flat_map(|sheet| sheet.cards.keys().map(String::as_str))
             .collect();
-        cfg.boosters_total_weight *= total;
+        for card in set.cards.iter().filter(|c| in_boosters.contains(c.uuid.as_str())) {
+            let Some(artist) = &card.artist else { continue };
+            if !seen.insert(card.uuid.clone()) {
+                continue;
+            }
+            for name in artist.split(" & ").map(str::trim).filter(|n| !n.is_empty()) {
+                index
+                    .artists
+                    .entry(name.to_string())
+                    .or_default()
+                    .push(ArtistCard { uuid: card.uuid.clone(), set: set.code.clone() });
+            }
+        }
+    }
+    index
+}
+
+/// Rarity given to art cards.
+pub const ART_RARITY: &str = "art";
+
+/// Sheets of the art card slot (MTGJSON describes none): the regular and the gold signed one.
+const ART_SHEET: &str = "unsealedArt";
+const ART_SIGNED_SHEET: &str = "unsealedArtSigned";
+
+/// The art series of a set: "A" + its code ("ALTR" for "LTR").
+pub fn art_set_code(code: &str) -> String {
+    format!("A{code}")
+}
+
+/// Adds a set's art cards, from its art series. MTGJSON lists them among the series' tokens,
+/// each face apart (a and b, the same card): one entry per card is kept, named once, and its
+/// gold signed version (finish "signed") is recorded as its "foil" finish.
+pub fn add_art_cards_from(set: &mut SetFile, art_set: &RawSet) {
+    let known: HashSet<String> = set.cards.iter().map(|c| c.uuid.clone()).collect();
+    let added: Vec<CardEntry> = art_set
+        .tokens
+        .iter()
+        .chain(&art_set.cards)
+        .filter(|c| c.side.as_deref() != Some("b") && !known.contains(&c.uuid))
+        .filter_map(|c| to_entry(c).ok())
+        .map(|entry| CardEntry {
+            name: entry.name.split(" // ").next().unwrap_or(&entry.name).to_string(),
+            rarity: ART_RARITY.to_string(),
+            finishes: entry.finishes.iter().map(|f| if f == "signed" { "foil".to_string() } else { f.clone() }).collect(),
+            art: true,
+            ..entry
+        })
+        .collect();
+    set.cards.extend(added);
+}
+
+/// How often boosters hold an art card (see `ArtCardOdds`).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArtCardOdds {
+    /// Set boosters always open on an art card; one in this many is the signed one.
+    pub set_signed_one_in: u64,
+    /// Play boosters of the sets released before `play_until`: percent of the packs with a
+    /// regular art card, and with a signed one.
+    pub play_percent: u64,
+    pub play_signed_percent: u64,
+    pub play_until: String,
+    /// Collector boosters of the sets released from `collector_from` (art cards moved there).
+    pub collector_percent: u64,
+    pub collector_signed_percent: u64,
+    pub collector_from: String,
+}
+
+impl Default for ArtCardOdds {
+    /// The MTG wiki's odds; art cards moved from Play to Collector boosters with Aetherdrift.
+    /// The Collector odds are not documented: an estimate.
+    fn default() -> Self {
+        Self {
+            set_signed_one_in: 20,
+            play_percent: 30,
+            play_signed_percent: 5,
+            play_until: "2025-02-14".into(),
+            collector_percent: 45,
+            collector_signed_percent: 5,
+            collector_from: "2025-02-14".into(),
+        }
+    }
+}
+
+/// Gives the boosters that hold one an art card of the set (Set boosters always, Play and
+/// Collector ones some of the time, depending on the set's date: see `ArtCardOdds`). In real
+/// Play and Collector boosters the art card takes the token's place; here it comes along.
+pub fn add_art_slots(set: &mut SetFile, odds: &ArtCardOdds) {
+    let sheet = |signed: bool| {
+        let finish = if signed { "foil" } else { "nonfoil" };
+        let cards: BTreeMap<String, u64> =
+            set.cards.iter().filter(|c| c.art && c.finishes.iter().any(|f| f == finish)).map(|c| (c.uuid.clone(), 1)).collect();
+        (!cards.is_empty()).then(|| BoosterSheet {
+            allow_duplicates: false,
+            balance_colors: false,
+            total_weight: cards.len() as u64,
+            cards,
+            fixed: false,
+            foil: signed,
+        })
+    };
+    let (plain, signed) = (sheet(false), sheet(true));
+    if plain.is_none() && signed.is_none() {
+        return;
+    }
+    let released = set.release_date.clone();
+    for (kind, cfg) in set.boosters.iter_mut() {
+        // Shares of the packs: (regular art card, signed one, none).
+        let (regular, gold, none) = match kind.as_str() {
+            "set" => (odds.set_signed_one_in.max(1) - 1, 1, 0),
+            "play" if released < odds.play_until => {
+                (odds.play_percent, odds.play_signed_percent, 100u64.saturating_sub(odds.play_percent + odds.play_signed_percent))
+            }
+            COLLECTOR_KIND if released >= odds.collector_from => (
+                odds.collector_percent,
+                odds.collector_signed_percent,
+                100u64.saturating_sub(odds.collector_percent + odds.collector_signed_percent),
+            ),
+            _ => continue,
+        };
+        // A missing version gives its share to the other one.
+        let (regular, gold) = match (&plain, &signed) {
+            (Some(_), None) => (regular + gold, 0),
+            (None, Some(_)) => (0, regular + gold),
+            _ => (regular, gold),
+        };
+        if regular > 0 {
+            cfg.sheets.insert(ART_SHEET.to_string(), plain.clone().expect("checked above"));
+        }
+        if gold > 0 {
+            cfg.sheets.insert(ART_SIGNED_SHEET.to_string(), signed.clone().expect("checked above"));
+        }
+        split_variants(cfg, &[(Some(ART_SHEET), regular), (Some(ART_SIGNED_SHEET), gold), (None, none)]);
     }
 }
 

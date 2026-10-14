@@ -5,10 +5,10 @@
 
 use crate::booster::BoosterConfig;
 use crate::catalog::{
-    BoosterValue, Manifest, ManifestSet, PriceFile, PriceSet, SetFile, SetSelection, COLLECTOR_KIND,
+    BoosterValue, Manifest, ManifestSet, PriceFile, PriceSet, SetFile, SetSelection, ARTISTS_FILE, COLLECTOR_KIND,
     DATA_FORMAT_VERSION,
 };
-use crate::import::{add_token_slots, add_tokens_from, compact_set, featured_card, token_set_code, prices_by_uuid, prices_from_scryfall_jsonl, read_all_printings, AllPrintings};
+use crate::import::{add_art_cards_from, add_art_slots, artist_index, add_token_slots, add_tokens_from, art_set_code, compact_set, ArtCardOdds, featured_card, token_set_code, prices_by_uuid, prices_from_scryfall_jsonl, read_all_printings, AllPrintings};
 use crate::sim::expected_value_cents;
 use crate::{simulate, ColorIndex};
 use flate2::read::GzDecoder;
@@ -59,11 +59,22 @@ pub struct BuildOptions {
     pub sim_boosters: u64,
     /// See `DataConfig::token_foil_one_in`.
     pub token_foil_one_in: u64,
+    /// See `DataConfig::art_cards`.
+    pub art_cards: ArtCardOdds,
 }
 
 /// A GET with the headers Scryfall and MTGJSON ask for (shared with `scryfall`).
 pub(crate) fn http_get(url: &str) -> Result<ureq::Response, BuildError> {
     Ok(ureq::get(url).set("User-Agent", USER_AGENT).set("Accept", ACCEPT).call()?)
+}
+
+/// A POST of a JSON body, with the same headers.
+pub(crate) fn http_post_json(url: &str, body: &str) -> Result<ureq::Response, BuildError> {
+    Ok(ureq::post(url)
+        .set("User-Agent", USER_AGENT)
+        .set("Accept", ACCEPT)
+        .set("Content-Type", "application/json")
+        .send_string(body)?)
 }
 
 /// Downloads a file, reporting the fraction received (at most once per percent) when the
@@ -169,7 +180,7 @@ fn build_set(
     code: &str,
     kinds: &[&str],
     sim_boosters: u64,
-    token_foil_one_in: u64,
+    extra: &BuildOptions,
     validated: &mut BTreeMap<String, String>,
     dropped: &mut BTreeMap<String, String>,
 ) -> Result<SetFile, BuildError> {
@@ -183,7 +194,11 @@ fn build_set(
     if let Some(token_set) = all.data.get(&token_set_code(raw)) {
         add_tokens_from(&mut set, token_set);
     }
-    add_token_slots(&mut set, token_foil_one_in);
+    add_token_slots(&mut set, extra.token_foil_one_in);
+    if let Some(art_set) = all.data.get(&art_set_code(code)) {
+        add_art_cards_from(&mut set, art_set);
+        add_art_slots(&mut set, &extra.art_cards);
+    }
     let colors = ColorIndex::from_cards(&set.cards);
     let mut failed = Vec::new();
     for (kind, cfg) in &set.boosters {
@@ -294,7 +309,7 @@ pub fn build(opts: &BuildOptions, progress: Progress<'_>) -> Result<Manifest, Bu
     for (i, code) in codes.iter().enumerate() {
         let at = MTGJSON_READ_END + (SETS_END - MTGJSON_READ_END) * i as f64 / codes.len().max(1) as f64;
         progress(&format!("Preparing {} ({}/{})", all.data[code].name, i + 1, codes.len()), at);
-        let set = match build_set(&all, code, &kinds, opts.sim_boosters, opts.token_foil_one_in, &mut validated, &mut skipped) {
+        let set = match build_set(&all, code, &kinds, opts.sim_boosters, opts, &mut validated, &mut skipped) {
             Ok(set) => set,
             Err(e) => {
                 eprintln!("{code} left out: {e}");
@@ -372,6 +387,7 @@ pub fn build(opts: &BuildOptions, progress: Progress<'_>) -> Result<Manifest, Bu
         );
     }
     write_json(&opts.out.join("prices.json"), &PriceFile { updated_at: bulk.updated_at.clone(), cards, boosters })?;
+    write_json(&opts.out.join(ARTISTS_FILE), &artist_index(&built_sets))?;
 
     progress("Saving the game data", 0.98);
     let generated_at = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().to_string();

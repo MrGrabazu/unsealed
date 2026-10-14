@@ -163,6 +163,13 @@ export const it: Messages = {
   "collection.extras": "Extra da collezione",
   "collection.extrasProgress": "{owned} / {total} · solo nelle buste da collezione, esclusi dal completamento",
   "collection.tokens": "Pedine",
+  "collection.arts": "Carte illustrazione",
+  "collection.source": "Collezione",
+  "collection.bySet": "Per set",
+  "collection.byArtist": "Per artista",
+  "collection.artistSearch": "Cerca un artista",
+  "collection.artsProgress": "{owned} / {total} · nelle buste dell'espansione (e in alcune da gioco o da collezione), escluse dal completamento",
+  "collection.signedBadge": "Firmata",
   "collection.tokensProgress": "{owned} / {total} · una in ogni busta, escluse dal completamento",
   "collection.layout": "Vista",
   "collection.layoutGrid": "Griglia",
@@ -343,6 +350,7 @@ export const it: Messages = {
   "rarityName.mythic": "Rara mitica",
   "rarityName.special": "Speciale",
   "rarityName.token": "Pedina",
+  "rarityName.art": "Carta illustrazione",
 
   // ---- footer
   "footer.sources": "Immagini e prezzi delle carte sono forniti da Scryfall.",

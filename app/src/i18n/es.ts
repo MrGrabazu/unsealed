@@ -163,6 +163,13 @@ export const es: Messages = {
   "collection.extras": "Extras de coleccionista",
   "collection.extrasProgress": "{owned} / {total} · solo en sobres de coleccionista, no cuentan para completar",
   "collection.tokens": "Fichas",
+  "collection.arts": "Cartas de arte",
+  "collection.source": "Colección",
+  "collection.bySet": "Por edición",
+  "collection.byArtist": "Por artista",
+  "collection.artistSearch": "Buscar un artista",
+  "collection.artsProgress": "{owned} / {total} · en los sobres de edición (y algunos de juego o de coleccionista), no cuentan para completar",
+  "collection.signedBadge": "Firmada",
   "collection.tokensProgress": "{owned} / {total} · una en cada sobre, no cuentan para completar",
   "collection.layout": "Vista",
   "collection.layoutGrid": "Cuadrícula",
@@ -343,6 +350,7 @@ export const es: Messages = {
   "rarityName.mythic": "Rara mítica",
   "rarityName.special": "Especial",
   "rarityName.token": "Ficha",
+  "rarityName.art": "Carta de arte",
 
   // ---- footer
   "footer.sources": "Las imágenes y precios de las cartas los proporciona Scryfall.",

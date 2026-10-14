@@ -3,6 +3,7 @@ import type { CollectionCard } from "./api";
 import { CardImage } from "./CardImage";
 import { useI18n } from "./i18n";
 import { Money } from "./money";
+import { sheenClass } from "./RevealedCards";
 
 /** One line of a sale: copies of a card in one finish. */
 export interface SoldLine {
@@ -58,11 +59,13 @@ export function SaleModal({ soldCount, totalCents, lines, onClose }: Props) {
               <li key={`${line.card.uuid}:${line.foil}`}>
                 <div className="sale-thumb thumb">
                   <CardImage front={line.card.imageUrl} back={null} alt={line.card.name} lazy />
-                  {line.foil && <div className="foil-sheen" />}
+                  {line.foil && <div className={sheenClass(line.card.rarity)} />}
                 </div>
                 <span className="sale-name">
                   {line.card.name}
-                  {line.foil && <span className="tag">{t("collection.foilBadge")}</span>}
+                  {line.foil && (
+                    <span className="tag">{t(line.card.rarity === "art" ? "collection.signedBadge" : "collection.foilBadge")}</span>
+                  )}
                 </span>
                 <span className="hint">
                   ×{line.quantity} · <Money cents={line.unitCents} />

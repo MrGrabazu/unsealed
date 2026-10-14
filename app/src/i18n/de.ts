@@ -163,6 +163,13 @@ export const de: Messages = {
   "collection.extras": "Sammler-Extras",
   "collection.extrasProgress": "{owned} / {total} · nur in Sammler-Boostern, zählt nicht zur Vervollständigung",
   "collection.tokens": "Spielsteine",
+  "collection.arts": "Kunstkarten",
+  "collection.source": "Sammlung",
+  "collection.bySet": "Nach Set",
+  "collection.byArtist": "Nach Künstler",
+  "collection.artistSearch": "Künstler suchen",
+  "collection.artsProgress": "{owned} / {total} · in Set-Boostern (und manchen Play- oder Sammler-Boostern), zählt nicht zur Vervollständigung",
+  "collection.signedBadge": "Signiert",
   "collection.tokensProgress": "{owned} / {total} · einer in jedem Booster, zählt nicht zur Vervollständigung",
   "collection.layout": "Ansicht",
   "collection.layoutGrid": "Raster",
@@ -343,6 +350,7 @@ export const de: Messages = {
   "rarityName.mythic": "Mythisch selten",
   "rarityName.special": "Besonders",
   "rarityName.token": "Spielstein",
+  "rarityName.art": "Kunstkarte",
 
   // ---- footer
   "footer.sources": "Kartenbilder und Preise werden von Scryfall bereitgestellt.",

@@ -167,7 +167,7 @@ impl Game {
         self.ensure_loaded(set_code).ok()?;
         let set = &self.sets[set_code];
         let card = &set.file.cards[*set.index.get(uuid)?];
-        Some(localized(card, &self.card_lang).name)
+        Some(localized(card, &self.card_lang, &self.image_quality).name)
     }
 
     fn set_name(&self, set_code: &str) -> String {

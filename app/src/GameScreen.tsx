@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import {
   buyBoosters,
+  checkSetImages,
   claimCharity,
   createSavePoint,
   getShop,
@@ -182,6 +183,8 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     setPack({ setCode, kind, quick: false });
     setLast({ setCode, kind });
     setTab("open");
+    // While the pack is sealed: which translated images are good scans (else English ones).
+    void checkSetImages(setCode).catch(() => {});
   }
 
   /** The quick opening: drawn at once, its cards dealt without the animation (and seen at
@@ -195,6 +198,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     setBusy(true);
     setError(null);
     try {
+      await checkSetImages(setCode).catch(() => {});
       setCards(await openBooster(setCode, kind, false));
       setOpenings((n) => n + 1);
       await revealCards(Number.MAX_SAFE_INTEGER);
