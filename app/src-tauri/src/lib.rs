@@ -204,9 +204,15 @@ fn buy_boosters(state: State<'_, SessionState>, set_code: String, kind: String, 
     with_game(&state, |g| g.buy_boosters(&set_code, &kind, quantity))
 }
 
+/// `animated`: the player watches the opening (false for a quick opening).
 #[tauri::command]
-fn open_booster(state: State<'_, SessionState>, set_code: String, kind: String) -> Result<Vec<OpenedCard>, String> {
-    with_game(&state, |g| g.open_booster(&set_code, &kind))
+fn open_booster(
+    state: State<'_, SessionState>,
+    set_code: String,
+    kind: String,
+    animated: bool,
+) -> Result<Vec<OpenedCard>, String> {
+    with_game(&state, |g| g.open_booster_as(&set_code, &kind, animated))
 }
 
 #[tauri::command]

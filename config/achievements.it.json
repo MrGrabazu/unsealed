@@ -231,6 +231,10 @@
   "big-sale": { "name": "Grande vendita", "description": "Guadagna {cents:100000} con una sola vendita." },
   "magnate": { "name": "Magnate dei Sigilli", "description": "Possiedi {cents:10000000} contemporaneamente." },
   "desert": { "name": "Deserto", "description": "Apri 100 buste di fila senza nessuna carta mitica." },
+  "savor-500": { "name": "Con calma", "description": "Apri 500 buste con calma, carta dopo carta." },
+  "savor-1000": { "name": "Intenditore", "description": "Apri 1.000 buste con calma, carta dopo carta." },
+  "rush-500": { "name": "Di fretta", "description": "Apri 500 buste senza l'animazione." },
+  "rush-1000": { "name": "Nemmeno un secondo da perdere", "description": "Apri 1.000 buste senza l'animazione." },
   "frequent-visitor": { "name": "Visitatore assiduo", "description": "Accetta l'aiuto del Boosterium 10 volte." },
   "overachiever": { "name": "Primo della classe", "description": "Sblocca 50 obiettivi." }
 }

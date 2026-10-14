@@ -50,7 +50,8 @@ function FlipCard({ card, faceUp }: { card: OpenedCard; faceUp: boolean }) {
 }
 
 /** Opening one booster, like for real: the sealed pack, torn open; the cards in a pile,
- * revealed one by one (the best last) and set aside in a row; then all of them to look at. */
+ * revealed one by one (in a real booster's order) and set aside in a row; then all of them to
+ * look at. */
 export function PackOpening({ setCode, set, kind, cards, onTear, onReveal, busy, onDetails }: Props) {
   const { t, tx } = useI18n();
   const money = useMoney();

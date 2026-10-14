@@ -18,7 +18,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use unsealed_core::achievements::{Engine, Event};
-use unsealed_core::catalog::{CardEntry, Manifest, PriceFile, SetFile, FOREIGN_LANGUAGES};
+use unsealed_core::catalog::{CardEntry, Manifest, PriceFile, SetFile, COLLECTOR_KIND, FOREIGN_LANGUAGES};
 use unsealed_core::economy::{charity_available, EconomyConfig};
 use unsealed_core::limited::LimitedConfig;
 use unsealed_core::{open_booster_excluding, ColorIndex};
@@ -542,14 +542,20 @@ impl Game {
     /// Cards come back in reveal order: the best card last. Their achievement events wait
     /// for the cards to be revealed (`reveal_cards`).
     pub fn open_booster(&mut self, set_code: &str, kind: &str) -> Result<Vec<OpenedCard>, String> {
+        self.open_booster_as(set_code, kind, true)
+    }
+
+    /// `open_booster`, saying whether the player watches the opening (`animated`) or skips it
+    /// (quick opening): achievements count both ways apart.
+    pub fn open_booster_as(&mut self, set_code: &str, kind: &str, animated: bool) -> Result<Vec<OpenedCard>, String> {
         self.flush_reveal();
-        let (cards, events) = self.open_one(set_code, kind)?;
+        let (cards, events) = self.open_one(set_code, kind, animated)?;
         self.pending_reveal = Some(PendingReveal { per_card: events.per_card, booster: events.booster, revealed: 0 });
         Ok(cards)
     }
 
     /// Draws one booster and records it, returning its cards and their events (not emitted).
-    fn open_one(&mut self, set_code: &str, kind: &str) -> Result<(Vec<OpenedCard>, OpeningEvents), String> {
+    fn open_one(&mut self, set_code: &str, kind: &str, animated: bool) -> Result<(Vec<OpenedCard>, OpeningEvents), String> {
         self.ensure_loaded(set_code)?;
         self.ensure_prices();
         // Cards of a limited print run whose every copy was pulled in this game.
@@ -594,7 +600,7 @@ impl Game {
                 }
             })
             .collect();
-        cards.sort_by_key(|c| (rarity_rank(&c.rarity), c.foil));
+        cards.sort_by_key(|c| reveal_rank(kind, c));
 
         let outcome = {
             let records: Vec<OpeningCard<'_>> = cards
@@ -613,18 +619,19 @@ impl Game {
             card.is_new = *is_new;
         }
 
-        let events = self.opening_events(set_code, kind, &cards, outcome.cost_cents);
+        let events = self.opening_events(set_code, kind, &cards, outcome.cost_cents, animated);
         Ok((cards, events))
     }
 
     /// Opens up to `quantity` sealed boosters in a row. Each opening is its own transaction, so
-    /// running out of stock part-way keeps (and returns) what was already opened. Played fast,
-    /// so their events are emitted at once (the interface holds the notifications back).
+    /// running out of stock part-way keeps (and returns) what was already opened. Played fast
+    /// (they count as opened without animation), so their events are emitted at once (the
+    /// interface holds the notifications back).
     pub fn open_boosters(&mut self, set_code: &str, kind: &str, quantity: u32) -> Result<Vec<Vec<OpenedCard>>, String> {
         self.flush_reveal();
         let mut opened = Vec::new();
         for _ in 0..quantity {
-            match self.open_one(set_code, kind) {
+            match self.open_one(set_code, kind, false) {
                 Ok((cards, events)) => {
                     self.emit(events.per_card.into_iter().chain(events.booster).collect());
                     opened.push(cards);
@@ -1139,15 +1146,71 @@ fn scryfall_image_face(scryfall_id: &str, version: &str, face: &str) -> String {
     }
 }
 
-/// Reveal order: the token first, the best card last.
-fn rarity_rank(rarity: &str) -> u8 {
-    match rarity {
-        "token" => 0,
-        "common" => 1,
-        "uncommon" => 2,
-        "rare" => 3,
-        "mythic" => 4,
-        _ => 2,
+/// Reveal order, as cards come in a real booster of each kind (MTGJSON gives none: each
+/// card's place is told by its rarity and the sheet it was drawn from). The token always
+/// comes last; cards of a same place keep their drawing order.
+/// - Play boosters (slots #1-15 of the MTG wiki): commons, then the common slot's Special
+///   Guest / The List card, uncommons, the non-foil wildcard, the rare or mythic, the land,
+///   the foil wildcard.
+/// - Set boosters (the wiki's "chapters"): the land first, commons and uncommons, the
+///   head-turning showcase common/uncommon, the wildcards, the rare or mythic, the foil, and
+///   in the epilogue The List card before the token.
+/// - Collector boosters (nearly all foil): by rarity only, commons first, rares last.
+/// - Draft boosters and the oldest ones: commons, uncommons, the rare or mythic, the foil,
+///   the basic land.
+fn reveal_rank(kind: &str, card: &OpenedCard) -> u8 {
+    if card.rarity == "token" {
+        return 99;
+    }
+    let sheet = card.sheet.to_lowercase();
+    let land = (sheet.contains("land") || sheet.contains("basic")) && !sheet.contains("orbasic");
+    let by_rarity = |common: u8, uncommon: u8, rare: u8| match card.rarity.as_str() {
+        "common" => common,
+        "uncommon" => uncommon,
+        _ => rare,
+    };
+    match kind {
+        COLLECTOR_KIND => by_rarity(0, 1, 2),
+        "set" => {
+            let rare = !matches!(card.rarity.as_str(), "common" | "uncommon");
+            if land {
+                0
+            } else if sheet.contains("thelist") {
+                6
+            } else if card.foil {
+                5
+            } else if sheet.contains("wildcard") {
+                3
+            } else if rare {
+                4
+            } else if sheet.contains("showcase") {
+                2
+            } else {
+                1
+            }
+        }
+        "play" => {
+            if land {
+                5
+            } else if card.foil {
+                6
+            } else if sheet.contains("wildcard") {
+                3
+            } else if ["specialguest", "thelist", "sourcematerial"].iter().any(|s| sheet.contains(s)) {
+                1
+            } else {
+                by_rarity(0, 2, 4)
+            }
+        }
+        _ => {
+            if card.foil {
+                3
+            } else if land {
+                4
+            } else {
+                by_rarity(0, 1, 2)
+            }
+        }
     }
 }
 
@@ -1254,6 +1317,97 @@ mod tests {
         let mut g = game(name);
         g.buy_boosters("TST", "play", 1).unwrap();
         g
+    }
+
+    #[test]
+    fn cards_come_in_the_order_of_a_real_booster_of_their_kind() {
+        let card = |uuid: &str, rarity: &str, foil: bool, sheet: &str| OpenedCard {
+            uuid: uuid.into(),
+            name: String::new(),
+            number: String::new(),
+            rarity: rarity.into(),
+            set_code: String::new(),
+            scryfall_id: String::new(),
+            foil,
+            sheet: sheet.into(),
+            image_url: String::new(),
+            back_image_url: None,
+            price_cents: None,
+            price_estimated: false,
+            is_new: false,
+        };
+        let order = |kind: &str, mut cards: Vec<OpenedCard>| {
+            cards.sort_by_key(|c| reveal_rank(kind, c));
+            cards.into_iter().map(|c| c.uuid).collect::<Vec<_>>()
+        };
+
+        // Draft: commons, uncommons, rare, foil, basic land, token.
+        let draft = vec![
+            card("token", "token", true, "unsealedTokenFoil"),
+            card("land", "common", false, "basic"),
+            card("foil", "common", true, "foil"),
+            card("mythic", "mythic", false, "rareMythic"),
+            card("u1", "uncommon", false, "uncommon"),
+            card("c1", "common", false, "common"),
+            card("c2", "common", false, "common"),
+        ];
+        assert_eq!(order("draft", draft), ["c1", "c2", "u1", "mythic", "foil", "land", "token"]);
+
+        // Play: commons, Special Guest, uncommons, wildcard, rare, land, foil wildcard, token.
+        let play = vec![
+            card("token", "token", false, "unsealedToken"),
+            card("foil", "uncommon", true, "foil"),
+            card("land", "common", true, "foilLand"),
+            card("rare", "rare", false, "rareMythic"),
+            card("wild", "rare", false, "wildcard"),
+            card("u1", "uncommon", false, "uncommon"),
+            card("guest", "mythic", false, "specialGuest"),
+            card("c1", "common", false, "common"),
+        ];
+        assert_eq!(order("play", play), ["c1", "guest", "u1", "wild", "rare", "land", "foil", "token"]);
+
+        // Set: land, commons/uncommons, showcase, wildcard, rare, foil, The List, token.
+        let set = vec![
+            card("token", "token", false, "unsealedToken"),
+            card("list", "rare", false, "theList"),
+            card("foil", "common", true, "foilWithShowcase"),
+            card("rare", "mythic", false, "rareMythic"),
+            card("wild", "uncommon", false, "wildcard"),
+            card("showcase", "uncommon", false, "commonUncommonShowcase"),
+            card("u1", "uncommon", false, "uncommon"),
+            card("c1", "common", false, "common"),
+            card("land", "common", true, "foilBasic"),
+        ];
+        assert_eq!(order("set", set), ["land", "u1", "c1", "showcase", "wild", "rare", "foil", "list", "token"]);
+
+        // Collector: by rarity, foil or not.
+        let collector = vec![
+            card("token", "token", true, "unsealedTokenFoil"),
+            card("mythic", "mythic", true, "foilRareMythic"),
+            card("showcase", "uncommon", false, "uncommonShowcase"),
+            card("fc", "common", true, "foilCommon"),
+            card("rare", "rare", false, "extendedRareMythic"),
+            card("fu", "uncommon", true, "foilUncommon"),
+        ];
+        assert_eq!(order("collector", collector), ["fc", "showcase", "fu", "mythic", "rare", "token"]);
+    }
+
+    #[test]
+    fn openings_watched_and_skipped_are_counted_apart() {
+        let rushed = r#"{ "id": "rushed", "name": "Rushed", "description": "Skip an opening.",
+            "rarity": "common", "emblem": "bolt", "palette": "ember",
+            "condition": { "type": "event", "event": "BoosterOpened",
+              "where": [{ "field": "animated", "op": "eq", "value": false }] } }"#;
+        let (mut g, _) = game_with_engine("rushed", PRICES, achievements(rushed));
+        g.buy_boosters("TST", "play", 3).unwrap();
+        // Watched: nothing.
+        g.open_booster("TST", "play").unwrap();
+        g.reveal_cards(usize::MAX);
+        assert!(g.take_unlocks("en").is_empty());
+        // Skipped (quick opening): unlocked.
+        g.open_booster_as("TST", "play", false).unwrap();
+        g.reveal_cards(usize::MAX);
+        assert_eq!(g.take_unlocks("en").len(), 1);
     }
 
     #[test]

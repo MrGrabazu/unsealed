@@ -78,6 +78,10 @@
   "big-sale": { "name": "Grosse vente", "description": "Gagnez {cents:100000} en une seule vente." },
   "magnate": { "name": "Magnat des Sceaux", "description": "Possédez {cents:10000000} en même temps." },
   "desert": { "name": "Désert", "description": "Ouvrez 100 boosters d'affilée sans carte mythique." },
+  "savor-500": { "name": "Tout en douceur", "description": "Ouvrez 500 boosters en prenant le temps, carte après carte." },
+  "savor-1000": { "name": "Fin connaisseur", "description": "Ouvrez 1 000 boosters en prenant le temps, carte après carte." },
+  "rush-500": { "name": "Pressé", "description": "Ouvrez 500 boosters sans l'animation." },
+  "rush-1000": { "name": "Pas une seconde à perdre", "description": "Ouvrez 1 000 boosters sans l'animation." },
   "frequent-visitor": { "name": "Habitué", "description": "Acceptez l'aide du Boosterium 10 fois." },
   "overachiever": { "name": "Bourreau de travail", "description": "Débloquez 50 succès." }
 }

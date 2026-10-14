@@ -169,6 +169,14 @@ export const sounds = {
   },
 };
 
+/** The card of a booster that deserves its sound: a mythic, else a great pull, else a foil,
+ * else the most valuable. (Cards come in a real booster's order, not the best last.) */
+export function bestCard(cards: OpenedCard[]): OpenedCard | undefined {
+  const score = (c: OpenedCard) =>
+    (c.rarity === "mythic" ? 4e9 : 0) + (isBigCard(c) ? 2e9 : 0) + (c.foil ? 1e9 : 0) + (c.priceCents ?? 0);
+  return cards.reduce<OpenedCard | undefined>((best, c) => (!best || score(c) > score(best) ? c : best), undefined);
+}
+
 /** What a card revealed sounds like: a bell for a great pull, a chime for a foil (both for a
  * great foil), a soft flip otherwise. */
 export function revealSound(card: OpenedCard | undefined) {

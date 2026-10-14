@@ -332,8 +332,9 @@ export const buyBoosters = (setCode: string, kind: string, quantity: number) =>
   invoke<void>("buy_boosters", { setCode, kind, quantity });
 export const sellBoosters = (setCode: string, kind: string, quantity: number) =>
   invoke<BoosterSaleResult>("sell_boosters", { setCode, kind, quantity });
-export const openBooster = (setCode: string, kind: string) =>
-  invoke<OpenedCard[]>("open_booster", { setCode, kind });
+/** `animated`: the player watches the opening (false for a quick opening). */
+export const openBooster = (setCode: string, kind: string, animated = true) =>
+  invoke<OpenedCard[]>("open_booster", { setCode, kind, animated });
 export const openBoosters = (setCode: string, kind: string, quantity: number) =>
   invoke<OpenedCard[][]>("open_boosters", { setCode, kind, quantity });
 /** The player turned over `count` cards of the booster being opened (their achievements

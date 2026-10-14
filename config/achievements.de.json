@@ -78,6 +78,10 @@
   "big-sale": { "name": "Großverkauf", "description": "Verdiene {cents:100000} mit einem einzigen Verkauf." },
   "magnate": { "name": "Siegel-Magnat", "description": "Besitze {cents:10000000} auf einmal." },
   "desert": { "name": "Wüste", "description": "Öffne 100 Booster in Folge ohne mythische Karte." },
+  "savor-500": { "name": "Mit Ruhe", "description": "Öffne 500 Booster in aller Ruhe, Karte für Karte." },
+  "savor-1000": { "name": "Kenner", "description": "Öffne 1.000 Booster in aller Ruhe, Karte für Karte." },
+  "rush-500": { "name": "In Eile", "description": "Öffne 500 Booster ohne Animation." },
+  "rush-1000": { "name": "Keine Sekunde zu verlieren", "description": "Öffne 1.000 Booster ohne Animation." },
   "frequent-visitor": { "name": "Stammgast", "description": "Nimm 10-mal die Hilfe des Boosteriums an." },
   "overachiever": { "name": "Streber", "description": "Schalte 50 Erfolge frei." }
 }

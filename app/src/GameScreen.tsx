@@ -23,8 +23,9 @@ import { Achievements } from "./Achievements";
 import { BatchOpening } from "./BatchOpening";
 import { CardDetails } from "./CardDetails";
 import { Logo } from "./Logo";
-import { sounds } from "./sound";
+import { getSoundOn, setSoundOn, sounds } from "./sound";
 import { PackOpening } from "./PackOpening";
+import { QuickOpening } from "./QuickOpening";
 import { canUseWebGL, getOpening3d } from "./settings";
 
 // The 3D opening brings three.js along: loaded the first time a booster is opened.
@@ -69,11 +70,12 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   const [cards, setCards] = useState<OpenedCard[] | null>(null);
   const [batch, setBatch] = useState<OpenedCard[][] | null>(null);
   // The pack being opened: shown sealed until torn (then `cards` holds what it gave).
-  const [pack, setPack] = useState<{ setCode: string; kind: string } | null>(null);
+  const [pack, setPack] = useState<{ setCode: string; kind: string; quick: boolean } | null>(null);
   // The card whose details are open.
   const [detailsOf, setDetailsOf] = useState<{ setCode: string; uuid: string } | null>(null);
   // The 3D opening, unless turned off in the options or impossible on this machine.
   const [opening3d] = useState(() => getOpening3d() && canUseWebGL());
+  const [soundOn, setSoundOnState] = useState(getSoundOn);
   // The booster kind shown in the opening view, to offer the next one.
   const [last, setLast] = useState<{ setCode: string; kind: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -177,9 +179,32 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   function open(setCode: string, kind: string) {
     setBatch(null);
     setCards(null);
-    setPack({ setCode, kind });
+    setPack({ setCode, kind, quick: false });
     setLast({ setCode, kind });
     setTab("open");
+  }
+
+  /** The quick opening: drawn at once, its cards dealt without the animation (and seen at
+   * once, achievements included). */
+  async function openQuick(setCode: string, kind: string) {
+    setBatch(null);
+    setCards(null);
+    setPack({ setCode, kind, quick: true });
+    setLast({ setCode, kind });
+    setTab("open");
+    setBusy(true);
+    setError(null);
+    try {
+      setCards(await openBooster(setCode, kind, false));
+      setOpenings((n) => n + 1);
+      await revealCards(Number.MAX_SAFE_INTEGER);
+    } catch (e) {
+      setError(String(e));
+      setPack(null);
+    } finally {
+      setBusy(false);
+      await refreshWallet();
+    }
   }
 
   /** The pack is torn open: the booster is drawn now. False when it failed (the pack
@@ -189,7 +214,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     setBusy(true);
     setError(null);
     try {
-      setCards(await openBooster(pack.setCode, pack.kind));
+      setCards(await openBooster(pack.setCode, pack.kind, true));
       setOpenings((n) => n + 1);
       return true;
     } catch (e) {
@@ -252,6 +277,19 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
             {save.name}
           </span>
           {wallet && <WalletBar wallet={wallet} />}
+          {/* Sound on or off, at hand (also in the options, with the volume). */}
+          <button
+            className="sound-toggle"
+            onClick={() => {
+              setSoundOn(!soundOn);
+              setSoundOnState(!soundOn);
+              if (!soundOn) sounds.click();
+            }}
+            title={t(soundOn ? "game.soundOn" : "game.soundOff")}
+            aria-label={t(soundOn ? "game.soundOn" : "game.soundOff")}
+          >
+            {soundOn ? "🔊" : "🔇"}
+          </button>
           <button onClick={() => void saveNow()} title={t("game.savePointTitle")}>
             {t("game.savePoint")}
           </button>
@@ -299,12 +337,32 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
                   <button onClick={closeOpening}>{t("open.back")}</button>
                   {/* Once this pack is open: the next one of the same kind, if any is left. */}
                   {remaining && (cards || batch) && (
-                    <button className="primary" disabled={busy} onClick={() => open(remaining.setCode, remaining.kind)}>
+                    <button
+                      className="primary"
+                      disabled={busy}
+                      onClick={() =>
+                        pack?.quick ? void openQuick(remaining.setCode, remaining.kind) : open(remaining.setCode, remaining.kind)
+                      }
+                    >
                       {t("open.next", { count: remaining.quantity })}
                     </button>
                   )}
+                  {/* The quick way, for the impatient, right from an opening. */}
+                  {remaining && (cards || batch) && !pack?.quick && (
+                    <button disabled={busy} onClick={() => void openQuick(remaining.setCode, remaining.kind)}>
+                      {t("open.quick")}
+                    </button>
+                  )}
                 </div>
-                {pack && opening3d && (
+                {pack?.quick && (
+                  <QuickOpening
+                    set={sets.find((s) => s.code === pack.setCode)}
+                    kind={pack.kind}
+                    cards={cards}
+                    onDetails={(card) => setDetailsOf({ setCode: pack.setCode, uuid: card.uuid })}
+                  />
+                )}
+                {pack && !pack.quick && opening3d && (
                   <Suspense fallback={<Loading />}>
                     <PackOpening3D
                       setCode={pack.setCode}
@@ -317,7 +375,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
                     />
                   </Suspense>
                 )}
-                {pack && !opening3d && (
+                {pack && !pack.quick && !opening3d && (
                   <PackOpening
                     setCode={pack.setCode}
                     set={sets.find((s) => s.code === pack.setCode)}
@@ -341,6 +399,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
                 sets={sets}
                 busy={busy}
                 onOpen={(s) => open(s.setCode, s.kind)}
+                onOpenQuick={(s) => void openQuick(s.setCode, s.kind)}
                 onOpenMany={(s, n) => run(() => openMany(s.setCode, s.kind, n))}
                 onSell={(s) =>
                   run(async () => {

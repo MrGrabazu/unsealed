@@ -231,6 +231,10 @@
   "big-sale": { "name": "Gran venta", "description": "Gana {cents:100000} en una sola venta." },
   "magnate": { "name": "Magnate de los Sellos", "description": "Ten {cents:10000000} a la vez." },
   "desert": { "name": "Desierto", "description": "Abre 100 sobres seguidos sin ninguna carta mítica." },
+  "savor-500": { "name": "Sin prisa", "description": "Abre 500 sobres con calma, carta a carta." },
+  "savor-1000": { "name": "Entendido", "description": "Abre 1.000 sobres con calma, carta a carta." },
+  "rush-500": { "name": "Con prisa", "description": "Abre 500 sobres sin la animación." },
+  "rush-1000": { "name": "Ni un segundo que perder", "description": "Abre 1.000 sobres sin la animación." },
   "frequent-visitor": { "name": "Visitante asiduo", "description": "Acepta la ayuda del Boosterium 10 veces." },
   "overachiever": { "name": "Superdotado", "description": "Desbloquea 50 logros." }
 }

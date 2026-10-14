@@ -13,13 +13,15 @@ interface Props {
   sets: SetSummary[];
   busy: boolean;
   onOpen: (stack: SealedStack) => void;
+  /** Opens one without the animation. */
+  onOpenQuick: (stack: SealedStack) => void;
   onOpenMany: (stack: SealedStack, quantity: number) => void;
   onSell: (stack: SealedStack) => void;
   onGoShopping: () => void;
 }
 
 /** The sealed boosters the player owns, to pick the next one to open. */
-export function SealedBoosters({ sealed, sets, busy, onOpen, onOpenMany, onSell, onGoShopping }: Props) {
+export function SealedBoosters({ sealed, sets, busy, onOpen, onOpenQuick, onOpenMany, onSell, onGoShopping }: Props) {
   const money = useMoney();
   const { t, tx } = useI18n();
   if (sealed.length === 0) {
@@ -64,6 +66,9 @@ export function SealedBoosters({ sealed, sets, busy, onOpen, onOpenMany, onSell,
               <div className="sealed-actions">
                 <button className="primary" disabled={busy} onClick={() => onOpen(s)}>
                   {t("open.openOne")}
+                </button>
+                <button disabled={busy} onClick={() => onOpenQuick(s)} title={t("open.quickHint")}>
+                  {t("open.quick")}
                 </button>
                 {BATCH_SIZES.filter((n) => s.quantity >= n).map((n) => (
                   <button key={n} disabled={busy} onClick={() => onOpenMany(s, n)}>

@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import type { OpenedCard, SetSummary } from "./api";
-import { isBigCard } from "./BatchOpening";
 import { kindLabel } from "./boosterKinds";
-import { CardImage } from "./CardImage";
 import { useI18n } from "./i18n";
-import { Money, useMoney } from "./money";
+import { useMoney } from "./money";
+import { RevealedCards } from "./RevealedCards";
 import { PackScene } from "./scene/PackScene";
 
 interface Props {
@@ -23,9 +22,6 @@ function hueOf(code: string): number {
   for (const c of code) h = (h * 31 + c.charCodeAt(0)) % 360;
   return h;
 }
-
-const hitOf = (card: OpenedCard) =>
-  card.rarity === "mythic" ? "hit-mythic" : isBigCard(card) ? "hit-rare" : card.foil ? "hit-foil" : "";
 
 /** Opening one booster in the 3D scene: tear the pack, then slide the cards off the pile one
  * by one. Once the last card has left, the scene gives way to the list of the cards, and a
@@ -118,32 +114,7 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
       )}
       {finished && <p className="hint scene-hint">{t("open.details")}</p>}
 
-      {seen.length > 0 && (
-        <div className={`revealed-row ${finished ? "final" : ""}`}>
-          {seen.map((card, index) => (
-            <div
-              key={index}
-              role="button"
-              tabIndex={0}
-              className={`revealed-card ${hitOf(card)}`}
-              style={{ "--i": index } as React.CSSProperties}
-              onClick={() => onDetails(card)}
-              onKeyDown={(e) => e.key === "Enter" && onDetails(card)}
-              title={t("details.open")}
-            >
-              <div className="thumb">
-                <CardImage front={card.imageUrl} back={card.backImageUrl} alt={card.name} />
-                {card.foil && <div className="foil-sheen" />}
-                {card.isNew && <span className="badge-new">{t("open.new")}</span>}
-              </div>
-              <span className="card-caption visible">
-                <span className="name">{card.name}</span>
-                <span className="price">{card.priceCents == null ? t("common.none") : <Money cents={card.priceCents} estimated={card.priceEstimated} />}</span>
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
+      {seen.length > 0 && <RevealedCards cards={seen} final={finished} onDetails={onDetails} />}
     </section>
   );
 }

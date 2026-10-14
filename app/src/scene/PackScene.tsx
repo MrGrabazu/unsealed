@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { OpenedCard } from "../api";
 import { isBigCard } from "../BatchOpening";
+import { largeImage } from "../images";
 import { revealSound, sounds } from "../sound";
 import { CARD_H, CARD_W, createCardGeometry, createCardMaterials } from "./cardMaterial";
 import { cardBackTexture, glowTexture, loadCardTexture, packTexture, stripTexture, type PackLook } from "./textures";
@@ -10,7 +11,8 @@ import { cardBackTexture, glowTexture, loadCardTexture, packTexture, stripTextur
 // The 3D opening. The pack tilts with the pointer, shakes when held and moved, and its top
 // strip tears off as the pointer slides along it, peeling back from where the tear started.
 // Out come the cards, face up, rigid like real cardboard: the top one is slid off the pile
-// (dragged in any direction, or clicked) to uncover the next, the best last. The last one
+// (dragged in any direction, or clicked) to uncover the next, in a real booster's order (the
+// rare, then the foils, the token last). The last one
 // leaves on its own after a moment, and the scene makes room for the list of the cards.
 
 const PACK_W = 2.7;
@@ -24,6 +26,8 @@ const SLIDE_AWAY = 1.3;
 const CARDS_OUT = 0.85;
 const PACK_FALLS = 0.6;
 const SETTLED = CARDS_OUT + PACK_FALLS;
+/** Out of the wrapper, the pile is brought closer to the player: its cards read better. */
+const CARD_ZOOM = 1.5;
 /** How long the last card stays before leaving (seconds). */
 const LAST_CARD_STAYS = 2.2;
 
@@ -373,7 +377,7 @@ function Cards({
     let live = true;
     const loaded: THREE.Texture[] = [];
     cards.forEach((card, i) => {
-      void loadCardTexture(card.imageUrl)
+      void loadCardTexture(largeImage(card.imageUrl))
         .then((t) => {
           if (!live) return t.dispose();
           loaded.push(t);
@@ -433,7 +437,9 @@ function Cards({
     if (k !== current.current || !settled()) return;
     e.stopPropagation();
     if (slide.current.kind !== "idle") return;
-    const z = stackZ(k);
+    // The pile is zoomed: pointer moves (in the world) become moves in the pile's own units.
+    const zoom = stack.current?.scale.x ?? 1;
+    const z = stackZ(k) * zoom;
     const start = pointOnPlane(e.nativeEvent.clientX, e.nativeEvent.clientY, camera, dom, z);
     const startedAt = clock.current;
     let last = start.clone();
@@ -443,7 +449,7 @@ function Cards({
     followDrag(
       (m) => {
         const p = pointOnPlane(m.clientX, m.clientY, camera, dom, z);
-        offset.current.set(p.x - start.x, p.y - start.y);
+        offset.current.set((p.x - start.x) / zoom, (p.y - start.y) / zoom);
         const dt = Math.max(1e-3, clock.current - lastAt);
         velocity.set((p.x - last.x) / dt, (p.y - last.y) / dt);
         last = p;
@@ -475,6 +481,8 @@ function Cards({
       const inside = since < CARDS_OUT;
       s.rotation.y = THREE.MathUtils.lerp(s.rotation.y, state.pointer.x * (inside ? 0.35 : 0.25), 0.08);
       s.rotation.x = THREE.MathUtils.lerp(s.rotation.x, -state.pointer.y * (inside ? 0.25 : 0.18), 0.08);
+      // Brought closer as the empty wrapper falls away.
+      s.scale.setScalar(1 + (CARD_ZOOM - 1) * ease((since - CARDS_OUT) / PACK_FALLS));
     }
 
     const mode = slide.current;
@@ -610,7 +618,9 @@ export function PackScene({ look, cards, top, onTorn, onNext, onFinished, slideR
   }, [cards]);
 
   return (
-    <Canvas className="pack-scene" flat dpr={[1, 2]} camera={{ position: [0, 0, 9.5], fov: 35 }}>
+    // A wide enough view for the zoomed cards to keep a margin above and below (with the
+    // frame's height, they show as large as before, the pack a little smaller).
+    <Canvas className="pack-scene" flat dpr={[1, 2]} camera={{ position: [0, 0, 9.5], fov: 40 }}>
       <ambientLight intensity={0.9} />
       <directionalLight position={[3, 4, 6]} intensity={1.6} />
       <PointerLight />

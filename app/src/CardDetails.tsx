@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getCardDetails, type CardDetailsView } from "./api";
 import { CardImage } from "./CardImage";
+import { largeImage } from "./images";
 import { CARD_LANGUAGES, useI18n, type I18n } from "./i18n";
 import { Loading } from "./Loading";
 import { ManaText } from "./ManaText";
@@ -63,7 +64,8 @@ export function CardDetails({ setCode, uuid, onClose }: Props) {
         {details && (
           <div className="details-layout">
             <div className="details-image">
-              <CardImage front={details.imageUrl} back={details.backImageUrl} alt={details.name} />
+              {/* Shown large: the sharper image. */}
+              <CardImage front={largeImage(details.imageUrl)} back={largeImage(details.backImageUrl)} alt={details.name} />
             </div>
 
             <div className="details-info">

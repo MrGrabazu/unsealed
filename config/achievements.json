@@ -39,7 +39,9 @@
     },
     "tokens_pulled": { "event": "CardAcquired", "where": [{ "field": "rarity", "op": "eq", "value": "token" }], "op": "sum" },
     "boosters_bought": { "event": "BoosterBought", "op": "sum", "field": "quantity" },
-    "charity_claims": { "event": "CharityClaimed", "op": "sum" }
+    "charity_claims": { "event": "CharityClaimed", "op": "sum" },
+    "boosters_watched": { "event": "BoosterOpened", "where": [{ "field": "animated", "op": "eq", "value": true }], "op": "sum" },
+    "boosters_rushed": { "event": "BoosterOpened", "where": [{ "field": "animated", "op": "eq", "value": false }], "op": "sum" }
   },
 
   "achievements": [
@@ -507,6 +509,30 @@
       "rarity": "rare", "emblem": "hourglass", "palette": "onyx",
       "condition": { "type": "metric", "metric": "no_mythic_streak", "atLeast": 100 },
       "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 10 } }
+    },
+    {
+      "id": "savor-500", "name": "Slow Hands", "secret": true, "description": "Open 500 boosters the slow way, watching every card.",
+      "rarity": "uncommon", "emblem": "hourglass", "palette": "ocean",
+      "condition": { "type": "metric", "metric": "boosters_watched", "atLeast": 500 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 5 } }
+    },
+    {
+      "id": "savor-1000", "name": "Connoisseur", "secret": true, "description": "Open 1,000 boosters the slow way, watching every card.",
+      "rarity": "rare", "emblem": "eye", "palette": "royal",
+      "condition": { "type": "metric", "metric": "boosters_watched", "atLeast": 1000 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "collector", "quantity": 2 } }
+    },
+    {
+      "id": "rush-500", "name": "In a Hurry", "secret": true, "description": "Open 500 boosters without the animation.",
+      "rarity": "uncommon", "emblem": "bolt", "palette": "ember",
+      "condition": { "type": "metric", "metric": "boosters_rushed", "atLeast": 500 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 5 } }
+    },
+    {
+      "id": "rush-1000", "name": "No Time to Lose", "secret": true, "description": "Open 1,000 boosters without the animation.",
+      "rarity": "rare", "emblem": "bolt", "palette": "gold",
+      "condition": { "type": "metric", "metric": "boosters_rushed", "atLeast": 1000 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "collector", "quantity": 2 } }
     },
     {
       "id": "frequent-visitor", "name": "Frequent Visitor", "secret": true, "description": "Accept the Boosterium's help 10 times.",

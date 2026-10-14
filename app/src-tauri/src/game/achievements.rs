@@ -176,6 +176,7 @@ impl Game {
         kind: &str,
         cards: &[OpenedCard],
         paid_cents: i64,
+        animated: bool,
     ) -> OpeningEvents {
         let value: i64 = cards.iter().map(|c| i64::from(c.price_cents.unwrap_or(0))).sum();
         let net_sale: i64 = cards.iter().map(|c| i64::from(self.sale_value(&c.uuid, c.foil))).sum();
@@ -196,6 +197,8 @@ impl Game {
         let mut booster = vec![Event::new("BoosterOpened")
             .with("setCode", set_code)
             .with("kind", kind)
+            // Watched (the pack torn, the cards revealed one by one) or skipped (quick, batch).
+            .with("animated", animated)
             .with("valueCents", value)
             .with("paidCents", paid_cents)
             .with("profitCents", net_sale - paid_cents)
