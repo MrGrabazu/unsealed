@@ -22,6 +22,7 @@ import { AchievementCard } from "./AchievementCard";
 import { Achievements } from "./Achievements";
 import { BatchOpening } from "./BatchOpening";
 import { CardDetails } from "./CardDetails";
+import { Logo } from "./Logo";
 import { PackOpening } from "./PackOpening";
 import { canUseWebGL, getOpening3d } from "./settings";
 
@@ -238,8 +239,9 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     <CurrencyContext.Provider value={currency}>
       <div className="app">
         <header>
-          <h1>Unsealed</h1>
-          <p className="tagline">Crack &amp; Collect</p>
+          <h1 className="header-logo">
+            <Logo />
+          </h1>
           <span className="game-name" title={t("game.nameTitle")}>
             {save.name}
           </span>

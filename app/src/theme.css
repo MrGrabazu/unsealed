@@ -1,0 +1,144 @@
+/* The "Grimoire" theme: dark tooled leather, aged vellum panels, gilded edges and engraved
+   capitals, a red wax seal for what matters. Loaded after styles.css, it sets the look
+   (palette, fonts, surfaces) and leaves the layout to styles.css. Fonts are bundled
+   (SIL Open Font License, see assets/fonts): Cinzel for titles, Alegreya for text. */
+
+@font-face { font-family: "Cinzel"; src: url("./assets/fonts/Cinzel-VF.ttf") format("truetype"); font-weight: 400 900; font-display: swap; }
+@font-face { font-family: "Alegreya"; src: url("./assets/fonts/Alegreya-VF.ttf") format("truetype"); font-weight: 400 900; font-display: swap; }
+@font-face { font-family: "Alegreya"; src: url("./assets/fonts/Alegreya-Italic-VF.ttf") format("truetype"); font-weight: 400 900; font-style: italic; font-display: swap; }
+
+:root {
+  --bg: #140d08;
+  --panel: #241811;
+  --panel-2: #2d1f15;
+  --text: #efe3c8;
+  --muted: #a8957a;
+  --accent: #d9a441;
+  --gold-hi: #f5d68a;
+  --gold-lo: #8a5f22;
+  --edge: #6b4d2a;
+  --wax: #a61f28;
+  --wax-hi: #d8454c;
+  --rare: #e0c15a;
+  --mythic: #e2682c;
+  --font-title: "Cinzel", "Trajan Pro", Georgia, serif;
+  --font-text: "Alegreya", Georgia, "Times New Roman", serif;
+}
+
+/* Tooled leather: a warm pool of light, a fine grain, darker edges. */
+body {
+  font-family: var(--font-text);
+  font-size: 17px;
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(ellipse at 50% -10%, #4a2f1b 0%, transparent 60%),
+    radial-gradient(ellipse at 50% 120%, #000 0%, transparent 55%),
+    radial-gradient(#ffffff06 0.7px, transparent 1.4px),
+    radial-gradient(#00000030 0.7px, transparent 1.4px);
+  background-size: 100% 100%, 100% 100%, 5px 5px, 7px 7px;
+  background-position: 0 0, 0 0, 0 0, 2px 3px;
+  background-attachment: fixed;
+}
+
+h1, h2, h3, .shop-name, .stat-title, .tabs button, .home-menu button, .binder-tab, .segmented button {
+  font-family: var(--font-title);
+  letter-spacing: 0.04em;
+}
+h2, h3 { color: var(--gold-hi); font-weight: 700; text-shadow: 0 1px 0 #000a; }
+h2 { font-size: 24px; }
+h3 { font-size: 18px; }
+.hint { color: var(--muted); }
+.error { color: #ff8f7a; }
+.notice, .gain { color: var(--gold-hi); }
+a { color: var(--gold-hi); }
+
+/* An ornamental rule: a gold hairline fading out, a diamond in the middle. */
+.ornament { height: 14px; margin: 14px 0; border: none;
+  background: radial-gradient(circle, var(--accent) 0 3px, transparent 3.5px) center / 14px 14px no-repeat,
+    linear-gradient(90deg, transparent, var(--gold-lo) 20%, var(--accent) 50%, var(--gold-lo) 80%, transparent) center / 100% 1px no-repeat; }
+
+/* Controls: engraved brass plates. */
+select, button, input {
+  background: linear-gradient(180deg, #3a2819, #24170e);
+  color: var(--text);
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  box-shadow: inset 0 1px 0 #ffffff12, 0 2px 4px #0006;
+  font-family: var(--font-text);
+}
+button { font-family: var(--font-title); font-size: 14px; font-weight: 600; letter-spacing: 0.05em; transition: border-color 0.15s, color 0.15s, box-shadow 0.15s; }
+button:hover:not(:disabled) { border-color: var(--accent); color: var(--gold-hi); box-shadow: inset 0 1px 0 #ffffff1a, 0 0 12px #d9a44133; }
+input, select { box-shadow: inset 0 2px 6px #0008; }
+/* The list a select unrolls is drawn by the system: it ignores the field's gradient but
+   keeps its light text, so its options get a dark background of their own. */
+select { color-scheme: dark; background-color: #24170e; }
+select option, select optgroup { background-color: #24170e; color: var(--text); }
+select option:checked { background-color: #4a3220; color: var(--gold-hi); }
+input:focus, select:focus, button:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+/* The main action: gilded. */
+button.primary {
+  background: linear-gradient(180deg, var(--gold-hi), var(--accent) 45%, var(--gold-lo));
+  color: #2a1606; border-color: #f7e1a0; text-shadow: 0 1px 0 #fff5; font-weight: 700;
+}
+button.primary:hover:not(:disabled) { color: #1a0d03; box-shadow: 0 0 16px #f5d68a66; }
+/* A risky action (selling a last copy...): red wax. */
+button.sell.confirm { background: linear-gradient(180deg, var(--wax-hi), var(--wax)); border-color: #f08a8e; color: #fff; }
+
+/* Panels: dark vellum framed by a gilded hairline. */
+.shop-set, .sealed-tile, .stat-tile, .stat-panel, .save-row, .printing, .inventory-row, .toast, .modal {
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--edge);
+  box-shadow: inset 0 0 0 1px #d9a4411c, inset 0 0 24px #0006, 0 6px 18px #0007;
+}
+.shop-set.open { outline: none; border-color: var(--accent); }
+/* A set's header is a button: its details read as text, only the set's name is engraved. */
+button.shop-set-header { font-family: var(--font-text); font-size: 15px; font-weight: 400; letter-spacing: 0; box-shadow: none; }
+button.shop-set-header .shop-name { font-family: var(--font-title); font-size: 17px; font-weight: 700; color: var(--gold-hi); }
+.shop-products .shop-row { background: #1a110b; border: 1px solid #3d2b1b; }
+.shop-price, .shop-from, .sealed-qty, .total, .wallet { color: var(--gold-hi); }
+.shop-set-header.with-art .shop-from { background: #140d08e6; border: 1px solid var(--edge); }
+.modal-backdrop { background: #0a0603d9; }
+.modal { border-radius: 10px; }
+
+/* The header: the logo, the purse, a gilded rule below. */
+.app > header { padding-bottom: 14px; margin-bottom: 4px;
+  background: linear-gradient(90deg, transparent, var(--gold-lo) 15%, var(--accent) 50%, var(--gold-lo) 85%, transparent) bottom / 100% 1px no-repeat; }
+.header-logo { margin: 0; width: 250px; flex: none; line-height: 0; }
+.home-title { margin: 0 0 36px; line-height: 0; }
+.game-name { font-family: var(--font-title); color: var(--muted); font-size: 14px; }
+.wallet { background: linear-gradient(180deg, #2f2015, #1b120b); border: 1px solid var(--edge); border-radius: 999px;
+  box-shadow: inset 0 0 0 1px #d9a44122, 0 2px 6px #0007; font-family: var(--font-title); }
+
+/* Tabs: leather bookmarks; the open one stands out, gilded on top. */
+.tabs { gap: 6px; border-bottom: 1px solid var(--edge); margin-top: 16px; }
+.tabs button { border-radius: 8px 8px 0 0; border-bottom: none; padding: 10px 18px 9px; margin-bottom: -1px;
+  background: linear-gradient(180deg, #2c1e14, #1d140d); color: var(--muted); box-shadow: none; }
+.tabs button.active { color: var(--gold-hi); border-color: var(--edge); border-top: 2px solid var(--accent);
+  background: linear-gradient(180deg, #3b2918, var(--bg)); }
+.tab-count { background: var(--wax); color: #fff; }
+
+/* Progress: a gold bar with a sheen. */
+.progress { background: #0f0905; border: 1px solid #3d2b1b; }
+.progress-bar { background: linear-gradient(180deg, var(--gold-hi), var(--accent) 50%, var(--gold-lo)); }
+.progress-label { color: var(--muted); }
+
+/* Badges. */
+.badge-new { background: var(--wax); color: #fff; font-family: var(--font-title); }
+.badge-qty { font-family: var(--font-title); }
+
+/* The home screen: the logo, large, over the menu. */
+.home-title .logo { width: min(640px, 100%); margin: 0 auto; }
+.home-menu button { font-size: 18px; }
+.home-sub { font-family: var(--font-text); font-size: 13px; letter-spacing: 0; text-transform: none; color: var(--muted); opacity: 1; }
+button.primary .home-sub { color: #4f2e0c; }
+.about .legal { background: var(--panel); border-left-color: var(--accent); }
+
+/* Toasts (achievement unlocked): a gilded frame. */
+.toast { border-color: var(--accent); }
+.toast-text strong { color: var(--gold-hi); font-family: var(--font-title); }
+
+footer { border-top-color: var(--edge); font-family: var(--font-text); }
+
+/* Binder pages: dark board in warm tones, not the old slate. */
+.binder-page { background: linear-gradient(180deg, #2a1f17, #1d150f); }
+.segmented button.active, .binder-tab.active { color: var(--gold-hi); border-color: var(--accent); }

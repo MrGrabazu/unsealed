@@ -4,6 +4,7 @@ import { DataStatusBar, useDataStatus } from "./DataStatus";
 import { Footer } from "./Footer";
 import { useI18n } from "./i18n";
 import { Loading } from "./Loading";
+import { Logo } from "./Logo";
 
 type Panel = "menu" | "new" | "load";
 
@@ -58,10 +59,9 @@ export function Home({ current, onPlay, onCurrentChanged, onOptions, onAbout }: 
 
   return (
     <div className="home">
-      <div className="home-title">
-        <h1>Unsealed</h1>
-        <p className="tagline">Crack &amp; Collect</p>
-      </div>
+      <h1 className="home-title">
+        <Logo />
+      </h1>
 
       <DataStatusBar status={dataStatus} />
       {error && <p className="error">{error}</p>}

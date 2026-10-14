@@ -6,11 +6,13 @@
     <title>Unsealed — Crack &amp; Collect</title>
     <!-- Inline, so the splash shows at once, before the app's scripts and styles load. -->
     <style>
-      html, body { margin: 0; background: #12131a; color: #e8e6df; font-family: system-ui, "Segoe UI", sans-serif; }
-      .splash { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
-      .splash h1 { margin: 0; font-size: 48px; letter-spacing: 0.06em; }
-      .splash p { margin: 0; color: #e0a526; font-style: italic; }
-      .splash .spinner { margin-top: 18px; width: 28px; height: 28px; border-radius: 50%; border: 3px solid #343748; border-top-color: #e0a526; animation: splash-spin 0.9s linear infinite; }
+      /* The Grimoire theme's colours (theme.css), before its fonts and styles load. */
+      html, body { margin: 0; background: #140d08; color: #efe3c8; font-family: Georgia, "Times New Roman", serif; }
+      .splash { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+        background: radial-gradient(ellipse at 50% -10%, #4a2f1b 0%, transparent 60%); }
+      .splash h1 { margin: 0; font-size: 52px; letter-spacing: 0.12em; color: #f0c35e; text-shadow: 0 3px 0 #1b0f05; font-variant: small-caps; }
+      .splash p { margin: 0; color: #d9a441; letter-spacing: 0.3em; text-transform: uppercase; font-size: 14px; }
+      .splash .spinner { margin-top: 18px; width: 28px; height: 28px; border-radius: 50%; border: 3px solid #3d2b1b; border-top-color: #a61f28; animation: splash-spin 0.9s linear infinite; }
       @keyframes splash-spin { to { transform: rotate(360deg); } }
     </style>
   </head>
