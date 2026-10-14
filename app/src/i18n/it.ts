@@ -284,6 +284,7 @@ export const it: Messages = {
   "about.gameTitle": "Il gioco",
   "about.community": "La community dei giocatori: condividi le tue migliori aperture, idee e opinioni.",
   "about.joinDiscord": "Unisciti a noi su Discord",
+  "about.viewGithub": "Codice sorgente su GitHub",
   "about.game1":
     "Unsealed ricrea l'emozione di aprire buste di carte collezionabili, senza spendere un centesimo. Compra buste virtuali al Boosterium, aprile carta per carta, costruisci la tua collezione, completa le espansioni e sblocca gli obiettivi.",
   "about.game2":

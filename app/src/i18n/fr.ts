@@ -284,6 +284,7 @@ export const fr: Messages = {
   "about.gameTitle": "Le jeu",
   "about.community": "La communauté des joueurs : partagez vos plus beaux tirages, vos idées et vos retours.",
   "about.joinDiscord": "Rejoignez-nous sur Discord",
+  "about.viewGithub": "Code source sur GitHub",
   "about.game1":
     "Unsealed recrée le frisson de l'ouverture de boosters de cartes à collectionner, sans dépenser un centime. Achetez des boosters virtuels au Boosterium, ouvrez-les carte par carte, construisez votre collection, complétez des extensions et débloquez des succès.",
   "about.game2":

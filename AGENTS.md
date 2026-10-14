@@ -168,7 +168,7 @@ Le jeu est un client lourd : **il n'y a pas de serveur à héberger**. L'app con
 - **Sauvegarde automatique** : chaque action est enregistrée aussitôt. **Sauvegarde manuelle** = « Save point » : une copie de la partie (`VACUUM INTO`), chargeable plus tard ; elle compte comme jouée juste avant l'originale, pour que « Continuer » reprenne l'originale.
 - L'ancienne sauvegarde unique (`unsealed.sqlite`) est adoptée comme première partie au premier lancement, puis renommée en `.migrated`.
 - **Chargement** : écran de démarrage inline dans `index.html` et fond de fenêtre sombre (`backgroundColor`) pour éviter tout écran blanc ; composant `Loading` sur chaque écran qui attend des données.
-- **À propos** : description, gratuité et absence de valeur réelle, notice de la Fan Content Policy mot pour mot (`app/src/legal.ts`), crédits Scryfall et MTGJSON.
+- **À propos** : description, gratuité et absence de valeur réelle, notice de la Fan Content Policy mot pour mot (`app/src/legal.ts`), crédits Scryfall et MTGJSON. En haut, la communauté « The Boosterium » avec un bouton vers le Discord ; en bas de page, un bouton vers le code source sur GitHub (`MrGrabazu/unsealed`). Chacun porte le logo du service (tracés Simple Icons, CC0), ouverts dans le navigateur par `tauri-plugin-opener`.
 
 ## 8 ter bis. Identité visuelle
 
@@ -241,6 +241,7 @@ Le jeu est un client lourd : **il n'y a pas de serveur à héberger**. L'app con
 - Données : `cargo run --release -p data-builder -- --sets all` (ou une liste : `--sets BLB,FDN`) ; écrit `dist/`, cache dans `.cache/`, et liste les sets mis de côté avec la raison
 - App en dev : `cd app && npm install && npm run tauri dev` (en debug elle lit `dist/` et range les parties dans `.dev-data/saves/` ; `UNSEALED_DATA_DIR` et `UNSEALED_SAVES_DIR` surchargent)
 - Tests : `cargo test --workspace` ; build du front : `cd app && npm run build`
+- **Version** (affichée dans À propos, lue dans `tauri.conf.json`) : la même dans `app/src-tauri/tauri.conf.json`, `app/package.json` (et `package-lock.json`), et les `Cargo.toml` de `app/src-tauri`, `core`, `data-builder` (puis `cargo update --workspace` pour `Cargo.lock`). 0.2.0 = première version publique (dépôt GitHub, Discord). Ensuite : +0.1 par lot de fonctionnalités, +0.0.1 par correctif, 1.0.0 à la première vraie sortie.
 - Node : Vite 6 est utilisé car Node 21 est installé (Vite 7+ exige Node ≥ 20.19 / 22.12) ; passer à Node 22 LTS permettra de monter Vite.
 
 ## 11. Règles pour l'agent
