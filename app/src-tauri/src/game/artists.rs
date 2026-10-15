@@ -64,7 +64,7 @@ impl Game {
     }
 
     /// Codes of the sets offered today (released ones).
-    fn offered_sets(&self) -> HashSet<String> {
+    pub(super) fn offered_sets(&self) -> HashSet<String> {
         self.list_sets().unwrap_or_default().into_iter().map(|s| s.code).collect()
     }
 

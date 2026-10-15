@@ -25,8 +25,8 @@ interface Page {
 const COVERS = ["leather", "canvas", "vinyl", "suede"] as const;
 
 /** Each set's binder has its own cover, colour and material, drawn from its code: the same
- * every time, with nothing to store. */
-function coverOf(setCode: string) {
+ * every time, with nothing to store (the library's shelves show the same covers). */
+export function coverOf(setCode: string) {
   return { hue: Math.floor(seeded(setCode, 101) * 360), material: COVERS[Math.floor(seeded(setCode, 102) * COVERS.length)] };
 }
 
@@ -155,7 +155,7 @@ function BinderPage({ page, side, onOpen }: { page: Page | undefined; side: "lef
 }
 
 /** A number in [0, 1) drawn from a text, the same every time (a card keeps its scrap). */
-function seeded(text: string, salt: number): number {
+export function seeded(text: string, salt: number): number {
   let h = 2166136261 ^ salt;
   for (const c of text) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
   return ((h >>> 0) % 10000) / 10000;

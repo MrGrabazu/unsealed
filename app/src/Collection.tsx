@@ -15,8 +15,8 @@ import {
   type SetSummary,
 } from "./api";
 
-/** The collection shown: one set's, or one artist's across the sets. */
-type Source = "sets" | "artists";
+/** The collection shown: the library of binders, one set's, or one artist's across the sets. */
+type Source = "library" | "sets" | "artists";
 
 /** In the set list: every card owned, across the sets (a grid to sort, to pick what to sell). */
 const ALL_SETS = "*";
@@ -58,6 +58,7 @@ import { Binder, type BinderSection } from "./Binder";
 import { CardDetails } from "./CardDetails";
 import { CardImage } from "./CardImage";
 import { useI18n } from "./i18n";
+import { Library } from "./Library";
 import { Loading } from "./Loading";
 import { duplicatesOf, SaleModal, type SoldLine } from "./SaleModal";
 import { sheenClass } from "./RevealedCards";
@@ -95,7 +96,7 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
   // The binder's section on show (index in `binderSections`).
   const [binderSection, setBinderSection] = useState(0);
   // Collections by artist.
-  const [source, setSource] = useState<Source>("sets");
+  const [source, setSource] = useState<Source>("library");
   const [artists, setArtists] = useState<ArtistSummary[] | null>(null);
   const [artist, setArtist] = useState("");
   const [artistSearch, setArtistSearch] = useState("");
@@ -122,7 +123,9 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
 
   const reload = useCallback(async () => {
     try {
-      if (source === "artists") {
+      if (source === "library") {
+        // The library loads its own binders.
+      } else if (source === "artists") {
         if (artist) setArtistView(await getArtistCollection(artist));
       } else if (setCode === ALL_SETS) {
         setOwnedAll(await getOwnedCards());
@@ -189,9 +192,10 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
   const shownTokens = view?.tokens.filter(matches);
   const shownArts = view?.arts.filter(matches);
 
+  const library = source === "library";
   const byArtist = source === "artists";
   // Every card owned: a sortable grid only.
-  const allSets = !byArtist && setCode === ALL_SETS;
+  const allSets = source === "sets" && setCode === ALL_SETS;
   const sortedOwned = useMemo(() => (ownedAll ? sortCards(ownedAll, sort) : []), [ownedAll, sort]);
 
   // The binder keeps every card in its place: no filter, sections one after the other (an
@@ -245,6 +249,15 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
   function changeLayout(next: CollectionLayout) {
     setLayout(next);
     setCollectionLayout(next);
+  }
+
+  /** A binder taken from the library's shelves: that set's collection, as a binder. */
+  function openBinder(code: string) {
+    sounds.page();
+    setSetCode(code);
+    setBinderSection(0);
+    setLayout("binder");
+    setSource("sets");
   }
 
   function cardTile(c: CollectionCard) {
@@ -307,14 +320,17 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
     <section>
       <div className="controls">
         <div className="segmented" role="group" aria-label={t("collection.source")}>
-          <button className={!byArtist ? "active" : ""} onClick={() => setSource("sets")}>
+          <button className={library ? "active" : ""} onClick={() => setSource("library")}>
+            {t("collection.library")}
+          </button>
+          <button className={source === "sets" ? "active" : ""} onClick={() => setSource("sets")}>
             {t("collection.bySet")}
           </button>
           <button className={byArtist ? "active" : ""} onClick={() => setSource("artists")}>
             {t("collection.byArtist")}
           </button>
         </div>
-        {!byArtist && (
+        {source === "sets" && (
           <select value={setCode} onChange={(e) => setSetCode(e.target.value)}>
             <option value={ALL_SETS}>{t("collection.allSets")}</option>
             {sets.map((s) => (
@@ -351,15 +367,15 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
             <option value="quantity">{t("collection.sortQuantity")}</option>
           </select>
         )}
-        {layout === "grid" && !allSets && (
+        {layout === "grid" && !allSets && !library && (
           <select value={filter} onChange={(e) => setFilter(e.target.value as Filter)}>
             <option value="all">{t("collection.allCards")}</option>
             <option value="owned">{t("collection.owned")}</option>
             <option value="missing">{t("collection.missing")}</option>
           </select>
         )}
-        {!byArtist && !allSets && <button onClick={() => void sellExtras()}>{t("collection.sellDuplicates")}</button>}
-        {!allSets && <div className="segmented" role="group" aria-label={t("collection.layout")}>
+        {source === "sets" && !allSets && <button onClick={() => void sellExtras()}>{t("collection.sellDuplicates")}</button>}
+        {!allSets && !library && <div className="segmented" role="group" aria-label={t("collection.layout")}>
           <button className={layout === "binder" ? "active" : ""} onClick={() => changeLayout("binder")}>
             {t("collection.layoutBinder")}
           </button>
@@ -371,7 +387,8 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
 
       {error && <p className="error">{error}</p>}
       {notice && <p className="notice">{notice}</p>}
-      {!(byArtist ? artistView : allSets ? ownedAll : view) && !error && <Loading label={t("collection.loading")} />}
+      {library && <Library sets={sets} refreshKey={refreshKey} onOpen={openBinder} />}
+      {!library && !(byArtist ? artistView : allSets ? ownedAll : view) && !error && <Loading label={t("collection.loading")} />}
       {byArtist && artistView && (
         <>
           {progress && (
@@ -418,7 +435,7 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
           )}
         </>
       )}
-      {!byArtist && !allSets && view && (
+      {source === "sets" && !allSets && view && (
         <>
           {progress && (
             <>

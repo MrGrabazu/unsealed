@@ -4,8 +4,10 @@ mod achievements;
 mod artists;
 mod details;
 mod history;
+mod library;
 
 pub use artists::{ArtistCardView, ArtistSummary, ArtistView};
+pub use library::LibraryBinder;
 
 pub use achievements::{AchievementTexts, AchievementView, AchievementsView};
 use achievements::{OpeningEvents, PendingReveal};
@@ -2032,6 +2034,25 @@ mod tests {
         let rows: Vec<(&str, u32, u32)> =
             view.cards.iter().map(|c| (c.name.as_str(), c.quantity, c.sell_value_cents)).collect();
         assert_eq!(rows, [("Mythic", 1, 800), ("Common", 2, 80)]);
+    }
+
+    #[test]
+    fn library_shows_a_binder_per_set_owned_with_its_value() {
+        let mut g = game_with_booster("library");
+        assert!(g.library().unwrap().is_empty());
+
+        g.open_booster("TST", "play").unwrap();
+        let shelf = g.library().unwrap();
+        assert_eq!(shelf.len(), 1);
+        let binder = &shelf[0];
+        assert_eq!(binder.set_code, "TST");
+        assert_eq!((binder.owned_count, binder.total_count), (2, 2));
+        assert_eq!((binder.mythics_owned, binder.mythics_total), (1, 1));
+        assert_eq!((binder.copies, binder.foil_copies, binder.boosters_opened), (3, 0, 1));
+        // Common ×2 at 100, Mythic at 1000; the Boosterium pays 80%.
+        assert_eq!((binder.value_cents, binder.sell_value_cents), (1200, 960));
+        let best = binder.best_card.as_ref().unwrap();
+        assert_eq!((best.name.as_str(), best.foil, best.price_cents), ("Mythic", false, 1000));
     }
 
     #[test]

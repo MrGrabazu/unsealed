@@ -186,30 +186,32 @@ footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #2a2c3a; col
 .binder-pages { text-align: center; margin: 10px 0 0; }
 /* minmax(0, 1fr): a track's minimum would otherwise be its content's width, and an image
    arriving at its natural size (Scryfall's are 488 px wide) would blow the layout up. */
-.binder-spread { --cover-h: 25; --cover: hsl(var(--cover-h) 38% 24%); --cover-dark: hsl(var(--cover-h) 40% 12%);
-  --cover-light: hsl(var(--cover-h) 35% 34%);
+.binder-spread, .library-spine { --cover-h: 25; --cover: hsl(var(--cover-h) 38% 24%); --cover-dark: hsl(var(--cover-h) 40% 12%);
+  --cover-light: hsl(var(--cover-h) 35% 34%); }
+.binder-spread {
   position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 18px minmax(0, 1fr); padding: 14px; border-radius: 16px;
   background-color: var(--cover); box-shadow: inset 0 0 0 2px var(--cover-light), inset 0 0 30px #0007, 0 16px 40px #0008; }
 .binder-spine { background: linear-gradient(90deg, var(--cover-dark), var(--cover) 50%, var(--cover-dark)); border-radius: 4px; }
-/* Cover materials, one per set (Binder's coverOf). Leather: fine grain and a stitched edge. */
-.binder-spread[data-cover="leather"] {
+/* Cover materials, one per set (Binder's coverOf), the same on the library's spines.
+   Leather: fine grain and a stitched edge. */
+:is(.binder-spread, .library-spine)[data-cover="leather"] {
   background-image: radial-gradient(#0000002e 0.6px, transparent 1.2px), radial-gradient(#ffffff0d 0.6px, transparent 1.2px),
     linear-gradient(160deg, var(--cover-light), var(--cover) 45%, var(--cover-dark));
   background-size: 4px 4px, 5px 5px, 100% 100%; background-position: 0 0, 2px 3px, 0 0; }
-.binder-spread[data-cover="leather"]::before { content: ""; position: absolute; inset: 6px; border-radius: 11px; pointer-events: none;
+:is(.binder-spread, .library-spine)[data-cover="leather"]::before { content: ""; position: absolute; inset: 6px; border-radius: 11px; pointer-events: none;
   border: 1.5px dashed hsl(var(--cover-h) 30% 62% / 0.55); }
 /* Canvas: a woven cloth. */
-.binder-spread[data-cover="canvas"] {
+:is(.binder-spread, .library-spine)[data-cover="canvas"] {
   --cover: hsl(var(--cover-h) 30% 30%); --cover-light: hsl(var(--cover-h) 28% 40%);
   background-image: repeating-linear-gradient(0deg, #ffffff0c 0 1px, transparent 1px 3px),
     repeating-linear-gradient(90deg, #0000001f 0 1px, transparent 1px 3px), linear-gradient(180deg, var(--cover-light), var(--cover-dark)); }
 /* Vinyl: smooth and glossy, a light sweeping across. */
-.binder-spread[data-cover="vinyl"] {
+:is(.binder-spread, .library-spine)[data-cover="vinyl"] {
   --cover: hsl(var(--cover-h) 55% 26%); --cover-light: hsl(var(--cover-h) 50% 40%);
   background-image: linear-gradient(115deg, transparent 20%, #ffffff1f 32%, transparent 44%),
     linear-gradient(180deg, var(--cover-light), var(--cover) 50%, var(--cover-dark)); }
 /* Suede: matte and velvety, a soft nap. */
-.binder-spread[data-cover="suede"] {
+:is(.binder-spread, .library-spine)[data-cover="suede"] {
   --cover: hsl(var(--cover-h) 32% 28%); --cover-light: hsl(var(--cover-h) 26% 36%);
   background-image: radial-gradient(ellipse at 30% 20%, #ffffff12, transparent 60%), radial-gradient(#0000001a 1px, transparent 1.6px),
     linear-gradient(200deg, var(--cover-light), var(--cover-dark));

@@ -268,6 +268,12 @@ fn get_owned_cards(state: State<'_, SessionState>) -> Result<Vec<game::ArtistCar
     with_game(&state, |g| g.owned_everywhere())
 }
 
+/// The library's binders: one per set the player owns cards of.
+#[tauri::command]
+fn get_library(state: State<'_, SessionState>) -> Result<Vec<game::LibraryBinder>, String> {
+    with_game(&state, |g| g.library())
+}
+
 #[tauri::command]
 fn list_artists(state: State<'_, SessionState>) -> Result<Vec<game::ArtistSummary>, String> {
     with_game(&state, |g| g.artists())
@@ -483,6 +489,7 @@ pub fn run() {
             get_artist_collection,
             check_set_images,
             get_owned_cards,
+            get_library,
             sell_cards,
             sell_duplicates,
             claim_charity,

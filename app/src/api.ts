@@ -72,6 +72,32 @@ export interface CollectionView {
   artsOwned: number;
 }
 
+/** A binder on the library's shelves: a set the player owns cards of. */
+export interface LibraryBinder {
+  setCode: string;
+  ownedCount: number;
+  totalCount: number;
+  completionPercent: number;
+  raresOwned: number;
+  raresTotal: number;
+  mythicsOwned: number;
+  mythicsTotal: number;
+  extrasOwned: number;
+  extrasTotal: number;
+  tokensOwned: number;
+  tokensTotal: number;
+  artsOwned: number;
+  artsTotal: number;
+  copies: number;
+  foilCopies: number;
+  /** Market value of every copy, and what the Boosterium would pay for them. */
+  valueCents: number;
+  sellValueCents: number;
+  /** The most valuable card owned (finest finish owned). */
+  bestCard: { name: string; foil: boolean; priceCents: number } | null;
+  boostersOpened: number;
+}
+
 /** An artist with cards in the sets offered. */
 export interface ArtistSummary {
   name: string;
@@ -373,6 +399,7 @@ export const getCollection = (setCode: string) =>
 export const checkSetImages = (setCode: string) => invoke<number>("check_set_images", { setCode });
 /** Every card owned, across the sets, with the set it comes from. */
 export const getOwnedCards = () => invoke<ArtistCard[]>("get_owned_cards");
+export const getLibrary = () => invoke<LibraryBinder[]>("get_library");
 export const listArtists = () => invoke<ArtistSummary[]>("list_artists");
 export const getArtistCollection = (name: string) => invoke<ArtistView>("get_artist_collection", { name });
 export const getHistory =(limit: number, offset: number) => invoke<HistoryView>("get_history", { limit, offset });
