@@ -318,7 +318,9 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
 
   return (
     <section>
-      <div className="controls">
+      {/* First row: what to show (left), the bulk sale (centred on the full width), the layout
+          (right). Second row: the filters of the view shown, on the left. */}
+      <div className="collection-bar">
         <div className="segmented" role="group" aria-label={t("collection.source")}>
           <button className={library ? "active" : ""} onClick={() => setSource("library")}>
             {t("collection.library")}
@@ -330,6 +332,27 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
             {t("collection.byArtist")}
           </button>
         </div>
+        <div className="collection-bar-middle">
+          {source === "sets" && !allSets && (
+            <button className="primary" onClick={() => void sellExtras()}>
+              {t("collection.sellDuplicates")}
+            </button>
+          )}
+        </div>
+        <div className="collection-bar-right">
+          {!allSets && !library && (
+            <div className="segmented" role="group" aria-label={t("collection.layout")}>
+              <button className={layout === "binder" ? "active" : ""} onClick={() => changeLayout("binder")}>
+                {t("collection.layoutBinder")}
+              </button>
+              <button className={layout === "grid" ? "active" : ""} onClick={() => changeLayout("grid")}>
+                {t("collection.layoutGrid")}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="controls collection-filters">
         {source === "sets" && (
           <select value={setCode} onChange={(e) => setSetCode(e.target.value)}>
             <option value={ALL_SETS}>{t("collection.allSets")}</option>
@@ -374,15 +397,6 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
             <option value="missing">{t("collection.missing")}</option>
           </select>
         )}
-        {source === "sets" && !allSets && <button onClick={() => void sellExtras()}>{t("collection.sellDuplicates")}</button>}
-        {!allSets && !library && <div className="segmented" role="group" aria-label={t("collection.layout")}>
-          <button className={layout === "binder" ? "active" : ""} onClick={() => changeLayout("binder")}>
-            {t("collection.layoutBinder")}
-          </button>
-          <button className={layout === "grid" ? "active" : ""} onClick={() => changeLayout("grid")}>
-            {t("collection.layoutGrid")}
-          </button>
-        </div>}
       </div>
 
       {error && <p className="error">{error}</p>}

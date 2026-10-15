@@ -184,6 +184,8 @@ export const en = {
   "library.empty": "No binder on the shelves yet: open a booster to start one.",
   "library.summary_one": "{count} binder",
   "library.summary_other": "{count} binders",
+  "library.cardCount_one": "{count} card",
+  "library.cardCount_other": "{count} cards",
   "library.rares": "Rares",
   "library.mythics": "Mythics",
   "library.copies": "Copies",

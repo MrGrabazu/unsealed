@@ -179,6 +179,8 @@ export const de: Messages = {
   "library.empty": "Noch keine Ordner im Regal: Öffne einen Booster, um einen anzufangen.",
   "library.summary_one": "{count} Ordner",
   "library.summary_other": "{count} Ordner",
+  "library.cardCount_one": "{count} Karte",
+  "library.cardCount_other": "{count} Karten",
   "library.rares": "Seltene",
   "library.mythics": "Mythische",
   "library.copies": "Exemplare",

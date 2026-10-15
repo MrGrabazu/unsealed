@@ -179,6 +179,8 @@ export const fr: Messages = {
   "library.empty": "Aucun classeur sur les étagères pour l'instant : ouvrez un booster pour en commencer un.",
   "library.summary_one": "{count} classeur",
   "library.summary_other": "{count} classeurs",
+  "library.cardCount_one": "{count} carte",
+  "library.cardCount_other": "{count} cartes",
   "library.rares": "Rares",
   "library.mythics": "Mythiques",
   "library.copies": "Exemplaires",

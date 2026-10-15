@@ -179,6 +179,8 @@ export const it: Messages = {
   "library.empty": "Ancora nessun raccoglitore sugli scaffali: apri una busta per iniziarne uno.",
   "library.summary_one": "{count} raccoglitore",
   "library.summary_other": "{count} raccoglitori",
+  "library.cardCount_one": "{count} carta",
+  "library.cardCount_other": "{count} carte",
   "library.rares": "Rare",
   "library.mythics": "Mitiche",
   "library.copies": "Copie",

@@ -25,6 +25,14 @@ h1 { margin: 0; font-size: 28px; letter-spacing: 0.04em; }
 .tagline { margin: 0; color: var(--accent); font-style: italic; }
 
 .controls { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
+/* The collection's bar: equal side columns keep the middle one centred on the full width. */
+.collection-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px; margin: 20px 0 10px; }
+/* The grid places them: no auto margin (which `.segmented` has elsewhere) pushing them aside. */
+.collection-bar .segmented { margin-left: 0; }
+.collection-bar > .segmented { justify-self: start; }
+.collection-bar-right { justify-self: end; }
+.controls.collection-filters { margin: 0 0 20px; }
+.controls.collection-filters:empty { display: none; }
 
 select, button, input {
   background: var(--panel);

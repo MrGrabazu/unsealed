@@ -179,6 +179,8 @@ export const es: Messages = {
   "library.empty": "Aún no hay carpetas en las estanterías: abre un sobre para empezar una.",
   "library.summary_one": "{count} carpeta",
   "library.summary_other": "{count} carpetas",
+  "library.cardCount_one": "{count} carta",
+  "library.cardCount_other": "{count} cartas",
   "library.rares": "Raras",
   "library.mythics": "Míticas",
   "library.copies": "Copias",

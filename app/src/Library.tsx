@@ -6,9 +6,12 @@ import { Loading } from "./Loading";
 import { Money } from "./money";
 import { SetIcon } from "./SetIcon";
 
-/** Room between two binders on a shelf, and on either side of the shelf. */
-const GAP = 4;
-const SHELF_PADDING = 28;
+/** Room between two binders on a shelf, and on either side of the shelf (keep in sync with
+ * `.shelf-books` and `.shelf` in theme.css). */
+const GAP = 2;
+const SHELF_PADDING = 6;
+/** Cards per binder page, as in `Binder.tsx`. */
+const PER_PAGE = 9;
 /** Shelves drawn even when there are few binders: a bookcase, not a single plank. */
 const MIN_SHELVES = 2;
 
@@ -27,10 +30,11 @@ interface Book {
   height: number;
 }
 
-/** A binder's thickness grows with what it holds, as a real one with more pages would. */
+/** A binder's thickness follows its number of pages, as a real one would: from a slim
+ * binder for a small set to a thick one for a set of several hundred cards. */
 function widthOf(b: LibraryBinder): number {
-  const cards = b.totalCount + b.extrasTotal + b.tokensTotal + b.artsTotal;
-  return Math.round(40 + Math.min(40, Math.sqrt(cards) * 2.2));
+  const pages = Math.ceil((b.totalCount + b.extrasTotal + b.tokensTotal + b.artsTotal) / PER_PAGE);
+  return Math.round(Math.max(34, Math.min(110, 26 + pages * 0.9)));
 }
 
 /** Room along a spine's label for its name (px), and Cinzel's mean capital width (em). */
@@ -187,7 +191,7 @@ function Spine({
 
 /** What a binder holds, next to the mouse (and kept inside the window). */
 function BinderTooltip({ book, x, y }: { book: Book; x: number; y: number }) {
-  const { t, formatNumber } = useI18n();
+  const { t, plural, formatNumber } = useI18n();
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 300, height: 320 });
   useLayoutEffect(() => {
@@ -219,6 +223,7 @@ function BinderTooltip({ book, x, y }: { book: Book; x: number; y: number }) {
           <div className="hint">
             {b.setCode}
             {set && ` · ${set.releaseDate.slice(0, 4)}`}
+            {` · ${plural("library.cardCount", b.totalCount)}`}
           </div>
         </div>
       </div>
