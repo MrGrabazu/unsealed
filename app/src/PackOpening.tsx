@@ -2,6 +2,7 @@ import { LayoutGroup, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import type { OpenedCard, SetSummary } from "./api";
 import { isBigCard } from "./BatchOpening";
+import { SellBoosterButton, SellCardButton, useBoosterSale } from "./BoosterSale";
 import { cardBackUrl } from "./canvasArt";
 import { CardImage } from "./CardImage";
 import { useI18n } from "./i18n";
@@ -22,6 +23,8 @@ interface Props {
   onReveal: (count: number) => void;
   busy: boolean;
   onDetails: (card: OpenedCard) => void;
+  /** Cards of the booster were sold (the wallet changed). */
+  onSold: () => void;
 }
 
 /** How dramatic a card's reveal is. */
@@ -66,9 +69,10 @@ function FlipCard({ card, faceUp }: { card: OpenedCard; faceUp: boolean }) {
 /** Opening one booster, like for real: the sealed pack, torn open; the cards in a pile,
  * revealed one by one (in a real booster's order) and set aside in a row; then all of them to
  * look at. */
-export function PackOpening({ setCode, set, kind, cards, onTear, onReveal, busy, onDetails }: Props) {
+export function PackOpening({ setCode, set, kind, cards, onTear, onReveal, busy, onDetails, onSold }: Props) {
   const { t, tx } = useI18n();
   const money = useMoney();
+  const sale = useBoosterSale(cards, onSold);
   const [torn, setTorn] = useState(false);
   // Cards already set aside in the row, and whether the top of the pile is turned over.
   const [aside, setAside] = useState(0);
@@ -150,6 +154,7 @@ export function PackOpening({ setCode, set, kind, cards, onTear, onReveal, busy,
           </button>
         )}
         {aside > 0 && <strong className="total">{tx("open.boosterValue", { amount: money(value) })}</strong>}
+        {done && <SellBoosterButton sale={sale} />}
       </div>
 
       <LayoutGroup>
@@ -199,7 +204,7 @@ export function PackOpening({ setCode, set, kind, cards, onTear, onReveal, busy,
                 tabIndex={0}
                 key={index}
                 layoutId={`pack-card-${index}`}
-                className={`revealed-card ${hitOf(card)}`}
+                className={`revealed-card ${hitOf(card)} ${sale.sold[index] ? "sold" : ""}`}
                 onClick={() => onDetails(card)}
                 onKeyDown={(e) => e.key === "Enter" && onDetails(card)}
                 title={t("details.open")}
@@ -210,6 +215,7 @@ export function PackOpening({ setCode, set, kind, cards, onTear, onReveal, busy,
                   <span className="name">{card.name}</span>
                   <span className="price">{card.priceCents == null ? t("common.none") : <Money cents={card.priceCents} estimated={card.priceEstimated} />}</span>
                 </span>
+                {done && <SellCardButton sale={sale} index={index} card={card} />}
               </motion.div>
             ))}
           </div>

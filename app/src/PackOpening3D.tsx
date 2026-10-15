@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { OpenedCard, SetSummary } from "./api";
 import { kindLabel } from "./boosterKinds";
+import { SellBoosterButton, useBoosterSale } from "./BoosterSale";
 import { useI18n } from "./i18n";
 import { useMoney } from "./money";
 import { RevealedCards } from "./RevealedCards";
@@ -14,6 +15,8 @@ interface Props {
   onTear: () => Promise<boolean>;
   onReveal: (count: number) => void;
   onDetails: (card: OpenedCard) => void;
+  /** Cards of the booster were sold (the wallet changed). */
+  onSold: () => void;
 }
 
 /** A colour per set, the same as the classic wrapper's. */
@@ -26,9 +29,10 @@ function hueOf(code: string): number {
 /** Opening one booster in the 3D scene: tear the pack, then slide the cards off the pile one
  * by one. Once the last card has left, the scene gives way to the list of the cards, and a
  * click on one shows its details. */
-export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onDetails }: Props) {
+export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onDetails, onSold }: Props) {
   const { t, tx } = useI18n();
   const money = useMoney();
+  const sale = useBoosterSale(cards, onSold);
   const [top, setTop] = useState(0);
   const [finished, setFinished] = useState(false);
   const [slideRequest, setSlideRequest] = useState(0);
@@ -83,6 +87,7 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
             <span>{t("open.revealed", { revealed: finished ? total : Math.min(top + 1, total), total })}</span>
             {!finished && <button onClick={() => setFinished(true)}>{t("open.revealAll")}</button>}
             {seen.length > 0 && <strong className="total">{tx("open.boosterValue", { amount: money(value) })}</strong>}
+            {finished && <SellBoosterButton sale={sale} />}
           </>
         ) : (
           <span className="hint">{t("scene.tearHint")}</span>
@@ -114,7 +119,9 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
       )}
       {finished && <p className="hint scene-hint">{t("open.details")}</p>}
 
-      {seen.length > 0 && <RevealedCards cards={seen} final={finished} onDetails={onDetails} />}
+      {seen.length > 0 && (
+        <RevealedCards cards={seen} final={finished} onDetails={onDetails} sale={finished ? sale : undefined} />
+      )}
     </section>
   );
 }

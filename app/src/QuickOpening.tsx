@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import type { OpenedCard, SetSummary } from "./api";
 import { kindLabel } from "./boosterKinds";
+import { SellBoosterButton, useBoosterSale } from "./BoosterSale";
 import { useI18n } from "./i18n";
 import { Loading } from "./Loading";
 import { useMoney } from "./money";
@@ -17,14 +18,18 @@ export function QuickOpening({
   kind,
   cards,
   onDetails,
+  onSold,
 }: {
   set: SetSummary | undefined;
   kind: string;
   cards: OpenedCard[] | null;
   onDetails: (card: OpenedCard) => void;
+  /** Cards of the booster were sold (the wallet changed). */
+  onSold: () => void;
 }) {
   const { t, tx } = useI18n();
   const money = useMoney();
+  const sale = useBoosterSale(cards, onSold);
 
   // The rip, then the best card's sound once every card has landed.
   useEffect(() => {
@@ -43,8 +48,9 @@ export function QuickOpening({
           {set?.name} · {kindLabel(t, kind)}
         </span>
         <strong className="total">{tx("open.boosterValue", { amount: money(value) })}</strong>
+        <SellBoosterButton sale={sale} />
       </div>
-      <RevealedCards cards={cards} final onDetails={onDetails} />
+      <RevealedCards cards={cards} final onDetails={onDetails} sale={sale} />
       <p className="hint scene-hint">{t("open.details")}</p>
     </section>
   );

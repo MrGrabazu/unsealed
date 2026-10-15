@@ -1,5 +1,6 @@
 import type { OpenedCard } from "./api";
 import { isBigCard } from "./BatchOpening";
+import { SellCardButton, type BoosterSale } from "./BoosterSale";
 import { CardImage } from "./CardImage";
 import { useI18n } from "./i18n";
 import { Money } from "./money";
@@ -12,8 +13,19 @@ const hitOf = (card: OpenedCard) =>
 export const sheenClass = (rarity: string) => (rarity === "art" ? "foil-sheen signed" : "foil-sheen");
 
 /** The cards of an opened booster, in a row, each with its price; a click shows its details.
- * `final`: the whole booster at once, the cards dealt one after the other. */
-export function RevealedCards({ cards, final, onDetails }: { cards: OpenedCard[]; final: boolean; onDetails: (card: OpenedCard) => void }) {
+ * `final`: the whole booster at once, the cards dealt one after the other. With `sale`, each
+ * card can be sold from here. */
+export function RevealedCards({
+  cards,
+  final,
+  onDetails,
+  sale,
+}: {
+  cards: OpenedCard[];
+  final: boolean;
+  onDetails: (card: OpenedCard) => void;
+  sale?: BoosterSale;
+}) {
   const { t } = useI18n();
   return (
     <div className={`revealed-row ${final ? "final" : ""}`}>
@@ -22,7 +34,7 @@ export function RevealedCards({ cards, final, onDetails }: { cards: OpenedCard[]
           key={index}
           role="button"
           tabIndex={0}
-          className={`revealed-card ${hitOf(card)}`}
+          className={`revealed-card ${hitOf(card)} ${sale?.sold[index] ? "sold" : ""}`}
           style={{ "--i": index } as React.CSSProperties}
           onClick={() => onDetails(card)}
           onKeyDown={(e) => e.key === "Enter" && onDetails(card)}
@@ -39,6 +51,7 @@ export function RevealedCards({ cards, final, onDetails }: { cards: OpenedCard[]
               {card.priceCents == null ? t("common.none") : <Money cents={card.priceCents} estimated={card.priceEstimated} />}
             </span>
           </span>
+          {sale && <SellCardButton sale={sale} index={index} card={card} />}
         </div>
       ))}
     </div>

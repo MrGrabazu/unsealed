@@ -76,6 +76,8 @@ pub struct OpenedCard {
     pub price_cents: Option<u32>,
     /// The card has no market price of its own: `price_cents` is estimated.
     pub price_estimated: bool,
+    /// What the Boosterium pays for it now (0 = cannot be sold), to sell it right after opening.
+    pub sell_value_cents: u32,
     /// First time the player owns this card (in any finish).
     pub is_new: bool,
 }
@@ -619,6 +621,8 @@ impl Game {
                     sheet: d.sheet,
                     price_cents: price,
                     price_estimated,
+                    // As `Game::sale_value` reckons it.
+                    sell_value_cents: price.map_or(0, |p| economy.sell_value_cents(p)),
                     is_new: false,
                 }
             })
@@ -963,6 +967,7 @@ impl Game {
             price_cents,
             // A pull keeps the price it had when pulled, estimated or not.
             price_estimated: false,
+            sell_value_cents: 0,
             is_new: false,
         })
     }
@@ -1505,6 +1510,7 @@ mod tests {
             back_image_url: None,
             price_cents: None,
             price_estimated: false,
+            sell_value_cents: 0,
             is_new: false,
         };
         let order = |kind: &str, mut cards: Vec<OpenedCard>| {

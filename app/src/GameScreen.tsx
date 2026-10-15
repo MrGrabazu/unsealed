@@ -367,6 +367,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
                     kind={pack.kind}
                     cards={cards}
                     onDetails={(card) => setDetailsOf({ setCode: pack.setCode, uuid: card.uuid })}
+                    onSold={refreshWallet}
                   />
                 )}
                 {pack && !pack.quick && opening3d && (
@@ -379,6 +380,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
                       onTear={tear}
                       onReveal={(count) => void reveal(count)}
                       onDetails={(card) => setDetailsOf({ setCode: pack.setCode, uuid: card.uuid })}
+                      onSold={refreshWallet}
                     />
                   </Suspense>
                 )}
@@ -393,6 +395,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
                     busy={busy}
                     // The details live in the booster's set file (it holds cards from other sets too).
                     onDetails={(card) => setDetailsOf({ setCode: pack.setCode, uuid: card.uuid })}
+                    onSold={refreshWallet}
                   />
                 )}
                 {batch && <BatchOpening boosters={batch} onFinished={releaseToasts} />}

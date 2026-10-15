@@ -32,6 +32,8 @@ export interface OpenedCard {
   priceCents: number | null;
   /** The card has no market price of its own: the price is estimated. */
   priceEstimated: boolean;
+  /** What the Boosterium pays for it (0 = cannot be sold), to sell it right after opening. */
+  sellValueCents: number;
   /** First time the player owns this card (in any finish). */
   isNew: boolean;
 }
