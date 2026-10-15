@@ -13,17 +13,21 @@ export interface SoldLine {
   unitCents: number;
 }
 
-/** The copies "sell duplicates" sells: every copy beyond the first of each card and finish
+/** What is left to sell of a card when one copy is kept, whatever its finish: the foil one
+ * if there is one (as `Game::sell_duplicates` does). */
+export function beyondOneCopy(card: CollectionCard): { normal: number; foil: number } {
+  const keptFoil = card.foilQuantity > 0 ? 1 : 0;
+  return { normal: Math.max(0, card.quantity - (1 - keptFoil)), foil: card.foilQuantity - keptFoil };
+}
+
+/** The copies "sell duplicates" sells: every copy beyond the one kept of each card, that
  * the Boosterium buys (as the game does it, see `Game::sell_duplicates`). */
 export function duplicatesOf(cards: CollectionCard[]): SoldLine[] {
   const lines: SoldLine[] = [];
   for (const card of cards) {
-    if (card.quantity > 1 && card.sellValueCents > 0) {
-      lines.push({ card, foil: false, quantity: card.quantity - 1, unitCents: card.sellValueCents });
-    }
-    if (card.foilQuantity > 1 && card.foilSellValueCents > 0) {
-      lines.push({ card, foil: true, quantity: card.foilQuantity - 1, unitCents: card.foilSellValueCents });
-    }
+    const { normal, foil } = beyondOneCopy(card);
+    if (normal > 0 && card.sellValueCents > 0) lines.push({ card, foil: false, quantity: normal, unitCents: card.sellValueCents });
+    if (foil > 0 && card.foilSellValueCents > 0) lines.push({ card, foil: true, quantity: foil, unitCents: card.foilSellValueCents });
   }
   return lines.sort((a, b) => b.quantity * b.unitCents - a.quantity * a.unitCents);
 }

@@ -10,7 +10,8 @@ import { cardBackTexture, glowTexture, loadCardTexture, packTexture, stripTextur
 
 // The 3D opening. The pack tilts with the pointer, shakes when held and moved, and its top
 // strip tears off as the pointer slides along it, peeling back from where the tear started.
-// Out come the cards, face up, rigid like real cardboard: the top one is slid off the pile
+// Out come the cards, back up as from a real booster, rigid like real cardboard; once in place
+// the pile is turned over in one go, and the top one is slid off the pile
 // (dragged in any direction, or clicked) to uncover the next, in a real booster's order (the
 // rare, then the foils, the token last). The last one
 // leaves on its own after a moment, and the scene makes room for the list of the cards.
@@ -25,7 +26,10 @@ const SLIDE_AWAY = 1.3;
  * away while the pile settles (seconds). */
 const CARDS_OUT = 0.85;
 const PACK_FALLS = 0.6;
-const SETTLED = CARDS_OUT + PACK_FALLS;
+/** The pile comes out back up, as from a real booster, then is turned over in one go to show
+ * its first card (seconds). */
+const PILE_TURNS = 0.5;
+const SETTLED = CARDS_OUT + PACK_FALLS + PILE_TURNS;
 /** Out of the wrapper, the pile is brought closer to the player: its cards read better. */
 const CARD_ZOOM = 1.5;
 /** How long the last card stays before leaving (seconds). */
@@ -363,6 +367,7 @@ function Cards({
   const topSince = useRef(SETTLED);
   const finishing = useRef(false);
   const firstShown = useRef(false);
+  const turnSounded = useRef(false);
   // The card on top, moved on as soon as one leaves: waiting for React to pass the new `top`
   // would show the card that left back on the pile for a frame or two.
   const current = useRef(top);
@@ -495,6 +500,14 @@ function Cards({
     const top = current.current;
     const isLast = top === cards.length - 1;
 
+    // Back up until the pile is in place, then turned over as one block (about its middle).
+    const turnStart = CARDS_OUT + PACK_FALLS;
+    if (!turnSounded.current && since >= turnStart) {
+      turnSounded.current = true;
+      sounds.flip();
+    }
+    const turn = Math.PI * (1 - ease((since - turnStart) / PILE_TURNS));
+
     // The last card stays a moment, then leaves on its own.
     if (isLast && !finishing.current && slide.current.kind === "idle" && clock.current - topSince.current > LAST_CARD_STAYS) {
       finishing.current = true;
@@ -506,19 +519,23 @@ function Cards({
       uniforms.uLight.value.set(state.pointer.x, state.pointer.y);
     });
 
+    // Out of the pack: the pile, behind the wrapper's front, slides up through the torn top;
+    // then, as the empty wrapper falls away, it comes forward and settles.
+    const settle = ease((since - CARDS_OUT) / PACK_FALLS);
+    const depth = (k: number) => THREE.MathUtils.lerp(-0.2 - 0.01 * k, stackZ(k), settle);
+    const middle = (depth(0) + depth(cards.length - 1)) / 2;
     meshes.current.forEach((mesh, k) => {
       if (!mesh) return;
       mesh.visible = k >= top;
-      // Out of the pack: the pile, behind the wrapper's front, slides up through the torn top;
-      // then, as the empty wrapper falls away, it comes forward and settles.
       const out = ease((since - (cards.length - k) * 0.012) / CARDS_OUT);
-      const settle = ease((since - CARDS_OUT) / PACK_FALLS);
+      // Turned over about the pile's middle: back up, its order reversed, then face up.
+      const dz = depth(k) - middle;
       const base = new THREE.Vector3(
-        0,
+        dz * Math.sin(turn),
         THREE.MathUtils.lerp(-0.4 + out * 1.4, 0, settle),
-        // Inside, the pile is packed tight just behind the front.
-        THREE.MathUtils.lerp(-0.2 - 0.01 * k, stackZ(k), settle),
+        middle + dz * Math.cos(turn),
       );
+      mesh.rotation.y = turn;
       if (k === top) {
         mesh.position.set(base.x + offset.current.x, base.y + offset.current.y, base.z + Math.min(0.3, offset.current.length() * 0.1));
         mesh.rotation.z = -offset.current.x * 0.08;

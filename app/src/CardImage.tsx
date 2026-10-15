@@ -10,20 +10,32 @@ interface Props {
   lazy?: boolean;
 }
 
+/** Where a turn is: the face shown going edge-on, then the other one coming round. */
+type Turn = "idle" | "out" | "in";
+
 /** A card image that double-faced cards can turn over. The image is never altered. */
 export function CardImage({ front, back, alt, className, lazy }: Props) {
   const { t } = useI18n();
   const [showBack, setShowBack] = useState(false);
+  const [turn, setTurn] = useState<Turn>("idle");
+  const turnClass = turn === "out" ? "turning-out" : turn === "in" ? "turning-in" : "";
   return (
     <>
       <img
-        // A new key restarts the turn animation on each flip.
-        key={showBack ? "back" : "front"}
-        className={`${className ?? ""} ${back ? "turnable" : ""}`}
+        className={`${className ?? ""} ${turnClass}`}
         src={showBack && back ? back : front}
         alt={alt}
         loading={lazy ? "lazy" : undefined}
         draggable={false}
+        onAnimationEnd={() => {
+          // Edge-on: the other face takes its place and finishes the turn.
+          if (turn === "out") {
+            setShowBack((b) => !b);
+            setTurn("in");
+          } else if (turn === "in") {
+            setTurn("idle");
+          }
+        }}
       />
       {back && (
         <button
@@ -34,7 +46,7 @@ export function CardImage({ front, back, alt, className, lazy }: Props) {
           onClick={(e) => {
             // The card itself may be clickable (reveal, details): turning it over is not a click on it.
             e.stopPropagation();
-            setShowBack((b) => !b);
+            if (turn === "idle") setTurn("out");
           }}
         >
           ⟲

@@ -647,6 +647,24 @@ impl Store {
         Ok(rows.collect::<Result<_, _>>()?)
     }
 
+    /// Files the copies of a card under another uuid (a foil printing merged into its card in
+    /// the data), with its openings: the copies add up, the history follows. Nothing happens
+    /// when no copy of `from` was ever owned.
+    pub fn merge_card(&mut self, from: &str, into: &str) -> StoreResult<()> {
+        let tx = self.conn.transaction()?;
+        tx.execute(
+            "INSERT INTO collection (card_uuid, foil, set_code, quantity, first_acquired_at)
+             SELECT ?2, foil, set_code, quantity, first_acquired_at FROM collection WHERE card_uuid = ?1
+             ON CONFLICT (card_uuid, foil) DO UPDATE SET quantity = quantity + excluded.quantity,
+               first_acquired_at = MIN(first_acquired_at, excluded.first_acquired_at)",
+            params![from, into],
+        )?;
+        tx.execute("DELETE FROM collection WHERE card_uuid = ?1", [from])?;
+        tx.execute("UPDATE opening_cards SET card_uuid = ?2 WHERE card_uuid = ?1", params![from, into])?;
+        tx.commit()?;
+        Ok(())
+    }
+
     /// Owned quantities of the cards belonging to a set, by card uuid.
     pub fn owned_in_set(&self, set_code: &str) -> StoreResult<HashMap<String, Owned>> {
         let mut stmt =

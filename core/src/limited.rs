@@ -98,6 +98,7 @@ mod tests {
             serialized,
             token: false,
             art: false,
+            foil_scryfall_id: None,
         }
     }
 

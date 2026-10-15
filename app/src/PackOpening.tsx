@@ -2,6 +2,7 @@ import { LayoutGroup, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import type { OpenedCard, SetSummary } from "./api";
 import { isBigCard } from "./BatchOpening";
+import { cardBackUrl } from "./canvasArt";
 import { CardImage } from "./CardImage";
 import { useI18n } from "./i18n";
 import { Money, useMoney } from "./money";
@@ -27,9 +28,23 @@ interface Props {
 const hitOf = (card: OpenedCard) =>
   card.rarity === "mythic" ? "hit-mythic" : isBigCard(card) ? "hit-rare" : card.foil ? "hit-foil" : "";
 
+/** The cards' back (drawn once, see `canvasArt.ts`), as an image URL once ready. */
+function useCardBack(): string | null {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    void cardBackUrl().then((u) => live && setUrl(u));
+    return () => {
+      live = false;
+    };
+  }, []);
+  return url;
+}
+
 /** A card that can be face down (its back) or face up. */
 function FlipCard({ card, faceUp }: { card: OpenedCard; faceUp: boolean }) {
   const { t } = useI18n();
+  const backUrl = useCardBack();
   return (
     <motion.div
       className="card"
@@ -38,9 +53,7 @@ function FlipCard({ card, faceUp }: { card: OpenedCard; faceUp: boolean }) {
       animate={{ rotateY: faceUp ? 180 : 0 }}
       transition={{ duration: 0.5, ease: "easeInOut" }}
     >
-      <div className="face back">
-        <span>U</span>
-      </div>
+      <div className="face back" style={backUrl ? { backgroundImage: `url(${backUrl})` } : undefined} />
       <div className="face front">
         <CardImage front={card.imageUrl} back={faceUp ? card.backImageUrl : null} alt={card.name} />
         {card.foil && <div className={sheenClass(card.rarity)} />}

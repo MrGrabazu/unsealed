@@ -62,6 +62,7 @@ import { Library } from "./Library";
 import { Loading } from "./Loading";
 import { duplicatesOf, SaleModal, type SoldLine } from "./SaleModal";
 import { sheenClass } from "./RevealedCards";
+import { SellPicker } from "./SellPicker";
 import { Money, useMoney, useMoneyText } from "./money";
 import { getCollectionLayout, setCollectionLayout, type CollectionLayout } from "./settings";
 import { sounds } from "./sound";
@@ -74,10 +75,12 @@ interface Props {
   refreshKey: number;
   /** Called after a sale so the wallet can refresh. */
   onChanged: () => void;
+  /** Takes the player to the Boosterium, on a set's boosters. */
+  onShop: (setCode: string) => void;
 }
 
 /** Collection of one set: completion progress, missing cards greyed out, selling. */
-export function Collection({ sets, refreshKey, onChanged }: Props) {
+export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
   const money = useMoney();
   const moneyText = useMoneyText();
   const { t, tx } = useI18n();
@@ -93,6 +96,8 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
   const [layout, setLayout] = useState<CollectionLayout>(getCollectionLayout);
   // The last bulk sale, shown in its own window.
   const [sale, setSale] = useState<{ soldCount: number; totalCents: number; lines: SoldLine[] } | null>(null);
+  // The window to sell in bulk (every card, or one rarity).
+  const [picking, setPicking] = useState(false);
   // The binder's section on show (index in `binderSections`).
   const [binderSection, setBinderSection] = useState(0);
   // Collections by artist.
@@ -176,6 +181,21 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
       } else {
         setNotice(t("collection.noDuplicates"));
       }
+      await reload();
+      onChanged();
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
+  /** Sells the lines chosen in the bulk sale window, then shows what it brought in. */
+  async function sellLines(lines: SoldLine[]) {
+    try {
+      const result = await sellCards(lines.map((l) => ({ uuid: l.card.uuid, foil: l.foil, quantity: l.quantity })));
+      sounds.coins();
+      setNotice(null);
+      setPicking(false);
+      setSale({ soldCount: result.soldCount, totalCents: result.totalCents, lines });
       await reload();
       onChanged();
     } catch (e) {
@@ -334,9 +354,14 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
         </div>
         <div className="collection-bar-middle">
           {source === "sets" && !allSets && (
-            <button className="primary" onClick={() => void sellExtras()}>
-              {t("collection.sellDuplicates")}
-            </button>
+            <>
+              <button className="primary" onClick={() => void sellExtras()}>
+                {t("collection.sellDuplicates")}
+              </button>
+              <button onClick={() => setPicking(true)} disabled={!view}>
+                {t("collection.sellMore")}
+              </button>
+            </>
           )}
         </div>
         <div className="collection-bar-right">
@@ -362,6 +387,9 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
               </option>
             ))}
           </select>
+        )}
+        {source === "sets" && !allSets && setCode && (
+          <button onClick={() => onShop(setCode)}>{t("collection.buyBoosters")}</button>
         )}
         {byArtist && (
           <>
@@ -508,6 +536,13 @@ export function Collection({ sets, refreshKey, onChanged }: Props) {
             </>
           )}
         </>
+      )}
+      {picking && view && (
+        <SellPicker
+          cards={[...view.cards, ...view.extras, ...view.tokens, ...view.arts]}
+          onSell={sellLines}
+          onClose={() => setPicking(false)}
+        />
       )}
       {sale && <SaleModal {...sale} onClose={() => setSale(null)} />}
       {detailsSet && detailsOf && (

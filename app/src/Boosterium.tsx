@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { SetSummary, ShopItem, WalletView } from "./api";
 import { kindLabel, kindRank } from "./boosterKinds";
 import { useI18n } from "./i18n";
@@ -14,6 +14,8 @@ interface Props {
   onBuyAndOpen: (item: ShopItem) => void;
   onClaimCharity: () => void;
   busy: boolean;
+  /** A set to show, open, on arrival (from its collection); `at` tells two requests apart. */
+  focus?: { setCode: string; at: number } | null;
 }
 
 /** Budget filter choices, in cents (0 = any price). */
@@ -26,7 +28,7 @@ interface SetGroup {
 }
 
 /** The shop: buy sealed boosters, and ask for help when truly stranded. */
-export function Boosterium({ shop, sets, wallet, onBuy, onBuyAndOpen, onClaimCharity, busy }: Props) {
+export function Boosterium({ shop, sets, wallet, onBuy, onBuyAndOpen, onClaimCharity, busy, focus }: Props) {
   const money = useMoney();
   const moneyText = useMoneyText();
   const { t, tx, plural } = useI18n();
@@ -35,6 +37,18 @@ export function Boosterium({ shop, sets, wallet, onBuy, onBuyAndOpen, onClaimCha
   const [maxPrice, setMaxPrice] = useState(0);
   const [open, setOpen] = useState<Set<string>>(new Set());
   const canAfford = (item: ShopItem, quantity: number) => wallet.balanceCents >= item.priceCents * quantity;
+
+  // Arriving for one set: no filter hides it, its products are open and in view.
+  useEffect(() => {
+    if (!focus) return;
+    setSearch("");
+    setYear("all");
+    setMaxPrice(0);
+    setOpen(new Set([focus.setCode]));
+    requestAnimationFrame(() =>
+      document.getElementById(`shop-set-${focus.setCode}`)?.scrollIntoView({ block: "start", behavior: "smooth" }),
+    );
+  }, [focus]);
 
   const inBudget = (item: ShopItem) => maxPrice === 0 || item.priceCents <= maxPrice;
   const years = [...new Set(sets.map((s) => s.releaseDate.slice(0, 4)))];
@@ -104,7 +118,7 @@ export function Boosterium({ shop, sets, wallet, onBuy, onBuyAndOpen, onClaimCha
           const expanded = open.has(set.code);
           const cheapest = Math.min(...products.map((p) => p.priceCents));
           return (
-            <div key={set.code} className={`shop-set ${expanded ? "open" : ""}`}>
+            <div key={set.code} id={`shop-set-${set.code}`} className={`shop-set ${expanded ? "open" : ""}`}>
               <button
                 className={`shop-set-header ${set.art ? "with-art" : ""}`}
                 onClick={() => toggle(set.code)}

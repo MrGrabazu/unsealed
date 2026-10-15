@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { SEAL_PATH } from "../logoSvg";
+import { cardBackCanvas, cardBackReady, drawSeal, gold, TITLE_FONT } from "../canvasArt";
 
 // Textures of the 3D opening, drawn on canvases: the original wrapper (with the set's art
 // in a window, the art itself left unaltered), its tear-off strip, the cards' back, and the
@@ -113,19 +113,6 @@ async function drawArtFallback(g: CanvasRenderingContext2D, look: PackLook, win:
   g.restore();
 }
 
-const TITLE_FONT = "Cinzel, Georgia, serif";
-
-/** A gold gradient running down `y0`..`y1`, like the logo's gilding. */
-function gold(g: CanvasRenderingContext2D, y0: number, y1: number) {
-  const gradient = g.createLinearGradient(0, y0, 0, y1);
-  gradient.addColorStop(0, "#fff4c8");
-  gradient.addColorStop(0.35, "#f0c35e");
-  gradient.addColorStop(0.55, "#a8742a");
-  gradient.addColorStop(0.65, "#e9c271");
-  gradient.addColorStop(1, "#6d4512");
-  return gradient;
-}
-
 /** A gilded frame inside the wrapper's edges, with a flourish in each corner. */
 function drawFrame(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
   g.save();
@@ -153,38 +140,6 @@ function drawFrame(g: CanvasRenderingContext2D, x: number, y: number, w: number,
     g.fill();
     g.restore();
   }
-  g.restore();
-}
-
-/** The logo's wax seal, a U pressed in it, at `cx`, `cy`, `size` wide. */
-function drawSeal(g: CanvasRenderingContext2D, cx: number, cy: number, size: number) {
-  const outline = new Path2D(SEAL_PATH);
-  g.save();
-  g.translate(cx, cy);
-  g.scale(size / 130, size / 130);
-  g.save();
-  g.translate(2, 6);
-  g.fillStyle = "#1b0f05aa";
-  g.fill(outline);
-  g.restore();
-  const wax = g.createRadialGradient(-20, -25, 5, 0, 0, 80);
-  wax.addColorStop(0, "#e2545a");
-  wax.addColorStop(0.45, "#a61f28");
-  wax.addColorStop(1, "#4f080e");
-  g.fillStyle = wax;
-  g.fill(outline);
-  g.strokeStyle = "#3d060b";
-  g.lineWidth = 2.5;
-  g.stroke(outline);
-  g.beginPath();
-  g.arc(0, 0, 45, 0, Math.PI * 2);
-  g.strokeStyle = gold(g, -45, 45);
-  g.lineWidth = 3;
-  g.stroke();
-  g.font = `900 84px ${TITLE_FONT}`;
-  g.textAlign = "center";
-  g.fillStyle = gold(g, -30, 30);
-  g.fillText("U", 0, 29);
   g.restore();
 }
 
@@ -326,32 +281,11 @@ export function stripTexture(hue: number): THREE.CanvasTexture {
   return canvasTexture(canvas);
 }
 
-/** The cards' back: Unsealed's own design (not Magic's). */
+/** The cards' back (see `canvasArt.ts`) as a texture, redrawn once its font is loaded. */
 export function cardBackTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement("canvas");
-  canvas.width = 250;
-  canvas.height = 350;
-  const g = canvas.getContext("2d")!;
-  g.fillStyle = "#0d1124";
-  g.fillRect(0, 0, 250, 350);
-  for (let y = -250; y < 350; y += 20) {
-    g.fillStyle = "#26304f";
-    g.beginPath();
-    g.moveTo(0, y);
-    g.lineTo(250, y + 250);
-    g.lineTo(250, y + 260);
-    g.lineTo(0, y + 10);
-    g.fill();
-  }
-  g.strokeStyle = "#0d1124";
-  g.lineWidth = 16;
-  g.strokeRect(0, 0, 250, 350);
-  g.fillStyle = "#e0a526";
-  g.font = "700 110px system-ui, sans-serif";
-  g.textAlign = "center";
-  g.textBaseline = "middle";
-  g.fillText("U", 125, 180);
-  return canvasTexture(canvas);
+  const texture = canvasTexture(cardBackCanvas);
+  void cardBackReady.then(() => (texture.needsUpdate = true));
+  return texture;
 }
 
 /** A soft round glow, coloured at display time. */

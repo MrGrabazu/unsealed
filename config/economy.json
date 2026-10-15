@@ -9,6 +9,17 @@
     "minCents": 100,
     "overrides": {}
   },
+  "fallbackPrices": {
+    "common": { "normalCents": 5, "foilCents": 15 },
+    "uncommon": { "normalCents": 10, "foilCents": 25 },
+    "rare": { "normalCents": 25, "foilCents": 75 },
+    "mythic": { "normalCents": 50, "foilCents": 150 },
+    "special": { "normalCents": 25, "foilCents": 75 },
+    "bonus": { "normalCents": 25, "foilCents": 75 },
+    "token": { "normalCents": 10, "foilCents": 30 },
+    "art": { "normalCents": 20, "foilCents": 250 },
+    "default": { "normalCents": 10, "foilCents": 30 }
+  },
   "charity": {
     "amountCents": 2000,
     "maxClaimsPerDay": 1

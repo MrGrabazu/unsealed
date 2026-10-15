@@ -4,9 +4,10 @@ use unsealed_core::catalog::{AllSets, Manifest, ManifestSet, SetSelection, DATA_
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use unsealed_core::import::{
-    add_art_cards_from, add_art_slots, add_token_slots, artist_index, add_tokens_from, parse_cents, prices_from_scryfall_jsonl,
-    read_all_printings, set_from_mtgjson, ArtCardOdds,
+    add_art_cards_from, add_art_slots, add_token_slots, artist_index, add_tokens_from, merge_foil_printings, parse_cents,
+    prices_by_uuid, prices_from_scryfall_jsonl, read_all_printings, set_from_mtgjson, ArtCardOdds,
 };
+use unsealed_core::catalog::PriceSet;
 use unsealed_core::{open_booster, ColorIndex};
 use unsealed_core::update::{refresh_reason, DataConfig, RefreshReason};
 
@@ -108,6 +109,58 @@ fn every_booster_gets_a_token_foil_in_collector_boosters() {
         let token = pack.iter().find(|d| d.uuid.starts_with('t')).expect("a token in every pack");
         assert!(token.foil);
     }
+}
+
+/// Unhinged-like: "1★" is the foil of "1" (merged), "2★" has another artist (kept apart).
+const SET_WITH_STAR_FOILS: &str = r#"{
+  "meta": { "version": "5.3.0+test" },
+  "data": {
+    "code": "TST", "name": "Test Set", "releaseDate": "2005-01-01", "type": "funny",
+    "cards": [
+      { "uuid": "u1", "setCode": "TST", "name": "A", "number": "1", "rarity": "common", "artist": "Ann",
+        "finishes": ["nonfoil"], "layout": "normal", "identifiers": { "scryfallId": "s1" } },
+      { "uuid": "u1s", "setCode": "TST", "name": "A", "number": "1★", "rarity": "common", "artist": "Ann",
+        "finishes": ["foil"], "layout": "normal", "identifiers": { "scryfallId": "s1s" } },
+      { "uuid": "u2", "setCode": "TST", "name": "B", "number": "2", "rarity": "rare", "artist": "Bob",
+        "finishes": ["nonfoil"], "layout": "normal", "identifiers": { "scryfallId": "s2" } },
+      { "uuid": "u2s", "setCode": "TST", "name": "B", "number": "2★", "rarity": "rare", "artist": "Kaz",
+        "finishes": ["foil"], "layout": "normal", "identifiers": { "scryfallId": "s2s" } }
+    ],
+    "booster": {
+      "draft": {
+        "boosters": [ { "contents": { "common": 1, "foil": 1 }, "weight": 1 } ],
+        "boostersTotalWeight": 1,
+        "sheets": {
+          "common": { "cards": { "u1": 1, "u2": 1 }, "foil": false, "totalWeight": 2 },
+          "foil": { "cards": { "u1s": 3, "u2s": 1 }, "foil": true, "totalWeight": 4 }
+        },
+        "sourceSetCodes": ["TST"]
+      }
+    }
+  }
+}"#;
+
+#[test]
+fn star_foil_printings_become_the_foil_copies_of_their_card() {
+    let mut set = set_from_mtgjson(SET_WITH_STAR_FOILS, &["draft"], &[]).unwrap();
+    merge_foil_printings(&mut set);
+    let numbers: Vec<&str> = set.cards.iter().map(|c| c.number.as_str()).collect();
+    assert_eq!(numbers, ["1", "2", "2★"]);
+    let a = &set.cards[0];
+    assert_eq!(a.finishes, ["nonfoil", "foil"]);
+    assert_eq!(a.foil_scryfall_id.as_deref(), Some("s1s"));
+    let foil = &set.boosters["draft"].sheets["foil"];
+    assert_eq!(foil.cards, BTreeMap::from([("u1".to_string(), 3), ("u2s".to_string(), 1)]));
+    set.boosters["draft"].validate().unwrap();
+    assert_eq!(set.foil_aliases, BTreeMap::from([("u1s".to_string(), "u1".to_string())]));
+
+    // The card's foil prices come from the merged printing.
+    let by_id = BTreeMap::from([
+        ("s1".to_string(), PriceSet { usd: Some(33), ..Default::default() }),
+        ("s1s".to_string(), PriceSet { usd_foil: Some(880), ..Default::default() }),
+    ]);
+    let prices = prices_by_uuid(&by_id, &set.cards);
+    assert_eq!((prices["u1"].usd, prices["u1"].usd_foil), (Some(33), Some(880)));
 }
 
 #[test]

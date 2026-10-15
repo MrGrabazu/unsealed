@@ -152,6 +152,7 @@ fn to_entry(c: &RawCard) -> Result<CardEntry, ConfigError> {
         serialized: c.promo_types.iter().any(|p| p == "serialized"),
         token: false,
         art: false,
+        foil_scryfall_id: None,
     })
 }
 
@@ -520,7 +521,51 @@ pub fn compact_set(raw: &RawSet, version: &str, kinds: &[&str], extra_sets: &[&R
             .iter()
             .filter_map(|(language, name)| Some((language_code(language)?.to_string(), name.clone()?)))
             .collect(),
+        foil_aliases: BTreeMap::new(),
     })
+}
+
+/// Merges the foil versions MTGJSON lists as printings of their own ("★" numbers: the foils of
+/// 7th to 10th Edition, Unhinged…) into their card: a foil copy of the card, not another card
+/// to collect. A "★" printing is merged only when it is foil only, has the same name, artist
+/// and face as the card numbered without the "★", and that card has no foil finish (WAR's
+/// "★" planeswalkers, with another art, stay apart). Its sheets draw the card instead (they
+/// are foil sheets), its foil price comes from it (`foil_scryfall_id`), and `foil_aliases`
+/// keeps its uuid for games saved before.
+pub fn merge_foil_printings(set: &mut SetFile) {
+    let mut aliases = BTreeMap::new();
+    for star in set.cards.iter().filter(|c| c.number.ends_with('★') && c.finishes == ["foil"]) {
+        let base_number = star.number.trim_end_matches('★');
+        let base = set.cards.iter().find(|c| {
+            c.number == base_number
+                && c.name == star.name
+                && c.artist == star.artist
+                && c.side == star.side
+                && c.set_code == star.set_code
+                && !c.finishes.iter().any(|f| f == "foil")
+        });
+        if let Some(base) = base {
+            aliases.insert(star.uuid.clone(), (base.uuid.clone(), star.scryfall_id.clone()));
+        }
+    }
+    if aliases.is_empty() {
+        return;
+    }
+    for card in &mut set.cards {
+        if let Some((_, scryfall_id)) = aliases.values().find(|(base, _)| *base == card.uuid) {
+            card.finishes.push("foil".to_string());
+            card.foil_scryfall_id = Some(scryfall_id.clone());
+        }
+    }
+    set.cards.retain(|c| !aliases.contains_key(&c.uuid));
+    for sheet in set.boosters.values_mut().flat_map(|b| b.sheets.values_mut()) {
+        for (star, (base, _)) in &aliases {
+            if let Some(weight) = sheet.cards.remove(star) {
+                *sheet.cards.entry(base.clone()).or_insert(0) += weight;
+            }
+        }
+    }
+    set.foil_aliases = aliases.into_iter().map(|(star, (base, _))| (star, base)).collect();
 }
 
 /// Parses a decimal price string ("0.05", "12", "1.5") into cents without floats.
@@ -544,7 +589,16 @@ pub fn prices_by_uuid(
 ) -> BTreeMap<String, PriceSet> {
     cards
         .iter()
-        .filter_map(|c| by_scryfall_id.get(&c.scryfall_id).map(|p| (c.uuid.clone(), *p)))
+        .filter_map(|c| {
+            let mut prices = by_scryfall_id.get(&c.scryfall_id).copied();
+            // A foil version merged into the card (`merge_foil_printings`) gives its foil prices.
+            if let Some(foil) = c.foil_scryfall_id.as_ref().and_then(|id| by_scryfall_id.get(id)) {
+                let p = prices.get_or_insert(PriceSet { estimated: foil.estimated, ..Default::default() });
+                p.usd_foil = foil.usd_foil.or(p.usd_foil);
+                p.eur_foil = foil.eur_foil.or(p.eur_foil);
+            }
+            Some((c.uuid.clone(), prices?))
+        })
         .collect()
 }
 

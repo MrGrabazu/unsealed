@@ -8,7 +8,7 @@ use crate::catalog::{
     BoosterValue, Manifest, ManifestSet, PriceFile, PriceSet, SetFile, SetSelection, ARTISTS_FILE, COLLECTOR_KIND,
     DATA_FORMAT_VERSION,
 };
-use crate::import::{add_art_cards_from, add_art_slots, artist_index, add_token_slots, add_tokens_from, art_set_code, compact_set, ArtCardOdds, featured_card, token_set_code, prices_by_uuid, prices_from_scryfall_jsonl, read_all_printings, AllPrintings};
+use crate::import::{add_art_cards_from, add_art_slots, artist_index, add_token_slots, add_tokens_from, art_set_code, compact_set, merge_foil_printings, ArtCardOdds, featured_card, token_set_code, prices_by_uuid, prices_from_scryfall_jsonl, read_all_printings, AllPrintings};
 use crate::sim::expected_value_cents;
 use crate::{simulate, ColorIndex};
 use flate2::read::GzDecoder;
@@ -191,6 +191,7 @@ fn build_set(
         .map(|c| all.data.get(c).ok_or_else(|| format!("source set {c} not found")))
         .collect::<Result<Vec<_>, _>>()?;
     let mut set = compact_set(raw, &all.meta.version, kinds, &extras)?;
+    merge_foil_printings(&mut set);
     if let Some(token_set) = all.data.get(&token_set_code(raw)) {
         add_tokens_from(&mut set, token_set);
     }
@@ -320,7 +321,7 @@ pub fn build(opts: &BuildOptions, progress: Progress<'_>) -> Result<Manifest, Bu
         for (kind, cfg) in &set.boosters {
             built_boosters.push((format!("{code}/{kind}"), cfg.clone()));
         }
-        wanted.extend(set.cards.iter().map(|c| c.scryfall_id.clone()));
+        wanted.extend(set.cards.iter().flat_map(|c| [Some(c.scryfall_id.clone()), c.foil_scryfall_id.clone()]).flatten());
         all_cards.extend(set.cards.iter().cloned());
         write_json(&sets_dir.join(format!("{code}.json")), &set)?;
         manifest_sets.insert(

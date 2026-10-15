@@ -600,8 +600,11 @@ impl Game {
             .into_iter()
             .map(|d| {
                 let card = &set.file.cards[set.index[&d.uuid]];
-                let price = market_price(prices.as_ref(), economy, limited, print_runs, &d.uuid, d.foil);
-                let price_estimated = prices.as_ref().and_then(|p| p.cards.get(&d.uuid)).is_some_and(|p| p.estimated);
+                let own = |foil| market_price(prices.as_ref(), economy, limited, print_runs, &d.uuid, foil);
+                let unpriced = own(false).is_none() && own(true).is_none();
+                let price = if unpriced { economy.fallback_price_cents(&card.rarity, d.foil) } else { own(d.foil) };
+                let price_estimated =
+                    unpriced || prices.as_ref().and_then(|p| p.cards.get(&d.uuid)).is_some_and(|p| p.estimated);
                 let shown = localized(card, card_lang, image_quality);
                 OpenedCard {
                     image_url: shown.image_url,
@@ -812,9 +815,12 @@ impl Game {
         let owned = self.owned_with_tokens(set_code)?;
         let mut requests = Vec::new();
         for (uuid, have) in owned {
-            for (foil, quantity) in [(false, have.normal), (true, have.foil)] {
-                if quantity > 1 && self.sale_value(&uuid, foil) > 0 {
-                    requests.push(SaleRequest { uuid: uuid.clone(), foil, quantity: quantity - 1 });
+            // One copy of each card is kept, whatever its finish: the foil one if there is one.
+            let kept_foil = u32::from(have.foil > 0);
+            let to_sell = [(false, have.normal - (1 - kept_foil).min(have.normal)), (true, have.foil - kept_foil)];
+            for (foil, quantity) in to_sell {
+                if quantity > 0 && self.sale_value(&uuid, foil) > 0 {
+                    requests.push(SaleRequest { uuid: uuid.clone(), foil, quantity });
                 }
             }
         }
@@ -967,13 +973,27 @@ impl Game {
         Ok(owned.iter().any(|(uuid, foil, _)| self.sale_value(uuid, *foil) > 0))
     }
 
+    /// A card's market price in one finish. A card nothing prices, in any finish, gets the
+    /// fallback price of its rarity (`fallbackPrices` of the economy) so it can be sold; a card
+    /// priced in one finish only keeps no price in the other (see `market_price_cents`).
     fn market_price(&self, uuid: &str, foil: bool) -> Option<u32> {
+        if self.unpriced(uuid) {
+            let card = self.sets.values().find_map(|s| s.index.get(uuid).map(|&i| &s.file.cards[i]))?;
+            return self.economy.fallback_price_cents(&card.rarity, foil);
+        }
         market_price(self.prices.as_ref(), &self.economy, &self.limited, &self.print_runs, uuid, foil)
     }
 
-    /// Whether a card's price is an estimate (it has none of its own).
+    /// Whether neither finish of a card has a market price (or an estimate from its other
+    /// printings).
+    fn unpriced(&self, uuid: &str) -> bool {
+        let own = |foil| market_price(self.prices.as_ref(), &self.economy, &self.limited, &self.print_runs, uuid, foil);
+        own(false).is_none() && own(true).is_none()
+    }
+
+    /// Whether a card's price is an estimate: from its other printings, or its rarity's.
     fn price_estimated(&self, uuid: &str) -> bool {
-        self.prices.as_ref().and_then(|p| p.cards.get(uuid)).is_some_and(|p| p.estimated)
+        self.unpriced(uuid) || self.prices.as_ref().and_then(|p| p.cards.get(uuid)).is_some_and(|p| p.estimated)
     }
 
     /// What the Boosterium pays for one copy; 0 when the card has no market price.
@@ -992,6 +1012,11 @@ impl Game {
             return Ok(());
         }
         let file: SetFile = read_json(&self.data_dir.join("sets").join(format!("{code}.json")))?;
+        // Foil printings merged into their card since the game was saved: their copies become
+        // foil copies of the card.
+        for (from, into) in &file.foil_aliases {
+            self.store.merge_card(from, into).map_err(err)?;
+        }
         let colors = ColorIndex::from_cards(&file.cards);
         let index = file.cards.iter().enumerate().map(|(i, c)| (c.uuid.clone(), i)).collect();
         let (obtainable, extras) = obtainable_cards(&file);
@@ -2037,6 +2062,24 @@ mod tests {
     }
 
     #[test]
+    fn cards_without_any_price_get_their_rarity_fallback_as_an_estimate() {
+        let (mut g, _) = game_with("fallback", NO_PRICES);
+        g.buy_boosters("TST", "play", 1).unwrap();
+        let opened = g.open_booster("TST", "play").unwrap();
+        assert!(opened.iter().all(|c| c.price_estimated));
+        let view = g.collection("TST").unwrap();
+        let rows: Vec<(&str, Option<u32>, Option<u32>, u32, bool)> = view
+            .cards
+            .iter()
+            .map(|c| (c.name.as_str(), c.price_cents, c.foil_price_cents, c.sell_value_cents, c.price_estimated))
+            .collect();
+        // The shipped fallbacks: a mythic 50 (foil 150), a common 5 (foil 15); 80% when sold.
+        assert_eq!(rows, [("Mythic", Some(50), Some(150), 40, true), ("Common", Some(5), Some(15), 4, true)]);
+        let sold = g.sell_cards(&[SaleRequest { uuid: "c1".into(), foil: false, quantity: 2 }]).unwrap();
+        assert_eq!(sold.total_cents, 8);
+    }
+
+    #[test]
     fn library_shows_a_binder_per_set_owned_with_its_value() {
         let mut g = game_with_booster("library");
         assert!(g.library().unwrap().is_empty());
@@ -2094,6 +2137,29 @@ mod tests {
     }
 
     #[test]
+    fn duplicates_keep_one_copy_of_a_card_the_foil_one_first() {
+        let mut g = game("dupes-foil");
+        g.buy_boosters("TST", "play", 1).unwrap();
+        let copy = |foil| OpeningCard { uuid: "c1", set_code: "TST", foil, price_cents: Some(100), limited: false };
+        g.store.open_sealed("TST", "play", &[copy(false), copy(false), copy(true)], 0).unwrap();
+        // Three copies, one foil: the foil stays, both plain copies go.
+        assert_eq!(g.sell_duplicates("TST").unwrap(), SaleResult { sold_count: 2, total_cents: 160 });
+        let c1 = g.collection("TST").unwrap().cards.into_iter().find(|c| c.uuid == "c1").unwrap();
+        assert_eq!((c1.quantity, c1.foil_quantity), (0, 1));
+    }
+
+    #[test]
+    fn copies_of_a_merged_printing_join_its_card() {
+        let mut g = game_with_booster("merge");
+        g.open_booster("TST", "play").unwrap(); // c1 ×2, m1
+        g.store.merge_card("m1", "c1").unwrap();
+        g.store.merge_card("gone", "c1").unwrap(); // never owned: nothing happens
+        let owned = g.store.owned_in_set("TST").unwrap();
+        assert_eq!(owned.get("c1").map(|o| (o.normal, o.foil)), Some((3, 0)));
+        assert!(!owned.contains_key("m1"));
+    }
+
+    #[test]
     fn help_is_only_for_players_who_are_truly_stranded() {
         let (mut g, day) = game_with("charity", NO_PRICES);
         assert!(g.claim_charity().is_err()); // $100: not stranded
@@ -2104,8 +2170,13 @@ mod tests {
         for _ in 0..25 {
             g.open_booster("TST", "play").unwrap();
         }
+        // With the rarity fallbacks, every card can be sold: it must be sacrificed first.
+        let fallbacks = std::mem::take(&mut g.economy.fallback_prices);
         // Nothing left to open and the cards have no market value: stranded.
         assert!(g.wallet().unwrap().charity.available);
+        g.economy.fallback_prices = fallbacks;
+        assert!(!g.wallet().unwrap().charity.available);
+        g.economy.fallback_prices.clear();
         g.claim_charity().unwrap();
         assert_eq!(balance(&mut g), 2_000);
         assert!(g.claim_charity().is_err()); // not stranded any more

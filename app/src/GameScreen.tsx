@@ -82,6 +82,8 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<Tab>("boosterium");
+  // A set to show open in the Boosterium (asked for from its collection).
+  const [shopFocus, setShopFocus] = useState<{ setCode: string; at: number } | null>(null);
   // Bumped after each opening so the collection view reloads.
   const [openings, setOpenings] = useState(0);
 
@@ -330,6 +332,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
             onBuyAndOpen={buyAndOpen}
             onClaimCharity={() => run(() => claimCharity())}
             busy={busy}
+            focus={shopFocus}
           />
         )}
 
@@ -423,7 +426,17 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
           </section>
         )}
 
-        {tab === "collection" && <Collection sets={sets} refreshKey={openings} onChanged={refreshWallet} />}
+        {tab === "collection" && (
+          <Collection
+            sets={sets}
+            refreshKey={openings}
+            onChanged={refreshWallet}
+            onShop={(setCode) => {
+              setShopFocus({ setCode, at: Date.now() });
+              switchTab("boosterium");
+            }}
+          />
+        )}
 
         {tab === "achievements" && <Achievements refreshKey={unlockCount} />}
 

@@ -24,11 +24,15 @@ pub struct SetFile {
     /// The set's name in other languages (code -> name), when it was translated.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub names: BTreeMap<String, String>,
+    /// Foil printings merged into their card (see `CardEntry::foil_scryfall_id`): their uuid
+    /// -> the card's. Games saved before the merge own them under the old uuid.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub foil_aliases: BTreeMap<String, String>,
 }
 
 /// Bump when the compact files change in a way older data cannot satisfy: the app then
 /// rebuilds its data at the next launch.
-pub const DATA_FORMAT_VERSION: u32 = 5;
+pub const DATA_FORMAT_VERSION: u32 = 6;
 
 /// Languages kept for card and set names, as (MTGJSON language name, code). Cards printed
 /// in other languages, or never translated, stay in English.
@@ -108,6 +112,11 @@ pub struct CardEntry {
     /// signed version is drawn as its "foil" finish.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub art: bool,
+    /// The foil version, when MTGJSON lists it as a printing of its own ("★" numbers: 7th to
+    /// 10th Edition, Unhinged…), merged into this card (`merge_foil_printings`): the Scryfall
+    /// printing its foil price comes from.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub foil_scryfall_id: Option<String>,
 }
 
 /// Prices in cents, as given by Scryfall.

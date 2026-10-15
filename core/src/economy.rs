@@ -20,6 +20,19 @@ pub struct EconomyConfig {
     pub charity: Charity,
     #[serde(default)]
     pub cancellation: Cancellation,
+    /// Price of a card nothing prices (neither its own printing in any finish, nor its other
+    /// printings: art cards, some tokens), by rarity ("common"…"mythic", "token", "art"; any
+    /// other rarity takes "default"), so that it can still be sold. Shown as an estimate.
+    #[serde(default)]
+    pub fallback_prices: BTreeMap<String, FallbackPrice>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FallbackPrice {
+    pub normal_cents: u32,
+    /// The foil copy (for an art card: its gold signed version).
+    pub foil_cents: u32,
 }
 
 /// Undoing a transaction. A sale can be undone at any time: the player pays back what they
@@ -190,6 +203,13 @@ impl EconomyConfig {
             (_, true) => prices.usd_foil,
             (_, false) => prices.usd,
         }
+    }
+
+    /// Price of a card without any market price, from its rarity, else the `default` entry
+    /// (none if neither is configured).
+    pub fn fallback_price_cents(&self, rarity: &str, foil: bool) -> Option<u32> {
+        let price = self.fallback_prices.get(rarity).or_else(|| self.fallback_prices.get("default"))?;
+        Some(if foil { price.foil_cents } else { price.normal_cents }).filter(|&c| c > 0)
     }
 
     /// What the Boosterium pays for a card worth `market_cents` (rounded down).
