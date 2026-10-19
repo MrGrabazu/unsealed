@@ -74,6 +74,112 @@ export interface CollectionView {
   artsOwned: number;
 }
 
+/** What the collection earns by itself. */
+export interface IncomeView {
+  /** What the collection would sell for (real market prices only). */
+  collectionValueCents: number;
+  /** What it earns each minute, in cents (with their fraction). */
+  perMinuteCents: number;
+  /** Paid by this call. */
+  earnedCents: number;
+  /** The time this call paid for, in minutes (capped). */
+  minutes: number;
+  percentPerMinute: number;
+  offlineCapMinutes: number;
+}
+
+// Bets (see `unsealed_core::betting`): every condition of a bet must hold.
+export type Compare = "atLeast" | "exactly" | "atMost";
+export type Finish = "any" | "normal" | "foil";
+export type CardKind = "cards" | "tokens" | "artCards" | "all";
+export type CardType =
+  | "land"
+  | "basicLand"
+  | "creature"
+  | "instant"
+  | "sorcery"
+  | "artifact"
+  | "enchantment"
+  | "planeswalker"
+  | "battle";
+export type ColorChoice = "white" | "blue" | "black" | "red" | "green" | "colorless" | "multicolor";
+export type Treatment = "any" | "fullArt" | "specialFrame";
+
+/** Which cards a condition counts; every criterion is optional. */
+export interface CardFilter {
+  /** A given card's uuid. */
+  card?: string | null;
+  kind?: CardKind;
+  rarities?: string[];
+  types?: CardType[];
+  colors?: ColorChoice[];
+  finish?: Finish;
+  treatment?: Treatment;
+  minCents?: number | null;
+  maxCents?: number | null;
+}
+
+export type Clause =
+  | { type: "cards"; compare: Compare; count: number; filter: CardFilter }
+  | { type: "value"; compare: Compare; cents: number };
+
+export interface Bet {
+  clauses: Clause[];
+}
+
+/** A bet of the slip. `active: false`: paused, kept in the slip but not placed. */
+export interface BetRequest {
+  bet: Bet;
+  stakeCents: number;
+  active?: boolean;
+}
+
+/** A bet kept from one opening to the next; one naming a card only on its set's boosters. */
+export interface KeptBet extends BetRequest {
+  setCode: string | null;
+  /** The card it names, as shown ("Name (#61)"). */
+  cardName: string | null;
+}
+
+/** A bet left out of an opening (no stake taken), and why. */
+export interface SkippedBet {
+  bet: Bet;
+  /** Nothing to price on this booster, a stake under the minimum, or no money for it. */
+  reason: "unpriced" | "stake" | "funds";
+}
+
+/** What a bet slip needs to know of a booster. */
+export interface BetContext {
+  boosterPriceCents: number;
+  houseMarginPercent: number;
+  minStakeCents: number;
+}
+
+/** How likely a bet is: `null` when it cannot be priced (certain either way, or too rare). */
+export interface BetChance {
+  probability: number | null;
+  /** Worked out from the sheets (else over simulated boosters). */
+  exact: boolean;
+}
+
+export interface SettledBet {
+  bet: Bet;
+  stakeCents: number;
+  /** The chance it had of winning. */
+  probability: number;
+  won: boolean;
+  /** What it pays back, the stake included (0 when lost). */
+  payoutCents: number;
+}
+
+/** An opened booster: its cards, the bets it settled, and those left out (not priceable on
+ * this booster: no stake taken). */
+export interface OpenedBooster {
+  cards: OpenedCard[];
+  bets: SettledBet[];
+  skipped: SkippedBet[];
+}
+
 /** A binder on the library's shelves: a set the player owns cards of. */
 export interface LibraryBinder {
   setCode: string;
@@ -240,6 +346,9 @@ export interface StatsView {
   earnedFromBoostersCents: number;
   rewardsCents: number;
   charityCents: number;
+  /** Staked on bets, and what the winning ones paid back. */
+  betsStakedCents: number;
+  betsWonCents: number;
   balanceCents: number;
   /** Distinct cards owned (any finish). */
   distinctCards: number;
@@ -386,11 +495,20 @@ export const buyBoosters = (setCode: string, kind: string, quantity: number) =>
   invoke<void>("buy_boosters", { setCode, kind, quantity });
 export const sellBoosters = (setCode: string, kind: string, quantity: number) =>
   invoke<BoosterSaleResult>("sell_boosters", { setCode, kind, quantity });
-/** `animated`: the player watches the opening (false for a quick opening). */
-export const openBooster = (setCode: string, kind: string, animated = true) =>
-  invoke<OpenedCard[]>("open_booster", { setCode, kind, animated });
-export const openBoosters = (setCode: string, kind: string, quantity: number) =>
-  invoke<OpenedCard[][]>("open_boosters", { setCode, kind, quantity });
+/** `animated`: the player watches the opening (false for a quick opening). `bets`: placed on
+ * the booster, their stakes paid now and their winnings once every card is seen. */
+export const openBooster = (setCode: string, kind: string, animated: boolean, bets: BetRequest[]) =>
+  invoke<OpenedBooster>("open_booster", { setCode, kind, animated, bets });
+/** Several boosters, the same `bets` on each. */
+export const openBoosters = (setCode: string, kind: string, quantity: number, bets: BetRequest[]) =>
+  invoke<OpenedBooster[]>("open_boosters", { setCode, kind, quantity, bets });
+/** Pays what the collection earned since the last call. */
+export const collectIncome = () => invoke<IncomeView>("collect_income");
+export const getBetContext =(setCode: string, kind: string) => invoke<BetContext>("get_bet_context", { setCode, kind });
+export const getBetChance = (setCode: string, kind: string, bet: Bet) =>
+  invoke<BetChance>("get_bet_chance", { setCode, kind, bet });
+export const getKeptBets = () => invoke<KeptBet[]>("get_kept_bets");
+export const setKeptBets = (bets: KeptBet[]) => invoke<void>("set_kept_bets", { bets });
 /** The player turned over `count` cards of the booster being opened (their achievements
  * happen then). A large count reveals everything left. */
 export const revealCards = (count: number) => invoke<void>("reveal_cards", { count });

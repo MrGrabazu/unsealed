@@ -28,7 +28,16 @@ interface SetGroup {
 }
 
 /** The shop: buy sealed boosters, and ask for help when truly stranded. */
-export function Boosterium({ shop, sets, wallet, onBuy, onBuyAndOpen, onClaimCharity, busy, focus }: Props) {
+export function Boosterium({
+  shop,
+  sets,
+  wallet,
+  onBuy,
+  onBuyAndOpen,
+  onClaimCharity,
+  busy,
+  focus,
+}: Props) {
   const money = useMoney();
   const moneyText = useMoneyText();
   const { t, tx, plural } = useI18n();

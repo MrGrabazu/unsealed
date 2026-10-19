@@ -4,6 +4,8 @@ import {
   checkSetImages,
   claimCharity,
   createSavePoint,
+  collectIncome,
+  getKeptBets,
   getShop,
   getWallet,
   listSets,
@@ -11,9 +13,15 @@ import {
   openBoosters,
   revealCards,
   sellBoosters,
+  setKeptBets as saveKeptBets,
   takeUnlocks,
   type AchievementView,
+  type IncomeView,
+  type SkippedBet,
+  type KeptBet,
+  type BetRequest,
   type OpenedCard,
+  type SettledBet,
   type SaveInfo,
   type SetSummary,
   type ShopItem,
@@ -22,6 +30,9 @@ import {
 import { AchievementCard } from "./AchievementCard";
 import { Achievements } from "./Achievements";
 import { BatchOpening } from "./BatchOpening";
+import { BetResults } from "./BetResults";
+import { activeBets, keptFor, namedCard } from "./bets";
+import { BetSlip } from "./BetSlip";
 import { CardDetails } from "./CardDetails";
 import { Logo } from "./Logo";
 import { getSoundOn, setSoundOn, sounds } from "./sound";
@@ -39,7 +50,7 @@ import { Footer } from "./Footer";
 import { History } from "./History";
 import { useI18n } from "./i18n";
 import { Loading } from "./Loading";
-import { CurrencyContext, DEFAULT_CURRENCY, useMoney } from "./money";
+import { CurrencyContext, DEFAULT_CURRENCY, useMoney, useMoneyText } from "./money";
 import { SealedBoosters } from "./SealedBoosters";
 import { Stats } from "./Stats";
 
@@ -50,13 +61,52 @@ const TABS: Tab[] = ["boosterium", "open", "collection", "achievements", "stats"
 /** How long a notification stays on screen. */
 const TOAST_MS = 8000;
 
-function WalletBar({ wallet }: { wallet: WalletView }) {
+/** The collection's income is paid about each time a whole Seal is earned, within these bounds. */
+const INCOME_MIN_MS = 1_000;
+const INCOME_MAX_MS = 60_000;
+/** How often the income also refreshes the whole wallet (and shows the achievements it unlocked). */
+const INCOME_REFRESH_MS = 60_000;
+/** How long a "+N" floats up from the balance. */
+const INCOME_FLOAT_MS = 1_400;
+
+interface IncomeFloat {
+  id: number;
+  cents: number;
+}
+
+function WalletBar({ wallet, income, floats }: { wallet: WalletView; income: IncomeView | null; floats: IncomeFloat[] }) {
   const money = useMoney();
-  const { t } = useI18n();
+  const moneyText = useMoneyText();
+  const { t, formatNumber } = useI18n();
+  const toSeals = (cents: number) => Math.round(cents * wallet.currency.sealsPerCent);
+  const perMinute = income ? income.perMinuteCents * wallet.currency.sealsPerCent : 0;
   return (
-    <div className="wallet" title={t("game.balanceTitle")}>
-      {money(wallet.balanceCents)}
-    </div>
+    <>
+      <div className="wallet" title={t("game.balanceTitle")}>
+        {/* Keyed on the amount: it pulses each time it changes. */}
+        <span key={wallet.balanceCents} className="wallet-amount">
+          {money(wallet.balanceCents)}
+        </span>
+        {floats.map((f) => (
+          <span key={f.id} className="income-float" aria-hidden="true">
+            +{formatNumber(toSeals(f.cents))}
+          </span>
+        ))}
+      </div>
+      {income && (
+        <span
+          className="income-rate"
+          title={t("income.rateTitle", {
+            value: moneyText(income.collectionValueCents),
+            percent: formatNumber(income.percentPerMinute),
+            hours: formatNumber(income.offlineCapMinutes / 60),
+          })}
+        >
+          {/* Whole Seals only: there is no such thing as a fraction of one. */}
+          {t("income.rate", { rate: formatNumber(Math.ceil(perMinute)) })}
+        </span>
+      )}
+    </>
   );
 }
 
@@ -82,10 +132,43 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<Tab>("boosterium");
+  // What the collection earns, and what it earned while the player was away.
+  const [income, setIncome] = useState<IncomeView | null>(null);
+  const [awayIncome, setAwayIncome] = useState<IncomeView | null>(null);
+  // The "+N" floating up from the balance, one per payment.
+  const [incomeFloats, setIncomeFloats] = useState<IncomeFloat[]>([]);
+  const floatId = useRef(0);
   // A set to show open in the Boosterium (asked for from its collection).
   const [shopFocus, setShopFocus] = useState<{ setCode: string; at: number } | null>(null);
   // Bumped after each opening so the collection view reloads.
   const [openings, setOpenings] = useState(0);
+  // Bets: those kept from one opening to the next, those on the pack about to be torn, and
+  // what the last opening settled (shown once every card is seen).
+  const [kept, setKept] = useState<KeptBet[]>([]);
+  const [slip, setSlip] = useState<BetRequest[]>([]);
+  const [betResults, setBetResults] = useState<SettledBet[]>([]);
+  // Bets left out of the last opening (no stake taken), and why.
+  const [betSkipped, setBetSkipped] = useState<SkippedBet[]>([]);
+  const [allSeen, setAllSeen] = useState(false);
+  // Names of the cards bet on (the results name them).
+  const betCardNames = useRef(new Map<string, string>());
+
+  useEffect(() => {
+    getKeptBets()
+      .then(setKept)
+      .catch(() => {});
+  }, []);
+
+  function changeKept(next: KeptBet[]) {
+    setKept(next);
+    saveKeptBets(next).catch((e) => setError(String(e)));
+  }
+
+  const betCardName = (uuid: string) =>
+    betCardNames.current.get(uuid) ??
+    kept.find((b) => namedCard(b.bet) === uuid)?.cardName ??
+    cards?.find((c) => c.uuid === uuid)?.name ??
+    "?";
 
   // This component renders the currency provider, so it cannot use `useMoneyText` itself.
   const currency = wallet?.currency ?? DEFAULT_CURRENCY;
@@ -126,8 +209,64 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     }
   }, [lang, showToasts]);
 
+  // The Seals per cent, for the income's pace (read from a ref: it must not restart the timer).
+  const sealsPerCent = useRef(currency.sealsPerCent);
+  sealsPerCent.current = currency.sealsPerCent;
+  // When the wallet was last fully refreshed by the income (the achievements it unlocked with it).
+  const incomeRefreshedAt = useRef(0);
+
+  /** Pays what the collection earned since the last time: a "+N" floats up from the balance,
+   * which grows at once. After a while away, a banner says how much it earned. */
+  const payIncome = useCallback(
+    async (onArrival: boolean): Promise<IncomeView | null> => {
+      try {
+        const paid = await collectIncome();
+        setIncome(paid);
+        if (onArrival && paid.earnedCents > 0 && paid.minutes >= 5) setAwayIncome(paid);
+        if (paid.earnedCents > 0) {
+          const id = ++floatId.current;
+          setIncomeFloats((current) => [...current, { id, cents: paid.earnedCents }]);
+          setTimeout(() => setIncomeFloats((current) => current.filter((f) => f.id !== id)), INCOME_FLOAT_MS);
+          // The balance follows at once; the full refresh (and its achievements) once a minute.
+          if (Date.now() - incomeRefreshedAt.current >= INCOME_REFRESH_MS) {
+            incomeRefreshedAt.current = Date.now();
+            await refreshWallet();
+          } else {
+            setWallet((w) => w && { ...w, balanceCents: w.balanceCents + paid.earnedCents });
+          }
+        }
+        return paid;
+      } catch (e) {
+        setError(String(e));
+        return null;
+      }
+    },
+    [refreshWallet],
+  );
+
+  // Paid about each time a whole Seal is earned (at most every second, at least every minute),
+  // so that it can be seen coming in; on arrival, for the time away.
+  useEffect(() => {
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const tick = async (onArrival: boolean) => {
+      const paid = await payIncome(onArrival);
+      if (stopped) return;
+      const perMinute = paid ? paid.perMinuteCents * sealsPerCent.current : 0;
+      const delay = perMinute > 0 ? Math.min(Math.max(60_000 / perMinute, INCOME_MIN_MS), INCOME_MAX_MS) : INCOME_MAX_MS;
+      timer = setTimeout(() => void tick(false), delay);
+    };
+    void tick(true);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+    };
+  }, [payIncome]);
+
   /** Cards of the pack were turned over: their achievements show up now. */
   async function reveal(count: number) {
+    // Every card is seen: the bets' results (and their winnings) show up.
+    if (cards && count >= cards.length) setAllSeen(true);
     try {
       await revealCards(count);
       await refreshWallet();
@@ -168,11 +307,24 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     }
   }
 
+  /** Forgets the bets of the last opening, for a new one. */
+  function resetBets() {
+    setBetResults([]);
+    setBetSkipped([]);
+    setAllSeen(false);
+  }
+
   async function openMany(setCode: string, kind: string, quantity: number) {
     holdingToasts.current = true;
     setPack(null);
     setCards(null);
-    setBatch(await openBoosters(setCode, kind, quantity));
+    resetBets();
+    const opened = await openBoosters(setCode, kind, quantity, activeBets(keptFor(kept, setCode)));
+    setBatch(opened.map((b) => b.cards));
+    setBetResults(opened.flatMap((b) => b.bets));
+    // The same bets on every booster: those left out of any booster, once each.
+    const skipped = new Map(opened.flatMap((b) => b.skipped).map((s) => [`${JSON.stringify(s.bet)}:${s.reason}`, s]));
+    setBetSkipped([...skipped.values()]);
     setLast({ setCode, kind });
     setOpenings((n) => n + 1);
     setTab("open");
@@ -182,6 +334,10 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   function open(setCode: string, kind: string) {
     setBatch(null);
     setCards(null);
+    resetBets();
+    // The kept bets come with every booster (the player can still change them); the others
+    // were for the last one.
+    setSlip(keptFor(kept, setCode));
     setPack({ setCode, kind, quick: false });
     setLast({ setCode, kind });
     setTab("open");
@@ -194,6 +350,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   async function openQuick(setCode: string, kind: string) {
     setBatch(null);
     setCards(null);
+    resetBets();
     setPack({ setCode, kind, quick: true });
     setLast({ setCode, kind });
     setTab("open");
@@ -201,9 +358,13 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     setError(null);
     try {
       await checkSetImages(setCode).catch(() => {});
-      setCards(await openBooster(setCode, kind, false));
+      const opened = await openBooster(setCode, kind, false, activeBets(keptFor(kept, setCode)));
+      setCards(opened.cards);
+      setBetResults(opened.bets);
+      setBetSkipped(opened.skipped);
       setOpenings((n) => n + 1);
       await revealCards(Number.MAX_SAFE_INTEGER);
+      setAllSeen(true);
     } catch (e) {
       setError(String(e));
       setPack(null);
@@ -220,7 +381,10 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     setBusy(true);
     setError(null);
     try {
-      setCards(await openBooster(pack.setCode, pack.kind, true));
+      const opened = await openBooster(pack.setCode, pack.kind, true, activeBets(slip));
+      setCards(opened.cards);
+      setBetResults(opened.bets);
+      setBetSkipped(opened.skipped);
       setOpenings((n) => n + 1);
       return true;
     } catch (e) {
@@ -241,6 +405,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     setPack(null);
     setCards(null);
     setBatch(null);
+    resetBets();
   }
 
   function switchTab(t: Tab) {
@@ -282,7 +447,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
           <span className="game-name" title={t("game.nameTitle")}>
             {save.name}
           </span>
-          {wallet && <WalletBar wallet={wallet} />}
+          {wallet && <WalletBar wallet={wallet} income={income} floats={incomeFloats} />}
           {/* Sound on or off, at hand (also in the options, with the volume). */}
           <button
             className="sound-toggle"
@@ -301,6 +466,21 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
           </button>
           <button onClick={onMenu}>{t("game.menu")}</button>
         </header>
+
+        {awayIncome && (
+          <div className="income-away">
+            <p>
+              {t("income.away", {
+                amount: money(awayIncome.earnedCents),
+                time:
+                  awayIncome.minutes < 90
+                    ? i18n.plural("income.minutes", Math.round(awayIncome.minutes))
+                    : i18n.plural("income.hours", Math.round(awayIncome.minutes / 60)),
+              })}
+            </p>
+            <button onClick={() => setAwayIncome(null)}>{t("income.dismiss")}</button>
+          </div>
+        )}
 
         <nav className="tabs">
           {TABS.map((each) => (
@@ -361,6 +541,21 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
                     </button>
                   )}
                 </div>
+                {/* Bets on the sealed pack, until it is torn. */}
+                {pack && !pack.quick && !cards && (
+                  <BetSlip
+                    key={`${pack.setCode}/${pack.kind}`}
+                    setCode={pack.setCode}
+                    kind={pack.kind}
+                    bets={slip}
+                    onBets={setSlip}
+                    kept={kept}
+                    onKept={changeKept}
+                    onCardName={(uuid, name) => betCardNames.current.set(uuid, name)}
+                    balanceCents={wallet.balanceCents}
+                  />
+                )}
+                {allSeen && <BetResults bets={betResults} skipped={betSkipped} cardName={betCardName} />}
                 {pack?.quick && (
                   <QuickOpening
                     set={sets.find((s) => s.code === pack.setCode)}
@@ -398,7 +593,15 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
                     onSold={refreshWallet}
                   />
                 )}
-                {batch && <BatchOpening boosters={batch} onFinished={releaseToasts} />}
+                {batch && (
+                  <BatchOpening
+                    boosters={batch}
+                    onFinished={() => {
+                      releaseToasts();
+                      setAllSeen(true);
+                    }}
+                  />
+                )}
                 {detailsOf && (
                   <CardDetails setCode={detailsOf.setCode} uuid={detailsOf.uuid} onClose={() => setDetailsOf(null)} />
                 )}

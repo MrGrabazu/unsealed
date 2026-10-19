@@ -37,6 +37,8 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
   const [finished, setFinished] = useState(false);
   const [slideRequest, setSlideRequest] = useState(0);
   const [tearing, setTearing] = useState(false);
+  // Bumped when tearing failed: the scene starts over, the pack sealed again.
+  const [attempt, setAttempt] = useState(0);
 
   const look = useMemo(
     () => ({
@@ -98,6 +100,7 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
         <>
           <div className="scene-frame">
             <PackScene
+              key={attempt}
               look={look}
               cards={cards}
               top={top}
@@ -107,7 +110,11 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
               onTorn={() => {
                 if (tearing) return;
                 setTearing(true);
-                void onTear().then((ok) => !ok && setTearing(false));
+                void onTear().then((ok) => {
+                  if (ok) return;
+                  setTearing(false);
+                  setAttempt((n) => n + 1);
+                });
               }}
             />
           </div>

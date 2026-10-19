@@ -2,11 +2,15 @@
 
 mod achievements;
 mod artists;
+mod betting;
 mod details;
 mod history;
+mod income;
 mod library;
 
+pub use income::IncomeView;
 pub use artists::{ArtistCardView, ArtistSummary, ArtistView};
+pub use betting::{BetChance, BetContext, BetRequest, KeptBet, OpenedBooster};
 pub use library::LibraryBinder;
 
 pub use achievements::{AchievementTexts, AchievementView, AchievementsView};
@@ -236,6 +240,9 @@ pub struct StatsView {
     pub earned_from_boosters_cents: i64,
     pub rewards_cents: i64,
     pub charity_cents: i64,
+    /// Staked on bets, and what the winning ones paid back.
+    pub bets_staked_cents: i64,
+    pub bets_won_cents: i64,
     pub balance_cents: i64,
     /// Distinct cards owned (any finish).
     pub distinct_cards: u32,
@@ -317,6 +324,8 @@ pub struct Game {
     prices: Option<PriceFile>,
     /// Modification time of the prices file that `prices` was loaded from.
     prices_stamp: Option<SystemTime>,
+    /// What the bets know of each booster kind, by "SET/kind" (see `betting`).
+    bet_tables: HashMap<String, betting::BetTable>,
     rng: ChaCha8Rng,
     clock: ClockFn,
 }
@@ -353,6 +362,8 @@ impl Game {
         clock: ClockFn,
     ) -> Result<Self, String> {
         store.ensure_starting_balance(economy.starting_balance_cents, clock().now).map_err(err)?;
+        // Bets of a booster left unseen when the game was last closed.
+        store.pay_bets(clock().now).map_err(err)?;
         let image_quality = read_json(&data_dir.join(IMAGE_QUALITY_FILE)).unwrap_or_default();
         Ok(Self {
             data_dir,
@@ -370,6 +381,7 @@ impl Game {
             image_quality,
             prices: None,
             prices_stamp: None,
+            bet_tables: HashMap::new(),
             rng,
             clock,
         })
@@ -382,6 +394,7 @@ impl Game {
         self.artists = None;
         self.prices = None;
         self.prices_stamp = None;
+        self.bet_tables.clear();
     }
 
     /// The cards of a limited print run: no more copies of them can be pulled in this game
@@ -569,17 +582,39 @@ impl Game {
 
     /// `open_booster`, saying whether the player watches the opening (`animated`) or skips it
     /// (quick opening): achievements count both ways apart.
+    #[cfg(test)]
     pub fn open_booster_as(&mut self, set_code: &str, kind: &str, animated: bool) -> Result<Vec<OpenedCard>, String> {
-        self.flush_reveal();
-        let (cards, events) = self.open_one(set_code, kind, animated)?;
-        self.pending_reveal = Some(PendingReveal { per_card: events.per_card, booster: events.booster, revealed: 0 });
-        Ok(cards)
+        Ok(self.open_booster_with_bets(set_code, kind, animated, &[])?.cards)
     }
 
-    /// Draws one booster and records it, returning its cards and their events (not emitted).
-    fn open_one(&mut self, set_code: &str, kind: &str, animated: bool) -> Result<(Vec<OpenedCard>, OpeningEvents), String> {
+    /// `open_booster_as`, with bets placed on the booster: their stakes are paid now, their
+    /// winnings once every card is seen (`reveal_cards`).
+    pub fn open_booster_with_bets(
+        &mut self,
+        set_code: &str,
+        kind: &str,
+        animated: bool,
+        bets: &[BetRequest],
+    ) -> Result<OpenedBooster, String> {
+        self.flush_reveal();
+        let (opened, events) = self.open_one(set_code, kind, animated, bets)?;
+        self.pending_reveal = Some(PendingReveal { per_card: events.per_card, booster: events.booster, revealed: 0 });
+        Ok(opened)
+    }
+
+    /// Draws one booster and records it with the bets placed on it, returning its cards and
+    /// settled bets (not paid yet), and their events (not emitted).
+    fn open_one(
+        &mut self,
+        set_code: &str,
+        kind: &str,
+        animated: bool,
+        bets: &[BetRequest],
+    ) -> Result<(OpenedBooster, OpeningEvents), String> {
         self.ensure_loaded(set_code)?;
         self.ensure_prices();
+        // The odds are those of the booster as it is now, before it is drawn.
+        let (bets, skipped) = self.price_bets(set_code, kind, bets)?;
         // Cards of a limited print run whose every copy was pulled in this game.
         let exhausted: HashSet<String> = self
             .store
@@ -589,7 +624,7 @@ impl Game {
             .filter(|(uuid, pulled)| self.print_runs.get(uuid).is_some_and(|run| pulled >= run))
             .map(|(uuid, _)| uuid)
             .collect();
-        let Self { sets, prices, rng, store, economy, clock, card_lang, print_runs, limited, image_quality, .. } = self;
+        let Self { sets, prices, rng, economy, clock, card_lang, print_runs, limited, image_quality, .. } = self;
         let set = &sets[set_code];
         let cfg = set
             .file
@@ -604,7 +639,9 @@ impl Game {
                 let card = &set.file.cards[set.index[&d.uuid]];
                 let own = |foil| market_price(prices.as_ref(), economy, limited, print_runs, &d.uuid, foil);
                 let unpriced = own(false).is_none() && own(true).is_none();
-                let price = if unpriced { economy.fallback_price_cents(&card.rarity, d.foil) } else { own(d.foil) };
+                // As `Game::market_price`: the other finish's price, else the rarity's.
+                let price =
+                    if unpriced { economy.fallback_price_cents(&card.rarity, d.foil) } else { own(d.foil).or_else(|| own(!d.foil)) };
                 let price_estimated =
                     unpriced || prices.as_ref().and_then(|p| p.cards.get(&d.uuid)).is_some_and(|p| p.estimated);
                 let shown = localized(card, card_lang, image_quality);
@@ -629,45 +666,74 @@ impl Game {
             .collect();
         cards.sort_by_key(|c| reveal_rank(kind, c));
 
+        let drawn: Vec<(String, bool)> = cards.iter().map(|c| (c.uuid.clone(), c.foil)).collect();
+        let limited: Vec<bool> = cards.iter().map(|c| print_runs.contains_key(&c.uuid)).collect();
+        let now = clock().now;
+        let (settled, placed) = self.settle_bets(set_code, kind, &bets, &drawn)?;
+
         let outcome = {
             let records: Vec<OpeningCard<'_>> = cards
                 .iter()
-                .map(|c| OpeningCard {
+                .zip(&limited)
+                .map(|(c, &limited)| OpeningCard {
                     uuid: &c.uuid,
                     set_code: &c.set_code,
                     foil: c.foil,
                     price_cents: c.price_cents,
-                    limited: print_runs.contains_key(&c.uuid),
+                    limited,
                 })
                 .collect();
-            store.open_sealed(set_code, kind, &records, clock().now).map_err(err)?
+            self.store.open_sealed_with_bets(set_code, kind, &records, &placed, now).map_err(err)?
         };
         for (card, is_new) in cards.iter_mut().zip(&outcome.is_new) {
             card.is_new = *is_new;
         }
 
-        let events = self.opening_events(set_code, kind, &cards, outcome.cost_cents, animated);
-        Ok((cards, events))
+        let mut events = self.opening_events(set_code, kind, &cards, outcome.cost_cents, animated);
+        events.booster.extend(settled.iter().map(betting::bet_event));
+        Ok((OpenedBooster { cards, bets: settled, skipped }, events))
     }
 
     /// Opens up to `quantity` sealed boosters in a row. Each opening is its own transaction, so
     /// running out of stock part-way keeps (and returns) what was already opened. Played fast
     /// (they count as opened without animation), so their events are emitted at once (the
     /// interface holds the notifications back).
+    #[cfg(test)]
     pub fn open_boosters(&mut self, set_code: &str, kind: &str, quantity: u32) -> Result<Vec<Vec<OpenedCard>>, String> {
+        Ok(self.open_boosters_with_bets(set_code, kind, quantity, &[])?.into_iter().map(|b| b.cards).collect())
+    }
+
+    /// `open_boosters`, with the same bets on each booster (settled and paid one booster after
+    /// the other; running out of money for the stakes stops the batch like running out of
+    /// boosters).
+    pub fn open_boosters_with_bets(
+        &mut self,
+        set_code: &str,
+        kind: &str,
+        quantity: u32,
+        bets: &[BetRequest],
+    ) -> Result<Vec<OpenedBooster>, String> {
         self.flush_reveal();
         let mut opened = Vec::new();
         for _ in 0..quantity {
-            match self.open_one(set_code, kind, false) {
-                Ok((cards, events)) => {
+            match self.open_one(set_code, kind, false, bets) {
+                Ok((booster, events)) => {
                     self.emit(events.per_card.into_iter().chain(events.booster).collect());
-                    opened.push(cards);
+                    self.pay_bets();
+                    opened.push(booster);
                 }
                 Err(_) if !opened.is_empty() => break,
                 Err(e) => return Err(e),
             }
         }
         Ok(opened)
+    }
+
+    /// Pays the bets won whose boosters were seen (and any left from an earlier session).
+    fn pay_bets(&mut self) {
+        let now = (self.clock)().now;
+        // Kept unpaid on failure: paid on the next try.
+        let _ = self.store.pay_bets(now);
     }
 
     // ---- collection and selling ------------------------------------------------------
@@ -915,6 +981,8 @@ impl Game {
             earned_from_boosters_cents: ledger_sum("booster_sale"),
             rewards_cents: ledger_sum("achievement_reward"),
             charity_cents: ledger_sum("charity"),
+            bets_staked_cents: -ledger_sum("bet_stake"),
+            bets_won_cents: ledger_sum("bet_win"),
             balance_cents: self.store.balance().map_err(err)?,
             distinct_cards,
             collection_value_cents,
@@ -978,15 +1046,17 @@ impl Game {
         Ok(owned.iter().any(|(uuid, foil, _)| self.sale_value(uuid, *foil) > 0))
     }
 
-    /// A card's market price in one finish. A card nothing prices, in any finish, gets the
-    /// fallback price of its rarity (`fallbackPrices` of the economy) so it can be sold; a card
-    /// priced in one finish only keeps no price in the other (see `market_price_cents`).
+    /// A card's market price in one finish. A finish without a price of its own takes the other
+    /// one's (a foil token priced only plain could otherwise never be sold); a card nothing
+    /// prices, in any finish, gets the fallback price of its rarity (`fallbackPrices` of the
+    /// economy) so it can be sold all the same.
     fn market_price(&self, uuid: &str, foil: bool) -> Option<u32> {
         if self.unpriced(uuid) {
             let card = self.sets.values().find_map(|s| s.index.get(uuid).map(|&i| &s.file.cards[i]))?;
             return self.economy.fallback_price_cents(&card.rarity, foil);
         }
-        market_price(self.prices.as_ref(), &self.economy, &self.limited, &self.print_runs, uuid, foil)
+        let own = |foil| market_price(self.prices.as_ref(), &self.economy, &self.limited, &self.print_runs, uuid, foil);
+        own(foil).or_else(|| own(!foil))
     }
 
     /// Whether neither finish of a card has a market price (or an estimate from its other
@@ -1047,6 +1117,8 @@ impl Game {
         }
         self.prices = read_json(&path).ok();
         self.prices_stamp = stamp;
+        // Bets on prices and values were priced on the old prices.
+        self.bet_tables.clear();
         self.record_price_snapshot();
     }
 
@@ -1337,6 +1409,8 @@ fn reveal_rank(kind: &str, card: &OpenedCard) -> u8 {
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicU32, Ordering};
+    use betting::SkipReason;
+    use unsealed_core::betting::{Bet, CardFilter, Clause, Compare};
     use std::sync::Arc;
 
     const ECONOMY: &str = include_str!("../../../config/economy.json");
@@ -2140,6 +2214,132 @@ mod tests {
         assert_eq!(result, SaleResult { sold_count: 1, total_cents: 80 });
         assert_eq!(g.collection("TST").unwrap().owned_count, 2);
         assert_eq!(g.sell_duplicates("TST").unwrap(), SaleResult { sold_count: 0, total_cents: 0 });
+    }
+
+    /// `SET` where one booster in four has the mythic (the others two commons only).
+    fn set_with_a_mythic_one_in_four() -> String {
+        SET.replace(
+            r#""boosters": [ { "contents": { "mythic": 1, "common": 2 }, "weight": 1 } ],
+        "boostersTotalWeight": 1,"#,
+            r#""boosters": [ { "contents": { "common": 2 }, "weight": 3 }, { "contents": { "mythic": 1, "common": 2 }, "weight": 1 } ],
+        "boostersTotalWeight": 4,"#,
+        )
+    }
+
+    #[test]
+    fn bets_have_the_odds_of_the_draw_and_pay_once_every_card_is_seen() {
+        let (mut g, _) = game_with("bets", PRICES);
+        let set = set_with_a_mythic_one_in_four();
+        assert_ne!(set, SET);
+        fs::write(g.data_dir.join("sets/TST.json"), set).unwrap();
+        g.buy_boosters("TST", "play", 3).unwrap();
+
+        let cards = |compare, count, filter| Bet { clauses: vec![Clause::Cards { compare, count, filter }] };
+        let m1 = cards(Compare::AtLeast, 1, CardFilter { card: Some("m1".into()), ..CardFilter::default() });
+        let no_mythic = cards(Compare::AtMost, 0, CardFilter { rarities: vec!["mythic".into()], ..CardFilter::default() });
+        // Whether a kind of card comes: exact.
+        assert_eq!(g.bet_chance("TST", "play", &m1).unwrap(), BetChance { probability: Some(0.25), exact: true });
+        assert_eq!(g.bet_chance("TST", "play", &no_mythic).unwrap().probability, Some(0.75));
+        // Anything else: simulated. The booster is worth 1,200 with the mythic, 200 without.
+        let rich = Bet { clauses: vec![Clause::Value { compare: Compare::AtLeast, cents: 1_000 }] };
+        let simulated = g.bet_chance("TST", "play", &rich).unwrap();
+        assert!(!simulated.exact && (simulated.probability.unwrap() - 0.25).abs() < 0.01, "{simulated:?}");
+        // Always two commons, never three: certain either way, nothing to bet.
+        let two = cards(Compare::Exactly, 2, CardFilter { rarities: vec!["common".into()], ..CardFilter::default() });
+        assert_eq!(g.bet_chance("TST", "play", &two).unwrap().probability, None);
+
+        // A sure thing, or a stake under the minimum, is left out (no stake taken): the booster
+        // still opens. A kept bet can well be one of those on another booster.
+        // So is a stake the wallet cannot pay any more, once the bets before it are placed.
+        let before = balance(&mut g);
+        let left_out = [
+            BetRequest { bet: two.clone(), stake_cents: 100 },
+            BetRequest { bet: m1.clone(), stake_cents: 1 },
+            BetRequest { bet: no_mythic.clone(), stake_cents: before as u32 + 1 },
+        ];
+        let opened = g.open_booster_with_bets("TST", "play", true, &left_out).unwrap();
+        assert!(!opened.cards.is_empty() && opened.bets.is_empty());
+        let reasons: Vec<_> = opened.skipped.iter().map(|s| s.reason).collect();
+        assert_eq!(reasons, [SkipReason::Unpriced, SkipReason::Stake, SkipReason::Funds]);
+        g.reveal_cards(usize::MAX);
+        assert_eq!(balance(&mut g), before);
+        g.buy_boosters("TST", "play", 1).unwrap();
+
+        for _ in 0..3 {
+            let before = balance(&mut g);
+            let bets = [BetRequest { bet: m1.clone(), stake_cents: 100 }, BetRequest { bet: no_mythic.clone(), stake_cents: 100 }];
+            let opened = g.open_booster_with_bets("TST", "play", true, &bets).unwrap();
+            let pulled = opened.cards.iter().any(|c| c.uuid == "m1");
+            assert_eq!((opened.bets[0].won, opened.bets[1].won), (pulled, !pulled));
+            // The card bet pays 4 times its stake, the other 4/3 of it.
+            assert_eq!(opened.bets[0].payout_cents, if pulled { 400 } else { 0 });
+            assert_eq!(opened.bets[1].payout_cents, if pulled { 0 } else { 133 });
+            // Stakes are paid at once, winnings once every card is seen.
+            assert_eq!(balance(&mut g), before - 200);
+            g.reveal_cards(usize::MAX);
+            let won: u64 = opened.bets.iter().map(|b| b.payout_cents).sum();
+            assert_eq!(balance(&mut g), before - 200 + won as i64);
+        }
+    }
+
+    #[test]
+    fn the_collection_earns_a_share_of_its_value_each_minute() {
+        use std::sync::atomic::AtomicI64;
+        let now = Arc::new(AtomicI64::new(1_000));
+        let clock_now = now.clone();
+        let mut economy = test_economy();
+        economy.starting_balance_cents = 1_200;
+        economy.income = unsealed_core::economy::Income { percent_per_minute: 0.1, offline_cap_minutes: 480 };
+        let mut g = Game::with_parts(
+            data_dir("income", PRICES),
+            Store::open_in_memory().unwrap(),
+            economy,
+            no_achievements(),
+            ChaCha8Rng::seed_from_u64(1),
+            Box::new(move || Clock { now: clock_now.load(Ordering::SeqCst), day: "2026-10-19".into() }),
+        )
+        .unwrap();
+        let at = |seconds: i64| now.store(seconds, Ordering::SeqCst);
+        g.buy_boosters("TST", "play", 3).unwrap();
+        g.open_boosters("TST", "play", 2).unwrap(); // c1 ×4 ($1), m1 ×2 ($10): resale value 1920
+        assert_eq!(balance(&mut g), 0);
+
+        // The first call starts the count.
+        let first = g.collect_income().unwrap();
+        assert_eq!((first.collection_value_cents, first.per_minute_cents, first.earned_cents), (1920, 1.92, 0));
+        // 0.1% a minute: 19.2 in 10 minutes, the fraction kept for the next payment.
+        at(1_000 + 600);
+        assert_eq!(g.collect_income().unwrap().earned_cents, 19);
+        at(1_000 + 900);
+        assert_eq!(g.collect_income().unwrap().earned_cents, 9); // 9.6 + 0.2
+        // While a booster is being revealed, the income keeps the value from before it.
+        g.open_booster("TST", "play").unwrap();
+        at(1_000 + 960);
+        let revealing = g.collect_income().unwrap();
+        assert_eq!((revealing.collection_value_cents, revealing.earned_cents), (1920, 2)); // 1.92 + 0.8
+        g.reveal_cards(usize::MAX);
+        // Away for 10 hours: 8 hours are paid, on the value of now (c1 ×6, m1 ×3).
+        at(1_000 + 960 + 36_000);
+        let back = g.collect_income().unwrap();
+        assert_eq!((back.collection_value_cents, back.minutes, back.earned_cents), (2880, 480.0, 1383)); // 1382.4 + 0.72
+        assert_eq!(balance(&mut g), 19 + 9 + 2 + 1383);
+        // Payments within the same hour share one line of the history.
+        let lines: Vec<i64> =
+            g.history(10, 0).unwrap().entries.iter().filter(|e| e.kind == "income").map(|e| e.amount_cents).collect();
+        assert_eq!(lines, [1383, 30]);
+    }
+
+    #[test]
+    fn a_finish_without_a_price_takes_the_other_ones() {
+        let mut g = game("one-finish");
+        g.buy_boosters("TST", "play", 1).unwrap();
+        // c1 is priced only plain ($1.00): a foil copy is worth as much, and can be sold.
+        let foil = OpeningCard { uuid: "c1", set_code: "TST", foil: true, price_cents: Some(100), limited: false };
+        g.store.open_sealed("TST", "play", &[foil], 0).unwrap();
+        let c1 = g.collection("TST").unwrap().cards.into_iter().find(|c| c.uuid == "c1").unwrap();
+        assert_eq!((c1.foil_price_cents, c1.foil_sell_value_cents), (Some(100), 80));
+        let sold = g.sell_cards(&[SaleRequest { uuid: "c1".into(), foil: true, quantity: 1 }]).unwrap();
+        assert_eq!(sold.total_cents, 80);
     }
 
     #[test]

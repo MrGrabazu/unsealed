@@ -42,7 +42,7 @@ const cardName = (t: ReturnType<typeof useI18n>["t"], card: OpenedCard) =>
 /** Personal statistics: what was opened, spent and earned, and the best pulls of all time. */
 export function Stats({ refreshKey }: { refreshKey: string }) {
   const money = useMoney();
-  const { t, formatDate, formatNumber } = useI18n();
+  const { t, tx, formatDate, formatNumber } = useI18n();
   const [stats, setStats] = useState<StatsView | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -89,6 +89,14 @@ export function Stats({ refreshKey }: { refreshKey: string }) {
         <Tile label={t("stats.rewards")} hint={t("stats.rewardsHint")}>
           {money(s.rewardsCents + s.charityCents)}
         </Tile>
+        {s.betsStakedCents > 0 && (
+          <Tile label={t("stats.bets")} hint={t("stats.betsHint")}>
+            <span className={s.betsWonCents >= s.betsStakedCents ? "gain" : "loss"}>
+              {money(s.betsWonCents - s.betsStakedCents)}
+            </span>
+            <span className="hint stat-sub">{tx("stats.betsDetail", { staked: money(s.betsStakedCents), won: money(s.betsWonCents) })}</span>
+          </Tile>
+        )}
         <Tile label={t("stats.distinct")}>{formatNumber(s.distinctCards)}</Tile>
         <Tile label={t("stats.collectionValue")} hint={t("stats.collectionValueHint")}>
           {money(s.collectionValueCents)}

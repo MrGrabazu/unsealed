@@ -91,6 +91,28 @@ const MIGRATIONS: &[&str] = &[
     );",
     // 9: copies pulled of each card of a limited print run; never decreases (see `limited`)
     "CREATE TABLE limited_pulls (uuid TEXT PRIMARY KEY, pulled INTEGER NOT NULL) WITHOUT ROWID;",
+    // 10: bets on boosters; a winner is paid once its booster's cards are all seen (`paid_at`)
+    "CREATE TABLE bets (
+        id INTEGER PRIMARY KEY,
+        opening_id INTEGER NOT NULL REFERENCES openings (id),
+        placed_at INTEGER NOT NULL,
+        bet TEXT NOT NULL,
+        stake_cents INTEGER NOT NULL,
+        probability REAL NOT NULL,
+        won INTEGER NOT NULL CHECK (won IN (0, 1)),
+        payout_cents INTEGER NOT NULL,
+        paid_at INTEGER
+    );
+    CREATE INDEX bets_unpaid ON bets (paid_at);",
+    // 11: the debt of the Boosterium's advances, tried out for a while and given up for the
+    // collection's income; no longer read
+    "CREATE TABLE debt_movements (
+        id INTEGER PRIMARY KEY,
+        at INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        cents INTEGER NOT NULL,
+        day TEXT
+    );",
 ];
 
 #[derive(Debug, thiserror::Error)]
@@ -158,6 +180,17 @@ pub struct OpeningCard<'a> {
     pub price_cents: Option<u32>,
     /// Of a limited print run: counted in `limited_pulls`.
     pub limited: bool,
+}
+
+/// A bet placed on a booster and settled by its draw (see `open_sealed_with_bets`).
+pub struct PlacedBet {
+    /// What it was on, as JSON (target and direction).
+    pub bet: String,
+    pub stake_cents: u32,
+    pub probability: f64,
+    pub won: bool,
+    /// What it pays back, the stake included (0 when lost).
+    pub payout_cents: i64,
 }
 
 /// Copies of one card sold at a fixed unit price.
@@ -311,6 +344,36 @@ impl Store {
 
     pub fn balance(&self) -> StoreResult<i64> {
         Ok(balance_of(&self.conn)?)
+    }
+
+    /// Credits what the collection earned, with the `save_meta` entries that say how far it was
+    /// counted (`meta`), in one go. Earnings within the same hour share one wallet movement,
+    /// so that the history is not flooded with one line a minute.
+    pub fn credit_income(&mut self, cents: i64, meta: &[(&str, String)], now: i64) -> StoreResult<()> {
+        let tx = self.conn.transaction()?;
+        if cents > 0 {
+            let last: Option<(i64, String, i64)> = tx
+                .query_row("SELECT id, kind, at FROM ledger ORDER BY id DESC LIMIT 1", [], |r| {
+                    Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+                })
+                .optional()?;
+            match last {
+                Some((id, kind, at)) if kind == "income" && at.div_euclid(3600) == now.div_euclid(3600) => {
+                    tx.execute("UPDATE ledger SET amount_cents = amount_cents + ?2 WHERE id = ?1", params![id, cents])?;
+                }
+                _ => {
+                    add_ledger(&tx, now, "income", cents, None)?;
+                }
+            }
+        }
+        for (key, value) in meta {
+            tx.execute(
+                "INSERT INTO save_meta (key, value) VALUES (?1, ?2) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+                params![key, value],
+            )?;
+        }
+        tx.commit()?;
+        Ok(())
     }
 
     /// Grants the starting capital once, on the very first run.
@@ -595,11 +658,26 @@ impl Store {
     /// the collection, atomically. Returns, for each card, whether it is a new
     /// discovery: the player did not own that card (in any finish) before, including
     /// earlier cards of the same booster.
+    #[cfg(test)]
     pub fn open_sealed(
         &mut self,
         set_code: &str,
         booster_kind: &str,
         cards: &[OpeningCard<'_>],
+        now: i64,
+    ) -> StoreResult<OpenOutcome> {
+        self.open_sealed_with_bets(set_code, booster_kind, cards, &[], now)
+    }
+
+    /// `open_sealed`, with bets placed on the booster: their stakes leave the wallet with the
+    /// opening (refused if they cannot be afforded); what the winners pay waits for `pay_bets`,
+    /// once every card is seen.
+    pub fn open_sealed_with_bets(
+        &mut self,
+        set_code: &str,
+        booster_kind: &str,
+        cards: &[OpeningCard<'_>],
+        bets: &[PlacedBet],
         now: i64,
     ) -> StoreResult<OpenOutcome> {
         let tx = self.conn.transaction()?;
@@ -636,8 +714,41 @@ impl Store {
                 )?;
             }
         }
+        if !bets.is_empty() {
+            let stakes: i64 = bets.iter().map(|b| i64::from(b.stake_cents)).sum();
+            let available = balance_of(&tx)?;
+            if available < stakes {
+                return Err(StoreError::InsufficientFunds { needed: stakes, available });
+            }
+            let details = format!("{set_code}/{booster_kind}");
+            add_ledger(&tx, now, "bet_stake", -stakes, Some(&details))?;
+            for b in bets {
+                tx.execute(
+                    "INSERT INTO bets (opening_id, placed_at, bet, stake_cents, probability, won, payout_cents)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                    params![opening_id, now, b.bet, b.stake_cents, b.probability, b.won, b.payout_cents],
+                )?;
+            }
+        }
         tx.commit()?;
         Ok(OpenOutcome { is_new, cost_cents })
+    }
+
+    /// Pays the bets won and not paid yet (those of the booster whose cards were all seen, or
+    /// left from a game closed before), returning what they brought in. Paid once.
+    pub fn pay_bets(&mut self, now: i64) -> StoreResult<i64> {
+        let tx = self.conn.transaction()?;
+        let won: Vec<(i64, i64)> = {
+            let mut stmt = tx.prepare("SELECT opening_id, SUM(payout_cents) FROM bets WHERE paid_at IS NULL AND won = 1 GROUP BY opening_id")?;
+            let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+            rows.collect::<Result<_, _>>()?
+        };
+        for &(opening_id, payout) in &won {
+            add_ledger(&tx, now, "bet_win", payout, Some(&opening_id.to_string()))?;
+        }
+        tx.execute("UPDATE bets SET paid_at = ?1 WHERE paid_at IS NULL", [now])?;
+        tx.commit()?;
+        Ok(won.iter().map(|(_, p)| p).sum())
     }
 
     /// Copies ever pulled of each card of a limited print run, by uuid.
@@ -710,44 +821,7 @@ impl Store {
     /// Returns the total paid. Selling the last copy removes the card from the collection.
     pub fn sell_cards(&mut self, sales: &[Sale<'_>], now: i64) -> StoreResult<i64> {
         let tx = self.conn.transaction()?;
-        let mut total = 0i64;
-        let mut count = 0u32;
-        let mut items = Vec::with_capacity(sales.len());
-        for s in sales {
-            let owned: Option<(u32, String)> = tx
-                .query_row(
-                    "SELECT quantity, set_code FROM collection WHERE card_uuid = ?1 AND foil = ?2",
-                    params![s.uuid, s.foil],
-                    |r| Ok((r.get(0)?, r.get(1)?)),
-                )
-                .optional()?;
-            if let Some((_, set_code)) = &owned {
-                items.push(TxItem::Card {
-                    uuid: s.uuid.to_string(),
-                    set_code: set_code.clone(),
-                    foil: s.foil,
-                    quantity: s.quantity,
-                    unit_cents: s.unit_cents,
-                });
-            }
-            match owned.map(|(q, _)| q) {
-                Some(q) if q > s.quantity => {
-                    tx.execute(
-                        "UPDATE collection SET quantity = quantity - ?3 WHERE card_uuid = ?1 AND foil = ?2",
-                        params![s.uuid, s.foil, s.quantity],
-                    )?;
-                }
-                Some(q) if q == s.quantity => {
-                    tx.execute(
-                        "DELETE FROM collection WHERE card_uuid = ?1 AND foil = ?2",
-                        params![s.uuid, s.foil],
-                    )?;
-                }
-                _ => return Err(StoreError::NotOwned(s.uuid.to_string())),
-            }
-            total += i64::from(s.unit_cents) * i64::from(s.quantity);
-            count += s.quantity;
-        }
+        let (total, count, items) = take_cards(&tx, sales)?;
         let ledger_id = add_ledger(&tx, now, "card_sale", total, Some(&format!("{count} cards")))?;
         add_transaction(&tx, ledger_id, now, "card_sale", total, &items)?;
         tx.commit()?;
@@ -874,7 +948,47 @@ fn balance_of(conn: &Connection) -> rusqlite::Result<i64> {
     conn.query_row("SELECT COALESCE(SUM(amount_cents), 0) FROM ledger", [], |r| r.get(0))
 }
 
-/// Adds a movement to the wallet and returns its id.
+/// Takes copies out of the collection, failing if any is not owned. Returns what they are
+/// worth at the prices given, how many there were, and their detail.
+fn take_cards(conn: &Connection, sales: &[Sale<'_>]) -> StoreResult<(i64, u32, Vec<TxItem>)> {
+    let mut total = 0i64;
+    let mut count = 0u32;
+    let mut items = Vec::with_capacity(sales.len());
+    for s in sales {
+        let owned: Option<(u32, String)> = conn
+            .query_row(
+                "SELECT quantity, set_code FROM collection WHERE card_uuid = ?1 AND foil = ?2",
+                params![s.uuid, s.foil],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .optional()?;
+        if let Some((_, set_code)) = &owned {
+            items.push(TxItem::Card {
+                uuid: s.uuid.to_string(),
+                set_code: set_code.clone(),
+                foil: s.foil,
+                quantity: s.quantity,
+                unit_cents: s.unit_cents,
+            });
+        }
+        match owned.map(|(q, _)| q) {
+            Some(q) if q > s.quantity => {
+                conn.execute(
+                    "UPDATE collection SET quantity = quantity - ?3 WHERE card_uuid = ?1 AND foil = ?2",
+                    params![s.uuid, s.foil, s.quantity],
+                )?;
+            }
+            Some(q) if q == s.quantity => {
+                conn.execute("DELETE FROM collection WHERE card_uuid = ?1 AND foil = ?2", params![s.uuid, s.foil])?;
+            }
+            _ => return Err(StoreError::NotOwned(s.uuid.to_string())),
+        }
+        total += i64::from(s.unit_cents) * i64::from(s.quantity);
+        count += s.quantity;
+    }
+    Ok((total, count, items))
+}
+
 fn add_ledger(conn: &Connection, at: i64, kind: &str, amount_cents: i64, details: Option<&str>) -> rusqlite::Result<i64> {
     conn.execute(
         "INSERT INTO ledger (at, kind, amount_cents, details) VALUES (?1, ?2, ?3, ?4)",

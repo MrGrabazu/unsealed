@@ -25,6 +25,58 @@ pub struct EconomyConfig {
     /// other rarity takes "default"), so that it can still be sold. Shown as an estimate.
     #[serde(default)]
     pub fallback_prices: BTreeMap<String, FallbackPrice>,
+    #[serde(default)]
+    pub betting: Betting,
+    #[serde(default)]
+    pub income: Income,
+}
+
+/// What the collection earns by itself: each minute, a small share of what it would sell for.
+/// No strings attached: the more it is worth, the more it earns, which rewards keeping one's
+/// best cards.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Income {
+    /// Earned each minute, in percent of the collection's resale value (real prices only).
+    pub percent_per_minute: f64,
+    /// The collection earns for this long at most between two visits (while the game is
+    /// closed, or left on another screen).
+    pub offline_cap_minutes: u32,
+}
+
+impl Default for Income {
+    fn default() -> Self {
+        Self { percent_per_minute: 0.1, offline_cap_minutes: 480 }
+    }
+}
+
+impl Income {
+    /// What a collection worth `value_cents` earns over `minutes` (capped), in cents with their
+    /// fraction (kept from one payment to the next).
+    pub fn earned_cents(&self, value_cents: i64, minutes: f64) -> f64 {
+        let minutes = minutes.clamp(0.0, f64::from(self.offline_cap_minutes));
+        value_cents.max(0) as f64 * self.percent_per_minute / 100.0 * minutes
+    }
+}
+
+/// Bets on a booster's contents (see `betting`).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Betting {
+    /// Share of the fair odds kept by the house (0: fair odds, a bet is worth its stake on average).
+    pub house_margin_percent: u32,
+    /// Boosters simulated to price the bets whose chance cannot be worked out exactly.
+    pub simulated_boosters: u32,
+    /// Such a bet can be placed only if it held at least this many times, and failed at least
+    /// as many, in the simulation (rarer, its odds would be too rough).
+    pub min_simulated_hits: u32,
+    pub min_stake_cents: u32,
+}
+
+impl Default for Betting {
+    fn default() -> Self {
+        Self { house_margin_percent: 0, simulated_boosters: 100_000, min_simulated_hits: 20, min_stake_cents: 10 }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -167,6 +219,9 @@ impl EconomyConfig {
             return Err(ConfigError::Invalid(
                 "cancellation: steps must have increasing withinMinutes and penalties of at most 100%".into(),
             ));
+        }
+        if !(0.0..=100.0).contains(&self.income.percent_per_minute) {
+            return Err(ConfigError::Invalid("income.percentPerMinute must be between 0 and 100".into()));
         }
         if self.booster_prices.default_cents == 0 || self.booster_prices.ev_markup_percent == 0 {
             return Err(ConfigError::Invalid(

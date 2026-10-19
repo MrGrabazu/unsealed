@@ -223,11 +223,16 @@ impl Game {
         let upto = count.min(pending.per_card.len()).max(pending.revealed);
         let mut events: Vec<Event> = pending.per_card[pending.revealed..upto].to_vec();
         pending.revealed = upto;
-        if upto == pending.per_card.len() {
+        let complete = upto == pending.per_card.len();
+        if complete {
             events.extend(std::mem::take(&mut pending.booster));
             self.pending_reveal = None;
         }
         self.emit(events);
+        // Every card is seen: the bets placed on the booster pay now.
+        if complete {
+            self.pay_bets();
+        }
     }
 
     /// Emits whatever an opening still holds back: the player moved on.

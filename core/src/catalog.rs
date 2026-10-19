@@ -32,7 +32,7 @@ pub struct SetFile {
 
 /// Bump when the compact files change in a way older data cannot satisfy: the app then
 /// rebuilds its data at the next launch.
-pub const DATA_FORMAT_VERSION: u32 = 6;
+pub const DATA_FORMAT_VERSION: u32 = 8;
 
 /// Languages kept for card and set names, as (MTGJSON language name, code). Cards printed
 /// in other languages, or never translated, stay in English.
@@ -117,6 +117,19 @@ pub struct CardEntry {
     /// printing its foil price comes from.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub foil_scryfall_id: Option<String>,
+    /// A full-art printing (MTGJSON `isFullArt`), for the bets.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub full_art: bool,
+    /// A special frame: borderless, showcase or extended art (MTGJSON `borderColor`,
+    /// `frameEffects`), for the bets.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub special_frame: bool,
+    /// Types and supertypes in lower case ("basic", "land", "creature"…), for the bets.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub types: Vec<String>,
+    /// MTGJSON `colorIdentity` (a land's colors, for the bets).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub color_identity: Vec<String>,
 }
 
 /// Prices in cents, as given by Scryfall.

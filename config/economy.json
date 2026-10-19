@@ -20,6 +20,16 @@
     "art": { "normalCents": 20, "foilCents": 250 },
     "default": { "normalCents": 10, "foilCents": 30 }
   },
+  "betting": {
+    "houseMarginPercent": 0,
+    "simulatedBoosters": 100000,
+    "minSimulatedHits": 20,
+    "minStakeCents": 10
+  },
+  "income": {
+    "percentPerMinute": 0.1,
+    "offlineCapMinutes": 480
+  },
   "charity": {
     "amountCents": 2000,
     "maxClaimsPerDay": 1

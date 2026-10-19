@@ -152,6 +152,10 @@ fn prices_are_rekeyed_by_uuid_including_double_faced_cards() {
         token: false,
         art: false,
         foil_scryfall_id: None,
+        full_art: false,
+        special_frame: false,
+        types: vec![],
+        color_identity: vec![],
     };
     let by_scryfall = [("s1".to_string(), PriceSet { usd: Some(25), ..Default::default() })].into();
     let cards = [card("front", "s1"), card("back", "s1"), card("other", "s2")];

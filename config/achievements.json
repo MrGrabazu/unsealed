@@ -40,6 +40,7 @@
     "tokens_pulled": { "event": "CardAcquired", "where": [{ "field": "rarity", "op": "eq", "value": "token" }], "op": "sum" },
     "boosters_bought": { "event": "BoosterBought", "op": "sum", "field": "quantity" },
     "charity_claims": { "event": "CharityClaimed", "op": "sum" },
+    "income_cents": { "event": "IncomeEarned", "op": "sum", "field": "amountCents" },
     "token_kinds": {
       "event": "CardAcquired",
       "where": [{ "field": "rarity", "op": "eq", "value": "token" }],
@@ -272,6 +273,23 @@
       "reward": { "cashCents": 1500 }
     },
 
+    {
+      "id": "income-1000", "name": "Dividends", "description": "Earn {cents:1000} from your collection.",
+      "rarity": "common", "emblem": "coin", "palette": "gold",
+      "condition": { "type": "metric", "metric": "income_cents", "atLeast": 1000 }
+    },
+    {
+      "id": "income-10000", "name": "Living Off the Binder", "description": "Earn {cents:10000} from your collection.",
+      "rarity": "uncommon", "emblem": "coin", "palette": "gold",
+      "condition": { "type": "metric", "metric": "income_cents", "atLeast": 10000 },
+      "reward": { "cashCents": 500 }
+    },
+    {
+      "id": "income-100000", "name": "Collector Baron", "description": "Earn {cents:100000} from your collection.",
+      "rarity": "rare", "emblem": "crown", "palette": "gold",
+      "condition": { "type": "metric", "metric": "income_cents", "atLeast": 100000 },
+      "reward": { "cashCents": 2500 }
+    },
     {
       "id": "bulk-buyer", "name": "Bulk Buyer", "description": "Buy 10 boosters at once.",
       "rarity": "common", "emblem": "coin", "palette": "ocean",

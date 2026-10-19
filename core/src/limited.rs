@@ -99,6 +99,10 @@ mod tests {
             token: false,
             art: false,
             foil_scryfall_id: None,
+            full_art: false,
+            special_frame: false,
+            types: vec![],
+            color_identity: vec![],
         }
     }
 

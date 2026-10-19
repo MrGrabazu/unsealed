@@ -135,6 +135,18 @@
     "name": "Ripagato",
     "description": "Apri una busta che, una volta venduta, rende {cents:5000} più di quanto l'hai pagata."
   },
+  "income-1000": {
+    "name": "Dividendi",
+    "description": "Guadagna {cents:1000} grazie alla tua collezione."
+  },
+  "income-10000": {
+    "name": "Vivere di raccoglitore",
+    "description": "Guadagna {cents:10000} grazie alla tua collezione."
+  },
+  "income-100000": {
+    "name": "Barone collezionista",
+    "description": "Guadagna {cents:100000} grazie alla tua collezione."
+  },
   "bulk-buyer": {
     "name": "All'ingrosso",
     "description": "Compra 10 buste in una volta."

@@ -100,6 +100,18 @@ struct RawCard {
     foreign_data: Vec<RawForeign>,
     #[serde(default)]
     promo_types: Vec<String>,
+    #[serde(default)]
+    is_full_art: bool,
+    #[serde(default)]
+    border_color: Option<String>,
+    #[serde(default)]
+    frame_effects: Vec<String>,
+    #[serde(default)]
+    types: Vec<String>,
+    #[serde(default)]
+    supertypes: Vec<String>,
+    #[serde(default)]
+    color_identity: Vec<String>,
 }
 
 #[derive(Deserialize, Clone, Default)]
@@ -153,6 +165,11 @@ fn to_entry(c: &RawCard) -> Result<CardEntry, ConfigError> {
         token: false,
         art: false,
         foil_scryfall_id: None,
+        full_art: c.is_full_art,
+        special_frame: c.border_color.as_deref() == Some("borderless")
+            || c.frame_effects.iter().any(|f| f == "showcase" || f == "extendedart"),
+        types: c.supertypes.iter().chain(&c.types).map(|t| t.to_lowercase()).collect(),
+        color_identity: c.color_identity,
     })
 }
 

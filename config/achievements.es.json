@@ -135,6 +135,18 @@
     "name": "Salió rentable",
     "description": "Abre un sobre que, una vez vendido, te deje {cents:5000} más de lo que pagaste."
   },
+  "income-1000": {
+    "name": "Dividendos",
+    "description": "Gana {cents:1000} gracias a tu colección."
+  },
+  "income-10000": {
+    "name": "Vivir del archivador",
+    "description": "Gana {cents:10000} gracias a tu colección."
+  },
+  "income-100000": {
+    "name": "Barón coleccionista",
+    "description": "Gana {cents:100000} gracias a tu colección."
+  },
   "bulk-buyer": {
     "name": "Compra al por mayor",
     "description": "Compra 10 sobres de una vez."

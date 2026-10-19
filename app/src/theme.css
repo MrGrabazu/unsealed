@@ -207,6 +207,74 @@ button.brand-link { display: inline-flex; align-items: center; gap: 8px; white-s
 .binder-page { background: linear-gradient(180deg, #2a1f17, #1d150f); }
 .segmented button.active, .binder-tab.active { color: var(--gold-hi); border-color: var(--accent); }
 
+/* The collection's income: its rate under the balance, and what it earned while away. */
+.wallet { position: relative; }
+.wallet-amount { display: inline-block; animation: wallet-pulse 0.45s ease-out; }
+@keyframes wallet-pulse {
+  0% { transform: scale(1.08); text-shadow: 0 0 10px #ffd27a; }
+  100% { transform: scale(1); text-shadow: none; }
+}
+.income-float { position: absolute; right: 14px; top: -4px; pointer-events: none; font-size: 15px; font-weight: 700;
+  color: var(--gold-hi); text-shadow: 0 0 6px #ffd27a99, 0 1px 2px #000; animation: income-float 1.4s ease-out forwards; }
+@keyframes income-float {
+  0% { opacity: 0; transform: translateY(10px); }
+  15% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-26px); }
+}
+.income-rate { align-self: center; white-space: nowrap; font-size: 16px; font-weight: 600; color: var(--gold-hi); opacity: 0.85; cursor: help; }
+.income-away { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 8px 0; padding: 8px 14px;
+  border: 1px solid var(--edge); border-radius: 10px; background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  box-shadow: inset 0 0 0 1px #d9a4412e; }
+.income-away p { flex: 1 1 360px; margin: 0; }
+
+/* Bets on the booster about to be opened: a folded slip, then one line per offer (yes / no
+   at their odds), then the bets placed with their stakes. */
+.bet-slip { margin: 0 0 16px; border: 1px solid var(--edge); border-radius: 10px;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel)); box-shadow: inset 0 0 0 1px #d9a4411c; }
+button.bet-slip-toggle { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 14px; border: none;
+  background: none; box-shadow: none; text-align: left; font-size: 15px; color: var(--gold-hi); }
+button.bet-slip-toggle > span:first-child { flex: 1; }
+.bet-slip-body { padding: 0 14px 14px; }
+.bet-slip-body > .hint { margin: 0 0 10px; }
+/* The bet builder: conditions one under the other, the odds of the whole bet below. */
+.bet-builder { margin-top: 14px; padding: 12px; border: 1px dashed var(--edge); border-radius: 8px; background: #00000022; }
+.bet-builder h4 { margin: 0 0 8px; font-family: var(--font-title); color: var(--gold-hi); }
+.bet-clause { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: start;
+  margin-bottom: 8px; padding: 8px 10px; border: 1px solid #3d2b1b; border-radius: 8px; background: #0000002a; }
+.bet-and { grid-column: 1 / -1; font-family: var(--font-title); font-size: 12px; text-transform: uppercase; color: var(--muted); }
+.bet-clause-body { display: grid; gap: 6px; }
+.bet-clause-body > span, .bet-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.bet-clause-body:has(> select) { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.bet-label { min-width: 70px; font-size: 13px; color: var(--muted); }
+.bet-count { width: 64px; }
+.bet-amount { width: 96px; }
+.bet-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+button.bet-chip { padding: 2px 9px; border-radius: 999px; font-size: 12px; font-family: var(--font-text); letter-spacing: 0; }
+button.bet-chip.active { border-color: var(--accent); color: #1a0d03; background: linear-gradient(180deg, var(--gold-hi), var(--accent)); }
+.bet-builder-more { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 10px; }
+.bet-builder-summary { margin: 0 0 8px; font-style: italic; }
+.bet-builder-odds { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.bet-builder-odds strong { color: var(--gold-hi); font-size: 18px; }
+.bet-keep { display: flex; align-items: center; gap: 4px; font-size: 13px; white-space: nowrap; cursor: pointer; }
+.bet-lines { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 6px; }
+.bet-lines li.paused > :not(.bet-active):not(.bet-remove) { opacity: 0.45; }
+.bet-active { display: flex; align-items: center; cursor: pointer; }
+.bet-lines li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto auto auto auto; align-items: center; gap: 12px;
+  padding: 6px 8px; border: 1px solid var(--edge); border-radius: 8px; background: #0000002a; }
+.bet-line-name .tag { margin-right: 4px; color: var(--wax-hi, #e2545a); }
+.bet-stake { display: flex; align-items: center; gap: 6px; }
+.bet-stake input { width: 90px; }
+button.bet-remove { width: 28px; height: 28px; padding: 0; border-radius: 50%; }
+/* What the bets came to, once every card is seen. */
+.bet-results { margin: 0 0 16px; padding: 12px 16px; border: 1px solid var(--edge); border-radius: 10px;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel)); }
+.bet-results h3 { margin: 0 0 8px; }
+.bet-results ul { list-style: none; margin: 0; padding: 0; }
+.bet-results li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: center;
+  padding: 5px 0; border-bottom: 1px solid #3d2b1b; }
+.bet-results li.won strong { color: var(--gold-hi); }
+.bet-net { margin: 10px 0 0; font-family: var(--font-title); }
+
 /* Selling the booster just opened: a button under each card, the sold ones faded. */
 .revealed-card > button.sell { margin-top: 6px; width: 100%; padding: 4px 6px; font-size: 12px; }
 .revealed-card.sold .thumb { opacity: 0.4; filter: grayscale(0.6); }

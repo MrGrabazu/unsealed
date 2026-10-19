@@ -17,6 +17,11 @@ const KINDS = [
   "charity",
   "achievement_reward",
   "starting_balance",
+  "bet_stake",
+  "bet_win",
+  "advance",
+  "income",
+  "debt_repaid",
 ] as const;
 
 function kindName(t: I18n["t"], kind: string): string {

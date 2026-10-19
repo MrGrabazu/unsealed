@@ -8,7 +8,7 @@ mod updater;
 
 use game::{
     AchievementTexts, AchievementView, AchievementsView, BoosterSaleResult, CardDetailsView, CollectionView, DataInfo,
-    Game, HistoryView, OpenedCard, SaleRequest, SaleResult, SetSummary, ShopItem, StatsView, WalletView,
+    Game, HistoryView, SaleRequest, SaleResult, SetSummary, ShopItem, StatsView, WalletView,
 };
 use saves::{SaveInfo, Saves};
 use std::error::Error;
@@ -211,8 +211,9 @@ fn open_booster(
     set_code: String,
     kind: String,
     animated: bool,
-) -> Result<Vec<OpenedCard>, String> {
-    with_game(&state, |g| g.open_booster_as(&set_code, &kind, animated))
+    bets: Vec<game::BetRequest>,
+) -> Result<game::OpenedBooster, String> {
+    with_game(&state, |g| g.open_booster_with_bets(&set_code, &kind, animated, &bets))
 }
 
 #[tauri::command]
@@ -221,8 +222,43 @@ fn open_boosters(
     set_code: String,
     kind: String,
     quantity: u32,
-) -> Result<Vec<Vec<OpenedCard>>, String> {
-    with_game(&state, |g| g.open_boosters(&set_code, &kind, quantity))
+    bets: Vec<game::BetRequest>,
+) -> Result<Vec<game::OpenedBooster>, String> {
+    with_game(&state, |g| g.open_boosters_with_bets(&set_code, &kind, quantity, &bets))
+}
+
+/// Pays what the collection earned since the last call.
+#[tauri::command]
+fn collect_income(state: State<'_, SessionState>) -> Result<game::IncomeView, String> {
+    with_game(&state, |g| g.collect_income())
+}
+
+/// What a bet slip needs to know of a booster (its price, the house's margin, the minimum stake).
+#[tauri::command]
+fn get_bet_context(state: State<'_, SessionState>, set_code: String, kind: String) -> Result<game::BetContext, String> {
+    with_game(&state, |g| g.bet_context(&set_code, &kind))
+}
+
+/// How likely a bet is on a booster of this kind.
+#[tauri::command]
+fn get_bet_chance(
+    state: State<'_, SessionState>,
+    set_code: String,
+    kind: String,
+    bet: unsealed_core::betting::Bet,
+) -> Result<game::BetChance, String> {
+    with_game(&state, |g| g.bet_chance(&set_code, &kind, &bet))
+}
+
+/// The bets kept from one opening to the next, with the game.
+#[tauri::command]
+fn get_kept_bets(state: State<'_, SessionState>) -> Result<Vec<game::KeptBet>, String> {
+    with_game(&state, |g| g.kept_bets())
+}
+
+#[tauri::command]
+fn set_kept_bets(state: State<'_, SessionState>, bets: Vec<game::KeptBet>) -> Result<(), String> {
+    with_game(&state, |g| g.set_kept_bets(&bets))
 }
 
 /// The player turned over `count` cards of the booster being opened: their achievements
@@ -490,6 +526,11 @@ pub fn run() {
             check_set_images,
             get_owned_cards,
             get_library,
+            collect_income,
+            get_bet_context,
+            get_bet_chance,
+            get_kept_bets,
+            set_kept_bets,
             sell_cards,
             sell_duplicates,
             claim_charity,
