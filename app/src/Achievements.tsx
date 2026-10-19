@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AchievementCard } from "./AchievementCard";
+import { BackToTop } from "./BackToTop";
 import { getAchievements, type AchievementsView, type AchievementView } from "./api";
 import { rewardText } from "./boosterKinds";
 import { useI18n, type I18n } from "./i18n";
@@ -90,6 +91,7 @@ function AchievementDetails({ item, onClose }: { item: AchievementView; onClose:
   const moneyText = useMoneyText();
   const amountsInText = useAmountsInText();
   const hidden = item.secret && !item.unlocked;
+  const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -101,7 +103,7 @@ function AchievementDetails({ item, onClose }: { item: AchievementView; onClose:
   const percent = progress ? Math.min(100, (progress.current * 100) / Math.max(1, progress.goal)) : 0;
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal details ach-details" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+      <div ref={box} className="modal details ach-details" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <button className="modal-close" onClick={onClose} aria-label={t("details.close")}>
           ×
         </button>
@@ -146,6 +148,7 @@ function AchievementDetails({ item, onClose }: { item: AchievementView; onClose:
           </p>
         </div>
         </div>
+        <BackToTop target={box} />
       </div>
     </div>
   );

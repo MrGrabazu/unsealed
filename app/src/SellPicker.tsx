@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CollectionCard } from "./api";
+import { BackToTop } from "./BackToTop";
 import { useI18n } from "./i18n";
 import type { MessageKey } from "./i18n/en";
 import { Money } from "./money";
@@ -44,6 +45,7 @@ export function SellPicker({ cards, onSell, onClose }: Props) {
   const [keepOne, setKeepOne] = useState(true);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -81,7 +83,7 @@ export function SellPicker({ cards, onSell, onClose }: Props) {
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal sell-picker" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+      <div ref={box} className="modal sell-picker" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <h2>{t("sell.title")}</h2>
         <p className="hint">{t("sell.intro")}</p>
         <label className="sell-keep">
@@ -115,6 +117,7 @@ export function SellPicker({ cards, onSell, onClose }: Props) {
           ))}
         </ul>
         <button onClick={onClose}>{t("common.cancel")}</button>
+        <BackToTop target={box} />
       </div>
     </div>
   );

@@ -502,6 +502,9 @@ export const openBooster = (setCode: string, kind: string, animated: boolean, be
 /** Several boosters, the same `bets` on each. */
 export const openBoosters = (setCode: string, kind: string, quantity: number, bets: BetRequest[]) =>
   invoke<OpenedBooster[]>("open_boosters", { setCode, kind, quantity, bets });
+/** The sets pinned at the top of the Boosterium, in the order they were pinned. */
+export const getPinnedSets = () => invoke<string[]>("get_pinned_sets");
+export const setPinnedSets = (codes: string[]) => invoke<void>("set_pinned_sets", { codes });
 /** Pays what the collection earned since the last call. */
 export const collectIncome = () => invoke<IncomeView>("collect_income");
 export const getBetContext =(setCode: string, kind: string) => invoke<BetContext>("get_bet_context", { setCode, kind });

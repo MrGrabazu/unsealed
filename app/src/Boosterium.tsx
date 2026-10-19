@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import type { SetSummary, ShopItem, WalletView } from "./api";
+import { Fragment, useEffect, useState } from "react";
+import { getPinnedSets, setPinnedSets, type SetSummary, type ShopItem, type WalletView } from "./api";
 import { kindLabel, kindRank } from "./boosterKinds";
 import { useI18n } from "./i18n";
 import { useMoney, useMoneyText } from "./money";
@@ -45,6 +45,18 @@ export function Boosterium({
   const [year, setYear] = useState("all");
   const [maxPrice, setMaxPrice] = useState(0);
   const [open, setOpen] = useState<Set<string>>(new Set());
+  // Sets pinned at the top of the list (kept in the game).
+  const [pinned, setPinned] = useState<string[]>([]);
+  useEffect(() => {
+    getPinnedSets()
+      .then(setPinned)
+      .catch(() => {});
+  }, []);
+  const togglePin = (code: string) => {
+    const next = pinned.includes(code) ? pinned.filter((c) => c !== code) : [...pinned, code];
+    setPinned(next);
+    setPinnedSets(next).catch(() => {});
+  };
   const canAfford = (item: ShopItem, quantity: number) => wallet.balanceCents >= item.priceCents * quantity;
 
   // Arriving for one set: no filter hides it, its products are open and in view.
@@ -79,6 +91,9 @@ export function Boosterium({
         .sort((a, b) => kindRank(a.kind) - kindRank(b.kind) || a.kind.localeCompare(b.kind)),
     }))
     .filter((g) => g.products.length > 0);
+  // The favourites in a section of their own above the others, both newest first.
+  const favorites = groups.filter((g) => pinned.includes(g.set.code));
+  const others = groups.filter((g) => !pinned.includes(g.set.code));
 
   const toggle = (code: string) =>
     setOpen((current) => {
@@ -123,11 +138,30 @@ export function Boosterium({
 
       <div className="shop">
         {groups.length === 0 && <p className="hint">{t("shop.noMatch")}</p>}
-        {groups.map(({ set, products }) => {
+        {[...favorites, ...others].map(({ set, products }, index) => {
           const expanded = open.has(set.code);
+          const isPinned = pinned.includes(set.code);
           const cheapest = Math.min(...products.map((p) => p.priceCents));
           return (
-            <div key={set.code} id={`shop-set-${set.code}`} className={`shop-set ${expanded ? "open" : ""}`}>
+            <Fragment key={set.code}>
+              {favorites.length > 0 && index === 0 && <h3 className="shop-section">{t("shop.favorites")}</h3>}
+              {favorites.length > 0 && index === favorites.length && (
+                <h3 className="shop-section">{t("shop.allSets")}</h3>
+              )}
+            <div id={`shop-set-${set.code}`} className={`shop-set ${expanded ? "open" : ""}`}>
+              <div className="shop-set-head">
+              {/* Beside the header, not in it: a button cannot hold another one. */}
+              <button
+                className={`shop-star ${isPinned ? "on" : ""}`}
+                onClick={() => togglePin(set.code)}
+                title={t(isPinned ? "shop.unpin" : "shop.pin")}
+                aria-label={t(isPinned ? "shop.unpin" : "shop.pin")}
+                aria-pressed={isPinned}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 2.6l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17.2l-5.9 3.2 1.3-6.5-4.9-4.5 6.6-.8z" />
+                </svg>
+              </button>
               <button
                 className={`shop-set-header ${set.art ? "with-art" : ""}`}
                 onClick={() => toggle(set.code)}
@@ -159,6 +193,7 @@ export function Boosterium({
                 </span>
                 <span className="shop-from">{tx("shop.from", { amount: money(cheapest) })}</span>
               </button>
+              </div>
 
               {expanded && (
                 <div className="shop-products">
@@ -192,6 +227,7 @@ export function Boosterium({
                 </div>
               )}
             </div>
+            </Fragment>
           );
         })}
       </div>

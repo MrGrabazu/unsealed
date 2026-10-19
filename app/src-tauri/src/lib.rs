@@ -227,6 +227,17 @@ fn open_boosters(
     with_game(&state, |g| g.open_boosters_with_bets(&set_code, &kind, quantity, &bets))
 }
 
+/// The sets pinned at the top of the Boosterium.
+#[tauri::command]
+fn get_pinned_sets(state: State<'_, SessionState>) -> Result<Vec<String>, String> {
+    with_game(&state, |g| g.pinned_sets())
+}
+
+#[tauri::command]
+fn set_pinned_sets(state: State<'_, SessionState>, codes: Vec<String>) -> Result<(), String> {
+    with_game(&state, |g| g.set_pinned_sets(&codes))
+}
+
 /// Pays what the collection earned since the last call.
 #[tauri::command]
 fn collect_income(state: State<'_, SessionState>) -> Result<game::IncomeView, String> {
@@ -527,6 +538,8 @@ pub fn run() {
             get_owned_cards,
             get_library,
             collect_income,
+            get_pinned_sets,
+            set_pinned_sets,
             get_bet_context,
             get_bet_chance,
             get_kept_bets,

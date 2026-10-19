@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getCardDetails, type CardDetailsView } from "./api";
+import { BackToTop } from "./BackToTop";
 import { CardImage } from "./CardImage";
 import { largeImage } from "./images";
 import { CARD_LANGUAGES, useI18n, type I18n } from "./i18n";
@@ -39,6 +40,7 @@ export function CardDetails({ setCode, uuid, onClose }: Props) {
   const money = useMoney();
   const [details, setDetails] = useState<CardDetailsView | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     getCardDetails(setCode, uuid)
@@ -57,7 +59,7 @@ export function CardDetails({ setCode, uuid, onClose }: Props) {
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal details" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+      <div ref={box} className="modal details" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <button className="modal-close" onClick={onClose} aria-label={t("details.close")}>
           ×
         </button>
@@ -183,6 +185,7 @@ export function CardDetails({ setCode, uuid, onClose }: Props) {
             )}
           </div>
         )}
+        <BackToTop target={box} />
       </div>
     </div>
   );

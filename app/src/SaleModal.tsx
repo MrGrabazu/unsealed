@@ -1,5 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { CollectionCard } from "./api";
+import { BackToTop } from "./BackToTop";
 import { CardImage } from "./CardImage";
 import { useI18n } from "./i18n";
 import { Money } from "./money";
@@ -42,6 +43,8 @@ interface Props {
 /** What a sale brought in, in plain view: the total, then each card sold. */
 export function SaleModal({ soldCount, totalCents, lines, onClose }: Props) {
   const { t, plural } = useI18n();
+  const box = useRef<HTMLDivElement>(null);
+  const list = useRef<HTMLUListElement>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => (e.key === "Escape" || e.key === "Enter") && onClose();
@@ -51,14 +54,14 @@ export function SaleModal({ soldCount, totalCents, lines, onClose }: Props) {
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal sale-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+      <div ref={box} className="modal sale-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <h2>{t("sale.title")}</h2>
         <p className="sale-total">
           <Money cents={totalCents} />
         </p>
         <p className="hint sale-count">{plural("sale.count", soldCount)}</p>
         {lines.length > 0 && (
-          <ul className="sale-lines">
+          <ul ref={list} className="sale-lines">
             {lines.map((line) => (
               <li key={`${line.card.uuid}:${line.foil}`}>
                 <div className="sale-thumb thumb">
@@ -79,11 +82,15 @@ export function SaleModal({ soldCount, totalCents, lines, onClose }: Props) {
                 </strong>
               </li>
             ))}
+            <li className="back-to-top-row">
+              <BackToTop target={list} />
+            </li>
           </ul>
         )}
         <button className="primary" onClick={onClose} autoFocus>
           {t("common.ok")}
         </button>
+        <BackToTop target={box} />
       </div>
     </div>
   );

@@ -35,6 +35,8 @@ use unsealed_core::{open_booster_excluding, ColorIndex};
 
 /// Largest number of boosters bought in one purchase.
 const MAX_PURCHASE: u32 = 100;
+/// Key of the sets pinned in the Boosterium (`save_meta`).
+const PINNED_SETS: &str = "pinned_sets";
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -434,6 +436,20 @@ impl Game {
             }
         }
         Ok(items)
+    }
+
+    /// The sets pinned at the top of the Boosterium, in the order they were pinned.
+    pub fn pinned_sets(&self) -> Result<Vec<String>, String> {
+        let saved = self.store.meta(PINNED_SETS).map_err(err)?;
+        Ok(saved.and_then(|json| serde_json::from_str(&json).ok()).unwrap_or_default())
+    }
+
+    pub fn set_pinned_sets(&mut self, codes: &[String]) -> Result<(), String> {
+        if let Some(bad) = codes.iter().find(|c| c.is_empty() || !c.chars().all(|ch| ch.is_ascii_alphanumeric())) {
+            return Err(format!("invalid set code `{bad}`"));
+        }
+        let json = serde_json::to_string(codes).map_err(err)?;
+        self.store.set_meta(PINNED_SETS, &json).map_err(err)
     }
 
     pub fn wallet(&mut self) -> Result<WalletView, String> {
@@ -1768,6 +1784,16 @@ mod tests {
 
     fn balance(g: &mut Game) -> i64 {
         g.wallet().unwrap().balance_cents
+    }
+
+    #[test]
+    fn pinned_sets_are_kept_in_the_game() {
+        let mut g = game("pinned");
+        assert!(g.pinned_sets().unwrap().is_empty());
+        g.set_pinned_sets(&["TST".into(), "BLB".into()]).unwrap();
+        assert_eq!(g.pinned_sets().unwrap(), ["TST", "BLB"]);
+        assert!(g.set_pinned_sets(&["../x".into()]).is_err());
+        assert_eq!(g.pinned_sets().unwrap(), ["TST", "BLB"], "nothing saved from an invalid list");
     }
 
     #[test]

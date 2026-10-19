@@ -110,6 +110,19 @@ h2 { padding-bottom: 8px; background: linear-gradient(90deg, var(--accent), var(
 .details-info h2, .ach-details-info h2 { background: none; padding-bottom: 0; }
 
 .shop-set.open { outline: none; border-color: var(--accent); }
+/* The favourite star, left of the chevron and centred on the set's header: hollow, or gilded
+   for a favourite set (shown in the section above the others). */
+.shop-set-head { position: relative; }
+.shop-set-head > .shop-set-header { padding-left: 50px; }
+button.shop-star { position: absolute; z-index: 3; left: 12px; top: 50%; transform: translateY(-50%); width: 30px; height: 30px;
+  padding: 0; display: grid; place-items: center; background: none; border: none; box-shadow: none; cursor: pointer; }
+button.shop-star svg { width: 24px; height: 24px; fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-linejoin: round;
+  opacity: 0.6; transition: opacity 0.15s, transform 0.15s; }
+button.shop-star:hover:not(:disabled) { border: none; box-shadow: none; }
+button.shop-star:hover svg { opacity: 1; transform: scale(1.12); }
+button.shop-star.on svg { fill: var(--gold-hi); stroke: var(--gold-hi); opacity: 1; filter: drop-shadow(0 0 4px #ffd27a88); }
+.shop-section { margin: 14px 0 2px; font-family: var(--font-title); color: var(--gold-hi); letter-spacing: 0.06em; }
+.shop-section:first-child { margin-top: 0; }
 /* A set's header is a button: its details read as text, only the set's name is engraved. */
 button.shop-set-header { font-family: var(--font-text); font-size: 15px; font-weight: 400; letter-spacing: 0; box-shadow: none; }
 button.shop-set-header .shop-name { font-family: var(--font-title); font-size: 17px; font-weight: 700; color: var(--gold-hi); }
@@ -206,6 +219,16 @@ button.brand-link { display: inline-flex; align-items: center; gap: 8px; white-s
 /* Binder pages: dark board in warm tones, not the old slate. */
 .binder-page { background: linear-gradient(180deg, #2a1f17, #1d150f); }
 .segmented button.active, .binder-tab.active { color: var(--gold-hi); border-color: var(--accent); }
+
+/* Back to the top: in the page's corner, or at the bottom of a dialog that scrolls. */
+button.back-to-top { position: fixed; z-index: 50; right: 24px; bottom: 24px; width: 46px; height: 46px; padding: 0;
+  border-radius: 50%; font-size: 22px; line-height: 1; box-shadow: 0 6px 18px #000a; animation: back-to-top-in 0.2s ease-out; }
+button.back-to-top.in-box { position: sticky; display: block; bottom: 0; margin: 12px 0 0 auto; }
+@keyframes back-to-top-in { from { opacity: 0; transform: translateY(8px); } }
+/* In a list, its row is what sticks to the bottom. */
+.sale-lines li.back-to-top-row { position: sticky; bottom: 0; display: flex; justify-content: flex-end; padding: 0;
+  border: none; background: none; min-height: 0; }
+.back-to-top-row button.back-to-top.in-box { position: static; margin: 0; }
 
 /* The collection's income: its rate under the balance, and what it earned while away. */
 .wallet { position: relative; }
