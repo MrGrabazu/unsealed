@@ -3,21 +3,63 @@
 # `latest.json` (what the app's updater reads, one entry per platform). Secrets:
 # TAURI_SIGNING_PRIVATE_KEY (the content of the private key),
 # TAURI_SIGNING_PRIVATE_KEY_PASSWORD (left out: the key has none) and RELEASE_TOKEN.
+#
+# Run by hand (Actions > Release > Run workflow), it builds an existing tag again, for every
+# platform or one of them, and adds its files to that tag's release (a platform that failed,
+# say macOS when no runner was free).
 name: Release
 
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build (its release gets the files), e.g. v0.3.1"
+        required: true
+      platform:
+        description: "Platform to build"
+        type: choice
+        options: [all, windows, macos, linux]
+        default: all
 
 permissions:
   contents: write
 
+env:
+  # The version built: the tag pushed, or the one asked for.
+  TAG: ${{ inputs.tag || github.ref_name }}
+
 jobs:
+  # Which platforms to build: all of them for a tag pushed, else the one asked for.
+  plan:
+    runs-on: ubuntu-22.04
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - id: plan
+        env:
+          WANTED: ${{ inputs.platform || 'all' }}
+        run: |
+          all='[
+            {"name":"windows","platform":"windows-latest","args":"--bundles nsis"},
+            {"name":"macos","platform":"macos-15-intel","args":"--target universal-apple-darwin --bundles app,dmg"},
+            {"name":"linux","platform":"ubuntu-22.04","args":"--bundles appimage,deb,rpm"}
+          ]'
+          if [ "$WANTED" = all ]; then
+            matrix=$(echo "$all" | jq -c '{include: .}')
+          else
+            matrix=$(echo "$all" | jq -c --arg n "$WANTED" '{include: map(select(.name == $n))}')
+          fi
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
   # The tests once, before any build.
   test:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
       - uses: dtolnay/rust-toolchain@stable
       - uses: swatinem/rust-cache@v2
       - name: Install the system libraries Tauri needs
@@ -28,23 +70,19 @@ jobs:
         run: cargo test --workspace
 
   build:
-    needs: test
+    needs: [plan, test]
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          # Windows: the NSIS installer (.exe).
-          - platform: windows-latest
-            args: --bundles nsis
-          # macOS: one universal app for Apple Silicon and Intel (.dmg, and .app.tar.gz for updates).
-          - platform: macos-latest
-            args: --target universal-apple-darwin --bundles app,dmg
-          # Linux: AppImage (any distribution, self-updating), .deb and .rpm.
-          - platform: ubuntu-22.04
-            args: --bundles appimage,deb,rpm
+      # Windows: the NSIS installer (.exe). macOS: one universal app for Apple Silicon and
+      # Intel (.dmg, and .app.tar.gz for updates), built on an Intel runner (the Apple
+      # Silicon ones were often too busy to take the job). Linux: AppImage (any distribution,
+      # self-updating), .deb and .rpm.
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
 
       - uses: actions/setup-node@v7
         with:
@@ -54,12 +92,12 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ matrix.name == 'macos' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - uses: swatinem/rust-cache@v2
 
       - name: Install the system libraries Tauri needs
-        if: matrix.platform == 'ubuntu-22.04'
+        if: matrix.name == 'linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
@@ -70,16 +108,17 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           # The release is created with a personal token (secret RELEASE_TOKEN, fine-grained,
-          # Contents: read and write on this repository): the workflow's own token was refused
-          # ("Resource not accessible by integration") even with write permissions.
+          # Contents and Workflows: read and write on this repository): the workflow's own
+          # token was refused ("Resource not accessible by integration"), the commits tagged
+          # touching the workflows.
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: app
           args: ${{ matrix.args }}
-          tagName: ${{ github.ref_name }}
-          releaseName: Unsealed ${{ github.ref_name }}
+          tagName: ${{ env.TAG }}
+          releaseName: Unsealed ${{ env.TAG }}
           releaseBody: |
             Crack & Collect: free, 100% virtual booster opening.
 
