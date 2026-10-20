@@ -2,7 +2,8 @@
 
 use crate::booster::{BoosterConfig, BoosterPack, BoosterSheet, ConfigError};
 use crate::catalog::{
-    ArtistCard, ArtistIndex, CardEntry, FeaturedCard, ForeignCard, PriceSet, SetFile, COLLECTOR_KIND, FOREIGN_LANGUAGES,
+    ArtistCard, ArtistIndex, CardEntry, FeaturedCard, ForeignCard, GuestCard, GuestIndex, PriceSet, SetFile, COLLECTOR_KIND,
+    FOREIGN_LANGUAGES,
 };
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -53,6 +54,14 @@ pub struct RawSet {
 }
 
 impl RawSet {
+    /// The set's name in the languages kept (code -> name), when it was translated.
+    pub fn names(&self) -> BTreeMap<String, String> {
+        self.translations
+            .iter()
+            .filter_map(|(language, name)| Some((language_code(language)?.to_string(), name.clone()?)))
+            .collect()
+    }
+
     /// Whether the set has at least one of the wanted booster kinds.
     pub fn has_any_booster(&self, kinds: &[&str]) -> bool {
         kinds.iter().any(|k| self.booster.contains_key(*k))
@@ -306,6 +315,30 @@ pub fn artist_index(sets: &[SetFile]) -> ArtistIndex {
     index
 }
 
+/// The guest series: the cards of other sets the sets' boosters give, by their own set code,
+/// each with the sets whose boosters give it (in the order of `sets`). Sets that keep their
+/// guests are left out. Names, dates and symbols are filled in by the builder.
+pub fn guest_index(sets: &[SetFile]) -> GuestIndex {
+    let mut index = GuestIndex::default();
+    // Where each card is in its series' list (a card has one set code: one series).
+    let mut found: HashMap<String, usize> = HashMap::new();
+    for set in sets.iter().filter(|s| !s.keeps_its_guests()) {
+        for card in set.guest_cards() {
+            let series = index.series.entry(card.set_code.clone()).or_default();
+            if let Some(&i) = found.get(&card.uuid) {
+                let boosters = &mut series.cards[i].boosters;
+                if !boosters.contains(&set.code) {
+                    boosters.push(set.code.clone());
+                }
+            } else {
+                found.insert(card.uuid.clone(), series.cards.len());
+                series.cards.push(GuestCard { uuid: card.uuid.clone(), boosters: vec![set.code.clone()] });
+            }
+        }
+    }
+    index
+}
+
 /// Rarity given to art cards.
 pub const ART_RARITY: &str = "art";
 
@@ -540,11 +573,7 @@ pub fn compact_set(raw: &RawSet, version: &str, kinds: &[&str], extra_sets: &[&R
         source_version: version.to_string(),
         cards: entries,
         boosters,
-        names: raw
-            .translations
-            .iter()
-            .filter_map(|(language, name)| Some((language_code(language)?.to_string(), name.clone()?)))
-            .collect(),
+        names: raw.names(),
         foil_aliases: BTreeMap::new(),
     })
 }

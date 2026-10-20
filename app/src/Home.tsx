@@ -4,6 +4,7 @@ import { deleteSave, listSaves, listSets, loadGame, newGame, renameSave, type Sa
 import { DataStatusBar, useDataStatus } from "./DataStatus";
 import { Footer } from "./Footer";
 import { quitApp } from "./fullscreen";
+import { UpdateNotice } from "./UpdateNotice";
 import { useI18n } from "./i18n";
 import { Loading } from "./Loading";
 import { Logo } from "./Logo";
@@ -92,6 +93,7 @@ export function Home({ current, onPlay, onCurrentChanged, onOptions, onAbout }: 
       </div>
 
       <DataStatusBar status={dataStatus} />
+      <UpdateNotice />
       {error && <p className="error">{error}</p>}
       {saves === null && !error && <Loading />}
 

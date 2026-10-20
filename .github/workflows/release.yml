@@ -1,0 +1,57 @@
+# Publishes a version: pushing a tag "v0.3.0" builds the Windows installer, signs it for the
+# in-app updater, and creates the GitHub release with it and `latest.json` (what the app's
+# updater reads). Secrets: TAURI_SIGNING_PRIVATE_KEY (the content of the private key) and
+# TAURI_SIGNING_PRIVATE_KEY_PASSWORD (empty if the key has none).
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+
+      - name: Install the front end's dependencies
+        run: npm ci --prefix app
+
+      - name: Run the tests
+        run: cargo test --workspace
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: app
+          tagName: ${{ github.ref_name }}
+          releaseName: Unsealed ${{ github.ref_name }}
+          releaseBody: |
+            Crack & Collect: free, 100% virtual booster opening.
+
+            **Windows**: download `Unsealed_…_x64-setup.exe` below and run it. The installer is not
+            signed with a paid certificate: Windows may show "Windows protected your PC", click
+            "More info" then "Run anyway". Installed games update themselves from the home screen.
+
+            Unsealed is unofficial Fan Content permitted under the Fan Content Policy. Not
+            approved/endorsed by Wizards.
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true

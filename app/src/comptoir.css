@@ -77,6 +77,34 @@
 .res .v .money { gap: 7px; }
 .res .s { font: 700 12px var(--font-text); color: var(--accent); cursor: help; }
 .res .income-float { right: 12px; top: -6px; }
+/* A newer version, in the corner of the home screen. */
+.update-notice.frame { position: fixed; z-index: 50; right: 24px; top: 30px; width: 280px; padding: 26px 18px 16px; display: grid; gap: 10px; text-align: center; }
+.update-notice p { margin: 0; color: #cdbb9b; }
+.update-notice .cartouche { font-size: 11px; }
+
+/* A card's sheet: never beyond the window. The image keeps its ratio within the height;
+   on the right, the text then the printings, which scroll on their own. */
+.modal.details { max-height: calc(100vh - 48px); overflow: hidden; }
+.modal.details .details-layout { grid-template-columns: min(340px, calc((100vh - 96px) * 63 / 88)) minmax(0, 1fr); align-items: start; }
+.details-side { display: flex; flex-direction: column; gap: 16px; min-height: 0; max-height: calc(100vh - 96px); }
+.details-side .details-info { flex: 0 0 auto; max-height: calc((100vh - 96px) * .55); overflow: auto; padding-right: 6px; }
+.details-side .details-printings { flex: 1 1 auto; min-height: 180px; display: flex; flex-direction: column; }
+.details-printings h3 { margin: 0 0 4px; }
+.details-printings > .hint { margin: 0 0 8px; }
+.printing-list { position: relative; flex: 1 1 auto; min-height: 0; overflow: auto; padding-right: 6px; }
+
+/* What the collection earned while away: hanging under the balance, over the stage. */
+.res .away-pop.frame { position: absolute; z-index: 60; top: calc(100% + 22px); left: 50%; width: 270px; padding: 26px 18px 16px; display: grid; justify-items: center; gap: 6px;
+  white-space: normal; text-align: center; cursor: pointer; animation: away-drop .45s cubic-bezier(.2, 1.4, .4, 1) both; transform: translateX(-50%); }
+.away-pop::after { content: ""; position: absolute; left: 50%; top: -9px; width: 16px; height: 16px; transform: translateX(-50%) rotate(45deg);
+  background: #2e1f15; border-left: 1px solid var(--edge); border-top: 1px solid var(--edge); }
+.away-pop .cartouche { font-size: 11px; }
+.away-amount { display: flex; align-items: center; gap: 8px; font: 800 34px var(--font-title); color: var(--gold-hi); text-shadow: 0 0 14px #f5b84a88; }
+.away-amount .coin { width: 30px; height: 30px; }
+.away-pop p { margin: 0; color: #cdbb9b; font-size: 14px; }
+.away-pop button.big { margin-top: 6px; padding: 8px 22px; font-size: 13px; }
+@keyframes away-drop { from { opacity: 0; transform: translate(-50%, -14px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@media (prefers-reduced-motion: reduce) { .res .away-pop.frame { animation: none; } }
 .hud-tools { display: flex; gap: 6px; margin-left: 6px; }
 button.hud-tool { width: 38px; height: 38px; padding: 0; display: grid; place-items: center; border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, #4a3220, #1d130c); border: none; box-shadow: 0 0 0 1px #000, 0 0 0 2px #6b4d2a, 0 3px 6px #000a; }
@@ -436,3 +464,10 @@ button.bet-add { width: 100%; margin-top: 10px; padding: 9px; border: 1px dashed
 .ring-label { text-align: center; margin: -4px 0 8px; font: 700 12px var(--font-title); letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
 .ready-line b { font-family: var(--font-title); color: var(--gold-hi); }
 .set-side button.big { font-size: 13px; letter-spacing: .05em; }
+/* The guest series of a set (or the sets giving a series): lines that open their binder. */
+.set-side .side-title { margin: 14px 0 4px; font: 700 11px var(--font-title); letter-spacing: .18em; text-transform: uppercase; color: var(--gold-hi); }
+.set-side button.ready-line.link { width: 100%; flex-wrap: nowrap; padding-left: 0; padding-right: 0; border: none; border-radius: 0; background: none; box-shadow: none;
+  font: 400 14px var(--font-text); text-transform: none; letter-spacing: 0; text-align: left; cursor: pointer; }
+.set-side button.ready-line.link span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.set-side button.ready-line.link b { flex: none; white-space: nowrap; }
+.set-side button.ready-line.link:hover span, .set-side button.ready-line.link:hover b { color: var(--gold-hi); }

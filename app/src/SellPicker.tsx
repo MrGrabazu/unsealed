@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CollectionCard } from "./api";
+import { Backdrop } from "./Backdrop";
 import { BackToTop } from "./BackToTop";
 import { useI18n } from "./i18n";
 import type { MessageKey } from "./i18n/en";
@@ -82,7 +83,7 @@ export function SellPicker({ cards, onSell, onClose }: Props) {
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <Backdrop onClose={onClose}>
       <div ref={box} className="modal sell-picker" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <h2>{t("sell.title")}</h2>
         <p className="hint">{t("sell.intro")}</p>
@@ -119,6 +120,6 @@ export function SellPicker({ cards, onSell, onClose }: Props) {
         <button onClick={onClose}>{t("common.cancel")}</button>
         <BackToTop target={box} />
       </div>
-    </div>
+    </Backdrop>
   );
 }

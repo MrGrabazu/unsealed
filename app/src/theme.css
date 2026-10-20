@@ -255,10 +255,6 @@ button.back-to-top.in-box { position: sticky; display: block; bottom: 0; margin:
   100% { opacity: 0; transform: translateY(-26px); }
 }
 .income-rate { align-self: center; white-space: nowrap; font-size: 16px; font-weight: 600; color: var(--gold-hi); opacity: 0.85; cursor: help; }
-.income-away { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 8px 0; padding: 8px 14px;
-  border: 1px solid var(--edge); border-radius: 10px; background: linear-gradient(180deg, var(--panel-2), var(--panel));
-  box-shadow: inset 0 0 0 1px #d9a4412e; }
-.income-away p { flex: 1 1 360px; margin: 0; }
 
 /* Bets on the booster about to be opened: a folded slip, then one line per offer (yes / no
    at their odds), then the bets placed with their stakes. */

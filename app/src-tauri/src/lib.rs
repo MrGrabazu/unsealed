@@ -326,6 +326,12 @@ fn list_artists(state: State<'_, SessionState>) -> Result<Vec<game::ArtistSummar
     with_game(&state, |g| g.artists())
 }
 
+/// The guest series with a binder of their own (Special Guests, The List…).
+#[tauri::command]
+fn list_guest_series(state: State<'_, SessionState>) -> Result<Vec<game::SetSummary>, String> {
+    with_game(&state, |g| Ok(g.guest_series()))
+}
+
 #[tauri::command]
 fn get_artist_collection(state: State<'_, SessionState>, name: String) -> Result<game::ArtistView, String> {
     with_game(&state, |g| g.artist_collection(&name))
@@ -481,6 +487,10 @@ pub fn run() {
     tauri::Builder::default()
         // Opens links (the community's Discord) in the player's browser.
         .plugin(tauri_plugin_opener::init())
+        // New versions of the app, published on GitHub, offered from the home screen; the
+        // app restarts once one is installed.
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             let data_dir = resolve_data_dir(app.handle())?;
             // Fail early on a broken configuration rather than when a game is loaded.
@@ -533,6 +543,7 @@ pub fn run() {
             reveal_cards,
             get_collection,
             list_artists,
+            list_guest_series,
             get_artist_collection,
             check_set_images,
             get_owned_cards,

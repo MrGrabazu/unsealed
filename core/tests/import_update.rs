@@ -249,6 +249,48 @@ fn artists_list_the_cards_boosters_give_under_each_of_their_artists() {
     assert_eq!(index.artists["Bob"][0].set, "TST");
 }
 
+/// A compact set file whose boosters give `own` cards of its own and `guests` of other sets
+/// (as "uuid:SET").
+fn set_with_guests(code: &str, own: &[&str], guests: &[&str]) -> unsealed_core::catalog::SetFile {
+    let card = |uuid: &str, set: &str| {
+        format!(
+            r#"{{ "uuid": "{uuid}", "setCode": "{set}", "scryfallId": "s-{uuid}", "name": "{uuid}", "number": "1",
+              "rarity": "common", "finishes": ["nonfoil"], "layout": "normal" }}"#
+        )
+    };
+    let all: Vec<(&str, &str)> =
+        own.iter().map(|u| (*u, code)).chain(guests.iter().map(|g| g.split_once(':').unwrap())).collect();
+    let cards: Vec<String> = all.iter().map(|(u, s)| card(u, s)).collect();
+    let sheet: Vec<String> = all.iter().map(|(u, _)| format!(r#""{u}": 1"#)).collect();
+    serde_json::from_str(&format!(
+        r#"{{ "code": "{code}", "name": "{code}", "releaseDate": "2026-01-01", "setType": "expansion", "sourceVersion": "v",
+          "cards": [{}],
+          "boosters": {{ "play": {{ "boosters": [ {{ "contents": {{ "common": 1 }}, "weight": 1 }} ], "boostersTotalWeight": 1,
+            "sheets": {{ "common": {{ "cards": {{ {} }}, "foil": false, "totalWeight": {} }} }} }} }} }}"#,
+        cards.join(","),
+        sheet.join(","),
+        all.len()
+    ))
+    .unwrap()
+}
+
+#[test]
+fn guests_are_indexed_by_their_series_with_every_set_that_gives_them() {
+    use unsealed_core::import::guest_index;
+    let a = set_with_guests("AAA", &["a1", "a2"], &["g1:SPG"]);
+    let b = set_with_guests("BBB", &["b1", "b2"], &["g1:SPG", "g2:SPG", "l1:PLST"]);
+    // Nearly all The List, as a Mystery Booster: it keeps its guests.
+    let mystery = set_with_guests("MYS", &["m1"], &["l1:PLST", "l2:PLST", "l3:PLST"]);
+    assert!(!a.keeps_its_guests() && !b.keeps_its_guests() && mystery.keeps_its_guests());
+
+    let index = guest_index(&[a, b, mystery]);
+    assert_eq!(index.series.keys().collect::<Vec<_>>(), ["PLST", "SPG"]);
+    let spg: Vec<(&str, &Vec<String>)> = index.series["SPG"].cards.iter().map(|c| (c.uuid.as_str(), &c.boosters)).collect();
+    assert_eq!(spg, [("g1", &vec!["AAA".to_string(), "BBB".to_string()]), ("g2", &vec!["BBB".to_string()])]);
+    // The List's cards of the Mystery Booster stay in its binder.
+    assert_eq!(index.series["PLST"].cards.iter().map(|c| c.uuid.as_str()).collect::<Vec<_>>(), ["l1"]);
+}
+
 #[test]
 fn rejects_sheet_referencing_unknown_card() {
     let err =

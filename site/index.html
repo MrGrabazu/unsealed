@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en" data-lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Unsealed — Crack &amp; Collect</title>
+  <meta name="description" content="Unsealed: a free, fan-made booster opening game. Real draw rates, real market prices, virtual Seals only. For Windows.">
+  <meta property="og:title" content="Unsealed — Crack & Collect">
+  <meta property="og:description" content="A free, fan-made booster opening game: real draw rates, real market prices, virtual Seals only.">
+  <meta property="og:image" content="img/home.png">
+  <link rel="icon" href="img/icon.png">
+  <link rel="stylesheet" href="style.css">
+  <script>
+    // The language before anything shows: the one chosen, else the browser's (French or English).
+    (function () {
+      var lang = null;
+      try { lang = localStorage.getItem("unsealed-site-lang"); } catch (e) {}
+      if (lang !== "fr" && lang !== "en") lang = (navigator.language || "").toLowerCase().indexOf("fr") === 0 ? "fr" : "en";
+      document.documentElement.lang = lang;
+      document.documentElement.dataset.lang = lang;
+    })();
+  </script>
+  <script src="site.js" defer></script>
+</head>
+<body>
+  <div class="motes" aria-hidden="true"></div>
+
+  <header class="top">
+    <nav class="langs" aria-label="Language">
+      <button data-set-lang="fr">FR</button>
+      <button data-set-lang="en">EN</button>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <div class="fan" aria-hidden="true"></div>
+    <h1 class="logo" id="logo">Unsealed — Crack &amp; Collect</h1>
+    <p class="pitch">
+      <span lang="fr">Le plaisir d'ouvrir des boosters, sans dépenser un centime.</span>
+      <span lang="en">The thrill of cracking boosters open, without spending a cent.</span>
+    </p>
+    <div class="cta">
+      <a class="big" id="download" href="https://github.com/MrGrabazu/unsealed/releases/latest">
+        <span lang="fr">Télécharger pour Windows</span>
+        <span lang="en">Download for Windows</span>
+      </a>
+      <p class="hint" id="release">
+        <span lang="fr">Gratuit · Windows 10 et 11 · mises à jour intégrées</span>
+        <span lang="en">Free · Windows 10 and 11 · built-in updates</span>
+      </p>
+    </div>
+  </section>
+
+  <main>
+    <section class="frame shot-main">
+      <div class="cartouche">
+        <span lang="fr">Le classeur d'un set</span><span lang="en">A set's binder</span>
+      </div>
+      <img src="img/binder.png" alt="" loading="lazy">
+    </section>
+
+    <section class="features">
+      <article class="frame">
+        <div class="medal">✦</div>
+        <h2><span lang="fr">Des taux de tirage fidèles</span><span lang="en">True draw rates</span></h2>
+        <p>
+          <span lang="fr">Chaque booster suit la composition réelle de son set, d'Alpha (1993) à aujourd'hui : près de 180 sets, en Play, Draft, Set et Collector, vérifiés par simulation.</span>
+          <span lang="en">Every booster follows its set's real make-up, from Alpha (1993) to today: about 180 sets, in Play, Draft, Set and Collector, checked by simulation.</span>
+        </p>
+      </article>
+      <article class="frame">
+        <div class="medal">◈</div>
+        <h2><span lang="fr">Les prix du marché</span><span lang="en">Market prices</span></h2>
+        <p>
+          <span lang="fr">Les cartes valent leur prix du jour. Revendez-les au Boosterium, guettez la carte qui rentabilise le booster, voyez votre collection prendre de la valeur.</span>
+          <span lang="en">Cards are worth today's price. Sell them back at the Boosterium, hunt the pull that pays for the pack, watch your collection's value grow.</span>
+        </p>
+      </article>
+      <article class="frame">
+        <div class="medal">❖</div>
+        <h2><span lang="fr">L'ouverture, comme en vrai</span><span lang="en">Opening, for real</span></h2>
+        <p>
+          <span lang="fr">Déchirez l'emballage en 3D, faites glisser les cartes une à une, dans l'ordre d'un vrai booster. Foils irisés, sons, et une ouverture rapide ou par lots quand on est pressé.</span>
+          <span lang="en">Tear the wrapper open in 3D, slide the cards one by one, in a real booster's order. Shimmering foils, sounds, and quick or batch openings when you're in a hurry.</span>
+        </p>
+      </article>
+      <article class="frame">
+        <div class="medal">❧</div>
+        <h2><span lang="fr">Une collection à compléter</span><span lang="en">A collection to complete</span></h2>
+        <p>
+          <span lang="fr">Une bibliothèque de classeurs, un par set, des séries invitées, des collections par artiste, les cartes manquantes sur des bouts de papier.</span>
+          <span lang="en">A library of binders, one per set, guest series, collections by artist, missing cards on scraps of paper.</span>
+        </p>
+      </article>
+      <article class="frame">
+        <div class="medal">♛</div>
+        <h2><span lang="fr">96 succès</span><span lang="en">96 achievements</span></h2>
+        <p>
+          <span lang="fr">Chacun débloque sa propre carte, dessinée pour le jeu : des premiers paliers jusqu'aux secrets, tous obtenables dans une même partie.</span>
+          <span lang="en">Each unlocks a card of its own, drawn for the game: from the first steps to the secret ones, all reachable in a single game.</span>
+        </p>
+      </article>
+      <article class="frame">
+        <div class="medal">✧</div>
+        <h2><span lang="fr">100 % gratuit, 100 % virtuel</span><span lang="en">100% free, 100% virtual</span></h2>
+        <p>
+          <span lang="fr">Aucun achat, aucune publicité. On joue en Sceaux, une monnaie fictive que rien ne convertit en argent réel. Votre collection rapporte même un peu chaque minute.</span>
+          <span lang="en">No purchases, no ads. You play with Seals, a made-up currency nothing turns into real money. Your collection even earns a little every minute.</span>
+        </p>
+      </article>
+    </section>
+
+    <section class="gallery">
+      <h2 class="title"><span lang="fr">Dans le jeu</span><span lang="en">In the game</span></h2>
+      <div class="shots">
+        <figure class="frame"><img src="img/boosterium.png" alt="" loading="lazy"><figcaption><span lang="fr">Le Boosterium</span><span lang="en">The Boosterium</span></figcaption></figure>
+        <figure class="frame"><img src="img/reserve.png" alt="" loading="lazy"><figcaption><span lang="fr">La réserve de boosters</span><span lang="en">The booster reserve</span></figcaption></figure>
+        <figure class="frame"><img src="img/library.png" alt="" loading="lazy"><figcaption><span lang="fr">La bibliothèque</span><span lang="en">The library</span></figcaption></figure>
+        <figure class="frame"><img src="img/achievements.png" alt="" loading="lazy"><figcaption><span lang="fr">Le cabinet des succès</span><span lang="en">The achievements cabinet</span></figcaption></figure>
+        <figure class="frame"><img src="img/stats.png" alt="" loading="lazy"><figcaption><span lang="fr">Les statistiques</span><span lang="en">Statistics</span></figcaption></figure>
+        <figure class="frame"><img src="img/home.png" alt="" loading="lazy"><figcaption><span lang="fr">L'accueil</span><span lang="en">The home screen</span></figcaption></figure>
+      </div>
+      <p class="hint center">
+        <span lang="fr">Interface en français, anglais, allemand, espagnol et italien ; cartes aussi en japonais.</span>
+        <span lang="en">Interface in English, French, German, Spanish and Italian; cards in Japanese too.</span>
+      </p>
+    </section>
+
+    <section class="frame install">
+      <div class="cartouche"><span lang="fr">Installer</span><span lang="en">Install</span></div>
+      <ol>
+        <li>
+          <span lang="fr">Téléchargez <code>Unsealed_…_x64-setup.exe</code> et lancez-le : il s'installe pour votre compte, sans droits administrateur.</span>
+          <span lang="en">Download <code>Unsealed_…_x64-setup.exe</code> and run it: it installs for your account, no administrator rights needed.</span>
+        </li>
+        <li>
+          <span lang="fr">L'installateur n'est pas signé par un certificat payant : si Windows affiche « Windows a protégé votre ordinateur », cliquez sur « Informations complémentaires » puis « Exécuter quand même ».</span>
+          <span lang="en">The installer isn't signed with a paid certificate: if Windows shows "Windows protected your PC", click "More info" then "Run anyway".</span>
+        </li>
+        <li>
+          <span lang="fr">Au premier lancement, le jeu prépare ses données (quelques minutes, une connexion est nécessaire). Ensuite, il se met à jour tout seul depuis l'accueil.</span>
+          <span lang="en">On first launch, the game prepares its data (a few minutes, a connection is needed). From then on, it updates itself from the home screen.</span>
+        </li>
+      </ol>
+    </section>
+
+    <section class="community">
+      <a class="pill" href="https://discord.gg/B5P3NJYke">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
+        <span lang="fr">The Boosterium, la communauté sur Discord</span>
+        <span lang="en">The Boosterium, our community on Discord</span>
+      </a>
+      <a class="pill" href="https://github.com/MrGrabazu/unsealed">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+        <span lang="fr">Le code source sur GitHub</span>
+        <span lang="en">Source code on GitHub</span>
+      </a>
+    </section>
+  </main>
+
+  <footer>
+    <p class="legal">Unsealed is unofficial Fan Content permitted under the Fan Content Policy. Not approved/endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC.</p>
+    <p>
+      <span lang="fr">Un jeu de fan, gratuit, pour les collectionneurs de Magic: The Gathering. Aucune microtransaction, aucune publicité ; les Sceaux et les cartes n'ont aucune valeur réelle et ne s'échangent contre rien. Images et prix des cartes : <a href="https://scryfall.com">Scryfall</a>. Contenu des sets et des boosters : <a href="https://mtgjson.com">MTGJSON</a>. Polices Cinzel et Alegreya sous licence SIL OFL.</span>
+      <span lang="en">A free fan game for Magic: The Gathering collectors. No microtransactions, no ads; Seals and cards have no real value and can't be exchanged for anything. Card images and prices: <a href="https://scryfall.com">Scryfall</a>. Set and booster contents: <a href="https://mtgjson.com">MTGJSON</a>. Cinzel and Alegreya fonts under the SIL OFL.</span>
+    </p>
+  </footer>
+</body>
+</html>

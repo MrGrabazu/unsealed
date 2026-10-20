@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { getCardDetails, type CardDetailsView } from "./api";
+import { Backdrop } from "./Backdrop";
 import { BackToTop } from "./BackToTop";
 import { CardImage } from "./CardImage";
 import { largeImage } from "./images";
@@ -40,7 +41,7 @@ export function CardDetails({ setCode, uuid, onClose }: Props) {
   const money = useMoney();
   const [details, setDetails] = useState<CardDetailsView | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const box = useRef<HTMLDivElement>(null);
+  const printingList = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     getCardDetails(setCode, uuid)
@@ -58,8 +59,8 @@ export function CardDetails({ setCode, uuid, onClose }: Props) {
     cents == null ? t("common.none") : <Money cents={cents} estimated={details?.priceEstimated} />;
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div ref={box} className="modal details" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+    <Backdrop onClose={onClose}>
+      <div className="modal details" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <button className="modal-close" onClick={onClose} aria-label={t("details.close")}>
           ×
         </button>
@@ -72,6 +73,9 @@ export function CardDetails({ setCode, uuid, onClose }: Props) {
               <CardImage front={largeImage(details.imageUrl)} back={largeImage(details.backImageUrl)} alt={details.name} />
             </div>
 
+            {/* The text, then the printings, which scroll on their own: the sheet never
+                goes beyond the window, even for a basic land and its hundreds of printings. */}
+            <div className="details-side">
             <div className="details-info">
               <h2>{details.name}</h2>
               <p className="hint">
@@ -155,6 +159,7 @@ export function CardDetails({ setCode, uuid, onClose }: Props) {
               <div className="details-printings">
                 <h3>{t("details.printings")}</h3>
                 <p className="hint">{t("details.printingsHint")}</p>
+                <div className="printing-list" ref={printingList}>
                 <div className="printing-grid">
                   {details.printings.map((p) => (
                     <div key={`${p.setCode}-${p.number}`} className={`printing ${p.current ? "current" : ""}`}>
@@ -181,12 +186,14 @@ export function CardDetails({ setCode, uuid, onClose }: Props) {
                     </div>
                   ))}
                 </div>
+                <BackToTop target={printingList} />
+                </div>
               </div>
             )}
+            </div>
           </div>
         )}
-        <BackToTop target={box} />
       </div>
-    </div>
+    </Backdrop>
   );
 }

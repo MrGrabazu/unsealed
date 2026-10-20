@@ -6,9 +6,9 @@
 use crate::booster::BoosterConfig;
 use crate::catalog::{
     BoosterValue, Manifest, ManifestSet, PriceFile, PriceSet, SetFile, SetSelection, ARTISTS_FILE, COLLECTOR_KIND,
-    DATA_FORMAT_VERSION,
+    DATA_FORMAT_VERSION, GUESTS_FILE,
 };
-use crate::import::{add_art_cards_from, add_art_slots, artist_index, add_token_slots, add_tokens_from, art_set_code, compact_set, merge_foil_printings, ArtCardOdds, featured_card, token_set_code, prices_by_uuid, prices_from_scryfall_jsonl, read_all_printings, AllPrintings};
+use crate::import::{add_art_cards_from, add_art_slots, artist_index, guest_index, add_token_slots, add_tokens_from, art_set_code, compact_set, merge_foil_printings, ArtCardOdds, featured_card, token_set_code, prices_by_uuid, prices_from_scryfall_jsonl, read_all_printings, AllPrintings};
 use crate::sim::expected_value_cents;
 use crate::{simulate, ColorIndex};
 use flate2::read::GzDecoder;
@@ -338,6 +338,18 @@ pub fn build(opts: &BuildOptions, progress: Progress<'_>) -> Result<Manifest, Bu
         );
         built_sets.push(set);
     }
+    // The guest series, named while every set of MTGJSON is at hand.
+    let mut guests = guest_index(&built_sets);
+    for (code, series) in &mut guests.series {
+        match all.data.get(code) {
+            Some(raw) => {
+                series.name = raw.name.clone();
+                series.names = raw.names();
+                series.release_date = raw.release_date.clone();
+            }
+            None => series.name = code.clone(),
+        }
+    }
     drop(all); // hundreds of MB, no longer needed
     if built_sets.is_empty() {
         return Err("no set could be built".into());
@@ -372,6 +384,9 @@ pub fn build(opts: &BuildOptions, progress: Progress<'_>) -> Result<Manifest, Bu
             entry.icon_svg_uri = icons.get(&set.code).cloned();
         }
     }
+    for (code, series) in &mut guests.series {
+        series.icon_svg_uri = icons.get(code).cloned();
+    }
 
     // Expected market value of each booster: the game prices boosters from it.
     let mut boosters = BTreeMap::new();
@@ -389,6 +404,7 @@ pub fn build(opts: &BuildOptions, progress: Progress<'_>) -> Result<Manifest, Bu
     }
     write_json(&opts.out.join("prices.json"), &PriceFile { updated_at: bulk.updated_at.clone(), cards, boosters })?;
     write_json(&opts.out.join(ARTISTS_FILE), &artist_index(&built_sets))?;
+    write_json(&opts.out.join(GUESTS_FILE), &guests)?;
 
     progress("Saving the game data", 0.98);
     let generated_at = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().to_string();

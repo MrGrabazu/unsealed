@@ -96,6 +96,8 @@ impl Game {
         let owned = self.owned_by_uuid()?;
         let mut cards = Vec::new();
         for (uuid, card_set, booster_set) in sources {
+            // A guest is listed under its series (Special Guests), its file still holding it.
+            let series = self.series_label(&card_set);
             let parent = card_set.get(1..).map(str::to_string);
             let file = [booster_set, Some(card_set), parent]
                 .into_iter()
@@ -104,11 +106,14 @@ impl Game {
             let Some(file) = file else { continue };
             let set = &self.sets[&file];
             let card = &set.file.cards[set.index[&uuid]];
+            let (set_name, release_date) = series.unwrap_or_else(|| {
+                (set.file.names.get(&self.card_lang).unwrap_or(&set.file.name).clone(), set.file.release_date.clone())
+            });
             cards.push(ArtistCardView {
                 card: self.collection_card(card, owned.get(&uuid).copied().unwrap_or_default()),
                 set_code: file.clone(),
-                set_name: set.file.names.get(&self.card_lang).unwrap_or(&set.file.name).clone(),
-                release_date: set.file.release_date.clone(),
+                set_name,
+                release_date,
             });
         }
         Ok(cards)

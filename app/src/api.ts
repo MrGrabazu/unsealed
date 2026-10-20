@@ -54,6 +54,17 @@ export interface CollectionCard {
   /** What the Boosterium pays for one copy (0 = cannot be sold). */
   sellValueCents: number;
   foilSellValueCents: number;
+  /** A guest's (or a card from other sets' boosters): the sets whose boosters give it, the
+   * first one's file holding it. */
+  boosters?: string[];
+}
+
+/** In a set's completion panel: a guest series its boosters give, with its own binder. */
+export interface GuestLink {
+  code: string;
+  name: string;
+  owned: number;
+  total: number;
 }
 
 export interface CollectionView {
@@ -72,9 +83,14 @@ export interface CollectionView {
   /** The set's art cards (`foilQuantity`: their gold signed version): outside completion. */
   arts: CollectionCard[];
   artsOwned: number;
-  /** Cards of other sets its boosters give (Special Guests, The List…): outside completion. */
+  /** Cards of other sets its boosters give, for a set that keeps them (the Mystery
+   * Boosters); elsewhere they have the binders of their series (`guestLinks`). */
   guests: CollectionCard[];
   guestsOwned: number;
+  /** The set's own cards that only other sets' boosters give: outside completion. */
+  elsewhere: CollectionCard[];
+  elsewhereOwned: number;
+  guestLinks: GuestLink[];
 }
 
 /** What the collection earns by itself. */
@@ -529,6 +545,8 @@ export const checkSetImages = (setCode: string) => invoke<number>("check_set_ima
 export const getOwnedCards = () => invoke<ArtistCard[]>("get_owned_cards");
 export const getLibrary = () => invoke<LibraryBinder[]>("get_library");
 export const listArtists = () => invoke<ArtistSummary[]>("list_artists");
+/** The guest series with a binder of their own (no boosters, no art). */
+export const listGuestSeries = () => invoke<SetSummary[]>("list_guest_series");
 export const getArtistCollection = (name: string) => invoke<ArtistView>("get_artist_collection", { name });
 export const getHistory =(limit: number, offset: number) => invoke<HistoryView>("get_history", { limit, offset });
 /** Returns the money moved (negative: what undoing a sale cost). */

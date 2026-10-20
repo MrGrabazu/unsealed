@@ -4,10 +4,11 @@
 //! - `manifest.json`   : small, always fetched first (see `update`)
 //! - `sets/<CODE>.json`: one `SetFile` per set, downloaded on demand
 //! - `prices.json`     : daily prices for every published card
+//! - `artists.json`, `guests.json`: indexes across the sets (by artist, guest series)
 
 use crate::booster::BoosterConfig;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,7 +33,7 @@ pub struct SetFile {
 
 /// Bump when the compact files change in a way older data cannot satisfy: the app then
 /// rebuilds its data at the next launch.
-pub const DATA_FORMAT_VERSION: u32 = 9;
+pub const DATA_FORMAT_VERSION: u32 = 10;
 
 /// Languages kept for card and set names, as (MTGJSON language name, code). Cards printed
 /// in other languages, or never translated, stay in English.
@@ -67,10 +68,79 @@ pub struct ArtistCard {
     pub set: String,
 }
 
+/// Name of the guest series index in the data directory.
+pub const GUESTS_FILE: &str = "guests.json";
+
+/// The series whose cards come in other sets' boosters (`guests.json`, built with the sets):
+/// Special Guests, The List, Masterpieces, a commander set's cards in collector boosters…
+/// Each has its own binder, unless it is a set offered (its binder exists already). Sets
+/// that keep their guests (`SetFile::keeps_its_guests`) are left out.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GuestIndex {
+    pub series: BTreeMap<String, GuestSeries>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GuestSeries {
+    pub name: String,
+    /// The name in other languages (code -> name), when it was translated.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub names: BTreeMap<String, String>,
+    pub release_date: String,
+    /// Scryfall's SVG of the series' symbol (black, to be shown unaltered).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon_svg_uri: Option<String>,
+    pub cards: Vec<GuestCard>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GuestCard {
+    pub uuid: String,
+    /// The sets whose boosters give it; the first one's file (`sets/<set>.json`) holds it.
+    pub boosters: Vec<String>,
+}
+
 /// Booster kind whose exclusive cards are extras, outside a set's completion target.
 pub const COLLECTOR_KIND: &str = "collector";
 
+/// See `SetFile::keeps_its_guests`.
+const KEEPS_GUESTS_RATIO: usize = 3;
+
 impl SetFile {
+    /// The cards its boosters can give (their uuids).
+    pub fn in_boosters(&self) -> HashSet<&str> {
+        self.boosters
+            .values()
+            .flat_map(|cfg| cfg.sheets.values())
+            .flat_map(|sheet| sheet.cards.keys().map(String::as_str))
+            .collect()
+    }
+
+    /// The cards of other sets its boosters give (Special Guests, The List…). Tokens and art
+    /// cards, filed under sets of their own too, are not guests.
+    pub fn guest_cards(&self) -> Vec<&CardEntry> {
+        let in_boosters = self.in_boosters();
+        self.cards
+            .iter()
+            .filter(|c| c.set_code != self.code && !c.token && !c.art && in_boosters.contains(c.uuid.as_str()))
+            .collect()
+    }
+
+    /// Whether the set keeps its guests in its own binder: its boosters give at least
+    /// `KEEPS_GUESTS_RATIO` times more cards of other sets than of its own (the Mystery
+    /// Boosters, nearly all The List; sets with many List cards, DMU or MOM, stay under
+    /// twice). Elsewhere, the guests go to the binders of their series.
+    pub fn keeps_its_guests(&self) -> bool {
+        let in_boosters = self.in_boosters();
+        let own = self
+            .cards
+            .iter()
+            .filter(|c| c.set_code == self.code && !c.token && !c.art && in_boosters.contains(c.uuid.as_str()))
+            .count();
+        self.guest_cards().len() >= KEEPS_GUESTS_RATIO * own.max(1)
+    }
+
     /// Whether a booster kind is one of the set's main boosters (those that define what
     /// completing the set means). A set offering nothing but collector boosters counts them.
     pub fn is_main_booster(&self, kind: &str) -> bool {

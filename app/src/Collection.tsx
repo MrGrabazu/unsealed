@@ -5,6 +5,7 @@ import {
   getCollection,
   getOwnedCards,
   listArtists,
+  listGuestSeries,
   sellCards,
   sellDuplicates,
   type ArtistCard,
@@ -52,6 +53,16 @@ function sortCards(cards: ArtistCard[], sort: Sort): ArtistCard[] {
   }
 }
 
+/** Every card of a set's binder, its sections one after the other. */
+const sectionsOf = (view: CollectionView) => [
+  ...view.cards,
+  ...view.extras,
+  ...view.tokens,
+  ...view.arts,
+  ...view.guests,
+  ...view.elsewhere,
+];
+
 /** For a search: lower case, without accents ("Magali Villeneuve" ~ "magali villeneuve"). */
 const fold = (text: string) => text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 import { Binder, type BinderSection } from "./Binder";
@@ -84,7 +95,7 @@ interface Props {
 export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
   const money = useMoney();
   const moneyText = useMoneyText();
-  const { t, tx } = useI18n();
+  const { t, tx, plural } = useI18n();
   const [setCode, setSetCode] = useState("");
   const [view, setView] = useState<CollectionView | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
@@ -110,10 +121,20 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
   // "All sets": every card owned.
   const [ownedAll, setOwnedAll] = useState<ArtistCard[] | null>(null);
   const [sort, setSort] = useState<Sort>("priceDesc");
+  // The guest series (Special Guests, The List…), with binders of their own.
+  const [series, setSeries] = useState<SetSummary[]>([]);
+  const known = useMemo(() => [...sets, ...series], [sets, series]);
+  const isSeries = (code: string) => series.some((s) => s.code === code);
 
   useEffect(() => {
     if (!setCode && sets.length > 0) setSetCode(sets[0].code);
   }, [sets, setCode]);
+
+  useEffect(() => {
+    listGuestSeries()
+      .then(setSeries)
+      .catch(() => setSeries([]));
+  }, [refreshKey]);
 
   // The artists, most prolific first, loaded the first time they are asked for.
   useEffect(() => {
@@ -173,7 +194,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
   async function sellExtras() {
     try {
       // What is about to go, read before the collection changes (shown in the sale's window).
-      const lines = view ? duplicatesOf([...view.cards, ...view.extras, ...view.tokens, ...view.arts, ...view.guests]) : [];
+      const lines = view ? duplicatesOf(sectionsOf(view)) : [];
       const result = await sellDuplicates(setCode);
       if (result.soldCount > 0) {
         sounds.coins();
@@ -213,6 +234,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
   const shownTokens = view?.tokens.filter(matches);
   const shownArts = view?.arts.filter(matches);
   const shownGuests = view?.guests.filter(matches);
+  const shownElsewhere = view?.elsewhere.filter(matches);
 
   const library = source === "library";
   const byArtist = source === "artists";
@@ -235,6 +257,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
               { title: t("collection.tokens"), cards: view.tokens },
               { title: t("collection.arts"), cards: view.arts },
               { title: t("collection.guests"), cards: view.guests },
+              { title: t("collection.elsewhere"), cards: view.elsewhere },
             ].filter((s) => s.cards.length > 0)
           : [],
     [byArtist, artistView, view, t],
@@ -263,7 +286,8 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
     ? artistView?.cards.find((c) => c.uuid === detailsOf)?.setCode
     : allSets
       ? ownedAll?.find((c) => c.uuid === detailsOf)?.setCode
-      : view?.setCode;
+      : // A guest's file is that of the first set whose boosters give it.
+        view && (sectionsOf(view).find((c) => c.uuid === detailsOf)?.boosters?.[0] ?? view.setCode);
   const shownArtists = useMemo(() => {
     const query = fold(artistSearch.trim());
     return (artists ?? []).filter((a) => !query || fold(a.name).includes(query)).slice(0, 300);
@@ -311,6 +335,13 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
           <span className="price">{c.priceCents == null ? "—" : <Money cents={c.priceCents} estimated={c.priceEstimated} />}</span>
         </div>
         {"setName" in c && <div className="card-set hint">{(c as ArtistCard).setName}</div>}
+        {!("setName" in c) && c.boosters && c.boosters.length > 0 && (
+          <div className="card-set hint">
+            {t("collection.fromBoosters", {
+              sets: c.boosters.map((code) => known.find((s) => s.code === code)?.name ?? code).join(", "),
+            })}
+          </div>
+        )}
         <div className="sell-row">
           {sellButton(c, false)}
           {sellButton(c, true)}
@@ -367,6 +398,15 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
                 {s.name} ({s.code})
               </option>
             ))}
+            {series.length > 0 && (
+              <optgroup label={t("collection.guestSeries")}>
+                {series.map((s) => (
+                  <option key={s.code} value={s.code}>
+                    {s.name} ({s.code})
+                  </option>
+                ))}
+              </optgroup>
+            )}
           </select>
         )}
         {byArtist && (
@@ -424,7 +464,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
 
   const content = (
     <>
-      {library && <Library sets={sets} refreshKey={refreshKey} onOpen={openBinder} />}
+      {library && <Library sets={known} refreshKey={refreshKey} onOpen={openBinder} />}
       {!library && !(byArtist ? artistView : allSets ? ownedAll : view) && !error && <Loading label={t("collection.loading")} />}
       {byArtist && artistView && (
         <>
@@ -507,6 +547,15 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
                   <div className="collection-grid">{shownGuests?.map(cardTile)}</div>
                 </>
               )}
+              {view.elsewhere.length > 0 && (
+                <>
+                  <h3>{t("collection.elsewhere")}</h3>
+                  <p className="progress-label">
+                    {t("collection.elsewhereProgress", { owned: view.elsewhereOwned, total: view.elsewhere.length })}
+                  </p>
+                  <div className="collection-grid">{shownElsewhere?.map(cardTile)}</div>
+                </>
+              )}
             </>
           )}
         </>
@@ -518,7 +567,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
   const panelCards: CollectionCard[] | null = byArtist
     ? (artistView?.cards ?? null)
     : oneSet && view
-      ? [...view.cards, ...view.extras, ...view.tokens, ...view.arts, ...view.guests]
+      ? sectionsOf(view)
       : null;
 
   const dialogs = (
@@ -549,7 +598,17 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
     );
   }
 
-  const set = view && !byArtist ? sets.find((s) => s.code === view.setCode) : undefined;
+  const set = view && !byArtist ? known.find((s) => s.code === view.setCode) : undefined;
+  const ofSeries = !byArtist && !!view && isSeries(view.setCode);
+  // A guest series: the sets whose boosters give its cards, those giving the most first.
+  const givenBy = ofSeries && view
+    ? Object.entries(
+        view.cards.reduce<Record<string, number>>((n, c) => {
+          for (const code of c.boosters ?? []) n[code] = (n[code] ?? 0) + 1;
+          return n;
+        }, {}),
+      ).sort((a, b) => b[1] - a[1])
+    : [];
   const ownedValueCents = panelCards.reduce((n, c) => n + c.quantity * (c.priceCents ?? 0) + c.foilQuantity * (c.foilPriceCents ?? 0), 0);
   const resaleCents = panelCards.reduce((n, c) => n + c.quantity * c.sellValueCents + c.foilQuantity * c.foilSellValueCents, 0);
   const duplicates = duplicatesOf(panelCards);
@@ -642,6 +701,33 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
               <Money cents={ownedValueCents} /> · <Money cents={resaleCents} />
             </b>
           </div>
+          {/* The guest series its boosters give, each in a binder of its own. */}
+          {!byArtist && view && view.guestLinks.length > 0 && (
+            <>
+              <div className="side-title">{t("collection.guests")}</div>
+              {view.guestLinks.map((l) => (
+                <button key={l.code} className="ready-line link" onClick={() => openBinder(l.code)}>
+                  <span title={l.name}>{l.name}</span>
+                  <b>
+                    {l.owned} / {l.total} ›
+                  </b>
+                </button>
+              ))}
+            </>
+          )}
+          {givenBy.length > 0 && (
+            <>
+              <div className="side-title">{t("collection.givenBy")}</div>
+              {givenBy.map(([code, count]) => (
+                <button key={code} className="ready-line link" onClick={() => onShop(code)}>
+                  <span>{known.find((s) => s.code === code)?.name ?? code}</span>
+                  <b>
+                    {plural("collection.cardCount", count)} ›
+                  </b>
+                </button>
+              ))}
+            </>
+          )}
         </div>
         <div className="buy-bar">
           <button className="big" onClick={() => void sellPanelDuplicates()} disabled={duplicatesCents === 0}>
@@ -649,7 +735,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
           </button>
           <div className="ready-more">
             <button onClick={() => setPicking(true)}>{t("collection.sellMore")}</button>
-            {view && !byArtist && <button onClick={() => onShop(view.setCode)}>{t("collection.buyBoosters")}</button>}
+            {view && !byArtist && !ofSeries && <button onClick={() => onShop(view.setCode)}>{t("collection.buyBoosters")}</button>}
           </div>
         </div>
       </aside>

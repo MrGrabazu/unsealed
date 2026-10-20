@@ -4,6 +4,7 @@ mod achievements;
 mod artists;
 mod betting;
 mod details;
+mod guests;
 mod history;
 mod income;
 mod library;
@@ -107,6 +108,10 @@ pub struct CollectionCard {
     /// What the Boosterium pays for one copy (0 = cannot be sold).
     pub sell_value_cents: u32,
     pub foil_sell_value_cents: u32,
+    /// For a card of a guest series, or of a set found in other sets' boosters: the sets
+    /// whose boosters give it (the first one's file holds it). Empty otherwise.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub boosters: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -129,9 +134,16 @@ pub struct CollectionView {
     /// The set's art cards (`foil_quantity`: their gold signed version); outside completion.
     pub arts: Vec<CollectionCard>,
     pub arts_owned: usize,
-    /// Cards of other sets its boosters give (Special Guests, The List…); outside completion.
+    /// Cards of other sets its boosters give, for a set that keeps them (the Mystery
+    /// Boosters, see `SetFile::keeps_its_guests`); outside completion.
     pub guests: Vec<CollectionCard>,
     pub guests_owned: usize,
+    /// The set's own cards that only other sets' boosters give (Theros cards in Born of the
+    /// Gods boosters…); outside completion.
+    pub elsewhere: Vec<CollectionCard>,
+    pub elsewhere_owned: usize,
+    /// The guest series its boosters give, each with a binder (see `guests`).
+    pub guest_links: Vec<guests::GuestLink>,
 }
 
 #[derive(Debug, Serialize)]
@@ -304,8 +316,10 @@ struct LoadedSet {
     /// The set's art cards (its art series): outside the completion target too.
     arts: Vec<usize>,
     /// Cards of other sets its boosters give (Special Guests, The List, a commander set's
-    /// cards in collector boosters…): outside the completion target too.
+    /// cards in collector boosters…): in the binders of their series, unless the set keeps
+    /// them (`keeps_guests`).
     guests: Vec<usize>,
+    keeps_guests: bool,
 }
 
 pub struct Game {
@@ -327,6 +341,8 @@ pub struct Game {
     print_runs: HashMap<String, u32>,
     /// The collections by artist (see `artists`), read when first needed.
     artists: Option<unsealed_core::catalog::ArtistIndex>,
+    /// The guest series (see `guests`), read when first needed.
+    guests: Option<unsealed_core::catalog::GuestIndex>,
     /// Whether each translated printing checked has a good scan (see `localized`).
     image_quality: HashMap<String, bool>,
     prices: Option<PriceFile>,
@@ -386,6 +402,7 @@ impl Game {
             limited: LimitedConfig::default(),
             print_runs: HashMap::new(),
             artists: None,
+            guests: None,
             image_quality,
             prices: None,
             prices_stamp: None,
@@ -400,6 +417,7 @@ impl Game {
         self.sets.clear();
         self.print_runs.clear();
         self.artists = None;
+        self.guests = None;
         self.prices = None;
         self.prices_stamp = None;
         self.bet_tables.clear();
@@ -760,10 +778,15 @@ impl Game {
 
     // ---- collection and selling ------------------------------------------------------
 
-    /// The player's collection for one set, with completion progress.
+    /// The player's collection for one set (or one guest series), with completion progress.
     pub fn collection(&mut self, set_code: &str) -> Result<CollectionView, String> {
+        if self.is_guest_series(set_code) {
+            return self.series_collection(set_code);
+        }
         self.ensure_loaded(set_code)?;
         self.ensure_prices();
+        let elsewhere = self.cards_elsewhere(set_code)?;
+        let guest_links = self.guest_links(set_code)?;
         let owned = self.owned_with_tokens(set_code)?;
         let set = &self.sets[set_code];
 
@@ -781,7 +804,7 @@ impl Game {
         let extras = view(&set.extras);
         let tokens = view(&set.tokens);
         let arts = view(&set.arts);
-        let guests = view(&set.guests);
+        let guests = if set.keeps_guests { view(&set.guests) } else { Vec::new() };
         let owned_count = owned_in(&cards);
         let total_count = cards.len();
         let completion_percent =
@@ -796,11 +819,14 @@ impl Game {
             tokens_owned: owned_in(&tokens),
             arts_owned: owned_in(&arts),
             guests_owned: owned_in(&guests),
+            elsewhere_owned: owned_in(&elsewhere),
             cards,
             extras,
             tokens,
             arts,
             guests,
+            elsewhere,
+            guest_links,
         })
     }
 
@@ -858,6 +884,7 @@ impl Game {
             price_estimated: self.price_estimated(&c.uuid),
             sell_value_cents: self.sale_value(&c.uuid, false),
             foil_sell_value_cents: self.sale_value(&c.uuid, true),
+            boosters: Vec::new(),
         }
     }
 
@@ -907,12 +934,15 @@ impl Game {
         Ok(owned)
     }
 
-    /// Sells every copy beyond the first of each card and finish in a set (and its tokens).
+    /// Sells every copy beyond the first of each card and finish in a set's binder (or a
+    /// guest series'): exactly the cards its collection shows, every section included.
     pub fn sell_duplicates(&mut self, set_code: &str) -> Result<SaleResult, String> {
-        self.ensure_loaded(set_code)?;
-        let owned = self.owned_with_tokens(set_code)?;
+        let view = self.collection(set_code)?;
+        let sections = [view.cards, view.extras, view.tokens, view.arts, view.guests, view.elsewhere];
+        let mut seen = HashSet::new();
         let mut requests = Vec::new();
-        for (uuid, have) in owned {
+        for card in sections.into_iter().flatten().filter(|c| seen.insert(c.uuid.clone())) {
+            let (uuid, have) = (card.uuid, Owned { normal: card.quantity, foil: card.foil_quantity });
             // One copy of each card is kept, whatever its finish: the foil one if there is one.
             let kept_foil = u32::from(have.foil > 0);
             let to_sell = [(false, have.normal - (1 - kept_foil).min(have.normal)), (true, have.foil - kept_foil)];
@@ -1126,12 +1156,13 @@ impl Game {
         let tokens = cards_where(&file, |c| c.token);
         let arts = cards_where(&file, |c| c.art);
         let guests = guest_cards(&file);
+        let keeps_guests = file.keeps_its_guests();
         for card in &file.cards {
             if let Some(run) = self.limited.print_run_of(card) {
                 self.print_runs.insert(card.uuid.clone(), run);
             }
         }
-        self.sets.insert(code.to_string(), LoadedSet { file, colors, index, obtainable, extras, tokens, arts, guests });
+        self.sets.insert(code.to_string(), LoadedSet { file, colors, index, obtainable, extras, tokens, arts, guests, keeps_guests });
         Ok(())
     }
 
@@ -1213,22 +1244,12 @@ fn obtainable_cards(file: &SetFile) -> (Vec<usize>, Vec<usize>) {
     (pick(&|u| main.contains(u)), pick(&|u| collector.contains(u) && !main.contains(u)))
 }
 
-/// The cards of other sets the set's boosters give (Special Guests, The List…), by set then
-/// collector number. Tokens and art cards have their own sections.
+/// The cards of other sets the set's boosters give (`SetFile::guest_cards`: Special Guests,
+/// The List…), by set then collector number.
 fn guest_cards(file: &SetFile) -> Vec<usize> {
-    let in_sheets: HashSet<&str> = file
-        .boosters
-        .values()
-        .flat_map(|cfg| cfg.sheets.values())
-        .flat_map(|sheet| sheet.cards.keys().map(String::as_str))
-        .collect();
-    let mut indices: Vec<usize> = file
-        .cards
-        .iter()
-        .enumerate()
-        .filter(|(_, c)| c.set_code != file.code && !c.token && !c.art && in_sheets.contains(c.uuid.as_str()))
-        .map(|(i, _)| i)
-        .collect();
+    let guests: HashSet<&str> = file.guest_cards().into_iter().map(|c| c.uuid.as_str()).collect();
+    let mut indices: Vec<usize> =
+        file.cards.iter().enumerate().filter(|(_, c)| guests.contains(c.uuid.as_str())).map(|(i, _)| i).collect();
     indices.sort_by(|&a, &b| {
         let (a, b) = (&file.cards[a], &file.cards[b]);
         (a.set_code.as_str(), number_key(&a.number)).cmp(&(b.set_code.as_str(), number_key(&b.number)))
@@ -1786,20 +1807,40 @@ mod tests {
     }
 
     #[test]
-    fn a_set_shows_the_guests_of_other_sets_its_boosters_give() {
-        let mut g = game_with_booster("guests");
-        // A Special Guest (filed under SPG, a set not offered) acquired as if pulled.
-        g.store
-            .open_sealed("TST", "play", &[OpeningCard { uuid: "g1", set_code: "SPG", foil: false, price_cents: None, limited: false }], 0)
-            .unwrap();
+    fn guests_of_other_sets_have_the_binder_of_their_series() {
+        let mut g = game("guests");
+        g.buy_boosters("TST", "play", 2).unwrap();
+        // The index the builder writes, from the set file.
+        let file: SetFile = serde_json::from_str(SET).unwrap();
+        let mut index = unsealed_core::import::guest_index(&[file]);
+        index.series.get_mut("SPG").unwrap().name = "Special Guests".into();
+        index.series.get_mut("SPG").unwrap().release_date = "2023-11-17".into();
+        fs::write(g.data_dir.join(unsealed_core::catalog::GUESTS_FILE), serde_json::to_string(&index).unwrap()).unwrap();
+        // Two copies of a Special Guest (filed under SPG, a set not offered), as if pulled.
+        let guest = || OpeningCard { uuid: "g1", set_code: "SPG", foil: false, price_cents: None, limited: false };
+        g.store.open_sealed("TST", "play", &[guest()], 0).unwrap();
+        g.store.open_sealed("TST", "play", &[guest()], 0).unwrap();
+
+        // Not in its booster's binder: a link to its series' binder.
         let view = g.collection("TST").unwrap();
-        let guests: Vec<(&str, u32)> = view.guests.iter().map(|c| (c.uuid.as_str(), c.quantity)).collect();
-        assert_eq!(guests, [("g1", 1)]);
-        assert_eq!(view.guests_owned, 1);
-        // Outside completion, but its binder is on the shelf.
-        assert_eq!((view.owned_count, view.total_count), (0, 2));
-        let shelf = g.library().unwrap();
-        assert_eq!(shelf.iter().map(|b| (b.set_code.as_str(), b.guests_owned)).collect::<Vec<_>>(), [("TST", 1)]);
+        assert!(view.guests.is_empty());
+        let links: Vec<(&str, &str, usize, usize)> =
+            view.guest_links.iter().map(|l| (l.code.as_str(), l.name.as_str(), l.owned, l.total)).collect();
+        assert_eq!(links, [("SPG", "Special Guests", 1, 1)]);
+
+        assert_eq!(g.guest_series().iter().map(|s| s.code.as_str()).collect::<Vec<_>>(), ["SPG"]);
+        let series = g.collection("SPG").unwrap();
+        assert_eq!(series.set_name, "Special Guests");
+        let cards: Vec<(&str, u32, &[String])> =
+            series.cards.iter().map(|c| (c.uuid.as_str(), c.quantity, c.boosters.as_slice())).collect();
+        assert_eq!(cards, [("g1", 2, &["TST".to_string()][..])]);
+        assert_eq!(series.completion_percent, 100.0);
+
+        // On the shelf (not TST: none of its own cards is owned), and its duplicates sell.
+        let shelf: Vec<String> = g.library().unwrap().into_iter().map(|b| b.set_code).collect();
+        assert_eq!(shelf, ["SPG"]);
+        assert_eq!(g.sell_duplicates("SPG").unwrap().sold_count, 1);
+        assert_eq!(g.collection("SPG").unwrap().cards[0].quantity, 1);
     }
 
     #[test]
@@ -2741,15 +2782,24 @@ mod tests {
         .unwrap();
         let sets = g.list_sets().unwrap();
         assert!(!sets.is_empty());
+        let mut checked = 0;
         for s in &sets {
-            g.buy_boosters(&s.code, "play", 3).unwrap();
+            // As far as the starting capital goes (newest sets first).
+            if g.buy_boosters(&s.code, "play", 3).is_err() {
+                break;
+            }
+            checked += 1;
             let mut new_cards = 0;
             for _ in 0..3 {
                 let cards = g.open_booster(&s.code, "play").unwrap();
                 assert!(cards.len() >= 12);
                 assert!(cards.iter().all(|c| c.image_url.starts_with("https://cards.scryfall.io/")));
-                // Cards from other sets (e.g. Special Guests) do not count for this set.
-                new_cards += cards.iter().filter(|c| c.is_new && c.set_code == s.code).count();
+                // Cards from other sets (e.g. Special Guests) do not count for this set, nor
+                // its tokens and art cards (some bear its own code: FRA).
+                new_cards += cards
+                    .iter()
+                    .filter(|c| c.is_new && c.set_code == s.code && c.rarity != "token" && c.rarity != ART_RARITY)
+                    .count();
             }
             let view = g.collection(&s.code).unwrap();
             let sold = g.sell_duplicates(&s.code).unwrap();
@@ -2759,6 +2809,15 @@ mod tests {
             );
             assert_eq!(view.owned_count, new_cards);
             assert!(view.owned_count > 0 && view.owned_count <= view.total_count);
+        }
+        assert!(checked > 0);
+        // The guest series pulled have binders of their own.
+        let pulled: Vec<SetSummary> =
+            g.guest_series().into_iter().filter(|s| g.store.owned_in_set(&s.code).is_ok_and(|o| !o.is_empty())).collect();
+        for series in pulled {
+            let view = g.collection(&series.code).unwrap();
+            println!("{} ({}): {}/{} cards", series.code, series.name, view.owned_count, view.total_count);
+            assert!(view.owned_count > 0 && view.cards.iter().all(|c| !c.boosters.is_empty()));
         }
         let view = g.achievements("en").unwrap();
         println!("achievements: {}/{} unlocked", view.unlocked_count, view.total);

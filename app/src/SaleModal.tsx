@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { CollectionCard } from "./api";
+import { Backdrop } from "./Backdrop";
 import { BackToTop } from "./BackToTop";
 import { CardImage } from "./CardImage";
 import { useI18n } from "./i18n";
@@ -53,7 +54,7 @@ export function SaleModal({ soldCount, totalCents, lines, onClose }: Props) {
   }, [onClose]);
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <Backdrop onClose={onClose}>
       <div ref={box} className="modal sale-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <h2>{t("sale.title")}</h2>
         <p className="sale-total">
@@ -92,6 +93,6 @@ export function SaleModal({ soldCount, totalCents, lines, onClose }: Props) {
         </button>
         <BackToTop target={box} />
       </div>
-    </div>
+    </Backdrop>
   );
 }

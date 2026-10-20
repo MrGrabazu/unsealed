@@ -19,8 +19,8 @@ pub struct LibraryBinder {
     pub rares_total: usize,
     pub mythics_owned: usize,
     pub mythics_total: usize,
-    /// Distinct cards owned in the other sections (collector extras, tokens, art cards, guests
-    /// from other sets).
+    /// Distinct cards owned in the other sections (collector extras, tokens, art cards; the
+    /// guests a set keeps, or its cards from other sets' boosters).
     pub extras_owned: usize,
     pub extras_total: usize,
     pub tokens_owned: usize,
@@ -68,10 +68,13 @@ impl Game {
             *opened.entry(row.set_code).or_default() += row.boosters;
         }
 
+        // The guest series have binders of their own (Special Guests, The List…).
+        let candidates: Vec<String> =
+            candidates.into_iter().filter(|c| offered.contains(c) || self.is_guest_series(c)).collect();
         let mut binders = Vec::new();
-        for code in candidates.into_iter().filter(|c| offered.contains(c)) {
+        for code in candidates {
             let view = self.collection(&code)?;
-            let sections = [&view.cards, &view.extras, &view.tokens, &view.arts, &view.guests];
+            let sections = [&view.cards, &view.extras, &view.tokens, &view.arts, &view.guests, &view.elsewhere];
             let owned = |c: &CollectionCard| c.quantity + c.foil_quantity > 0;
             if !sections.iter().any(|s| s.iter().any(owned)) {
                 continue;
@@ -106,8 +109,8 @@ impl Game {
                 tokens_total: view.tokens.len(),
                 arts_owned: view.arts_owned,
                 arts_total: view.arts.len(),
-                guests_owned: view.guests_owned,
-                guests_total: view.guests.len(),
+                guests_owned: view.guests_owned + view.elsewhere_owned,
+                guests_total: view.guests.len() + view.elsewhere.len(),
                 copies: all().map(|c| c.quantity + c.foil_quantity).sum(),
                 foil_copies: all().map(|c| c.foil_quantity).sum(),
                 value_cents: all()
@@ -127,8 +130,12 @@ impl Game {
                 set_code: code,
             });
         }
-        let release: HashMap<String, String> =
-            self.list_sets()?.into_iter().map(|s| (s.code, s.release_date)).collect();
+        let release: HashMap<String, String> = self
+            .list_sets()?
+            .into_iter()
+            .chain(self.guest_series())
+            .map(|s| (s.code, s.release_date))
+            .collect();
         binders.sort_by(|a, b| release.get(&a.set_code).cmp(&release.get(&b.set_code)).then(a.set_code.cmp(&b.set_code)));
         Ok(binders)
     }

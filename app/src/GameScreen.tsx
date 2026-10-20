@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useContext, useEffect, useRef, useState } from "react";
 import {
   buyBoosters,
   checkSetImages,
@@ -87,7 +87,47 @@ const TAB_ICONS: Record<Tab, IconName> = {
 
 /** The resources on the HUD's strap: the balance (with what the collection earns, and the
  * "+N" floating up from it), the sealed boosters, and what the collection is worth. */
-function Resources({ wallet, income, floats }: { wallet: WalletView; income: IncomeView | null; floats: IncomeFloat[] }) {
+/** What the collection earned while the game was closed: a small frame hanging under the
+ * balance (it moves nothing), closed by a click or after a while. */
+function AwayIncome({ away, onClose }: { away: IncomeView; onClose: () => void }) {
+  const { t, plural, formatNumber } = useI18n();
+  const rules = useContext(CurrencyContext);
+  useEffect(() => {
+    sounds.coins();
+    const timer = window.setTimeout(onClose, AWAY_INCOME_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
+  const time =
+    away.minutes < 90 ? plural("income.minutes", Math.round(away.minutes)) : plural("income.hours", Math.round(away.minutes / 60));
+  return (
+    <div className="away-pop frame" role="status" onClick={onClose}>
+      <div className="cartouche">{t("income.welcome")}</div>
+      <div className="away-amount">
+        +{formatNumber(Math.round(away.earnedCents * rules.sealsPerCent))}
+        <Coin />
+      </div>
+      <p>{t("income.awayShort", { time })}</p>
+      <button className="big">{t("income.dismiss")}</button>
+    </div>
+  );
+}
+
+/** How long the frame of what was earned away stays, unless closed before. */
+const AWAY_INCOME_MS = 20_000;
+
+function Resources({
+  wallet,
+  income,
+  floats,
+  away,
+  onAwayClosed,
+}: {
+  wallet: WalletView;
+  income: IncomeView | null;
+  floats: IncomeFloat[];
+  away: IncomeView | null;
+  onAwayClosed: () => void;
+}) {
   const moneyText = useMoneyText();
   const { t, formatNumber } = useI18n();
   const toSeals = (cents: number) => Math.round(cents * wallet.currency.sealsPerCent);
@@ -122,6 +162,7 @@ function Resources({ wallet, income, floats }: { wallet: WalletView; income: Inc
             +{formatNumber(toSeals(f.cents))}
           </span>
         ))}
+        {away && <AwayIncome away={away} onClose={onAwayClosed} />}
       </div>
       <div className="res" title={t("hud.sealed")}>
         <span className="ico">
@@ -560,7 +601,15 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
             <Logo />
           </div>
           <div className="hud-title">{t(`tab.${tab}`)}</div>
-          {wallet && <Resources wallet={wallet} income={income} floats={incomeFloats} />}
+          {wallet && (
+            <Resources
+              wallet={wallet}
+              income={income}
+              floats={incomeFloats}
+              away={awayIncome}
+              onAwayClosed={() => setAwayIncome(null)}
+            />
+          )}
           <div className="hud-tools">
             {/* Sound on or off, at hand (also in the options, with the volume). */}
             <button
@@ -606,21 +655,6 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
         </nav>
 
         <main className="stage" ref={stage}>
-        {awayIncome && (
-          <div className="income-away">
-            <p>
-              {t("income.away", {
-                amount: money(awayIncome.earnedCents),
-                time:
-                  awayIncome.minutes < 90
-                    ? i18n.plural("income.minutes", Math.round(awayIncome.minutes))
-                    : i18n.plural("income.hours", Math.round(awayIncome.minutes / 60)),
-              })}
-            </p>
-            <button onClick={() => setAwayIncome(null)}>{t("income.dismiss")}</button>
-          </div>
-        )}
-
         <DataStatusBar status={dataStatus} />
         {error && <p className="error">{error}</p>}
         {notice && <p className="notice">{notice}</p>}
