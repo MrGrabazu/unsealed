@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Unsealed — Crack &amp; Collect</title>
-  <meta name="description" content="Unsealed: a free, fan-made booster opening game. Real draw rates, real market prices, virtual Seals only. For Windows.">
+  <meta name="description" content="Unsealed: a free, fan-made booster opening game. Real draw rates, real market prices, virtual Seals only. For Windows, macOS and Linux.">
   <meta property="og:title" content="Unsealed — Crack & Collect">
   <meta property="og:description" content="A free, fan-made booster opening game: real draw rates, real market prices, virtual Seals only.">
   <meta property="og:image" content="img/home.png">
@@ -40,13 +40,18 @@
       <span lang="en">The thrill of cracking boosters open, without spending a cent.</span>
     </p>
     <div class="cta">
+      <!-- The visitor's platform, guessed by site.js; Windows until then. -->
       <a class="big" id="download" href="https://github.com/MrGrabazu/unsealed/releases/latest">
-        <span lang="fr">Télécharger pour Windows</span>
-        <span lang="en">Download for Windows</span>
+        <span lang="fr">Télécharger pour <b data-os-name>Windows</b></span>
+        <span lang="en">Download for <b data-os-name>Windows</b></span>
       </a>
       <p class="hint" id="release">
-        <span lang="fr">Gratuit · Windows 10 et 11 · mises à jour intégrées</span>
-        <span lang="en">Free · Windows 10 and 11 · built-in updates</span>
+        <span lang="fr">Gratuit · Windows, macOS et Linux · mises à jour intégrées</span>
+        <span lang="en">Free · Windows, macOS and Linux · built-in updates</span>
+      </p>
+      <p class="platforms" id="platforms">
+        <span lang="fr">Toutes les plateformes :</span><span lang="en">Every platform:</span>
+        <a data-asset="windows" href="https://github.com/MrGrabazu/unsealed/releases/latest">Windows</a><a data-asset="macos" href="https://github.com/MrGrabazu/unsealed/releases/latest">macOS</a><a data-asset="appimage" href="https://github.com/MrGrabazu/unsealed/releases/latest">Linux AppImage</a><a data-asset="deb" href="https://github.com/MrGrabazu/unsealed/releases/latest">.deb</a><a data-asset="rpm" href="https://github.com/MrGrabazu/unsealed/releases/latest">.rpm</a>
       </p>
     </div>
   </section>
@@ -128,20 +133,33 @@
 
     <section class="frame install">
       <div class="cartouche"><span lang="fr">Installer</span><span lang="en">Install</span></div>
-      <ol>
-        <li>
-          <span lang="fr">Téléchargez <code>Unsealed_…_x64-setup.exe</code> et lancez-le : il s'installe pour votre compte, sans droits administrateur.</span>
-          <span lang="en">Download <code>Unsealed_…_x64-setup.exe</code> and run it: it installs for your account, no administrator rights needed.</span>
-        </li>
-        <li>
-          <span lang="fr">L'installateur n'est pas signé par un certificat payant : si Windows affiche « Windows a protégé votre ordinateur », cliquez sur « Informations complémentaires » puis « Exécuter quand même ».</span>
-          <span lang="en">The installer isn't signed with a paid certificate: if Windows shows "Windows protected your PC", click "More info" then "Run anyway".</span>
-        </li>
-        <li>
-          <span lang="fr">Au premier lancement, le jeu prépare ses données (quelques minutes, une connexion est nécessaire). Ensuite, il se met à jour tout seul depuis l'accueil.</span>
-          <span lang="en">On first launch, the game prepares its data (a few minutes, a connection is needed). From then on, it updates itself from the home screen.</span>
-        </li>
-      </ol>
+      <div class="os-steps">
+        <div>
+          <h3>Windows</h3>
+          <p>
+            <span lang="fr">Lancez <code>Unsealed_…_x64-setup.exe</code> : il s'installe pour votre compte, sans droits administrateur. Il n'est pas signé par un certificat payant : si Windows affiche « Windows a protégé votre ordinateur », cliquez sur « Informations complémentaires » puis « Exécuter quand même ».</span>
+            <span lang="en">Run <code>Unsealed_…_x64-setup.exe</code>: it installs for your account, no administrator rights needed. It isn't signed with a paid certificate: if Windows shows "Windows protected your PC", click "More info" then "Run anyway".</span>
+          </p>
+        </div>
+        <div>
+          <h3>macOS</h3>
+          <p>
+            <span lang="fr">Ouvrez <code>Unsealed_…_universal.dmg</code> (puces Apple et Intel) et glissez Unsealed dans Applications. L'app n'est pas notariée par Apple : au premier lancement, faites un clic droit sur Unsealed puis « Ouvrir ». Si macOS la dit endommagée, lancez <code>xattr -cr /Applications/Unsealed.app</code> dans le Terminal.</span>
+            <span lang="en">Open <code>Unsealed_…_universal.dmg</code> (Apple silicon and Intel) and drag Unsealed to Applications. The app isn't notarized by Apple: on first launch, right-click Unsealed and choose "Open". If macOS says it is damaged, run <code>xattr -cr /Applications/Unsealed.app</code> in Terminal.</span>
+          </p>
+        </div>
+        <div>
+          <h3>Linux</h3>
+          <p>
+            <span lang="fr">L'<code>AppImage</code> marche sur toutes les distributions : rendez-la exécutable (<code>chmod +x</code>) et lancez-la ; c'est elle qui se met à jour seule. Sinon, le paquet <code>.deb</code> (Debian, Ubuntu…) ou <code>.rpm</code> (Fedora, openSUSE…).</span>
+            <span lang="en">The <code>AppImage</code> runs on any distribution: make it executable (<code>chmod +x</code>) and run it; it is the one that updates itself. Otherwise, the <code>.deb</code> (Debian, Ubuntu…) or <code>.rpm</code> (Fedora, openSUSE…) package.</span>
+          </p>
+        </div>
+      </div>
+      <p class="hint">
+        <span lang="fr">Au premier lancement, le jeu prépare ses données (quelques minutes, une connexion est nécessaire). Ensuite, il se met à jour tout seul depuis l'accueil.</span>
+        <span lang="en">On first launch, the game prepares its data (a few minutes, a connection is needed). From then on, it updates itself from the home screen.</span>
+      </p>
     </section>
 
     <section class="community">

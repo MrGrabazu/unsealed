@@ -19,19 +19,41 @@
     });
   });
 
-  // The latest release's installer: a direct link, with its version and size. Without a
-  // release (or offline), the button keeps pointing at the releases page.
+  // Each installer of a release, by the end of its file name.
+  var ASSETS = {
+    windows: /-setup\.exe$/,
+    macos: /\.dmg$/,
+    appimage: /\.AppImage$/,
+    deb: /\.deb$/,
+    rpm: /\.rpm$/,
+  };
+  var NAMES = { windows: "Windows", macos: "macOS", appimage: "Linux" };
+
+  // The visitor's platform: the main button offers its installer.
+  var ua = navigator.userAgent || "";
+  var os = /Mac/.test(ua) && !/iPhone|iPad/.test(ua) ? "macos" : /Linux/.test(ua) && !/Android/.test(ua) ? "appimage" : "windows";
+  document.querySelectorAll("[data-os-name]").forEach(function (b) { b.textContent = NAMES[os]; });
+
+  // The latest release's installers: direct links, and the main one's version and size.
+  // Without a release (or offline), every link keeps pointing at the releases page.
   fetch("https://api.github.com/repos/" + REPO + "/releases/latest")
     .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
     .then(function (release) {
-      var setup = (release.assets || []).find(function (a) { return /-setup\.exe$/.test(a.name); });
-      if (!setup) return;
-      document.getElementById("download").href = setup.browser_download_url;
-      var size = (setup.size / 1048576).toFixed(1);
+      var assets = release.assets || [];
+      var find = function (kind) { return assets.find(function (a) { return ASSETS[kind].test(a.name); }); };
+      document.querySelectorAll("[data-asset]").forEach(function (link) {
+        var asset = find(link.dataset.asset);
+        if (asset) link.href = asset.browser_download_url;
+        else link.hidden = true;
+      });
+      var main = find(os) || find("windows");
+      if (!main) return;
+      document.getElementById("download").href = main.browser_download_url;
+      var size = (main.size / 1048576).toFixed(1);
       var version = release.tag_name.replace(/^v/, "");
       document.getElementById("release").innerHTML =
-        '<span lang="fr">Version ' + version + " · " + size.replace(".", ",") + " Mo · Windows 10 et 11 · gratuit</span>" +
-        '<span lang="en">Version ' + version + " · " + size + " MB · Windows 10 and 11 · free</span>";
+        '<span lang="fr">Version ' + version + " · " + size.replace(".", ",") + " Mo · gratuit · mises à jour intégrées</span>" +
+        '<span lang="en">Version ' + version + " · " + size + " MB · free · built-in updates</span>";
     })
     .catch(function () {});
 

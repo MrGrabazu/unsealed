@@ -1,20 +1,48 @@
-# Publishes a version: pushing a tag "v0.3.0" builds the Windows installer, signs it for the
-# in-app updater, and creates the GitHub release with it and `latest.json` (what the app's
-# updater reads). Secrets: TAURI_SIGNING_PRIVATE_KEY (the content of the private key) and
+# Publishes a version: pushing a tag "v0.3.0" builds the installers (Windows, macOS, Linux),
+# signs them for the in-app updater, and creates the GitHub release with them and
+# `latest.json` (what the app's updater reads, one entry per platform). Secrets:
+# TAURI_SIGNING_PRIVATE_KEY (the content of the private key) and
 # TAURI_SIGNING_PRIVATE_KEY_PASSWORD (empty if the key has none).
 name: Release
 
 on:
   push:
     tags: ["v*"]
-  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  windows:
-    runs-on: windows-latest
+  # The tests once, before any build.
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+      - name: Install the system libraries Tauri needs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - name: Run the tests
+        run: cargo test --workspace
+
+  build:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Windows: the NSIS installer (.exe).
+          - platform: windows-latest
+            args: --bundles nsis
+          # macOS: one universal app for Apple Silicon and Intel (.dmg, and .app.tar.gz for updates).
+          - platform: macos-latest
+            args: --target universal-apple-darwin --bundles app,dmg
+          # Linux: AppImage (any distribution, self-updating), .deb and .rpm.
+          - platform: ubuntu-22.04
+            args: --bundles appimage,deb,rpm
+    runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
 
@@ -25,14 +53,19 @@ jobs:
           cache-dependency-path: app/package-lock.json
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - uses: swatinem/rust-cache@v2
 
+      - name: Install the system libraries Tauri needs
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
       - name: Install the front end's dependencies
         run: npm ci --prefix app
-
-      - name: Run the tests
-        run: cargo test --workspace
 
       - uses: tauri-apps/tauri-action@v0
         env:
@@ -41,14 +74,23 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: app
+          args: ${{ matrix.args }}
           tagName: ${{ github.ref_name }}
           releaseName: Unsealed ${{ github.ref_name }}
           releaseBody: |
             Crack & Collect: free, 100% virtual booster opening.
 
-            **Windows**: download `Unsealed_…_x64-setup.exe` below and run it. The installer is not
-            signed with a paid certificate: Windows may show "Windows protected your PC", click
-            "More info" then "Run anyway". Installed games update themselves from the home screen.
+            **Windows**: `Unsealed_…_x64-setup.exe`. Not signed with a paid certificate: if Windows
+            shows "Windows protected your PC", click "More info" then "Run anyway".
+
+            **macOS** (Apple Silicon and Intel): `Unsealed_…_universal.dmg`. Not notarized by Apple:
+            after moving Unsealed to Applications, right-click it and choose "Open" (or run
+            `xattr -cr /Applications/Unsealed.app` if macOS says it is damaged).
+
+            **Linux**: `Unsealed_…_amd64.AppImage` (any distribution: make it executable and run it;
+            it updates itself), or the `.deb` / `.rpm` package.
+
+            Installed games update themselves from the home screen.
 
             Unsealed is unofficial Fan Content permitted under the Fan Content Policy. Not
             approved/endorsed by Wizards.

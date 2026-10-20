@@ -89,10 +89,12 @@ fn a_purchase_can_only_be_undone_right_away() {
     assert_eq!(c.purchase_refund_cents(1_000, 60), Some(950));
     assert_eq!(c.purchase_refund_cents(1_000, 5 * 60), Some(950));
     assert_eq!(c.purchase_refund_cents(1_000, 5 * 60 + 1), None);
-    // An economy file without the section gets the same defaults.
-    let start = CONFIG.find(r#",
+    // An economy file without the section gets the same defaults. (Line endings may be
+    // Windows ones, depending on how git checked the file out.)
+    let config = CONFIG.replace("\r\n", "\n");
+    let start = config.find(r#",
   "cancellation""#).unwrap();
-    let without = format!("{}\n}}", &CONFIG[..start]);
+    let without = format!("{}\n}}", &config[..start]);
     let defaults = EconomyConfig::from_json(&without).unwrap().cancellation;
     assert_eq!(defaults.sale_penalty_percent(0), 5);
     assert!(bad_cancellation(r#""penaltyPercent": 50"#, r#""penaltyPercent": 150"#));

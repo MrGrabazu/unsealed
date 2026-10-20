@@ -96,8 +96,17 @@ main { position: relative; z-index: 1; width: min(1180px, 100% - 32px); margin: 
 .shots figure { margin: 0; padding: 12px 12px 10px; }
 .shots figcaption { margin-top: 8px; text-align: center; font: 700 14px var(--font-title); letter-spacing: .1em; color: var(--gold-hi); }
 
+.platforms { margin: 0; font-size: 15px; color: var(--muted); }
+.platforms a { color: #e6d3ab; }
+.platforms a { margin-left: 6px; }
+/* The separators, inside the links (a hidden one takes its own away), never underlined. */
+.platforms a:not([hidden]) ~ a:not([hidden])::before { content: "·"; display: inline-block; margin-right: 6px; color: var(--muted); text-decoration: none; }
+
 .install { padding: 34px 28px 22px; }
-.install ol { margin: 0; padding-left: 22px; display: grid; gap: 10px; }
+.os-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px 26px; }
+.os-steps h3 { margin: 0 0 6px; font: 700 17px var(--font-title); color: var(--gold-hi); letter-spacing: .06em; }
+.os-steps p { margin: 0; color: #d8c8a6; font-size: 16px; }
+.install > .hint { margin: 16px 0 0; }
 
 .community { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; }
 .pill { display: inline-flex; align-items: center; gap: 10px; padding: 12px 22px; border-radius: 999px; text-decoration: none;
