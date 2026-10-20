@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { SaveInfo } from "./api";
 import { About } from "./About";
 import { BackToTop } from "./BackToTop";
+import { getFullscreen, setFullscreen, toggleFullscreen } from "./fullscreen";
 import { GameScreen } from "./GameScreen";
 import { Home } from "./Home";
 import { Options } from "./Options";
@@ -13,6 +14,18 @@ export function App() {
   const [screen, setScreen] = useState<Screen>("home");
   // The game being played; it stays open while the player visits the menu.
   const [save, setSave] = useState<SaveInfo | null>(null);
+
+  // The window opens in full screen: back in a window if the player chose so. F11 switches.
+  useEffect(() => {
+    if (!getFullscreen()) void setFullscreen(false);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "F11") return;
+      e.preventDefault();
+      void toggleFullscreen();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   return (
     <>

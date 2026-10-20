@@ -52,7 +52,7 @@ import { History } from "./History";
 import { useI18n } from "./i18n";
 import { Icon, type IconName } from "./icons";
 import { Loading } from "./Loading";
-import { CurrencyContext, DEFAULT_CURRENCY, Money, useMoneyText } from "./money";
+import { Coin, CurrencyContext, DEFAULT_CURRENCY, useMoneyText } from "./money";
 import { SealedBoosters } from "./SealedBoosters";
 import { Stats } from "./Stats";
 
@@ -95,10 +95,14 @@ function Resources({ wallet, income, floats }: { wallet: WalletView; income: Inc
   const sealed = wallet.sealed.reduce((n, s) => n + s.quantity, 0);
   return (
     <div className="resources">
-      <div className="res wallet" title={t("game.balanceTitle")}>
+      <div className="res" title={t("game.balanceTitle")}>
+        {/* The coin in its medallion before the amount, as the other resources have theirs. */}
+        <span className="ico coin-ico">
+          <Coin />
+        </span>
         {/* Keyed on the amount: it pulses each time it changes. */}
         <span key={wallet.balanceCents} className="v wallet-amount">
-          <Money cents={wallet.balanceCents} />
+          {formatNumber(toSeals(wallet.balanceCents))}
         </span>
         {income && (
           <span
@@ -130,26 +134,32 @@ function Resources({ wallet, income, floats }: { wallet: WalletView; income: Inc
           <span className="ico">
             <Icon name="gem" />
           </span>
-          <span className="v">
-            <Money cents={income.collectionValueCents} />
-          </span>
+          <span className="v">{formatNumber(toSeals(income.collectionValueCents))}</span>
         </div>
       )}
     </div>
   );
 }
 
-/** The keys at the bottom of the screen: what they do here. */
+/** The last bookmark of the rail: hovered (or focused), it shows in a small frame what the
+ * keys do on the screen shown. */
 function Keys({ hints }: { hints: [string, string][] }) {
+  const { t } = useI18n();
   return (
-    <footer className="keys">
-      {hints.map(([key, label]) => (
-        <span key={key}>
-          <kbd>{key}</kbd>
-          {label}
-        </span>
-      ))}
-    </footer>
+    <div className="rail-keys">
+      <button className="rail-tab" aria-label={t("keys.title")}>
+        <Icon name="keyboard" />
+      </button>
+      <div className="keys-pop frame" role="tooltip">
+        <div className="cartouche">{t("keys.title")}</div>
+        {hints.map(([key, label]) => (
+          <div key={key} className="keys-row">
+            <kbd>{key}</kbd>
+            <span>{label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -510,7 +520,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
       if (openNow) open(item.setCode, item.kind);
     });
 
-  // What the keys do on this screen (shown at the bottom).
+  // What the keys do on this screen (shown by the last bookmark of the rail).
   const opening = tab === "open" && !!(pack || batch);
   const hints: [string, string][] = [
     ["1–6", t("keys.tabs")],
@@ -526,7 +536,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
         ? [
             ["␣", t("keys.tear")],
             ["Q", t("keys.quick")],
-            ["Échap", t("keys.reserve")],
+            [t("keys.esc"), t("keys.reserve")],
           ]
       : opening
         ? [["␣", t("keys.nextCard")]]
@@ -538,7 +548,8 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
         : tab === "collection"
           ? [["← →", t("keys.turnPage")]]
           : []) as [string, string][]),
-    ...(detailsOf ? ([["Échap", t("keys.close")]] as [string, string][]) : []),
+    ...(detailsOf ? ([[t("keys.esc"), t("keys.close")]] as [string, string][]) : []),
+    ["F11", t("keys.fullscreen")],
   ];
 
   return (
@@ -591,6 +602,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
               </button>
             );
           })}
+          <Keys hints={hints} />
         </nav>
 
         <main className="stage" ref={stage}>
@@ -829,7 +841,6 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
         <BackToTop target={stage} />
         </main>
 
-        <Keys hints={hints} />
         <Ambience />
 
         <div className="toasts" aria-live="polite">

@@ -72,6 +72,9 @@ export interface CollectionView {
   /** The set's art cards (`foilQuantity`: their gold signed version): outside completion. */
   arts: CollectionCard[];
   artsOwned: number;
+  /** Cards of other sets its boosters give (Special Guests, The List…): outside completion. */
+  guests: CollectionCard[];
+  guestsOwned: number;
 }
 
 /** What the collection earns by itself. */
@@ -196,6 +199,8 @@ export interface LibraryBinder {
   tokensTotal: number;
   artsOwned: number;
   artsTotal: number;
+  guestsOwned: number;
+  guestsTotal: number;
   copies: number;
   foilCopies: number;
   /** Market value of every copy, and what the Boosterium would pay for them. */

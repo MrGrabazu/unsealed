@@ -173,7 +173,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
   async function sellExtras() {
     try {
       // What is about to go, read before the collection changes (shown in the sale's window).
-      const lines = view ? duplicatesOf([...view.cards, ...view.extras, ...view.tokens, ...view.arts]) : [];
+      const lines = view ? duplicatesOf([...view.cards, ...view.extras, ...view.tokens, ...view.arts, ...view.guests]) : [];
       const result = await sellDuplicates(setCode);
       if (result.soldCount > 0) {
         sounds.coins();
@@ -212,6 +212,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
   const shownExtras = view?.extras.filter(matches);
   const shownTokens = view?.tokens.filter(matches);
   const shownArts = view?.arts.filter(matches);
+  const shownGuests = view?.guests.filter(matches);
 
   const library = source === "library";
   const byArtist = source === "artists";
@@ -233,6 +234,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
               { title: t("collection.extras"), cards: view.extras },
               { title: t("collection.tokens"), cards: view.tokens },
               { title: t("collection.arts"), cards: view.arts },
+              { title: t("collection.guests"), cards: view.guests },
             ].filter((s) => s.cards.length > 0)
           : [],
     [byArtist, artistView, view, t],
@@ -342,9 +344,9 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
 
   const bar = (
     <>
-      {/* First row: what to show (left), the layout (right). Second row: the filters of the
-          view shown, on the left. */}
-      <div className="collection-bar">
+      {/* One row: what to show (left), the filters of the view shown (middle), the layout
+          (right). */}
+      <div className="collection-bar compact">
         <div className="segmented" role="group" aria-label={t("collection.source")}>
           <button className={library ? "active" : ""} onClick={() => setSource("library")}>
             {t("collection.library")}
@@ -356,21 +358,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
             {t("collection.byArtist")}
           </button>
         </div>
-        <div className="collection-bar-middle" />
-        <div className="collection-bar-right">
-          {!allSets && !library && (
-            <div className="segmented" role="group" aria-label={t("collection.layout")}>
-              <button className={layout === "binder" ? "active" : ""} onClick={() => changeLayout("binder")}>
-                {t("collection.layoutBinder")}
-              </button>
-              <button className={layout === "grid" ? "active" : ""} onClick={() => changeLayout("grid")}>
-                {t("collection.layoutGrid")}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-      <div className="controls collection-filters">
+        <div className="collection-bar-middle">
         {source === "sets" && (
           <select value={setCode} onChange={(e) => setSetCode(e.target.value)}>
             <option value={ALL_SETS}>{t("collection.allSets")}</option>
@@ -415,6 +403,19 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
             <option value="missing">{t("collection.missing")}</option>
           </select>
         )}
+        </div>
+        <div className="collection-bar-right">
+          {!allSets && !library && (
+            <div className="segmented" role="group" aria-label={t("collection.layout")}>
+              <button className={layout === "binder" ? "active" : ""} onClick={() => changeLayout("binder")}>
+                {t("collection.layoutBinder")}
+              </button>
+              <button className={layout === "grid" ? "active" : ""} onClick={() => changeLayout("grid")}>
+                {t("collection.layoutGrid")}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
       {error && <p className="error">{error}</p>}
       {notice && <p className="notice">{notice}</p>}
@@ -427,21 +428,6 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
       {!library && !(byArtist ? artistView : allSets ? ownedAll : view) && !error && <Loading label={t("collection.loading")} />}
       {byArtist && artistView && (
         <>
-          {progress && (
-            <>
-              <div className="progress">
-                <div className="progress-bar" style={{ width: `${progress.percent}%` }} />
-              </div>
-              <p className="progress-label">
-                <strong className="progress-section">{artistView.name} · </strong>
-                {t("collection.progress", {
-                  owned: progress.owned,
-                  total: progress.total,
-                  percent: progress.percent.toFixed(1),
-                })}
-              </p>
-            </>
-          )}
           {layout === "binder" ? (
             <Binder
               key={`artist:${artistView.name}`}
@@ -512,6 +498,15 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
                   <div className="collection-grid">{shownArts?.map(cardTile)}</div>
                 </>
               )}
+              {view.guests.length > 0 && (
+                <>
+                  <h3>{t("collection.guests")}</h3>
+                  <p className="progress-label">
+                    {t("collection.guestsProgress", { owned: view.guestsOwned, total: view.guests.length })}
+                  </p>
+                  <div className="collection-grid">{shownGuests?.map(cardTile)}</div>
+                </>
+              )}
             </>
           )}
         </>
@@ -519,11 +514,18 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
     </>
   );
 
+  // The cards of the completion panel: one set's, or one artist's across the sets.
+  const panelCards: CollectionCard[] | null = byArtist
+    ? (artistView?.cards ?? null)
+    : oneSet && view
+      ? [...view.cards, ...view.extras, ...view.tokens, ...view.arts, ...view.guests]
+      : null;
+
   const dialogs = (
     <>
-      {picking && view && (
+      {picking && panelCards && (
         <SellPicker
-          cards={[...view.cards, ...view.extras, ...view.tokens, ...view.arts]}
+          cards={panelCards}
           onSell={sellLines}
           onClose={() => setPicking(false)}
         />
@@ -535,7 +537,8 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
     </>
   );
 
-  if (!oneSet || !view) {
+  const panelName = byArtist ? artistView?.name : oneSet ? view?.setName : undefined;
+  if (!panelCards || panelName === undefined) {
     return (
       <section className="frame">
         <div className="cartouche">{t(library ? "collection.library" : byArtist ? "collection.byArtist" : "tab.collection")}</div>
@@ -546,13 +549,16 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
     );
   }
 
-  const set = sets.find((s) => s.code === view.setCode);
-  const every = [...view.cards, ...view.extras, ...view.tokens, ...view.arts];
-  const ownedValueCents = every.reduce((n, c) => n + c.quantity * (c.priceCents ?? 0) + c.foilQuantity * (c.foilPriceCents ?? 0), 0);
-  const resaleCents = every.reduce((n, c) => n + c.quantity * c.sellValueCents + c.foilQuantity * c.foilSellValueCents, 0);
-  const duplicatesCents = duplicatesOf(every).reduce((n, l) => n + l.quantity * l.unitCents, 0);
+  const set = view && !byArtist ? sets.find((s) => s.code === view.setCode) : undefined;
+  const ownedValueCents = panelCards.reduce((n, c) => n + c.quantity * (c.priceCents ?? 0) + c.foilQuantity * (c.foilPriceCents ?? 0), 0);
+  const resaleCents = panelCards.reduce((n, c) => n + c.quantity * c.sellValueCents + c.foilQuantity * c.foilSellValueCents, 0);
+  const duplicates = duplicatesOf(panelCards);
+  const duplicatesCents = duplicates.reduce((n, l) => n + l.quantity * l.unitCents, 0);
+  // A set's rows count its main cards (its tokens and arts have their own binder sections); an
+  // artist's count every card, tokens and arts included, as its completion does.
+  const rarityCards = byArtist ? panelCards : (view?.cards ?? []);
   const byRarity = (rarities: string[]) => {
-    const cards = view.cards.filter((c) => rarities.includes(c.rarity));
+    const cards = rarityCards.filter((c) => rarities.includes(c.rarity));
     return { owned: cards.filter((c) => c.quantity + c.foilQuantity > 0).length, total: cards.length };
   };
   const rows: [string, { owned: number; total: number }][] = (
@@ -562,29 +568,58 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
       [t("sell.rare"), byRarity(["rare"])],
       [t("sell.mythic"), byRarity(["mythic"])],
       [t("sell.other"), byRarity(["special", "bonus"])],
+      [t("collection.tokens"), byArtist ? byRarity(["token"]) : { owned: 0, total: 0 }],
+      [t("collection.arts"), byArtist ? byRarity(["art"]) : { owned: 0, total: 0 }],
     ] as [string, { owned: number; total: number }][]
   ).filter(([, r]) => r.total > 0);
   const percent = progress?.percent ?? 0;
+  // An artist's years: from their oldest card to their latest.
+  const years =
+    byArtist && artistView && artistView.cards.length > 0
+      ? [artistView.cards[0].releaseDate.slice(0, 4), artistView.cards[artistView.cards.length - 1].releaseDate.slice(0, 4)]
+      : null;
+  const initials = panelName
+    .split(/\s+/)
+    .filter((w) => /^\p{L}/u.test(w))
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join("");
+
+  async function sellPanelDuplicates() {
+    if (!byArtist) return sellExtras();
+    if (duplicates.length === 0) setNotice(t("collection.noDuplicates"));
+    else await sellLines(duplicates);
+  }
 
   return (
-    <div className="split collection-split">
+    // The whole screen scrolls (not the binder in its frame): the completion panel stays in
+    // view beside it.
+    <div className="split flow collection-split">
       <section className="frame">
-        <div className="cartouche">{view.setName}</div>
+        <div className="cartouche">{byArtist ? t("collection.byArtist") : view?.setName}</div>
         {bar}
-        <div className="scroll">{content}</div>
+        {content}
       </section>
       <aside className="frame set-side">
         <div className="cartouche">{t("collection.completion")}</div>
         <div className="scroll">
           <h2>
             <span className="medallion lg">
-              <SetIcon url={set?.iconUrl ?? null} name={view.setName} />
+              {byArtist ? <span className="initials">{initials}</span> : <SetIcon url={set?.iconUrl ?? null} name={panelName} />}
             </span>
-            {view.setName}
+            {panelName}
           </h2>
           <div className="meta">
-            {view.setCode}
-            {set && ` · ${set.releaseDate.slice(0, 4)}`}
+            {years
+              ? years[0] === years[1]
+                ? years[0]
+                : `${years[0]} – ${years[1]}`
+              : view && (
+                  <>
+                    {view.setCode}
+                    {set && ` · ${set.releaseDate.slice(0, 4)}`}
+                  </>
+                )}
           </div>
           <div className="ring" style={{ "--p": percent } as CSSProperties}>
             <b>{Math.floor(percent)} %</b>
@@ -609,12 +644,12 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
           </div>
         </div>
         <div className="buy-bar">
-          <button className="big" onClick={() => void sellExtras()} disabled={duplicatesCents === 0}>
+          <button className="big" onClick={() => void sellPanelDuplicates()} disabled={duplicatesCents === 0}>
             {tx("collection.sellDuplicatesFor", { amount: money(duplicatesCents) })}
           </button>
           <div className="ready-more">
             <button onClick={() => setPicking(true)}>{t("collection.sellMore")}</button>
-            <button onClick={() => onShop(view.setCode)}>{t("collection.buyBoosters")}</button>
+            {view && !byArtist && <button onClick={() => onShop(view.setCode)}>{t("collection.buyBoosters")}</button>}
           </div>
         </div>
       </aside>

@@ -12,7 +12,9 @@
     var(--corner-bl) bottom 3px left 3px / 18px no-repeat, var(--corner-br) bottom 3px right 3px / 18px no-repeat;
   --hud-h: 76px;
   --rail-w: 78px;
-  --keys-h: 48px;
+  /* No key bar any more (the keys are in the rail's last bookmark): kept at 0 for the
+     heights computed from it. */
+  --keys-h: 0px;
 }
 
 /* ---- scroll bars: thin gilded rods, faint until the pointer is over what they scroll ------ */
@@ -36,7 +38,20 @@
 
 .stage { position: absolute; z-index: 10; top: var(--hud-h); left: var(--rail-w); right: 0; bottom: var(--keys-h); overflow: auto; padding: 26px 22px 18px 24px; }
 /* A screen made of panels side by side: they scroll, the stage does not. */
-.stage:has(> .split) { overflow: hidden; }
+.stage:has(> .split:not(.flow)) { overflow: hidden; }
+/* Or, `flow`: the whole stage scrolls, the left panel at its full height, the right one sticky
+   beside it. */
+.split.flow { height: auto; align-items: start; }
+.split.flow > .frame { display: block; }
+/* Sticky offsets count from the stage's padding: top 0 lines it up with the list's frame. It
+   takes the visible height of the stage (not the page's), its content scrolling inside. */
+.split.flow > aside.frame { position: sticky; top: 0; height: calc(100vh - var(--hud-h) - var(--keys-h) - 44px); display: flex; flex-direction: column; }
+/* The collection's bar: one row, compact. */
+.collection-bar.compact { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 4px 0 14px; }
+.collection-bar.compact .collection-bar-middle { flex: 1 1 260px; display: flex; gap: 8px; min-width: 0; }
+.collection-bar.compact .collection-bar-middle select, .collection-bar.compact .collection-bar-middle input { flex: 0 1 auto; padding: 6px 10px; font-size: 14px; max-width: 240px; min-width: 90px; }
+.collection-bar.compact .segmented button { padding: 6px 12px; font-size: 12px; }
+.collection-bar.compact .collection-bar-right { margin-left: auto; }
 .split { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 18px; }
 .split > .frame { min-height: 0; display: flex; flex-direction: column; }
 .split > .frame > .scroll { flex: 1; min-height: 0; overflow: auto; margin: 0 -10px; padding: 6px 10px 0; }
@@ -57,6 +72,7 @@
   background: linear-gradient(180deg, #120b07, #1e140d); box-shadow: inset 0 2px 6px #000, 0 0 0 1px #6b4d2a, 0 0 0 2px #120b07, 0 0 0 3px #d9a44155; }
 .res .ico { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 35% 30%, #4a3220, #1d130c); box-shadow: inset 0 0 0 1px #d9a44177; }
 .res .ico .icon { width: 17px; height: 17px; fill: var(--gold-hi); }
+.res .coin-ico .coin { width: 20px; height: 20px; }
 .res .v { font: 800 17px var(--font-title); color: #fff1c7; }
 .res .v .money { gap: 7px; }
 .res .s { font: 700 12px var(--font-text); color: var(--accent); cursor: help; }
@@ -69,7 +85,7 @@ button.hud-tool:hover:not(:disabled) { box-shadow: 0 0 0 1px #000, 0 0 0 2px var
 button.hud-tool:hover .icon { fill: var(--gold-hi); }
 
 /* ---- the rail: leather bookmarks with engraved icons -------------------------------------- */
-.rail { position: absolute; z-index: 35; left: 0; top: var(--hud-h); bottom: var(--keys-h); width: var(--rail-w); padding-top: 22px; display: flex; flex-direction: column; gap: 8px;
+.rail { position: absolute; z-index: 35; left: 0; top: var(--hud-h); bottom: var(--keys-h); width: var(--rail-w); padding: 22px 0 18px; display: flex; flex-direction: column; gap: 8px;
   background: linear-gradient(90deg, #1a110a, #120c07); box-shadow: inset -1px 0 0 #000, inset -2px 0 0 #d9a44133, 6px 0 18px #0009; }
 button.rail-tab { position: relative; height: 62px; width: 66px; padding: 0; display: grid; place-items: center; border: none; border-radius: 0 8px 8px 0;
   background: var(--leather), linear-gradient(90deg, #2c1d13, #3a2618); box-shadow: inset 0 0 0 1px #6b4d2a, 0 3px 6px #000a; transition: width .15s; }
@@ -85,12 +101,18 @@ button.rail-tab.on .icon { fill: var(--gold-hi); filter: drop-shadow(0 0 4px #f5
   opacity: 0; transition: opacity .15s; }
 .rail-tab:hover .lbl, .rail-tab:focus-visible .lbl { opacity: 1; }
 
-/* ---- the keys at the bottom, like a console game ----------------------------------------- */
-.keys { position: absolute; z-index: 40; left: 0; right: 0; bottom: 0; height: var(--keys-h); display: flex; align-items: center; gap: 24px; padding: 0 22px 0 calc(var(--rail-w) + 22px);
-  background: linear-gradient(180deg, #1d130c, #0f0a06); box-shadow: inset 0 1px 0 #d9a44144, 0 -6px 16px #0009; font-size: 14px; color: #cdbb9b; white-space: nowrap; overflow: hidden; }
-.keys kbd { display: inline-grid; place-items: center; min-width: 26px; height: 24px; padding: 0 7px; margin-right: 7px; border-radius: 5px; font: 700 11px var(--font-title);
+/* ---- the keys: the rail's last bookmark, at its foot; hovered, a small frame lists them --- */
+.rail-keys { position: relative; margin-top: auto; }
+.rail-keys button.rail-tab { height: 50px; }
+.rail-keys button.rail-tab .icon { width: 30px; height: 30px; }
+/* `.rail-keys` first: `.frame`, declared later, would make it relative again. */
+.rail-keys .keys-pop { position: absolute; z-index: 50; left: calc(100% + 14px); bottom: 0; min-width: 240px; padding: 24px 18px 14px; display: grid; gap: 8px;
+  font-size: 14px; color: #cdbb9b; white-space: nowrap; pointer-events: none; opacity: 0; transform: translateX(-6px); transition: opacity .15s, transform .15s; }
+.rail-keys:hover .keys-pop, .rail-keys:focus-within .keys-pop { opacity: 1; transform: none; }
+.keys-pop .cartouche { font-size: 11px; }
+.keys-row { display: flex; align-items: center; gap: 10px; }
+.keys-pop kbd { display: inline-grid; place-items: center; min-width: 30px; height: 24px; padding: 0 7px; border-radius: 5px; font: 700 11px var(--font-title);
   color: #2a1606; background: linear-gradient(180deg, #f3e4c2, #cdb07a); box-shadow: inset 0 -2px 0 #8a6a3a, 0 2px 3px #000a; }
-.keys .notice-line { margin-left: auto; font-style: italic; color: #8a7558; font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---- ornate frame: filigree corners, a double gilded rule, a cartouche on top ------------ */
 .frame { position: relative; padding: 26px 18px 16px; background: var(--leather), linear-gradient(180deg, #2e1f15, #1f150e); border: 1px solid var(--edge); border-radius: 8px;
@@ -129,6 +151,7 @@ button.big:disabled { filter: grayscale(.6) brightness(.7); }
 .medallion .set-icon img { width: 19px; height: 19px; }
 .medallion.lg { width: 44px; height: 44px; }
 .medallion.lg .set-icon, .medallion.lg .set-icon img { width: 28px; height: 28px; }
+.medallion .initials { font-family: var(--font-title); font-weight: 700; font-size: 16px; color: #3a2410; letter-spacing: .02em; }
 
 /* ---- the Boosterium: illustrated slots, and the chosen set beside them -------------------- */
 .shop-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }

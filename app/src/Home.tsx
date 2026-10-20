@@ -3,6 +3,7 @@ import { Ambience } from "./Ambience";
 import { deleteSave, listSaves, listSets, loadGame, newGame, renameSave, type SaveInfo } from "./api";
 import { DataStatusBar, useDataStatus } from "./DataStatus";
 import { Footer } from "./Footer";
+import { quitApp } from "./fullscreen";
 import { useI18n } from "./i18n";
 import { Loading } from "./Loading";
 import { Logo } from "./Logo";
@@ -125,6 +126,7 @@ export function Home({ current, onPlay, onCurrentChanged, onOptions, onAbout }: 
           )}
           <button onClick={onOptions}>{t("home.options")}</button>
           <button onClick={onAbout}>{t("home.about")}</button>
+          <button onClick={() => void quitApp()}>{t("home.quit")}</button>
         </nav>
       )}
 

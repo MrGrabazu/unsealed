@@ -16,12 +16,14 @@ const PATHS = {
   dice:
     "M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2zm2.5 3a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm9 0a1.5 1.5 0 100 3 1.5 1.5 0 000-3zM12 10.5a1.5 1.5 0 100 3 1.5 1.5 0 000-3zM7.5 15a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm9 0a1.5 1.5 0 100 3 1.5 1.5 0 000-3z",
   undo: "M9 5L3 10l6 5v-3.5h6a3.5 3.5 0 010 7h-3v3h3a6.5 6.5 0 000-13H9V5z",
+  keyboard:
+    "M3 5h18a2 2 0 012 2v10a2 2 0 01-2 2H3a2 2 0 01-2-2V7a2 2 0 012-2zm1 3v2h2V8H4zm3.5 0v2h2V8h-2zm3.5 0v2h2V8h-2zm3.5 0v2h2V8h-2zM18 8v2h2V8h-2zM5.5 11.5v2h2v-2h-2zm3.5 0v2h2v-2H9zm3.5 0v2h2v-2h-2zm3.5 0v2h2v-2h-2zM7 15v2h10v-2H7z",
 } as const;
 
 export type IconName = keyof typeof PATHS;
 
-/** Icons drawn with holes (a die's pips). */
-const EVEN_ODD = new Set<IconName>(["dice"]);
+/** Icons drawn with holes (a die's pips, a keyboard's keys). */
+const EVEN_ODD = new Set<IconName>(["dice", "keyboard"]);
 
 export function Icon({ name, className }: { name: IconName; className?: string }) {
   return (

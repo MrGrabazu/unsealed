@@ -3,6 +3,7 @@ import { getDataInfo, type DataInfo } from "./api";
 import { DataStatusBar, useDataStatus } from "./DataStatus";
 import { CARD_LANGUAGES, LANGUAGES, useI18n, type CardLangSetting, type Lang } from "./i18n";
 import { Loading } from "./Loading";
+import { getFullscreen, setFullscreen } from "./fullscreen";
 import { getOpening3d, setOpening3d } from "./settings";
 import { getSoundOn, getVolume, setSoundOn, setVolume, sounds } from "./sound";
 
@@ -11,6 +12,7 @@ export function Options({ onBack }: { onBack: () => void }) {
   const { t, lang, setLang, cardLangSetting, setCardLangSetting, formatDate, formatNumber } = useI18n();
   const [info, setInfo] = useState<DataInfo | null>(null);
   const [opening3d, setOpening3dState] = useState(getOpening3d);
+  const [fullscreen, setFullscreenState] = useState(getFullscreen);
   const [soundOn, setSoundOnState] = useState(getSoundOn);
   const [volume, setVolumeState] = useState(getVolume);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +57,21 @@ export function Options({ onBack }: { onBack: () => void }) {
         ))}
       </select>
       <p className="hint">{t("options.cardLanguageHint")}</p>
+
+      <h3>{t("options.display")}</h3>
+      <select
+        value={fullscreen ? "fullscreen" : "windowed"}
+        onChange={(e) => {
+          const on = e.target.value === "fullscreen";
+          setFullscreenState(on);
+          void setFullscreen(on);
+        }}
+        aria-label={t("options.display")}
+      >
+        <option value="fullscreen">{t("options.fullscreen")}</option>
+        <option value="windowed">{t("options.windowed")}</option>
+      </select>
+      <p className="hint">{t("options.displayHint")}</p>
 
       <h3>{t("options.opening")}</h3>
       <label className="checkbox">

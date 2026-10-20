@@ -19,13 +19,16 @@ pub struct LibraryBinder {
     pub rares_total: usize,
     pub mythics_owned: usize,
     pub mythics_total: usize,
-    /// Distinct cards owned in the other sections (collector extras, tokens, art cards).
+    /// Distinct cards owned in the other sections (collector extras, tokens, art cards, guests
+    /// from other sets).
     pub extras_owned: usize,
     pub extras_total: usize,
     pub tokens_owned: usize,
     pub tokens_total: usize,
     pub arts_owned: usize,
     pub arts_total: usize,
+    pub guests_owned: usize,
+    pub guests_total: usize,
     /// Every copy in the binder, and those in foil.
     pub copies: u32,
     pub foil_copies: u32,
@@ -68,7 +71,7 @@ impl Game {
         let mut binders = Vec::new();
         for code in candidates.into_iter().filter(|c| offered.contains(c)) {
             let view = self.collection(&code)?;
-            let sections = [&view.cards, &view.extras, &view.tokens, &view.arts];
+            let sections = [&view.cards, &view.extras, &view.tokens, &view.arts, &view.guests];
             let owned = |c: &CollectionCard| c.quantity + c.foil_quantity > 0;
             if !sections.iter().any(|s| s.iter().any(owned)) {
                 continue;
@@ -103,6 +106,8 @@ impl Game {
                 tokens_total: view.tokens.len(),
                 arts_owned: view.arts_owned,
                 arts_total: view.arts.len(),
+                guests_owned: view.guests_owned,
+                guests_total: view.guests.len(),
                 copies: all().map(|c| c.quantity + c.foil_quantity).sum(),
                 foil_copies: all().map(|c| c.foil_quantity).sum(),
                 value_cents: all()

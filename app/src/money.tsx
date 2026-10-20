@@ -16,7 +16,7 @@ export const CurrencyContext = createContext<CurrencyRules>(DEFAULT_CURRENCY);
 const toSeals = (rules: CurrencyRules, cents: number) => Math.round(cents * rules.sealsPerCent);
 
 /** A wax-seal coin, drawn for Unsealed. */
-function Coin() {
+export function Coin() {
   return (
     <svg className="coin" viewBox="0 0 24 24" aria-hidden="true">
       <path

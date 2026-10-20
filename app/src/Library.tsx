@@ -33,7 +33,7 @@ interface Book {
 /** A binder's thickness follows its number of pages, as a real one would: from a slim
  * binder for a small set to a thick one for a set of several hundred cards. */
 function widthOf(b: LibraryBinder): number {
-  const pages = Math.ceil((b.totalCount + b.extrasTotal + b.tokensTotal + b.artsTotal) / PER_PAGE);
+  const pages = Math.ceil((b.totalCount + b.extrasTotal + b.tokensTotal + b.artsTotal + b.guestsTotal) / PER_PAGE);
   return Math.round(Math.max(34, Math.min(110, 26 + pages * 0.9)));
 }
 
@@ -208,6 +208,7 @@ function BinderTooltip({ book, x, y }: { book: Book; x: number; y: number }) {
   if (b.extrasTotal > 0) rows.push([t("collection.extras"), count(b.extrasOwned, b.extrasTotal)]);
   if (b.tokensTotal > 0) rows.push([t("collection.tokens"), count(b.tokensOwned, b.tokensTotal)]);
   if (b.artsTotal > 0) rows.push([t("collection.arts"), count(b.artsOwned, b.artsTotal)]);
+  if (b.guestsTotal > 0) rows.push([t("collection.guests"), count(b.guestsOwned, b.guestsTotal)]);
   rows.push(
     [t("library.copies"), t("library.copiesValue", { copies: formatNumber(b.copies), foil: formatNumber(b.foilCopies) })],
     [t("library.boosters"), formatNumber(b.boostersOpened)],

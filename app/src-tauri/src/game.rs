@@ -129,6 +129,9 @@ pub struct CollectionView {
     /// The set's art cards (`foil_quantity`: their gold signed version); outside completion.
     pub arts: Vec<CollectionCard>,
     pub arts_owned: usize,
+    /// Cards of other sets its boosters give (Special Guests, The List…); outside completion.
+    pub guests: Vec<CollectionCard>,
+    pub guests_owned: usize,
 }
 
 #[derive(Debug, Serialize)]
@@ -300,6 +303,9 @@ struct LoadedSet {
     tokens: Vec<usize>,
     /// The set's art cards (its art series): outside the completion target too.
     arts: Vec<usize>,
+    /// Cards of other sets its boosters give (Special Guests, The List, a commander set's
+    /// cards in collector boosters…): outside the completion target too.
+    guests: Vec<usize>,
 }
 
 pub struct Game {
@@ -775,6 +781,7 @@ impl Game {
         let extras = view(&set.extras);
         let tokens = view(&set.tokens);
         let arts = view(&set.arts);
+        let guests = view(&set.guests);
         let owned_count = owned_in(&cards);
         let total_count = cards.len();
         let completion_percent =
@@ -788,10 +795,12 @@ impl Game {
             extras_owned: owned_in(&extras),
             tokens_owned: owned_in(&tokens),
             arts_owned: owned_in(&arts),
+            guests_owned: owned_in(&guests),
             cards,
             extras,
             tokens,
             arts,
+            guests,
         })
     }
 
@@ -877,21 +886,24 @@ impl Game {
         Ok(SaleResult { sold_count, total_cents })
     }
 
-    /// Owned copies of a loaded set's cards, its tokens and art cards included: the collection
-    /// files each card under its own set, and those may have theirs ("TLTR", "ALTR").
+    /// Owned copies of a loaded set's cards, its tokens, art cards and guests included: the
+    /// collection files each card under its own set, and those may have theirs ("TLTR",
+    /// "ALTR", "SPG"). Only the cards of the set's file: another set's guests are not its own.
     fn owned_with_tokens(&self, set_code: &str) -> Result<HashMap<String, Owned>, String> {
         let mut owned = self.store.owned_in_set(set_code).map_err(err)?;
         let set = &self.sets[set_code];
-        let token_sets: HashSet<&str> = set
+        let other_sets: HashSet<&str> = set
             .tokens
             .iter()
             .chain(&set.arts)
+            .chain(&set.guests)
             .map(|&i| set.file.cards[i].set_code.as_str())
             .filter(|c| *c != set_code)
             .collect();
-        for code in token_sets {
+        for code in other_sets {
             owned.extend(self.store.owned_in_set(code).map_err(err)?);
         }
+        owned.retain(|uuid, _| set.index.contains_key(uuid));
         Ok(owned)
     }
 
@@ -1113,12 +1125,13 @@ impl Game {
         let (obtainable, extras) = obtainable_cards(&file);
         let tokens = cards_where(&file, |c| c.token);
         let arts = cards_where(&file, |c| c.art);
+        let guests = guest_cards(&file);
         for card in &file.cards {
             if let Some(run) = self.limited.print_run_of(card) {
                 self.print_runs.insert(card.uuid.clone(), run);
             }
         }
-        self.sets.insert(code.to_string(), LoadedSet { file, colors, index, obtainable, extras, tokens, arts });
+        self.sets.insert(code.to_string(), LoadedSet { file, colors, index, obtainable, extras, tokens, arts, guests });
         Ok(())
     }
 
@@ -1198,6 +1211,29 @@ fn obtainable_cards(file: &SetFile) -> (Vec<usize>, Vec<usize>) {
         indices
     };
     (pick(&|u| main.contains(u)), pick(&|u| collector.contains(u) && !main.contains(u)))
+}
+
+/// The cards of other sets the set's boosters give (Special Guests, The List…), by set then
+/// collector number. Tokens and art cards have their own sections.
+fn guest_cards(file: &SetFile) -> Vec<usize> {
+    let in_sheets: HashSet<&str> = file
+        .boosters
+        .values()
+        .flat_map(|cfg| cfg.sheets.values())
+        .flat_map(|sheet| sheet.cards.keys().map(String::as_str))
+        .collect();
+    let mut indices: Vec<usize> = file
+        .cards
+        .iter()
+        .enumerate()
+        .filter(|(_, c)| c.set_code != file.code && !c.token && !c.art && in_sheets.contains(c.uuid.as_str()))
+        .map(|(i, _)| i)
+        .collect();
+    indices.sort_by(|&a, &b| {
+        let (a, b) = (&file.cards[a], &file.cards[b]);
+        (a.set_code.as_str(), number_key(&a.number)).cmp(&(b.set_code.as_str(), number_key(&b.number)))
+    });
+    indices
 }
 
 /// The set's cards of a kind apart (`keep`: its tokens, its art cards), in collector number
@@ -1444,7 +1480,9 @@ mod tests {
         { "uuid": "t1", "setCode": "TTST", "scryfallId": "777777", "name": "Soldier", "number": "1",
           "rarity": "token", "finishes": ["nonfoil"], "layout": "token", "token": true },
         { "uuid": "t2", "setCode": "TST", "scryfallId": "888888", "name": "Spirit", "number": "2",
-          "rarity": "token", "finishes": ["nonfoil"], "layout": "token", "token": true }
+          "rarity": "token", "finishes": ["nonfoil"], "layout": "token", "token": true },
+        { "uuid": "g1", "setCode": "SPG", "scryfallId": "555555", "name": "Guest", "number": "159",
+          "rarity": "mythic", "finishes": ["nonfoil"], "layout": "normal" }
       ],
       "boosters": { "play": {
         "boosters": [ { "contents": { "mythic": 1, "common": 2 }, "weight": 1 } ],
@@ -1452,7 +1490,8 @@ mod tests {
         "sheets": {
           "common": { "allowDuplicates": true, "cards": { "c1": 1 }, "foil": false, "totalWeight": 1 },
           "mythic": { "cards": { "m1": 1 }, "foil": false, "totalWeight": 1 },
-          "unsealedToken": { "cards": { "t2": 1 }, "foil": false, "totalWeight": 1 }
+          "unsealedToken": { "cards": { "t2": 1 }, "foil": false, "totalWeight": 1 },
+          "specialGuest": { "cards": { "g1": 1 }, "foil": false, "totalWeight": 1 }
         },
         "sourceSetCodes": ["TST"] } } }"#;
 
@@ -1744,6 +1783,23 @@ mod tests {
         // found in its boosters' sheets.
         assert!(view.cards.iter().all(|c| !c.uuid.starts_with('t')));
         assert_eq!(view.total_count, 2);
+    }
+
+    #[test]
+    fn a_set_shows_the_guests_of_other_sets_its_boosters_give() {
+        let mut g = game_with_booster("guests");
+        // A Special Guest (filed under SPG, a set not offered) acquired as if pulled.
+        g.store
+            .open_sealed("TST", "play", &[OpeningCard { uuid: "g1", set_code: "SPG", foil: false, price_cents: None, limited: false }], 0)
+            .unwrap();
+        let view = g.collection("TST").unwrap();
+        let guests: Vec<(&str, u32)> = view.guests.iter().map(|c| (c.uuid.as_str(), c.quantity)).collect();
+        assert_eq!(guests, [("g1", 1)]);
+        assert_eq!(view.guests_owned, 1);
+        // Outside completion, but its binder is on the shelf.
+        assert_eq!((view.owned_count, view.total_count), (0, 2));
+        let shelf = g.library().unwrap();
+        assert_eq!(shelf.iter().map(|b| (b.set_code.as_str(), b.guests_owned)).collect::<Vec<_>>(), [("TST", 1)]);
     }
 
     #[test]

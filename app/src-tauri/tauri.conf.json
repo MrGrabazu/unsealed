@@ -17,6 +17,7 @@
         "height": 800,
         "minWidth": 820,
         "minHeight": 600,
+        "fullscreen": true,
         "backgroundColor": "#140d08"
       }
     ],
