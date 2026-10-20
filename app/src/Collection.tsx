@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   checkSetImages,
   getArtistCollection,
@@ -63,6 +63,7 @@ import { Loading } from "./Loading";
 import { duplicatesOf, SaleModal, type SoldLine } from "./SaleModal";
 import { sheenClass } from "./RevealedCards";
 import { SellPicker } from "./SellPicker";
+import { SetIcon } from "./SetIcon";
 import { Money, useMoney, useMoneyText } from "./money";
 import { getCollectionLayout, setCollectionLayout, type CollectionLayout } from "./settings";
 import { sounds } from "./sound";
@@ -336,10 +337,13 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
     );
   }
 
-  return (
-    <section>
-      {/* First row: what to show (left), the bulk sale (centred on the full width), the layout
-          (right). Second row: the filters of the view shown, on the left. */}
+  // One set's collection: its binder (or grid) beside a panel with its completion and sales.
+  const oneSet = source === "sets" && !allSets && !!view;
+
+  const bar = (
+    <>
+      {/* First row: what to show (left), the layout (right). Second row: the filters of the
+          view shown, on the left. */}
       <div className="collection-bar">
         <div className="segmented" role="group" aria-label={t("collection.source")}>
           <button className={library ? "active" : ""} onClick={() => setSource("library")}>
@@ -352,18 +356,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
             {t("collection.byArtist")}
           </button>
         </div>
-        <div className="collection-bar-middle">
-          {source === "sets" && !allSets && (
-            <>
-              <button className="primary" onClick={() => void sellExtras()}>
-                {t("collection.sellDuplicates")}
-              </button>
-              <button onClick={() => setPicking(true)} disabled={!view}>
-                {t("collection.sellMore")}
-              </button>
-            </>
-          )}
-        </div>
+        <div className="collection-bar-middle" />
         <div className="collection-bar-right">
           {!allSets && !library && (
             <div className="segmented" role="group" aria-label={t("collection.layout")}>
@@ -387,9 +380,6 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
               </option>
             ))}
           </select>
-        )}
-        {source === "sets" && !allSets && setCode && (
-          <button onClick={() => onShop(setCode)}>{t("collection.buyBoosters")}</button>
         )}
         {byArtist && (
           <>
@@ -426,9 +416,13 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
           </select>
         )}
       </div>
-
       {error && <p className="error">{error}</p>}
       {notice && <p className="notice">{notice}</p>}
+    </>
+  );
+
+  const content = (
+    <>
       {library && <Library sets={sets} refreshKey={refreshKey} onOpen={openBinder} />}
       {!library && !(byArtist ? artistView : allSets ? ownedAll : view) && !error && <Loading label={t("collection.loading")} />}
       {byArtist && artistView && (
@@ -479,21 +473,6 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
       )}
       {source === "sets" && !allSets && view && (
         <>
-          {progress && (
-            <>
-              <div className="progress">
-                <div className="progress-bar" style={{ width: `${progress.percent}%` }} />
-              </div>
-              <p className="progress-label">
-                {progress.label && <strong className="progress-section">{progress.label} · </strong>}
-                {t(progress.label ? "collection.sectionProgress" : "collection.progress", {
-                  owned: progress.owned,
-                  total: progress.total,
-                  percent: progress.percent.toFixed(1),
-                })}
-              </p>
-            </>
-          )}
           {layout === "binder" ? (
             <Binder
               key={view.setCode}
@@ -537,6 +516,11 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
           )}
         </>
       )}
+    </>
+  );
+
+  const dialogs = (
+    <>
       {picking && view && (
         <SellPicker
           cards={[...view.cards, ...view.extras, ...view.tokens, ...view.arts]}
@@ -548,6 +532,93 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
       {detailsSet && detailsOf && (
         <CardDetails setCode={detailsSet} uuid={detailsOf} onClose={() => setDetailsOf(null)} />
       )}
-    </section>
+    </>
+  );
+
+  if (!oneSet || !view) {
+    return (
+      <section className="frame">
+        <div className="cartouche">{t(library ? "collection.library" : byArtist ? "collection.byArtist" : "tab.collection")}</div>
+        {bar}
+        {content}
+        {dialogs}
+      </section>
+    );
+  }
+
+  const set = sets.find((s) => s.code === view.setCode);
+  const every = [...view.cards, ...view.extras, ...view.tokens, ...view.arts];
+  const ownedValueCents = every.reduce((n, c) => n + c.quantity * (c.priceCents ?? 0) + c.foilQuantity * (c.foilPriceCents ?? 0), 0);
+  const resaleCents = every.reduce((n, c) => n + c.quantity * c.sellValueCents + c.foilQuantity * c.foilSellValueCents, 0);
+  const duplicatesCents = duplicatesOf(every).reduce((n, l) => n + l.quantity * l.unitCents, 0);
+  const byRarity = (rarities: string[]) => {
+    const cards = view.cards.filter((c) => rarities.includes(c.rarity));
+    return { owned: cards.filter((c) => c.quantity + c.foilQuantity > 0).length, total: cards.length };
+  };
+  const rows: [string, { owned: number; total: number }][] = (
+    [
+      [t("sell.common"), byRarity(["common"])],
+      [t("sell.uncommon"), byRarity(["uncommon"])],
+      [t("sell.rare"), byRarity(["rare"])],
+      [t("sell.mythic"), byRarity(["mythic"])],
+      [t("sell.other"), byRarity(["special", "bonus"])],
+    ] as [string, { owned: number; total: number }][]
+  ).filter(([, r]) => r.total > 0);
+  const percent = progress?.percent ?? 0;
+
+  return (
+    <div className="split collection-split">
+      <section className="frame">
+        <div className="cartouche">{view.setName}</div>
+        {bar}
+        <div className="scroll">{content}</div>
+      </section>
+      <aside className="frame set-side">
+        <div className="cartouche">{t("collection.completion")}</div>
+        <div className="scroll">
+          <h2>
+            <span className="medallion lg">
+              <SetIcon url={set?.iconUrl ?? null} name={view.setName} />
+            </span>
+            {view.setName}
+          </h2>
+          <div className="meta">
+            {view.setCode}
+            {set && ` · ${set.releaseDate.slice(0, 4)}`}
+          </div>
+          <div className="ring" style={{ "--p": percent } as CSSProperties}>
+            <b>{Math.floor(percent)} %</b>
+            <small>
+              {progress?.owned ?? 0} / {progress?.total ?? 0}
+            </small>
+          </div>
+          {progress?.label && <div className="ring-label">{progress.label}</div>}
+          {rows.map(([label, r]) => (
+            <div key={label} className="ready-line">
+              <span>{label}</span>
+              <b>
+                {r.owned} / {r.total}
+              </b>
+            </div>
+          ))}
+          <div className="ready-line">
+            <span>{t("collection.valueResale")}</span>
+            <b>
+              <Money cents={ownedValueCents} /> · <Money cents={resaleCents} />
+            </b>
+          </div>
+        </div>
+        <div className="buy-bar">
+          <button className="big" onClick={() => void sellExtras()} disabled={duplicatesCents === 0}>
+            {tx("collection.sellDuplicatesFor", { amount: money(duplicatesCents) })}
+          </button>
+          <div className="ready-more">
+            <button onClick={() => setPicking(true)}>{t("collection.sellMore")}</button>
+            <button onClick={() => onShop(view.setCode)}>{t("collection.buyBoosters")}</button>
+          </div>
+        </div>
+      </aside>
+      {dialogs}
+    </div>
   );
 }

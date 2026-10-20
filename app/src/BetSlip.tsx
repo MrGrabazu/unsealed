@@ -33,6 +33,10 @@ interface Props {
   /** Names a card the slip knows (for the results of a bet on it). */
   onCardName: (uuid: string, name: string) => void;
   balanceCents: number;
+  /** In the opening screen's side panel: always unfolded, a new bet built on demand. */
+  panel?: boolean;
+  /** The pack is torn: the bets are placed, only shown. */
+  locked?: boolean;
 }
 
 const newCardsClause = (): Clause => ({ type: "cards", compare: "atLeast", count: 1, filter: {} });
@@ -41,10 +45,15 @@ const newCardsClause = (): Clause => ({ type: "cards", compare: "atLeast", count
  * on its cards (how many, of which rarity, type, colour, finish, treatment, price, or a given
  * card) or on its value, at odds from the real chances. As many bets as wanted; any can be
  * kept for the next boosters. Folded until opened. */
-export function BetSlip({ setCode, kind, bets, onBets, kept, onKept, onCardName, balanceCents }: Props) {
+export function BetSlip({ setCode, kind, bets, onBets, kept, onKept, onCardName, balanceCents, panel = false, locked = false }: Props) {
   const { t, plural, formatNumber } = useI18n();
   const moneyText = useMoneyText();
-  const [open, setOpen] = useState(bets.length > 0);
+  // Folded at first: the booster is what the screen shows; the folded slip still says how
+  // many bets are placed and what they stake. The side panel is always unfolded.
+  const [folded, setFolded] = useState(true);
+  const open = panel || !folded;
+  // In the panel: the builder of a new bet, shown on demand.
+  const [building, setBuilding] = useState(false);
   const [context, setContext] = useState<BetContext | null>(null);
   const [cards, setCards] = useState<CollectionCard[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -90,6 +99,7 @@ export function BetSlip({ setCode, kind, bets, onBets, kept, onKept, onCardName,
     if (card) onCardName(card, cardName(card));
     onBets([...bets, { bet, stakeCents }]);
     if (keep) setKeep({ bet, stakeCents }, true);
+    setBuilding(false);
   }
 
   function setKeep(request: BetRequest, on: boolean) {
@@ -121,9 +131,95 @@ export function BetSlip({ setCode, kind, bets, onBets, kept, onKept, onCardName,
   // What the active bets stake (the paused ones are not placed).
   const live = bets.filter((b) => b.active !== false);
   const total = live.reduce((sum, b) => sum + b.stakeCents, 0);
+
+  if (panel) {
+    const shown = locked ? live : bets;
+    return (
+      <div className={`bet-panel ${locked ? "locked" : ""}`}>
+        {!locked && <p className="hint">{margin === 0 ? t("bet.introFair") : t("bet.introMargin", { percent: margin })}</p>}
+        {error && <p className="error">{error}</p>}
+        {shown.length === 0 && <p className="hint">{t(locked ? "bet.emptyLocked" : "bet.empty")}</p>}
+        <ul className="bet-cards">
+          {shown.map((request) => {
+            const chance = chances[betKey(request.bet)];
+            const odds = chance?.probability ? oddsOf(chance.probability, margin) : null;
+            const active = request.active !== false;
+            return (
+              <li key={betKey(request.bet)} className={active ? "" : "paused"}>
+                {!locked && (
+                  <label className="bet-switch" title={t(active ? "bet.pauseHint" : "bet.playHint")}>
+                    <input type="checkbox" checked={active} onChange={(e) => setActive(request, e.target.checked)} />
+                    <span />
+                  </label>
+                )}
+                <span className="bet-card-name">
+                  {describe(request.bet)}
+                  {locked && isKept(request.bet) && <span className="bet-pin"> 📌</span>}
+                </span>
+                <span className="bet-odds">
+                  {chance === undefined ? "…" : odds == null ? t("bet.unpriced") : formatOdds(odds, formatNumber)}
+                </span>
+                <span className="bet-card-sub">
+                  {locked ? (
+                    <>
+                      {t("bet.stake")} <Money cents={request.stakeCents} />
+                    </>
+                  ) : (
+                    <StakeInput value={request.stakeCents} onChange={(c) => setStake(request, c)} />
+                  )}
+                  {odds != null && (
+                    <>
+                      {" "}
+                      → <Money cents={Math.floor(request.stakeCents * odds)} />
+                    </>
+                  )}
+                  {chance?.probability != null && <> · {formatNumber(Math.round(chance.probability * 1000) / 10)} %</>}
+                </span>
+                {!locked && (
+                  <span className="bet-card-tools">
+                    <label className="bet-keep" title={t("bet.keepHint")}>
+                      <input type="checkbox" checked={isKept(request.bet)} onChange={(e) => setKeep(request, e.target.checked)} />
+                      📌
+                    </label>
+                    <button
+                      className="bet-remove"
+                      onClick={() => onBets(bets.filter((b) => betKey(b.bet) !== betKey(request.bet)))}
+                      aria-label={t("bet.remove")}
+                      title={t("bet.remove")}
+                    >
+                      ×
+                    </button>
+                  </span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+        {!locked && total > balanceCents && <p className="hint">{t("bet.tooMuch")}</p>}
+        {!locked &&
+          (building && context ? (
+            <div className="bet-building">
+              <BetBuilder setCode={setCode} kind={kind} context={context} cards={cards} cardName={cardName} describe={describe} onAdd={add} />
+              <button onClick={() => setBuilding(false)}>{t("common.cancel")}</button>
+            </div>
+          ) : (
+            <button className="bet-add" onClick={() => setBuilding(true)} disabled={!context}>
+              + {t("bet.new")}
+            </button>
+          ))}
+        <div className="bet-total">
+          <span>{plural("bet.count", live.length)}</span>
+          <b>
+            <Money cents={total} />
+          </b>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <section className={`bet-slip ${open ? "open" : ""}`}>
-      <button className="bet-slip-toggle" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+      <button className="bet-slip-toggle" onClick={() => setFolded((f) => !f)} aria-expanded={open}>
         <span>🎲 {t("bet.title")}</span>
         {bets.length > 0 && (
           <span className="hint">

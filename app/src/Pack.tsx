@@ -27,7 +27,7 @@ const TOP_EDGE = crimp(18, "top");
 const BOTTOM_EDGE = crimp(18, "bottom");
 
 /** A colour per set, so each wrapper looks different (stable for a set). */
-function hueOf(code: string): number {
+export function hueOf(code: string): number {
   let h = 0;
   for (const c of code) h = (h * 31 + c.charCodeAt(0)) % 360;
   return h;

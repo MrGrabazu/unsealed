@@ -443,16 +443,23 @@ pub fn featured_card(set: &SetFile, prices: &BTreeMap<String, PriceSet>) -> Opti
         "rare" => 1,
         _ => 0,
     };
-    let candidates = set
-        .cards
-        .iter()
-        .filter(|c| c.set_code == set.code && !c.token && c.artist.is_some() && in_main.contains(c.uuid.as_str()));
+    let in_main = &in_main;
+    let candidates = |own_only: bool| {
+        set.cards.iter().filter(move |c| {
+            (!own_only || c.set_code == set.code) && !c.token && c.artist.is_some() && in_main.contains(c.uuid.as_str())
+        })
+    };
     // Highest price, then highest rarity, then lowest collector number.
-    let best = candidates.min_by(|a, b| {
-        (price(b), rank(b))
-            .cmp(&(price(a), rank(a)))
-            .then_with(|| number_order(&a.number).cmp(&number_order(&b.number)))
-    })?;
+    let pick = |own_only: bool| {
+        candidates(own_only).min_by(|a, b| {
+            (price(b), rank(b))
+                .cmp(&(price(a), rank(a)))
+                .then_with(|| number_order(&a.number).cmp(&number_order(&b.number)))
+        })
+    };
+    // The set's own cards, or else those it reprints from other sets (the Mystery Boosters
+    // hold nothing but reprints, filed under "PLST" and others).
+    let best = pick(true).or_else(|| pick(false))?;
     Some(FeaturedCard {
         scryfall_id: best.scryfall_id.clone(),
         name: best.name.clone(),

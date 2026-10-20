@@ -1,8 +1,9 @@
-import { Fragment, useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getPinnedSets, setPinnedSets, type SetSummary, type ShopItem, type WalletView } from "./api";
+import { BackToTop } from "./BackToTop";
 import { kindLabel, kindRank } from "./boosterKinds";
 import { useI18n } from "./i18n";
-import { useMoney, useMoneyText } from "./money";
+import { Money, useMoney, useMoneyText } from "./money";
 import { PriceTrend } from "./PriceTrend";
 import { SetIcon } from "./SetIcon";
 
@@ -10,16 +11,20 @@ interface Props {
   shop: ShopItem[];
   sets: SetSummary[];
   wallet: WalletView;
-  onBuy: (item: ShopItem, quantity: number) => void;
-  onBuyAndOpen: (item: ShopItem) => void;
+  /** Buys `quantity` boosters, and opens one of them at once with `openNow`. */
+  onBuy: (item: ShopItem, quantity: number, openNow: boolean) => void;
   onClaimCharity: () => void;
   busy: boolean;
-  /** A set to show, open, on arrival (from its collection); `at` tells two requests apart. */
+  /** A set to show on arrival (from its collection); `at` tells two requests apart. */
   focus?: { setCode: string; at: number } | null;
 }
 
 /** Budget filter choices, in cents (0 = any price). */
 const PRICE_LIMITS = [0, 1_000, 2_500, 5_000];
+/** Largest number of boosters bought at once (as the game allows). */
+const MAX_QUANTITY = 100;
+/** A set released this recently is new. */
+const NEW_FOR_DAYS = 45;
 
 interface SetGroup {
   set: SetSummary;
@@ -27,25 +32,21 @@ interface SetGroup {
   products: ShopItem[];
 }
 
-/** The shop: buy sealed boosters, and ask for help when truly stranded. */
-export function Boosterium({
-  shop,
-  sets,
-  wallet,
-  onBuy,
-  onBuyAndOpen,
-  onClaimCharity,
-  busy,
-  focus,
-}: Props) {
+/** The shop, laid out like a game's: every set as an illustrated slot (the favourites
+ * first), and the chosen one beside them with its boosters and a single way to buy. */
+export function Boosterium({ shop, sets, wallet, onBuy, onClaimCharity, busy, focus }: Props) {
   const money = useMoney();
   const moneyText = useMoneyText();
-  const { t, tx, plural } = useI18n();
+  const { t, tx } = useI18n();
   const [search, setSearch] = useState("");
   const [year, setYear] = useState("all");
   const [maxPrice, setMaxPrice] = useState(0);
-  const [open, setOpen] = useState<Set<string>>(new Set());
-  // Sets pinned at the top of the list (kept in the game).
+  const [chosen, setChosen] = useState<string | null>(null);
+  const [kind, setKind] = useState<string | null>(null);
+  const [quantity, setQuantity] = useState(1);
+  const [openNow, setOpenNow] = useState(false);
+  const list = useRef<HTMLDivElement>(null);
+  // Sets pinned as favourites (kept in the game).
   const [pinned, setPinned] = useState<string[]>([]);
   useEffect(() => {
     getPinnedSets()
@@ -57,180 +58,233 @@ export function Boosterium({
     setPinned(next);
     setPinnedSets(next).catch(() => {});
   };
-  const canAfford = (item: ShopItem, quantity: number) => wallet.balanceCents >= item.priceCents * quantity;
 
-  // Arriving for one set: no filter hides it, its products are open and in view.
+  // Arriving for one set: no filter hides it, it is the one chosen, and in view.
   useEffect(() => {
     if (!focus) return;
     setSearch("");
     setYear("all");
     setMaxPrice(0);
-    setOpen(new Set([focus.setCode]));
+    setChosen(focus.setCode);
     requestAnimationFrame(() =>
-      document.getElementById(`shop-set-${focus.setCode}`)?.scrollIntoView({ block: "start", behavior: "smooth" }),
+      document.getElementById(`shop-set-${focus.setCode}`)?.scrollIntoView({ block: "center", behavior: "smooth" }),
     );
   }, [focus]);
 
-  const inBudget = (item: ShopItem) => maxPrice === 0 || item.priceCents <= maxPrice;
   const years = [...new Set(sets.map((s) => s.releaseDate.slice(0, 4)))];
-  // `sets` comes newest first.
   const query = search.trim().toLowerCase();
-  const groups: SetGroup[] = sets
-    .filter((set) => year === "all" || set.releaseDate.startsWith(year))
-    .filter(
-      (set) =>
-        !query ||
-        set.name.toLowerCase().includes(query) ||
-        set.englishName.toLowerCase().includes(query) ||
-        set.code.toLowerCase() === query,
-    )
-    .map((set) => ({
-      set,
-      products: shop
-        .filter((item) => item.setCode === set.code && inBudget(item))
-        .sort((a, b) => kindRank(a.kind) - kindRank(b.kind) || a.kind.localeCompare(b.kind)),
-    }))
-    .filter((g) => g.products.length > 0);
-  // The favourites in a section of their own above the others, both newest first.
+  // `sets` comes newest first.
+  const groups: SetGroup[] = useMemo(
+    () =>
+      sets
+        .filter((set) => year === "all" || set.releaseDate.startsWith(year))
+        .filter(
+          (set) =>
+            !query ||
+            set.name.toLowerCase().includes(query) ||
+            set.englishName.toLowerCase().includes(query) ||
+            set.code.toLowerCase() === query,
+        )
+        .map((set) => ({
+          set,
+          products: shop
+            .filter((item) => item.setCode === set.code && (maxPrice === 0 || item.priceCents <= maxPrice))
+            .sort((a, b) => kindRank(a.kind) - kindRank(b.kind) || a.kind.localeCompare(b.kind)),
+        }))
+        .filter((g) => g.products.length > 0),
+    [sets, shop, year, query, maxPrice],
+  );
   const favorites = groups.filter((g) => pinned.includes(g.set.code));
   const others = groups.filter((g) => !pinned.includes(g.set.code));
 
-  const toggle = (code: string) =>
-    setOpen((current) => {
-      const next = new Set(current);
-      if (!next.delete(code)) next.add(code);
-      return next;
-    });
+  // The chosen set: the one picked, else the first favourite, else the newest.
+  const current = groups.find((g) => g.set.code === chosen) ?? favorites[0] ?? others[0] ?? null;
+  const item = current?.products.find((p) => p.kind === kind) ?? current?.products[0] ?? null;
+  const total = item ? item.priceCents * quantity : 0;
+  const affordable = !!item && wallet.balanceCents >= total;
+  const buy = () => item && affordable && !busy && onBuy(item, quantity, openNow);
+
+  // Enter buys; + and − change the quantity; F makes the set a favourite (not while typing).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(target.tagName)) return;
+      if (e.key === "Enter") buy();
+      else if (e.key === "+") setQuantity((q) => Math.min(MAX_QUANTITY, q + 1));
+      else if (e.key === "-") setQuantity((q) => Math.max(1, q - 1));
+      else if (e.key.toLowerCase() === "f" && current) togglePin(current.set.code);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  const today = Date.now();
+  const isNew = (set: SetSummary) => (today - Date.parse(set.releaseDate)) / 86_400_000 < NEW_FOR_DAYS;
+
+  const slot = ({ set, products }: SetGroup) => {
+    const cheapest = Math.min(...products.map((p) => p.priceCents));
+    const favorite = pinned.includes(set.code);
+    return (
+      <button
+        key={set.code}
+        id={`shop-set-${set.code}`}
+        className={`slot ${current?.set.code === set.code ? "sel" : ""}`}
+        onClick={() => {
+          setChosen(set.code);
+          setKind(null);
+          setQuantity(1);
+        }}
+      >
+        {set.art ? (
+          <img className="slot-art" src={set.art.imageUrl} alt="" draggable={false} />
+        ) : (
+          <span className="slot-symbol">
+            <SetIcon url={set.iconUrl} name={set.name} />
+          </span>
+        )}
+        {isNew(set) && <span className="slot-new">{t("shop.new")}</span>}
+        <span className="slot-top">
+          <span className="medallion">
+            <SetIcon url={set.iconUrl} name={set.name} />
+          </span>
+          <span
+            className={`star-toggle ${favorite ? "on" : ""}`}
+            role="switch"
+            aria-checked={favorite}
+            title={t(favorite ? "shop.unpin" : "shop.pin")}
+            onClick={(e) => {
+              e.stopPropagation();
+              togglePin(set.code);
+            }}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 2.6l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17.2l-5.9 3.2 1.3-6.5-4.9-4.5 6.6-.8z" />
+            </svg>
+          </span>
+        </span>
+        <span className="slot-plate">
+          <b>{set.name}</b>
+          <span>{tx("shop.from", { amount: money(cheapest) })}</span>
+        </span>
+      </button>
+    );
+  };
 
   return (
-    <section>
-      {wallet.charity.available && (
-        <div className="charity">
-          <p>{tx("shop.charity", { amount: money(wallet.charity.amountCents) })}</p>
-          <button className="primary" onClick={onClaimCharity} disabled={busy}>
-            {tx("shop.charityAccept", { amount: money(wallet.charity.amountCents) })}
-          </button>
+    <div className="split">
+      <section className="frame">
+        <div className="cartouche">{t("shop.boutique")}</div>
+        {wallet.charity.available && (
+          <div className="charity">
+            <p>{tx("shop.charity", { amount: money(wallet.charity.amountCents) })}</p>
+            <button className="primary" onClick={onClaimCharity} disabled={busy}>
+              {tx("shop.charityAccept", { amount: money(wallet.charity.amountCents) })}
+            </button>
+          </div>
+        )}
+        <div className="shop-tools">
+          <input type="search" placeholder={t("shop.search")} value={search} onChange={(e) => setSearch(e.target.value)} />
+          <select value={year} onChange={(e) => setYear(e.target.value)}>
+            <option value="all">{t("shop.allYears")}</option>
+            {years.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
+          <select value={maxPrice} onChange={(e) => setMaxPrice(Number(e.target.value))}>
+            {PRICE_LIMITS.map((limit) => (
+              <option key={limit} value={limit}>
+                {/* An <option> holds text only: the amount is written out. */}
+                {limit === 0 ? t("shop.anyPrice") : t("shop.under", { amount: moneyText(limit) })}
+              </option>
+            ))}
+          </select>
         </div>
-      )}
+        <div className="scroll" ref={list}>
+          {groups.length === 0 && <p className="hint">{t("shop.noMatch")}</p>}
+          {favorites.length > 0 && (
+            <>
+              <h3 className="shelf-title">★ {t("shop.favorites")}</h3>
+              <div className="slots">{favorites.map(slot)}</div>
+              {others.length > 0 && <h3 className="shelf-title">{t("shop.allSets")}</h3>}
+            </>
+          )}
+          <div className="slots">{others.map(slot)}</div>
+          <BackToTop target={list} />
+        </div>
+      </section>
 
-      <h2>Boosterium</h2>
-      <p className="hint">{t("shop.intro")}</p>
-
-      <div className="controls">
-        <input type="search" placeholder={t("shop.search")} value={search} onChange={(e) => setSearch(e.target.value)} />
-        <select value={year} onChange={(e) => setYear(e.target.value)}>
-          <option value="all">{t("shop.allYears")}</option>
-          {years.map((y) => (
-            <option key={y} value={y}>
-              {y}
-            </option>
-          ))}
-        </select>
-        <select value={maxPrice} onChange={(e) => setMaxPrice(Number(e.target.value))}>
-          {PRICE_LIMITS.map((limit) => (
-            <option key={limit} value={limit}>
-              {/* An <option> holds text only: the amount is written out. */}
-              {limit === 0 ? t("shop.anyPrice") : t("shop.under", { amount: moneyText(limit) })}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="shop">
-        {groups.length === 0 && <p className="hint">{t("shop.noMatch")}</p>}
-        {[...favorites, ...others].map(({ set, products }, index) => {
-          const expanded = open.has(set.code);
-          const isPinned = pinned.includes(set.code);
-          const cheapest = Math.min(...products.map((p) => p.priceCents));
-          return (
-            <Fragment key={set.code}>
-              {favorites.length > 0 && index === 0 && <h3 className="shop-section">{t("shop.favorites")}</h3>}
-              {favorites.length > 0 && index === favorites.length && (
-                <h3 className="shop-section">{t("shop.allSets")}</h3>
-              )}
-            <div id={`shop-set-${set.code}`} className={`shop-set ${expanded ? "open" : ""}`}>
-              <div className="shop-set-head">
-              {/* Beside the header, not in it: a button cannot hold another one. */}
-              <button
-                className={`shop-star ${isPinned ? "on" : ""}`}
-                onClick={() => togglePin(set.code)}
-                title={t(isPinned ? "shop.unpin" : "shop.pin")}
-                aria-label={t(isPinned ? "shop.unpin" : "shop.pin")}
-                aria-pressed={isPinned}
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M12 2.6l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17.2l-5.9 3.2 1.3-6.5-4.9-4.5 6.6-.8z" />
-                </svg>
-              </button>
-              <button
-                className={`shop-set-header ${set.art ? "with-art" : ""}`}
-                onClick={() => toggle(set.code)}
-                aria-expanded={expanded}
-              >
-                {/* Scryfall: an art crop is shown unaltered (no blur, no filter, full opacity), with
-                    its artist credited on the row. A fade of the panel colour covers its left edge so
-                    the text stays readable; the image itself is never recoloured. */}
-                {set.art && (
-                  <>
-                    <img className="shop-art-bg" src={set.art.imageUrl} alt="" aria-hidden="true" draggable={false} />
-                    <span className="shop-fade" aria-hidden="true" />
-                  </>
-                )}
-                <span className="shop-chevron">{expanded ? "▾" : "▸"}</span>
-                <span className="shop-set-title">
-                  <span className="shop-name">
-                    <SetIcon url={set.iconUrl} name={set.name} /> {set.name}
-                  </span>
-                  <span className="hint">
-                    {set.code} · {t("shop.released", { date: set.releaseDate })} ·{" "}
-                    {plural("shop.boosterTypes", products.length)}
-                  </span>
-                  {set.art && (
-                    <span className="shop-credit">
-                      {t("art.credit", { card: set.art.cardName, artist: set.art.artist })}
-                    </span>
-                  )}
-                </span>
-                <span className="shop-from">{tx("shop.from", { amount: money(cheapest) })}</span>
-              </button>
-              </div>
-
-              {expanded && (
-                <div className="shop-products">
-                  {products.map((item) => (
-                    <div key={`${item.setCode}/${item.kind}`} className="shop-row">
-                      <div>
-                        <div className="shop-name">{kindLabel(t, item.kind)}</div>
-                        <div className="hint">{tx("shop.sellsBack", { amount: money(item.sellBackCents) })}</div>
-                      </div>
-                      <PriceTrend history={item.history} />
-                      <div className="shop-price" title={t("shop.priceTitle")}>
-                        {money(item.priceCents)}
-                      </div>
-                      <div className="shop-actions">
-                        <button onClick={() => onBuy(item, 1)} disabled={busy || !canAfford(item, 1)}>
-                          {t("shop.buy", { count: 1 })}
-                        </button>
-                        <button onClick={() => onBuy(item, 10)} disabled={busy || !canAfford(item, 10)}>
-                          {t("shop.buy", { count: 10 })}
-                        </button>
-                        <button
-                          className="primary"
-                          onClick={() => onBuyAndOpen(item)}
-                          disabled={busy || !canAfford(item, 1)}
-                        >
-                          {t("shop.buyAndOpen")}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+      <section className="frame set-detail">
+        {current && item ? (
+          <>
+            <div className="cartouche">{current.set.name}</div>
+            <div className="scroll">
+            {/* Scryfall: an art crop is shown unaltered, its artist credited beside it. */}
+            <div className="set-plate-art">
+              {current.set.art ? (
+                <img className="art" src={current.set.art.imageUrl} alt="" draggable={false} />
+              ) : (
+                <SetIcon url={current.set.iconUrl} name={current.set.name} />
               )}
             </div>
-            </Fragment>
-          );
-        })}
-      </div>
-    </section>
+            {current.set.art && (
+              <div className="shop-credit" style={{ marginTop: 6 }}>
+                {t("art.credit", { card: current.set.art.cardName, artist: current.set.art.artist })}
+              </div>
+            )}
+            <h2>
+              <span className="medallion">
+                <SetIcon url={current.set.iconUrl} name={current.set.name} />
+              </span>
+              {current.set.name}
+            </h2>
+            <div className="meta">
+              {current.set.code} · {t("shop.released", { date: current.set.releaseDate })}
+            </div>
+            <div className="gild-divider" />
+            {current.products.map((p) => (
+              <button key={p.kind} className={`product ${p.kind === item.kind ? "sel" : ""}`} onClick={() => setKind(p.kind)}>
+                <b>{kindLabel(t, p.kind)}</b>
+                <span className="p" title={t("shop.priceTitle")}>
+                  <Money cents={p.priceCents} />
+                </span>
+                <small>{tx("shop.sellsBack", { amount: money(p.sellBackCents) })}</small>
+                <PriceTrend history={p.history} />
+              </button>
+            ))}
+            </div>
+            <div className="buy-bar">
+              <div className="buy-row">
+                <span className="stepper">
+                  <button onClick={() => setQuantity((q) => Math.max(1, q - 1))} disabled={quantity <= 1} aria-label="−">
+                    −
+                  </button>
+                  <input
+                    type="number"
+                    min={1}
+                    max={MAX_QUANTITY}
+                    value={quantity}
+                    onChange={(e) => setQuantity(Math.min(MAX_QUANTITY, Math.max(1, Math.floor(Number(e.target.value) || 1))))}
+                  />
+                  <button onClick={() => setQuantity((q) => Math.min(MAX_QUANTITY, q + 1))} disabled={quantity >= MAX_QUANTITY} aria-label="+">
+                    +
+                  </button>
+                </span>
+                <label className="tick">
+                  <input type="checkbox" checked={openNow} onChange={(e) => setOpenNow(e.target.checked)} />
+                  {t("shop.openNow")}
+                </label>
+              </div>
+              <button className="big" disabled={busy || !affordable} onClick={buy}>
+                {tx("shop.buyFor", { amount: money(total) })}
+              </button>
+            </div>
+          </>
+        ) : (
+          <p className="hint">{t("shop.noMatch")}</p>
+        )}
+      </section>
+    </div>
   );
 }

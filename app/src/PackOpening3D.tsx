@@ -3,8 +3,9 @@ import type { OpenedCard, SetSummary } from "./api";
 import { kindLabel } from "./boosterKinds";
 import { SellBoosterButton, useBoosterSale } from "./BoosterSale";
 import { useI18n } from "./i18n";
-import { useMoney } from "./money";
-import { RevealedCards } from "./RevealedCards";
+import { CardImage } from "./CardImage";
+import { Money, useMoney } from "./money";
+import { RevealedCards, sheenClass } from "./RevealedCards";
 import { PackScene } from "./scene/PackScene";
 
 interface Props {
@@ -17,6 +18,10 @@ interface Props {
   onDetails: (card: OpenedCard) => void;
   /** Cards of the booster were sold (the wallet changed). */
   onSold: () => void;
+  /** The last card has left the scene: the game shows the booster's result. */
+  onFinished?: () => void;
+  /** Bumped to tear the pack open without touching it. */
+  tearRequest?: number;
 }
 
 /** A colour per set, the same as the classic wrapper's. */
@@ -29,7 +34,7 @@ function hueOf(code: string): number {
 /** Opening one booster in the 3D scene: tear the pack, then slide the cards off the pile one
  * by one. Once the last card has left, the scene gives way to the list of the cards, and a
  * click on one shows its details. */
-export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onDetails, onSold }: Props) {
+export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onDetails, onSold, onFinished, tearRequest = 0 }: Props) {
   const { t, tx } = useI18n();
   const money = useMoney();
   const sale = useBoosterSale(cards, onSold);
@@ -66,6 +71,10 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
     if (cards) onReveal(finished ? total : top + 1);
   }, [cards, top, finished]);
 
+  useEffect(() => {
+    if (cards && finished) onFinished?.();
+  }, [cards, finished]);
+
   // Space slides the top card off.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -98,6 +107,10 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
 
       {!finished && (
         <>
+          {/* The cards already seen line up in a column over the scene's right edge, the latest
+              on top: laid over it, they take no room (below it, they made it shrink card after
+              card; beside it, they pushed the pack off centre). */}
+          <div className="scene-row">
           <div className="scene-frame">
             <PackScene
               key={attempt}
@@ -105,6 +118,7 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
               cards={cards}
               top={top}
               slideRequest={slideRequest}
+              tearRequest={tearRequest}
               onNext={() => setTop((n) => Math.min(n + 1, total - 1))}
               onFinished={() => setFinished(true)}
               onTorn={() => {
@@ -118,6 +132,21 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
               }}
             />
           </div>
+          {seen.length > 0 && (
+            <div className="seen-strip" aria-label={t("open.revealed", { revealed: seen.length, total })}>
+              {[...seen].reverse().map((card, i) => (
+                <button key={seen.length - i} className={`seen-card ${card.rarity}`} onClick={() => onDetails(card)} title={card.name}>
+                  <span className="thumb">
+                    <CardImage front={card.imageUrl} back={card.backImageUrl} alt={card.name} />
+                    {card.foil && <span className={sheenClass(card.rarity)} />}
+                    {card.isNew && <span className="badge-new">{t("open.new")}</span>}
+                  </span>
+                  <span className="seen-price">{card.priceCents == null ? "—" : <Money cents={card.priceCents} estimated={card.priceEstimated} />}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          </div>
           <p className="hint scene-hint">{!cards ? t("scene.shakeHint") : t("scene.peelHint")}</p>
           {set?.art && !cards && (
             <p className="shop-credit">{t("art.credit", { card: set.art.cardName, artist: set.art.artist })}</p>
@@ -126,9 +155,7 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
       )}
       {finished && <p className="hint scene-hint">{t("open.details")}</p>}
 
-      {seen.length > 0 && (
-        <RevealedCards cards={seen} final={finished} onDetails={onDetails} sale={finished ? sale : undefined} />
-      )}
+      {finished && seen.length > 0 && <RevealedCards cards={seen} final onDetails={onDetails} sale={sale} />}
     </section>
   );
 }

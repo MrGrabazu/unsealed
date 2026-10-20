@@ -1,36 +1,19 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { getStats, type OpenedCard, type OpeningView, type StatsView } from "./api";
 import { kindLabel } from "./boosterKinds";
-import { Card } from "./Card";
+import { CardImage } from "./CardImage";
 import { useI18n } from "./i18n";
 import { Loading } from "./Loading";
-import { useMoney } from "./money";
+import { Money, useMoney, useMoneyText } from "./money";
+import { sheenClass } from "./RevealedCards";
 
-const noop = () => {};
-
-function Tile({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
+/** A big number in its own medallion. */
+function Tile({ label, children, sub, hint }: { label: string; children: ReactNode; sub?: ReactNode; hint?: string }) {
   return (
-    <div className="stat-tile" title={hint}>
-      <span className="stat-label">{label}</span>
-      <strong className="stat-value">{children}</strong>
-    </div>
-  );
-}
-
-function OpeningPanel({ title, opening }: { title: string; opening: OpeningView }) {
-  const money = useMoney();
-  const { t, formatDate } = useI18n();
-  return (
-    <div className="stat-panel">
-      <span className="stat-label">{title}</span>
-      <strong className="stat-value">{money(opening.valueCents)}</strong>
-      <span>
-        {opening.setName} · {kindLabel(t, opening.kind)}
-      </span>
-      <span className="hint">
-        {formatDate(opening.openedAt)}
-        {opening.bestCard && t("stats.bestCard", { card: cardName(t, opening.bestCard) })}
-      </span>
+    <div className="frame stat-medal" title={hint}>
+      <small>{label}</small>
+      <b>{children}</b>
+      {sub && <em>{sub}</em>}
     </div>
   );
 }
@@ -39,7 +22,54 @@ function OpeningPanel({ title, opening }: { title: string; opening: OpeningView 
 const cardName = (t: ReturnType<typeof useI18n>["t"], card: OpenedCard) =>
   card.foil ? `${card.name}${t("stats.foilSuffix")}` : card.name;
 
-/** Personal statistics: what was opened, spent and earned, and the best pulls of all time. */
+const CHART_W = 1000;
+const CHART_H = 150;
+
+/** The latest openings' values, oldest first, as gilded bars; the best one marked. */
+function OpeningsChart({ openings }: { openings: OpeningView[] }) {
+  const moneyText = useMoneyText();
+  const { t, formatDate } = useI18n();
+  const shown = [...openings].reverse();
+  const max = Math.max(1, ...shown.map((o) => o.valueCents));
+  const average = shown.reduce((n, o) => n + o.valueCents, 0) / Math.max(1, shown.length);
+  const step = CHART_W / Math.max(1, shown.length);
+  const barW = Math.max(4, step - 6);
+  const best = shown.reduce((b, o, i) => (o.valueCents > shown[b].valueCents ? i : b), 0);
+  const y = (cents: number) => CHART_H - 4 - (cents * (CHART_H - 26)) / max;
+  return (
+    <svg className="stat-chart" viewBox={`0 0 ${CHART_W} ${CHART_H}`} preserveAspectRatio="none" role="img" aria-label={t("stats.latest")}>
+      {[0.25, 0.5, 0.75].map((f) => (
+        <line key={f} x1="0" x2={CHART_W} y1={y(max * f)} y2={y(max * f)} className="grid" />
+      ))}
+      {shown.map((o, i) => {
+        const top = y(o.valueCents);
+        const x = i * step + (step - barW) / 2;
+        return (
+          <g key={o.id}>
+            <path
+              className={`bar-mark ${i === best ? "best" : ""}`}
+              d={`M${x},${CHART_H - 4} V${top + 4} q0,-4 4,-4 h${barW - 8} q4,0 4,4 V${CHART_H - 4} Z`}
+            />
+            {/* The hit target is the whole column, larger than the bar. */}
+            <rect x={i * step} y="0" width={step} height={CHART_H} fill="transparent">
+              <title>
+                {`${formatDate(o.openedAt)} · ${o.setName} · ${kindLabel(t, o.kind)} · ${moneyText(o.valueCents)}`}
+                {o.bestCard ? ` · ${cardName(t, o.bestCard)}` : ""}
+              </title>
+            </rect>
+          </g>
+        );
+      })}
+      <line x1="0" x2={CHART_W} y1={y(average)} y2={y(average)} className="average" />
+      <text x={best * step + step / 2} y={Math.max(12, y(shown[best]?.valueCents ?? 0) - 8)} className="best-label" textAnchor="middle">
+        {moneyText(shown[best]?.valueCents ?? 0)}
+      </text>
+    </svg>
+  );
+}
+
+/** Personal statistics: the big numbers, what the boosters gave on average, the finest pulls of
+ * all time, and the latest openings. */
 export function Stats({ refreshKey }: { refreshKey: string }) {
   const money = useMoney();
   const { t, tx, formatDate, formatNumber } = useI18n();
@@ -55,133 +85,182 @@ export function Stats({ refreshKey }: { refreshKey: string }) {
   if (error) return <p className="error">{error}</p>;
   if (!stats) return <Loading label={t("stats.loading")} />;
   if (stats.boostersOpened === 0) {
-    return <p className="hint">{t("stats.empty")}</p>;
+    return (
+      <section className="frame empty-state">
+        <div className="cartouche">{t("tab.stats")}</div>
+        <p className="hint">{t("stats.empty")}</p>
+      </section>
+    );
   }
 
   const s = stats;
   // Pulled value against what the boosters cost: below 100 %, opening lost money (as it usually does).
   const returnPercent = s.spentOnBoostersCents === 0 ? null : (s.valuePulledCents * 100) / s.spentOnBoostersCents;
   const netWorth = s.balanceCents + s.collectionValueCents + s.sealedValueCents;
+  const byAverage = [...s.boosters].sort((a, b) => b.averageCents - a.averageCents).slice(0, 6);
+  const topAverage = Math.max(1, ...byAverage.map((b) => b.averageCents));
+  const betsNet = s.betsWonCents - s.betsStakedCents;
 
   return (
-    <section className="stats">
-      <div className="stat-grid">
-        <Tile label={t("stats.boostersOpened")}>{formatNumber(s.boostersOpened)}</Tile>
-        <Tile label={t("stats.cardsPulled")}>
-          {formatNumber(s.cardsPulled)}
-          <span className="hint stat-sub">{t("stats.foils", { count: formatNumber(s.foilsPulled) })}</span>
+    <div className="stats-screen">
+      <div className="stat-medals">
+        <Tile
+          label={t("stats.boostersOpened")}
+          sub={`${t("stats.cardsPulledShort", { count: formatNumber(s.cardsPulled) })}${t("stats.foils", { count: formatNumber(s.foilsPulled) })}`}
+        >
+          {formatNumber(s.boostersOpened)}
         </Tile>
-        <Tile label={t("stats.valuePulled")} hint={t("stats.valuePulledHint")}>
-          {money(s.valuePulledCents)}
+        <Tile
+          label={t("stats.spent")}
+          hint={t("stats.returnHint")}
+          sub={
+            returnPercent === null ? undefined : (
+              <span className={returnPercent >= 100 ? "gain" : "loss"}>{t("stats.returnShort", { percent: returnPercent.toFixed(0) })}</span>
+            )
+          }
+        >
+          <Money cents={s.spentOnBoostersCents} />
         </Tile>
-        <Tile label={t("stats.average")}>{money(Math.round(s.valuePulledCents / s.boostersOpened))}</Tile>
-        <Tile label={t("stats.spent")}>{money(s.spentOnBoostersCents)}</Tile>
-        <Tile label={t("stats.return")} hint={t("stats.returnHint")}>
-          {returnPercent === null ? (
-            t("common.none")
-          ) : (
-            <span className={returnPercent >= 100 ? "gain" : "loss"}>{returnPercent.toFixed(0)}%</span>
-          )}
+        <Tile label={t("stats.collectionValue")} hint={t("stats.collectionValueHint")} sub={tx("stats.netWorthShort", { amount: money(netWorth) })}>
+          <Money cents={s.collectionValueCents} />
         </Tile>
-        <Tile label={t("stats.earned")} hint={t("stats.earnedHint")}>
-          {money(s.earnedFromCardsCents + s.earnedFromBoostersCents)}
-        </Tile>
-        <Tile label={t("stats.rewards")} hint={t("stats.rewardsHint")}>
-          {money(s.rewardsCents + s.charityCents)}
-        </Tile>
-        {s.betsStakedCents > 0 && (
-          <Tile label={t("stats.bets")} hint={t("stats.betsHint")}>
-            <span className={s.betsWonCents >= s.betsStakedCents ? "gain" : "loss"}>
-              {money(s.betsWonCents - s.betsStakedCents)}
-            </span>
-            <span className="hint stat-sub">{tx("stats.betsDetail", { staked: money(s.betsStakedCents), won: money(s.betsWonCents) })}</span>
+        {s.bestBooster && (
+          <Tile label={t("stats.best")} sub={`${s.bestBooster.setName} · ${kindLabel(t, s.bestBooster.kind)}`}>
+            <Money cents={s.bestBooster.valueCents} />
           </Tile>
         )}
-        <Tile label={t("stats.distinct")}>{formatNumber(s.distinctCards)}</Tile>
-        <Tile label={t("stats.collectionValue")} hint={t("stats.collectionValueHint")}>
-          {money(s.collectionValueCents)}
-        </Tile>
-        <Tile label={t("stats.netWorth")} hint={t("stats.netWorthHint")}>
-          {money(netWorth)}
-        </Tile>
       </div>
 
-      <div className="stat-panels">
-        {s.bestBooster && <OpeningPanel title={t("stats.best")} opening={s.bestBooster} />}
-        {s.worstBooster && s.boostersOpened > 1 && <OpeningPanel title={t("stats.worst")} opening={s.worstBooster} />}
-      </div>
-
-      {s.bestPulls.length > 0 && (
-        <>
-          <h3>{t("stats.bestPulls")}</h3>
-          <p className="hint">{t("stats.bestPullsHint")}</p>
-          <div className="cards compact">
-            {s.bestPulls.map((p, i) => (
-              <div key={`${p.card.uuid}-${p.openedAt}-${i}`} title={formatDate(p.openedAt)}>
-                <Card card={p.card} faceUp clickable={false} onReveal={noop} />
+      <div className="stat-twocol">
+        <section className="frame">
+          <div className="cartouche">{t("stats.averageByBooster")}</div>
+          <div className="stat-bars">
+            {byAverage.map((b) => (
+              <div key={`${b.setCode}/${b.kind}`} className="stat-bar-row" title={t("stats.boostersCount", { count: formatNumber(b.boosters) })}>
+                <span className="stat-bar-name">
+                  {b.setName}
+                  <small>
+                    {kindLabel(t, b.kind)} · {t("stats.boostersCount", { count: formatNumber(b.boosters) })}
+                  </small>
+                </span>
+                <div className="bar">
+                  <i style={{ width: `${(b.averageCents * 100) / topAverage}%` }} />
+                </div>
+                <b>
+                  <Money cents={b.averageCents} />
+                </b>
               </div>
             ))}
           </div>
-        </>
+        </section>
+        {s.bestPulls.length > 0 && (
+          <section className="frame">
+            <div className="cartouche">{t("stats.bestPulls")}</div>
+            <div className="stat-pulls">
+              {s.bestPulls.slice(0, 5).map((p, i) => (
+                <div key={`${p.card.uuid}-${p.openedAt}-${i}`} title={`${cardName(t, p.card)} · ${formatDate(p.openedAt)}`}>
+                  <div className={`thumb pull-thumb ${p.card.rarity}`}>
+                    <CardImage front={p.card.imageUrl} back={p.card.backImageUrl} alt={p.card.name} lazy />
+                    {p.card.foil && <div className={sheenClass(p.card.rarity)} />}
+                  </div>
+                  <span className="pull-value">{p.card.priceCents == null ? "—" : <Money cents={p.card.priceCents} />}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+
+      {s.recentOpenings.length > 1 && (
+        <section className="frame">
+          <div className="cartouche">{t("stats.latestChart", { count: s.recentOpenings.length })}</div>
+          <p className="meta stat-chart-legend">{t("stats.latestChartHint")}</p>
+          <OpeningsChart openings={s.recentOpenings} />
+        </section>
       )}
 
-      <h3>{t("stats.byBooster")}</h3>
-      <table className="stat-table">
-        <thead>
-          <tr>
-            <th>{t("stats.colBooster")}</th>
-            <th>{t("stats.colOpened")}</th>
-            <th>{t("stats.colTotal")}</th>
-            <th>{t("stats.colAverage")}</th>
-            <th>{t("stats.colBest")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {s.boosters.map((b) => (
-            <tr key={`${b.setCode}/${b.kind}`}>
-              <td>
-                {b.setName} · {kindLabel(t, b.kind)}
-              </td>
-              <td>{formatNumber(b.boosters)}</td>
-              <td>{money(b.valueCents)}</td>
-              <td>{money(b.averageCents)}</td>
-              <td>{money(b.bestValueCents)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <h3>{t("stats.latest")}</h3>
-      <table className="stat-table">
-        <thead>
-          <tr>
-            <th>{t("stats.colDate")}</th>
-            <th>{t("stats.colBooster")}</th>
-            <th>{t("stats.colValue")}</th>
-            <th>{t("stats.colBestCard")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {s.recentOpenings.map((o) => (
-            <tr key={o.id}>
-              <td>{formatDate(o.openedAt)}</td>
-              <td>
-                {o.setName} · {kindLabel(t, o.kind)}
-              </td>
-              <td>{money(o.valueCents)}</td>
-              <td>
-                {o.bestCard ? (
-                  <>
-                    {cardName(t, o.bestCard)} · {money(o.bestCard.priceCents ?? 0)}
-                  </>
-                ) : (
-                  t("common.none")
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </section>
+      <div className="stat-twocol">
+        <section className="frame">
+          <div className="cartouche">{t("stats.accounts")}</div>
+          <div className="ready-line">
+            <span>{t("stats.valuePulled")}</span>
+            <b>
+              <Money cents={s.valuePulledCents} />
+            </b>
+          </div>
+          <div className="ready-line">
+            <span>{t("stats.average")}</span>
+            <b>
+              <Money cents={Math.round(s.valuePulledCents / s.boostersOpened)} />
+            </b>
+          </div>
+          <div className="ready-line">
+            <span>{t("stats.earned")}</span>
+            <b>
+              <Money cents={s.earnedFromCardsCents + s.earnedFromBoostersCents} />
+            </b>
+          </div>
+          <div className="ready-line">
+            <span>{t("stats.rewards")}</span>
+            <b>
+              <Money cents={s.rewardsCents + s.charityCents} />
+            </b>
+          </div>
+          {s.betsStakedCents > 0 && (
+            <div className="ready-line" title={t("stats.betsHint")}>
+              <span>{t("stats.bets")}</span>
+              <b className={betsNet >= 0 ? "gain" : "loss"}>
+                {betsNet >= 0 ? "+" : "−"}
+                <Money cents={Math.abs(betsNet)} />
+              </b>
+            </div>
+          )}
+          <div className="ready-line">
+            <span>{t("stats.distinct")}</span>
+            <b>{formatNumber(s.distinctCards)}</b>
+          </div>
+          {s.worstBooster && s.boostersOpened > 1 && (
+            <div className="ready-line">
+              <span>{t("stats.worst")}</span>
+              <b>
+                {s.worstBooster.setName} · <Money cents={s.worstBooster.valueCents} />
+              </b>
+            </div>
+          )}
+        </section>
+        <section className="frame">
+          <div className="cartouche">{t("stats.byBooster")}</div>
+          <table className="ledger stat-ledger">
+            <thead>
+              <tr>
+                <th>{t("stats.colBooster")}</th>
+                <th>{t("stats.colOpened")}</th>
+                <th>{t("stats.colTotal")}</th>
+                <th>{t("stats.colBest")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {s.boosters.map((b) => (
+                <tr key={`${b.setCode}/${b.kind}`}>
+                  <td>
+                    {b.setName}
+                    <span className="ledger-sub" style={{ marginLeft: 0 }}>
+                      {kindLabel(t, b.kind)}
+                    </span>
+                  </td>
+                  <td>{formatNumber(b.boosters)}</td>
+                  <td className="ledger-amount">
+                    <Money cents={b.valueCents} />
+                  </td>
+                  <td className="ledger-amount">
+                    <Money cents={b.bestValueCents} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      </div>
+    </div>
   );
 }

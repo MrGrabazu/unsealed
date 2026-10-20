@@ -217,7 +217,9 @@ function BinderTooltip({ book, x, y }: { book: Book; x: number; y: number }) {
   return (
     <div className="library-tooltip" ref={ref} style={{ left, top }} role="tooltip">
       <div className="library-tooltip-head">
-        <SetIcon url={set?.iconUrl ?? null} name={set?.name ?? b.setCode} />
+        <span className="medallion">
+          <SetIcon url={set?.iconUrl ?? null} name={set?.name ?? b.setCode} />
+        </span>
         <div>
           <strong>{set?.name ?? b.setCode}</strong>
           <div className="hint">
@@ -227,8 +229,8 @@ function BinderTooltip({ book, x, y }: { book: Book; x: number; y: number }) {
           </div>
         </div>
       </div>
-      <div className="progress">
-        <div className="progress-bar" style={{ width: `${b.completionPercent}%` }} />
+      <div className="bar">
+        <i style={{ width: `${b.completionPercent}%` }} />
       </div>
       <p className="library-tooltip-progress">
         {t("collection.progress", {

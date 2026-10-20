@@ -32,7 +32,7 @@ pub struct SetFile {
 
 /// Bump when the compact files change in a way older data cannot satisfy: the app then
 /// rebuilds its data at the next launch.
-pub const DATA_FORMAT_VERSION: u32 = 8;
+pub const DATA_FORMAT_VERSION: u32 = 9;
 
 /// Languages kept for card and set names, as (MTGJSON language name, code). Cards printed
 /// in other languages, or never translated, stay in English.

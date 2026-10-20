@@ -1,0 +1,130 @@
+import { useEffect, useRef } from "react";
+import type { OpenedCard, SealedStack, SetSummary, SettledBet, SkippedBet } from "./api";
+import { BackToTop } from "./BackToTop";
+import { BetResults } from "./BetResults";
+import { kindLabel } from "./boosterKinds";
+import { SellBoosterButton, useBoosterSale } from "./BoosterSale";
+import { useI18n } from "./i18n";
+import { Money, useMoney } from "./money";
+import { RevealedCards } from "./RevealedCards";
+import { bestCard, revealSound, sounds } from "./sound";
+
+/** Delay between two cards dealt (ms), as in `.revealed-row.final`. */
+const DEAL_MS = 30;
+
+interface Props {
+  set: SetSummary | undefined;
+  setCode: string;
+  kind: string;
+  cards: OpenedCard[];
+  /** What such a booster costs today, to tell a gain from a loss. */
+  priceCents: number | null;
+  /** A quick opening: its cards are dealt at once, with the rip and the best card's sound. */
+  quick: boolean;
+  bets: SettledBet[];
+  skipped: SkippedBet[];
+  cardName: (uuid: string) => string;
+  onDetails: (card: OpenedCard) => void;
+  /** Cards of the booster were sold (the wallet changed). */
+  onSold: () => void;
+  /** The next booster of the same kind, if any is left. */
+  remaining: SealedStack | null;
+  busy: boolean;
+  onNext: () => void;
+  onQuickNext: () => void;
+  onBack: () => void;
+}
+
+/** A booster once every card is seen: its hand spread out, and beside it the tally (its value,
+ * gain or loss on its price, new cards, the best one, what the Boosterium gives, the bets),
+ * with selling it all and the next one. */
+export function OpeningResult(props: Props) {
+  const { set, setCode, kind, cards, priceCents, quick, bets, skipped, cardName, onDetails, onSold, remaining, busy } = props;
+  const { t, tx } = useI18n();
+  const money = useMoney();
+  const sale = useBoosterSale(cards, onSold);
+  const list = useRef<HTMLDivElement>(null);
+
+  // A quick opening: the rip, then the best card's sound once every card has landed.
+  useEffect(() => {
+    if (!quick) return;
+    sounds.tear();
+    const timer = setTimeout(() => revealSound(bestCard(cards)), cards.length * DEAL_MS + 350);
+    return () => clearTimeout(timer);
+  }, [cards, quick]);
+
+  const value = cards.reduce((sum, c) => sum + (c.priceCents ?? 0), 0);
+  const resale = cards.reduce((sum, c) => sum + c.sellValueCents, 0);
+  const best = cards.reduce<OpenedCard | null>((b, c) => ((c.priceCents ?? 0) > (b?.priceCents ?? -1) ? c : b), null);
+  const fresh = cards.filter((c) => c.isNew).length;
+  const gain = priceCents == null ? null : value - priceCents;
+
+  return (
+    <div className="split result-split">
+      <section className="frame">
+        <div className="cartouche">
+          {set?.name ?? setCode} · {kindLabel(t, kind)}
+        </div>
+        <div className="scroll" ref={list}>
+          <RevealedCards cards={cards} final onDetails={onDetails} sale={sale} />
+          <p className="hint scene-hint">{t("open.details")}</p>
+          <BackToTop target={list} />
+        </div>
+      </section>
+      <aside className="frame result-side">
+        <div className="cartouche">{t("open.tally")}</div>
+        <div className="scroll">
+          <div className="bigvalue">
+            <small>{t("open.tallyValue")}</small>
+            <b>
+              <Money cents={value} />
+            </b>
+            {gain != null && priceCents != null && (
+              <em className={gain >= 0 ? "gain" : "loss"}>
+                {tx(gain >= 0 ? "open.tallyGain" : "open.tallyLoss", { amount: money(Math.abs(gain)), price: money(priceCents) })}
+              </em>
+            )}
+          </div>
+          <div className="gild-divider" />
+          <div className="ready-line">
+            <span>{t("open.tallyNew")}</span>
+            <b>{fresh}</b>
+          </div>
+          {best && (
+            <div className="ready-line">
+              <span>{t("open.tallyBest")}</span>
+              <b className="result-best">
+                {best.name} · <Money cents={best.priceCents ?? 0} />
+              </b>
+            </div>
+          )}
+          <div className="ready-line">
+            <span>{t("open.tallyResale")}</span>
+            <b>
+              <Money cents={resale} />
+            </b>
+          </div>
+          {(bets.length > 0 || skipped.length > 0) && <BetResults bets={bets} skipped={skipped} cardName={cardName} />}
+        </div>
+        <div className="buy-bar">
+          <div className="result-sell">
+            <SellBoosterButton sale={sale} />
+          </div>
+          {remaining ? (
+            <>
+              <button className="big" disabled={busy} onClick={quick ? props.onQuickNext : props.onNext}>
+                {t("open.next", { count: remaining.quantity })}
+              </button>
+              {!quick && (
+                <button disabled={busy} onClick={props.onQuickNext}>
+                  {t("open.quick")}
+                </button>
+              )}
+            </>
+          ) : null}
+          <button onClick={props.onBack}>{t("open.back")}</button>
+        </div>
+      </aside>
+    </div>
+  );
+}

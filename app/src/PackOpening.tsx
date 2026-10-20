@@ -25,7 +25,14 @@ interface Props {
   onDetails: (card: OpenedCard) => void;
   /** Cards of the booster were sold (the wallet changed). */
   onSold: () => void;
+  /** Every card is set aside: the game shows the booster's result. */
+  onFinished?: () => void;
+  /** Bumped to tear the pack open without touching it. */
+  tearRequest?: number;
 }
+
+/** How long the last card is left in the row before the result shows (ms). */
+const RESULT_AFTER_MS = 900;
 
 /** How dramatic a card's reveal is. */
 const hitOf = (card: OpenedCard) =>
@@ -69,7 +76,7 @@ function FlipCard({ card, faceUp }: { card: OpenedCard; faceUp: boolean }) {
 /** Opening one booster, like for real: the sealed pack, torn open; the cards in a pile,
  * revealed one by one (in a real booster's order) and set aside in a row; then all of them to
  * look at. */
-export function PackOpening({ setCode, set, kind, cards, onTear, onReveal, busy, onDetails, onSold }: Props) {
+export function PackOpening({ setCode, set, kind, cards, onTear, onReveal, busy, onDetails, onSold, onFinished, tearRequest }: Props) {
   const { t, tx } = useI18n();
   const money = useMoney();
   const sale = useBoosterSale(cards, onSold);
@@ -91,6 +98,11 @@ export function PackOpening({ setCode, set, kind, cards, onTear, onReveal, busy,
 
   const total = cards?.length ?? 0;
   const done = cards != null && aside >= total;
+  useEffect(() => {
+    if (!done) return;
+    const timer = setTimeout(() => onFinished?.(), RESULT_AFTER_MS);
+    return () => clearTimeout(timer);
+  }, [done]);
 
   function advance() {
     if (!cards || done) return;
@@ -117,22 +129,21 @@ export function PackOpening({ setCode, set, kind, cards, onTear, onReveal, busy,
     return () => window.removeEventListener("keydown", onKey);
   });
 
+  function tearIt() {
+    if (torn || busy) return;
+    setTorn(true);
+    sounds.tear();
+    // If the draw fails, the pack is whole again (the error is shown above it).
+    void onTear().then((ok) => !ok && setTorn(false));
+  }
+
+  // Asked from outside (the tally's button, a key).
+  useEffect(() => {
+    if (tearRequest && tearRequest > 0 && !cards) tearIt();
+  }, [tearRequest]);
+
   if (!cards) {
-    return (
-      <Pack
-        setCode={setCode}
-        set={set}
-        kind={kind}
-        torn={torn}
-        disabled={busy}
-        onTear={() => {
-          setTorn(true);
-          sounds.tear();
-          // If the draw fails, the pack is whole again (the error is shown above it).
-          void onTear().then((ok) => !ok && setTorn(false));
-        }}
-      />
-    );
+    return <Pack setCode={setCode} set={set} kind={kind} torn={torn} disabled={busy} onTear={tearIt} />;
   }
 
   const pile = cards.slice(aside);

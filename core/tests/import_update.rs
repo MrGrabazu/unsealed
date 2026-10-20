@@ -313,6 +313,14 @@ fn the_featured_card_is_the_most_valuable_credited_card_of_the_main_boosters() {
     let prices = [("u2".to_string(), PriceSet { usd: Some(500), ..Default::default() })].into();
     let featured = featured_card(&set, &prices).unwrap();
     assert_eq!((featured.name.as_str(), featured.scryfall_id.as_str(), featured.artist.as_str()), ("B", "s2", "Jane Doe"));
+
+    // A card the set reprints from another set only stands in when the set has none of its own
+    // (the Mystery Boosters hold nothing but reprints).
+    set.cards[1].set_code = "PLST".into();
+    let prices = [("u2".to_string(), PriceSet { usd: Some(500), ..Default::default() })].into();
+    assert_eq!(featured_card(&set, &prices).unwrap().name, "A");
+    set.cards[0].set_code = "PLST".into();
+    assert_eq!(featured_card(&set, &prices).unwrap().name, "B");
 }
 
 #[test]

@@ -62,7 +62,7 @@ const ease = (t: number) => 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
 
 // ---- the pack ------------------------------------------------------------------------------
 
-function Pack({ look, onTorn, leaving }: { look: PackLook; onTorn: () => void; leaving: boolean }) {
+function Pack({ look, onTorn, leaving, tearRequest }: { look: PackLook; onTorn: () => void; leaving: boolean; tearRequest: number }) {
   const camera = useThree((s) => s.camera);
   const dom = useThree((s) => s.gl.domElement);
   const group = useRef<THREE.Group>(null);
@@ -126,6 +126,11 @@ function Pack({ look, onTorn, leaving }: { look: PackLook; onTorn: () => void; l
     if (t.dir === 0) t.dir = x < 0 ? 1 : -1;
     t.auto = true;
   }
+
+  // Asked from outside the scene (a button, a key): torn by itself, from the left.
+  useEffect(() => {
+    if (tearRequest > 0) autoTear(-1);
+  }, [tearRequest]);
 
   function startShake(e: ThreeEvent<PointerEvent>) {
     e.stopPropagation();
@@ -623,9 +628,11 @@ interface Props {
   onNext: () => void;
   onFinished: () => void;
   slideRequest: number;
+  /** Bumped to tear the pack open without touching it. */
+  tearRequest: number;
 }
 
-export function PackScene({ look, cards, top, onTorn, onNext, onFinished, slideRequest }: Props) {
+export function PackScene({ look, cards, top, onTorn, onNext, onFinished, slideRequest, tearRequest }: Props) {
   // Once the cards are drawn they slide out of the wrapper, which then falls away.
   const [packGone, setPackGone] = useState(false);
   useEffect(() => {
@@ -641,7 +648,7 @@ export function PackScene({ look, cards, top, onTorn, onNext, onFinished, slideR
       <ambientLight intensity={0.9} />
       <directionalLight position={[3, 4, 6]} intensity={1.6} />
       <PointerLight />
-      {!packGone && <Pack look={look} onTorn={onTorn} leaving={cards != null} />}
+      {!packGone && <Pack look={look} onTorn={onTorn} leaving={cards != null} tearRequest={tearRequest} />}
       {cards && (
         <Cards cards={cards} top={top} onNext={onNext} onFinished={onFinished} slideRequest={slideRequest} />
       )}

@@ -37,20 +37,22 @@ import { CardDetails } from "./CardDetails";
 import { Logo } from "./Logo";
 import { getSoundOn, setSoundOn, sounds } from "./sound";
 import { PackOpening } from "./PackOpening";
-import { QuickOpening } from "./QuickOpening";
+import { OpeningResult } from "./OpeningResult";
 import { canUseWebGL, getOpening3d } from "./settings";
 
 // The 3D opening brings three.js along: loaded the first time a booster is opened.
 const PackOpening3D = lazy(() => import("./PackOpening3D").then((m) => ({ default: m.PackOpening3D })));
 import { Boosterium } from "./Boosterium";
 import { Collection } from "./Collection";
-import { rewardText } from "./boosterKinds";
+import { kindLabel, rewardText } from "./boosterKinds";
 import { DataStatusBar, useDataStatus } from "./DataStatus";
-import { Footer } from "./Footer";
+import { Ambience } from "./Ambience";
+import { BackToTop } from "./BackToTop";
 import { History } from "./History";
 import { useI18n } from "./i18n";
+import { Icon, type IconName } from "./icons";
 import { Loading } from "./Loading";
-import { CurrencyContext, DEFAULT_CURRENCY, useMoney, useMoneyText } from "./money";
+import { CurrencyContext, DEFAULT_CURRENCY, Money, useMoneyText } from "./money";
 import { SealedBoosters } from "./SealedBoosters";
 import { Stats } from "./Stats";
 
@@ -74,39 +76,80 @@ interface IncomeFloat {
   cents: number;
 }
 
-function WalletBar({ wallet, income, floats }: { wallet: WalletView; income: IncomeView | null; floats: IncomeFloat[] }) {
-  const money = useMoney();
+const TAB_ICONS: Record<Tab, IconName> = {
+  boosterium: "shop",
+  open: "pack",
+  collection: "book",
+  achievements: "trophy",
+  stats: "chart",
+  history: "scroll",
+};
+
+/** The resources on the HUD's strap: the balance (with what the collection earns, and the
+ * "+N" floating up from it), the sealed boosters, and what the collection is worth. */
+function Resources({ wallet, income, floats }: { wallet: WalletView; income: IncomeView | null; floats: IncomeFloat[] }) {
   const moneyText = useMoneyText();
   const { t, formatNumber } = useI18n();
   const toSeals = (cents: number) => Math.round(cents * wallet.currency.sealsPerCent);
   const perMinute = income ? income.perMinuteCents * wallet.currency.sealsPerCent : 0;
+  const sealed = wallet.sealed.reduce((n, s) => n + s.quantity, 0);
   return (
-    <>
-      <div className="wallet" title={t("game.balanceTitle")}>
+    <div className="resources">
+      <div className="res wallet" title={t("game.balanceTitle")}>
         {/* Keyed on the amount: it pulses each time it changes. */}
-        <span key={wallet.balanceCents} className="wallet-amount">
-          {money(wallet.balanceCents)}
+        <span key={wallet.balanceCents} className="v wallet-amount">
+          <Money cents={wallet.balanceCents} />
         </span>
+        {income && (
+          <span
+            className="s"
+            title={t("income.rateTitle", {
+              value: moneyText(income.collectionValueCents),
+              percent: formatNumber(income.percentPerMinute),
+              hours: formatNumber(income.offlineCapMinutes / 60),
+            })}
+          >
+            {/* Whole Seals only: there is no such thing as a fraction of one. */}
+            {t("income.rate", { rate: formatNumber(Math.ceil(perMinute)) })}
+          </span>
+        )}
         {floats.map((f) => (
           <span key={f.id} className="income-float" aria-hidden="true">
             +{formatNumber(toSeals(f.cents))}
           </span>
         ))}
       </div>
-      {income && (
-        <span
-          className="income-rate"
-          title={t("income.rateTitle", {
-            value: moneyText(income.collectionValueCents),
-            percent: formatNumber(income.percentPerMinute),
-            hours: formatNumber(income.offlineCapMinutes / 60),
-          })}
-        >
-          {/* Whole Seals only: there is no such thing as a fraction of one. */}
-          {t("income.rate", { rate: formatNumber(Math.ceil(perMinute)) })}
+      <div className="res" title={t("hud.sealed")}>
+        <span className="ico">
+          <Icon name="pack" />
         </span>
+        <span className="v">{formatNumber(sealed)}</span>
+      </div>
+      {income && (
+        <div className="res" title={t("hud.value")}>
+          <span className="ico">
+            <Icon name="gem" />
+          </span>
+          <span className="v">
+            <Money cents={income.collectionValueCents} />
+          </span>
+        </div>
       )}
-    </>
+    </div>
+  );
+}
+
+/** The keys at the bottom of the screen: what they do here. */
+function Keys({ hints }: { hints: [string, string][] }) {
+  return (
+    <footer className="keys">
+      {hints.map(([key, label]) => (
+        <span key={key}>
+          <kbd>{key}</kbd>
+          {label}
+        </span>
+      ))}
+    </footer>
   );
 }
 
@@ -150,6 +193,10 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   // Bets left out of the last opening (no stake taken), and why.
   const [betSkipped, setBetSkipped] = useState<SkippedBet[]>([]);
   const [allSeen, setAllSeen] = useState(false);
+  // A single booster's opening is over: its result (hand and tally) is shown.
+  const [resultShown, setResultShown] = useState(false);
+  // Bumped to tear the sealed pack open from its side panel (or a key), without touching it.
+  const [tearRequest, setTearRequest] = useState(0);
   // Names of the cards bet on (the results name them).
   const betCardNames = useRef(new Map<string, string>());
 
@@ -182,11 +229,16 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   const holdingToasts = useRef(false);
   const heldToasts = useRef<AchievementView[]>([]);
 
+  // Achievements unlocked since the achievements tab was last looked at (its bookmark's badge).
+  const [unseenAchievements, setUnseenAchievements] = useState(0);
+  const stage = useRef<HTMLElement>(null);
+
   const showToasts = useCallback((unlocked: AchievementView[]) => {
     if (unlocked.length === 0) return;
     sounds.seal();
     setToasts((current) => [...current, ...unlocked]);
     setUnlockCount((n) => n + unlocked.length);
+    setUnseenAchievements((n) => n + unlocked.length);
     for (const a of unlocked) {
       setTimeout(() => setToasts((current) => current.filter((t) => t.id !== a.id)), TOAST_MS);
     }
@@ -307,11 +359,12 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     }
   }
 
-  /** Forgets the bets of the last opening, for a new one. */
+  /** Forgets the bets of the last opening (and its result), for a new one. */
   function resetBets() {
     setBetResults([]);
     setBetSkipped([]);
     setAllSeen(false);
+    setResultShown(false);
   }
 
   async function openMany(setCode: string, kind: string, quantity: number) {
@@ -347,7 +400,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
 
   /** The quick opening: drawn at once, its cards dealt without the animation (and seen at
    * once, achievements included). */
-  async function openQuick(setCode: string, kind: string) {
+  async function openQuick(setCode: string, kind: string, bets: BetRequest[] = activeBets(keptFor(kept, setCode))) {
     setBatch(null);
     setCards(null);
     resetBets();
@@ -358,13 +411,14 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     setError(null);
     try {
       await checkSetImages(setCode).catch(() => {});
-      const opened = await openBooster(setCode, kind, false, activeBets(keptFor(kept, setCode)));
+      const opened = await openBooster(setCode, kind, false, bets);
       setCards(opened.cards);
       setBetResults(opened.bets);
       setBetSkipped(opened.skipped);
       setOpenings((n) => n + 1);
       await revealCards(Number.MAX_SAFE_INTEGER);
       setAllSeen(true);
+      setResultShown(true);
     } catch (e) {
       setError(String(e));
       setPack(null);
@@ -410,8 +464,30 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
 
   function switchTab(t: Tab) {
     if (t !== tab) closeOpening();
+    if (t === "achievements") setUnseenAchievements(0);
     setTab(t);
   }
+
+  // 1 to 6 go to the tabs, as their bookmarks are ordered (not while typing).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (["INPUT", "SELECT", "TEXTAREA"].includes(target.tagName) || e.ctrlKey || e.altKey || e.metaKey) return;
+      const index = Number(e.key) - 1;
+      if (Number.isInteger(index) && index >= 0 && index < TABS.length) switchTab(TABS[index]);
+      // The sealed pack: Space tears it open, Q opens it at once, Escape goes back to the reserve.
+      const sealed = tab === "open" && pack && !pack.quick && !cards && !busy;
+      if (sealed && !["BUTTON"].includes(target.tagName)) {
+        if (e.key === " ") {
+          e.preventDefault();
+          setTearRequest((n) => n + 1);
+        } else if (e.key.toLowerCase() === "q") void openQuick(pack.setCode, pack.kind, activeBets(slip));
+        else if (e.key === "Escape" && !detailsOf) closeOpening();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
 
   async function saveNow() {
     try {
@@ -424,49 +500,100 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   }
 
   const remaining = last && wallet?.sealed.find((s) => s.setCode === last.setCode && s.kind === last.kind);
+  // What the sealed pack on show costs today, and what the Boosterium would give for it.
+  const packShop = pack ? shop.find((s) => s.setCode === pack.setCode && s.kind === pack.kind) : undefined;
 
-  const buy = (item: ShopItem, quantity: number) =>
+  const buy = (item: ShopItem, quantity: number, openNow: boolean) =>
     run(async () => {
       await buyBoosters(item.setCode, item.kind, quantity);
       sounds.coins();
+      if (openNow) open(item.setCode, item.kind);
     });
-  const buyAndOpen = (item: ShopItem) =>
-    run(async () => {
-      await buyBoosters(item.setCode, item.kind, 1);
-      sounds.coins();
-      open(item.setCode, item.kind);
-    });
+
+  // What the keys do on this screen (shown at the bottom).
+  const opening = tab === "open" && !!(pack || batch);
+  const hints: [string, string][] = [
+    ["1–6", t("keys.tabs")],
+    ...((tab === "boosterium"
+      ? [
+          ["⏎", t("keys.buy")],
+          ["+ −", t("keys.quantity")],
+          ["F", t("keys.favorite")],
+        ]
+      : opening && resultShown
+        ? []
+      : opening && pack && !pack.quick && !cards
+        ? [
+            ["␣", t("keys.tear")],
+            ["Q", t("keys.quick")],
+            ["Échap", t("keys.reserve")],
+          ]
+      : opening
+        ? [["␣", t("keys.nextCard")]]
+        : tab === "open" && (wallet?.sealed.length ?? 0) > 0
+          ? [
+              ["⏎", t("keys.open")],
+              ["Q", t("keys.quick")],
+            ]
+        : tab === "collection"
+          ? [["← →", t("keys.turnPage")]]
+          : []) as [string, string][]),
+    ...(detailsOf ? ([["Échap", t("keys.close")]] as [string, string][]) : []),
+  ];
 
   return (
     <CurrencyContext.Provider value={currency}>
-      <div className="app">
-        <header>
-          <h1 className="header-logo">
+      <div className="game">
+        <header className="hud">
+          <div title={t("game.nameTitle") + " · " + save.name}>
             <Logo />
-          </h1>
-          <span className="game-name" title={t("game.nameTitle")}>
-            {save.name}
-          </span>
-          {wallet && <WalletBar wallet={wallet} income={income} floats={incomeFloats} />}
-          {/* Sound on or off, at hand (also in the options, with the volume). */}
-          <button
-            className="sound-toggle"
-            onClick={() => {
-              setSoundOn(!soundOn);
-              setSoundOnState(!soundOn);
-              if (!soundOn) sounds.click();
-            }}
-            title={t(soundOn ? "game.soundOn" : "game.soundOff")}
-            aria-label={t(soundOn ? "game.soundOn" : "game.soundOff")}
-          >
-            {soundOn ? "🔊" : "🔇"}
-          </button>
-          <button onClick={() => void saveNow()} title={t("game.savePointTitle")}>
-            {t("game.savePoint")}
-          </button>
-          <button onClick={onMenu}>{t("game.menu")}</button>
+          </div>
+          <div className="hud-title">{t(`tab.${tab}`)}</div>
+          {wallet && <Resources wallet={wallet} income={income} floats={incomeFloats} />}
+          <div className="hud-tools">
+            {/* Sound on or off, at hand (also in the options, with the volume). */}
+            <button
+              className="hud-tool"
+              onClick={() => {
+                setSoundOn(!soundOn);
+                setSoundOnState(!soundOn);
+                if (!soundOn) sounds.click();
+              }}
+              title={t(soundOn ? "game.soundOn" : "game.soundOff")}
+              aria-label={t(soundOn ? "game.soundOn" : "game.soundOff")}
+            >
+              <Icon name={soundOn ? "soundOn" : "soundOff"} />
+            </button>
+            <button className="hud-tool" onClick={() => void saveNow()} title={t("game.savePointTitle")} aria-label={t("game.savePoint")}>
+              <Icon name="save" />
+            </button>
+            <button className="hud-tool" onClick={onMenu} title={t("game.menu")} aria-label={t("game.menu")}>
+              <Icon name="menu" />
+            </button>
+          </div>
         </header>
 
+        <nav className="rail">
+          {TABS.map((each) => {
+            const badge =
+              each === "open" ? wallet?.sealed.reduce((n, s) => n + s.quantity, 0) ?? 0 : each === "achievements" ? unseenAchievements : 0;
+            return (
+              <button
+                key={each}
+                className={`rail-tab ${tab === each ? "on" : ""}`}
+                onClick={() => switchTab(each)}
+                aria-label={t(`tab.${each}`)}
+                aria-current={tab === each ? "page" : undefined}
+              >
+                <Icon name={TAB_ICONS[each]} />
+                {badge > 0 && <span className="badge">{badge}</span>}
+                <span className="lbl">{t(`tab.${each}`)}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+        <main className="stage" ref={stage}>
         {awayIncome && (
           <div className="income-away">
             <p>
@@ -481,17 +608,6 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
             <button onClick={() => setAwayIncome(null)}>{t("income.dismiss")}</button>
           </div>
         )}
-
-        <nav className="tabs">
-          {TABS.map((each) => (
-            <button key={each} className={tab === each ? "active" : ""} onClick={() => switchTab(each)}>
-              {t(`tab.${each}`)}
-              {each === "open" && wallet && wallet.sealed.length > 0 && (
-                <span className="tab-count">{wallet.sealed.reduce((n, s) => n + s.quantity, 0)}</span>
-              )}
-            </button>
-          ))}
-        </nav>
 
         <DataStatusBar status={dataStatus} />
         {error && <p className="error">{error}</p>}
@@ -509,7 +625,6 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
             sets={sets}
             wallet={wallet}
             onBuy={buy}
-            onBuyAndOpen={buyAndOpen}
             onClaimCharity={() => run(() => claimCharity())}
             busy={busy}
             focus={shopFocus}
@@ -517,13 +632,116 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
         )}
 
         {tab === "open" && wallet && (
-          <section>
-            {pack || batch ? (
-              <>
+          <>
+            {pack && cards && resultShown && !batch ? (
+              <OpeningResult
+                set={sets.find((s) => s.code === pack.setCode)}
+                setCode={pack.setCode}
+                kind={pack.kind}
+                cards={cards}
+                priceCents={shop.find((s) => s.setCode === pack.setCode && s.kind === pack.kind)?.priceCents ?? null}
+                quick={pack.quick}
+                bets={betResults}
+                skipped={betSkipped}
+                cardName={betCardName}
+                onDetails={(card) => setDetailsOf({ setCode: pack.setCode, uuid: card.uuid })}
+                onSold={refreshWallet}
+                remaining={remaining ?? null}
+                busy={busy}
+                onNext={() => remaining && open(remaining.setCode, remaining.kind)}
+                onQuickNext={() => remaining && void openQuick(remaining.setCode, remaining.kind)}
+                onBack={closeOpening}
+              />
+            ) : pack && !pack.quick && !batch ? (
+              // One booster, sealed then revealed: the pack alone in the light on the left, the
+              // bets beside it (then the bets placed), with the way to tear it open.
+              <div className="split opening-split">
+                <section className="frame opening-stage">
+                  <div className="cartouche">
+                    {sets.find((s) => s.code === pack.setCode)?.name ?? pack.setCode} · {kindLabel(t, pack.kind)}
+                  </div>
+                  <div className="opening-light" aria-hidden="true" />
+                  {opening3d ? (
+                    <Suspense fallback={<Loading />}>
+                      <PackOpening3D
+                        setCode={pack.setCode}
+                        set={sets.find((s) => s.code === pack.setCode)}
+                        kind={pack.kind}
+                        cards={cards}
+                        onTear={tear}
+                        onReveal={(count) => void reveal(count)}
+                        onDetails={(card) => setDetailsOf({ setCode: pack.setCode, uuid: card.uuid })}
+                        onSold={refreshWallet}
+                        onFinished={() => setResultShown(true)}
+                        tearRequest={tearRequest}
+                      />
+                    </Suspense>
+                  ) : (
+                    <PackOpening
+                      setCode={pack.setCode}
+                      set={sets.find((s) => s.code === pack.setCode)}
+                      kind={pack.kind}
+                      cards={cards}
+                      onTear={tear}
+                      onReveal={(count) => void reveal(count)}
+                      busy={busy}
+                      // The details live in the booster's set file (it holds cards from other sets too).
+                      onDetails={(card) => setDetailsOf({ setCode: pack.setCode, uuid: card.uuid })}
+                      onSold={refreshWallet}
+                      onFinished={() => setResultShown(true)}
+                      tearRequest={tearRequest}
+                    />
+                  )}
+                  {!cards && (
+                    <div className="pack-pills">
+                      {packShop && <span className="pill">{t("open.priceToday", { amount: money(packShop.priceCents) })}</span>}
+                      {packShop && <span className="pill">{t("open.resale", { amount: money(packShop.sellBackCents) })}</span>}
+                      {remaining && <span className="pill">{t("open.leftInReserve", { count: remaining.quantity })}</span>}
+                    </div>
+                  )}
+                </section>
+                <aside className="frame bet-side">
+                  <div className="cartouche">🎲 {t("bet.title")}</div>
+                  <div className="scroll">
+                    <BetSlip
+                      key={`${pack.setCode}/${pack.kind}`}
+                      setCode={pack.setCode}
+                      kind={pack.kind}
+                      bets={slip}
+                      onBets={setSlip}
+                      kept={kept}
+                      onKept={changeKept}
+                      onCardName={(uuid, name) => betCardNames.current.set(uuid, name)}
+                      balanceCents={wallet.balanceCents}
+                      panel
+                      locked={!!cards}
+                    />
+                  </div>
+                  <div className="buy-bar">
+                    {!cards && (
+                      <>
+                        <button className="big wax" disabled={busy} onClick={() => setTearRequest((n) => n + 1)}>
+                          {t("open.tear")}
+                        </button>
+                        <button disabled={busy} onClick={() => void openQuick(pack.setCode, pack.kind, activeBets(slip))}>
+                          {t("open.quick")}
+                        </button>
+                      </>
+                    )}
+                    <button onClick={closeOpening}>{t("open.back")}</button>
+                  </div>
+                </aside>
+              </div>
+            ) : pack || batch ? (
+              <section className="frame">
+                <div className="cartouche">
+                  {pack ? `${sets.find((s) => s.code === pack.setCode)?.name ?? pack.setCode} · ${kindLabel(t, pack.kind)}` : t("tab.open")}
+                </div>
                 <div className="controls">
                   <button onClick={closeOpening}>{t("open.back")}</button>
-                  {/* Once this pack is open: the next one of the same kind, if any is left. */}
-                  {remaining && (cards || batch) && (
+                  {/* Once a batch is open: the next one of the same kind, if any is left (a single
+                      booster offers it in its result). */}
+                  {remaining && batch && (
                     <button
                       className="primary"
                       disabled={busy}
@@ -535,64 +753,15 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
                     </button>
                   )}
                   {/* The quick way, for the impatient, right from an opening. */}
-                  {remaining && (cards || batch) && !pack?.quick && (
+                  {remaining && batch && (
                     <button disabled={busy} onClick={() => void openQuick(remaining.setCode, remaining.kind)}>
                       {t("open.quick")}
                     </button>
                   )}
                 </div>
-                {/* Bets on the sealed pack, until it is torn. */}
-                {pack && !pack.quick && !cards && (
-                  <BetSlip
-                    key={`${pack.setCode}/${pack.kind}`}
-                    setCode={pack.setCode}
-                    kind={pack.kind}
-                    bets={slip}
-                    onBets={setSlip}
-                    kept={kept}
-                    onKept={changeKept}
-                    onCardName={(uuid, name) => betCardNames.current.set(uuid, name)}
-                    balanceCents={wallet.balanceCents}
-                  />
-                )}
-                {allSeen && <BetResults bets={betResults} skipped={betSkipped} cardName={betCardName} />}
-                {pack?.quick && (
-                  <QuickOpening
-                    set={sets.find((s) => s.code === pack.setCode)}
-                    kind={pack.kind}
-                    cards={cards}
-                    onDetails={(card) => setDetailsOf({ setCode: pack.setCode, uuid: card.uuid })}
-                    onSold={refreshWallet}
-                  />
-                )}
-                {pack && !pack.quick && opening3d && (
-                  <Suspense fallback={<Loading />}>
-                    <PackOpening3D
-                      setCode={pack.setCode}
-                      set={sets.find((s) => s.code === pack.setCode)}
-                      kind={pack.kind}
-                      cards={cards}
-                      onTear={tear}
-                      onReveal={(count) => void reveal(count)}
-                      onDetails={(card) => setDetailsOf({ setCode: pack.setCode, uuid: card.uuid })}
-                      onSold={refreshWallet}
-                    />
-                  </Suspense>
-                )}
-                {pack && !pack.quick && !opening3d && (
-                  <PackOpening
-                    setCode={pack.setCode}
-                    set={sets.find((s) => s.code === pack.setCode)}
-                    kind={pack.kind}
-                    cards={cards}
-                    onTear={tear}
-                    onReveal={(count) => void reveal(count)}
-                    busy={busy}
-                    // The details live in the booster's set file (it holds cards from other sets too).
-                    onDetails={(card) => setDetailsOf({ setCode: pack.setCode, uuid: card.uuid })}
-                    onSold={refreshWallet}
-                  />
-                )}
+                {batch && allSeen && <BetResults bets={betResults} skipped={betSkipped} cardName={betCardName} />}
+                {/* A quick opening shows its result as soon as it is drawn. */}
+                {pack?.quick && <Loading />}
                 {batch && (
                   <BatchOpening
                     boosters={batch}
@@ -602,10 +771,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
                     }}
                   />
                 )}
-                {detailsOf && (
-                  <CardDetails setCode={detailsOf.setCode} uuid={detailsOf.uuid} onClose={() => setDetailsOf(null)} />
-                )}
-              </>
+              </section>
             ) : (
               <SealedBoosters
                 sealed={wallet.sealed}
@@ -629,7 +795,11 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
                 onGoShopping={() => switchTab("boosterium")}
               />
             )}
-          </section>
+          </>
+        )}
+
+        {tab === "open" && detailsOf && (
+          <CardDetails setCode={detailsOf.setCode} uuid={detailsOf.uuid} onClose={() => setDetailsOf(null)} />
         )}
 
         {tab === "collection" && (
@@ -656,8 +826,11 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
             }}
           />
         )}
+        <BackToTop target={stage} />
+        </main>
 
-        <Footer />
+        <Keys hints={hints} />
+        <Ambience />
 
         <div className="toasts" aria-live="polite">
           {toasts.map((a) => (

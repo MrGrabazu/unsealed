@@ -97,13 +97,23 @@ button.sell.confirm { background: linear-gradient(180deg, var(--wax-hi), var(--w
   --corner-bl: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Cg transform='matrix(1 0 0 -1 0 26)'%3E%3Cg fill='none' stroke='%23d9a441' stroke-width='1.4'%3E%3Cpath d='M2 24V9Q2 2 9 2H24'/%3E%3Cpath d='M6 20V12Q6 6 12 6H20' opacity='.55'/%3E%3C/g%3E%3Ccircle cx='9.5' cy='9.5' r='1.9' fill='%23f5d68a'/%3E%3C/g%3E%3C/svg%3E");
   --corner-br: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Cg transform='matrix(-1 0 0 -1 26 26)'%3E%3Cg fill='none' stroke='%23d9a441' stroke-width='1.4'%3E%3Cpath d='M2 24V9Q2 2 9 2H24'/%3E%3Cpath d='M6 20V12Q6 6 12 6H20' opacity='.55'/%3E%3C/g%3E%3Ccircle cx='9.5' cy='9.5' r='1.9' fill='%23f5d68a'/%3E%3C/g%3E%3C/svg%3E");
 }
-.sealed-tile, .stat-tile, .stat-panel, .save-row, .modal, .toast, .shop-set {
+.sealed-tile, .stat-tile, .stat-panel, .save-row, .modal, .toast {
   background:
     var(--corner-tl) top 4px left 4px / 22px no-repeat,
     var(--corner-tr) top 4px right 4px / 22px no-repeat,
     var(--corner-bl) bottom 4px left 4px / 22px no-repeat,
     var(--corner-br) bottom 4px right 4px / 22px no-repeat,
     linear-gradient(180deg, var(--panel-2), var(--panel));
+}
+/* A set's row is covered by its art: its corners are drawn over everything else, folded or not. */
+.shop-set { position: relative; }
+.shop-set::after {
+  content: ""; position: absolute; inset: 0; z-index: 4; pointer-events: none;
+  background:
+    var(--corner-tl) top 4px left 4px / 22px no-repeat,
+    var(--corner-tr) top 4px right 4px / 22px no-repeat,
+    var(--corner-bl) bottom 4px left 4px / 22px no-repeat,
+    var(--corner-br) bottom 4px right 4px / 22px no-repeat;
 }
 /* Section titles underlined by a gilded rule that fades out. */
 h2 { padding-bottom: 8px; background: linear-gradient(90deg, var(--accent), var(--gold-lo) 40%, transparent) left bottom / min(360px, 100%) 1px no-repeat; }
@@ -128,7 +138,7 @@ button.shop-set-header { font-family: var(--font-text); font-size: 15px; font-we
 button.shop-set-header .shop-name { font-family: var(--font-title); font-size: 17px; font-weight: 700; color: var(--gold-hi); }
 .shop-products .shop-row { background: #1a110b; border: 1px solid #3d2b1b; }
 .shop-price, .shop-from, .sealed-qty, .total, .wallet { color: var(--gold-hi); }
-.shop-set-header.with-art .shop-from { background: #140d08e6; border: 1px solid var(--edge); }
+.shop-set-header .shop-from { background: #140d08e6; border: 1px solid var(--edge); }
 .modal-backdrop { background: #0a0603d9; }
 .modal { border-radius: 10px; }
 
