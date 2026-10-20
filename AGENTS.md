@@ -86,7 +86,9 @@ Le jeu est un client lourd : **il n'y a pas de serveur à héberger**. L'app con
          │     └── écrit sets/, prices.json, artists.json, guests.json, manifest.json (rename atomique, manifest en dernier)
          └── émet l'événement `data-status` (message + pourcentage estimé) ; l'UI affiche une barre de progression et se recharge à la fin
 [Client Unsealed]
-   └── reste jouable sur les anciennes données pendant la mise à jour (ou affiche une erreur non bloquante hors ligne)
+   └── premier lancement (aucun set, `get_data_info`) : écran « Préparation du jeu » (`Preparing.tsx`) à la place de l'accueil, jusqu'à la fin du build ; en cas d'échec (hors ligne…), son message et « Réessayer » (`retry_data_update`, qui relance le build après un échec)
+   └── ensuite, reste jouable sur les anciennes données pendant la mise à jour : bande dorée avec sa jauge en haut de la scène (`DataStatusBar`), ou une erreur non bloquante hors ligne
+   └── filet de sécurité : sans aucun set pendant une préparation, Boosterium, Ouvrir et Collection montrent la préparation (`DataPreparing`) plutôt qu'une liste vide
    └── charge les images depuis le CDN Scryfall
 ```
 
@@ -180,7 +182,7 @@ Le jeu est un client lourd : **il n'y a pas de serveur à héberger**. L'app con
 - **Sauvegarde automatique** : chaque action est enregistrée aussitôt. **Sauvegarde manuelle** = « Save point » : une copie de la partie (`VACUUM INTO`), chargeable plus tard ; elle compte comme jouée juste avant l'originale, pour que « Continuer » reprenne l'originale.
 - L'ancienne sauvegarde unique (`unsealed.sqlite`) est adoptée comme première partie au premier lancement, puis renommée en `.migrated`.
 - **Chargement** : écran de démarrage inline dans `index.html` et fond de fenêtre sombre (`backgroundColor`) pour éviter tout écran blanc ; composant `Loading` sur chaque écran qui attend des données.
-- **À propos** : description, gratuité et absence de valeur réelle, notice de la Fan Content Policy mot pour mot (`app/src/legal.ts`), crédits Scryfall et MTGJSON. En haut, la communauté « The Boosterium » avec un bouton vers le Discord ; en bas de page, un bouton vers le code source sur GitHub (`MrGrabazu/unsealed`). Chacun porte le logo du service (tracés Simple Icons, CC0), ouverts dans le navigateur par `tauri-plugin-opener`.
+- **À propos** : description, gratuité et absence de valeur réelle, notice de la Fan Content Policy mot pour mot (`app/src/legal.ts`), crédits Scryfall et MTGJSON, puis la section « Licence » (code sous GPL v3.0 ou ultérieure, créations sous CC BY-NC-SA 4.0, nom et logo non concédés comme marques, polices et contenus tiers sous leurs propres conditions) avec un bouton vers `LICENSE-ASSETS` sur GitHub. En haut, la communauté « The Boosterium » avec un bouton vers le Discord ; en bas de page, un bouton vers le code source sur GitHub (`MrGrabazu/unsealed`). Chacun porte le logo du service (tracés Simple Icons, CC0), ouverts dans le navigateur par `tauri-plugin-opener`.
 
 ## 8 ter bis. Identité visuelle
 

@@ -506,6 +506,8 @@ export const getDataInfo = () => invoke<DataInfo>("get_data_info");
 /** Language of card names, card images and set names (English when not printed in it). */
 export const setCardLanguage = (lang: string) => invoke<void>("set_card_language", { lang });
 export const getDataStatus = () => invoke<DataStatus>("get_data_status");
+/** Prepares the data again after a failure (nothing happens otherwise). */
+export const retryDataUpdate = () => invoke<void>("retry_data_update");
 /** `lang`: the interface language, for the achievements' names and descriptions. */
 export const getAchievements = (lang: string) => invoke<AchievementsView>("get_achievements", { lang });
 export const takeUnlocks = (lang: string) => invoke<AchievementView[]>("take_unlocks", { lang });

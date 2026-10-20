@@ -22,7 +22,7 @@ use unsealed_core::economy::EconomyConfig;
 use unsealed_core::limited::LimitedConfig;
 use unsealed_core::scryfall;
 use unsealed_core::update::DataConfig;
-use updater::{DataStatus, SharedStatus};
+use updater::{DataStatus, Refresh, SharedStatus};
 
 /// Economy settings shipped with the app. A `economy.json` in the data directory
 /// overrides them (this is how published balance changes will reach players).
@@ -152,6 +152,12 @@ fn delete_save(state: State<'_, SessionState>, id: String) -> Result<(), String>
 #[tauri::command]
 fn get_data_status(status: State<'_, SharedStatus>) -> DataStatus {
     status.lock().map(|s| s.clone()).unwrap_or(DataStatus::Checking)
+}
+
+/// Prepares the data again after a failure (the player was offline…).
+#[tauri::command]
+fn retry_data_update(app: tauri::AppHandle, status: State<'_, SharedStatus>, refresh: State<'_, Arc<Refresh>>) {
+    updater::retry(app, status.inner().clone(), refresh.inner().clone());
 }
 
 #[tauri::command]
@@ -515,10 +521,12 @@ pub fn run() {
 
             let status: SharedStatus = Arc::new(Mutex::new(DataStatus::Checking));
             app.manage(status.clone());
+            let refresh = Arc::new(Refresh { data_dir, cache_dir: resolve_cache_dir(app.handle())?, cfg: data_config });
+            app.manage(refresh.clone());
             if std::env::var("UNSEALED_NO_UPDATE").is_ok() {
                 *status.lock().expect("fresh mutex") = DataStatus::UpToDate;
             } else {
-                updater::spawn(app.handle().clone(), status, data_dir, resolve_cache_dir(app.handle())?, data_config);
+                updater::spawn(app.handle().clone(), status, refresh);
             }
             Ok(())
         })
@@ -531,6 +539,7 @@ pub fn run() {
             rename_save,
             delete_save,
             get_data_status,
+            retry_data_update,
             get_data_info,
             list_sets,
             set_card_language,

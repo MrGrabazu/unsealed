@@ -30,6 +30,13 @@ pub enum DataStatus {
 
 pub type SharedStatus = Arc<Mutex<DataStatus>>;
 
+/// What a refresh needs, kept to start one again after a failure (`retry`).
+pub struct Refresh {
+    pub data_dir: PathBuf,
+    pub cache_dir: PathBuf,
+    pub cfg: DataConfig,
+}
+
 fn set_status(app: &AppHandle, shared: &SharedStatus, status: DataStatus) {
     if let Ok(mut current) = shared.lock() {
         *current = status.clone();
@@ -45,11 +52,22 @@ fn read_manifest(data_dir: &Path) -> Option<Manifest> {
     serde_json::from_str(&fs::read_to_string(data_dir.join("manifest.json")).ok()?).ok()
 }
 
+/// Starts the refresh again after a failure (offline at the first launch…). Does nothing
+/// while one is running or when the data is up to date.
+pub fn retry(app: AppHandle, status: SharedStatus, refresh: Arc<Refresh>) {
+    let failed = status.lock().is_ok_and(|s| matches!(*s, DataStatus::Failed { .. }));
+    if failed {
+        set_status(&app, &status, DataStatus::Checking);
+        spawn(app, status, refresh);
+    }
+}
+
 /// Starts the refresh check on its own thread. Never blocks the UI and never panics the app.
-pub fn spawn(app: AppHandle, status: SharedStatus, data_dir: PathBuf, cache_dir: PathBuf, cfg: DataConfig) {
+pub fn spawn(app: AppHandle, status: SharedStatus, refresh: Arc<Refresh>) {
     std::thread::spawn(move || {
-        let local = read_manifest(&data_dir);
-        let Some(reason) = refresh_reason(local.as_ref(), &cfg, now_secs()) else {
+        let Refresh { data_dir, cache_dir, cfg } = &*refresh;
+        let local = read_manifest(data_dir);
+        let Some(reason) = refresh_reason(local.as_ref(), cfg, now_secs()) else {
             set_status(&app, &status, DataStatus::UpToDate);
             return;
         };
@@ -60,8 +78,8 @@ pub fn spawn(app: AppHandle, status: SharedStatus, data_dir: PathBuf, cache_dir:
             sets: cfg.sets.clone(),
             set_types: cfg.set_types.clone(),
             boosters: cfg.boosters.clone(),
-            out: data_dir,
-            cache: cache_dir,
+            out: data_dir.clone(),
+            cache: cache_dir.clone(),
             sim_boosters: cfg.sim_boosters,
             token_foil_one_in: cfg.token_foil_one_in,
             art_cards: cfg.art_cards.clone(),

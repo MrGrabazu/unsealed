@@ -37,6 +37,13 @@ export const de: Messages = {
   "data.updating": "Kartendaten und Preise werden aktualisiert ({percent} %): {step}…",
   "data.failed": "Kartendaten konnten nicht aktualisiert werden ({reason}). Du spielst mit den bereits geladenen Daten weiter.",
   "data.none": "Noch keine Kartendaten. Sie werden automatisch geladen, sobald die App mit Internetverbindung startet.",
+  "data.prepareCartouche": "Erster Start",
+  "data.prepareTitle": "Das Spiel wird vorbereitet",
+  "data.prepareChecking": "Die Spieldaten werden geprüft…",
+  "data.prepareHint": "Sets, Karten und Preise werden heruntergeladen und geprüft: ein paar Minuten, nur dieses eine Mal. Danach aktualisiert sich das Spiel im Hintergrund, während du spielst.",
+  "data.prepareFailedTitle": "Das Spiel konnte nicht vorbereitet werden",
+  "data.prepareFailed": "Seine Daten (Sets, Karten, Preise) konnten nicht heruntergeladen werden. Prüfe deine Verbindung und versuche es erneut.",
+  "data.retry": "Erneut versuchen",
 
   // ---- home screen
   "home.continue": "Weiterspielen",
@@ -451,6 +458,14 @@ export const de: Messages = {
   "about.fcp1":
     "Unsealed steht in keiner Verbindung zu Wizards of the Coast und wird von Wizards of the Coast weder unterstützt, gesponsert noch genehmigt. Magic: The Gathering, die Kartennamen, Kartenbilder, Mana- und Erweiterungssymbole sind Marken und urheberrechtlich geschütztes Material von Wizards of the Coast LLC und werden hier im Rahmen der Fan Content Policy verwendet. Die Kartenillustrationen gehören Wizards of the Coast und den jeweiligen Künstlern, die überall dort genannt werden, wo eine Illustration für sich allein gezeigt wird.",
   "about.fcp2": "Die Erfolgskarten sind eigene Kreationen von Unsealed und geben kein Design von Wizards of the Coast wieder.",
+  "about.licenseTitle": "Lizenz",
+  "about.license1":
+    "Der Quellcode von Unsealed steht unter der GNU GPL v3.0 (oder später): Jeder darf ihn weiterverwenden und ändern, aber jede verbreitete Version muss unter dieser Lizenz bleiben und ihren Quellcode veröffentlichen.",
+  "about.license2":
+    "Logo, Symbol, Kartenrückseite, Verpackungen, Erfolgskarten und die Texte des Spiels stehen unter Creative Commons BY-NC-SA 4.0: Teilen und Bearbeiten ohne kommerzielle Nutzung erlaubt, mit Nennung „Unsealed, von MrGrabazu“ und unter derselben Lizenz.",
+  "about.license3":
+    "Der Name „Unsealed“ und sein Logo sind als Marken nicht lizenziert. Die Schriften Cinzel und Alegreya stehen unter der SIL Open Font License; Inhalte von Wizards of the Coast, Scryfall und MTGJSON unterliegen deren eigenen Bedingungen.",
+  "about.viewLicense": "Lizenzen lesen",
   "about.sourcesTitle": "Datenquellen",
   "about.sources1":
     "Kartenbilder, Set-Symbole und Preise werden von Scryfall (scryfall.com) bereitgestellt. Unsealed wird nicht von Scryfall erstellt oder unterstützt.",

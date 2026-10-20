@@ -45,7 +45,7 @@ const PackOpening3D = lazy(() => import("./PackOpening3D").then((m) => ({ defaul
 import { Boosterium } from "./Boosterium";
 import { Collection } from "./Collection";
 import { kindLabel, rewardText } from "./boosterKinds";
-import { DataStatusBar, useDataStatus } from "./DataStatus";
+import { DataPreparing, DataStatusBar, useDataStatus } from "./DataStatus";
 import { Ambience } from "./Ambience";
 import { BackToTop } from "./BackToTop";
 import { History } from "./History";
@@ -395,6 +395,12 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
 
   // The backend refreshes the card data in the background; reload everything once it is done.
   const dataStatus = useDataStatus(loadAll);
+  // No set yet while the data is being prepared (or failed to be): the screens that need
+  // sets show the preparation instead of an empty list.
+  const waitingForData =
+    (tab === "boosterium" || tab === "open" || tab === "collection") &&
+    sets.length === 0 &&
+    (dataStatus.state === "updating" || dataStatus.state === "failed");
 
   /** Runs a game action with the busy flag and error handling. */
   async function run(action: () => Promise<void>) {
@@ -655,17 +661,20 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
         </nav>
 
         <main className="stage" ref={stage}>
-        <DataStatusBar status={dataStatus} />
+        {!waitingForData && <DataStatusBar status={dataStatus} />}
         {error && <p className="error">{error}</p>}
         {notice && <p className="notice">{notice}</p>}
         {!wallet && !error && <Loading label={t("game.loading")} />}
-        {wallet &&
-          !error &&
-          sets.length === 0 &&
-          dataStatus.state !== "updating" &&
-          dataStatus.state !== "checking" && <p className="hint">{t("data.none")}</p>}
+        {wallet && !error && sets.length === 0 && dataStatus.state === "upToDate" && <p className="hint">{t("data.none")}</p>}
+        {/* No set yet, the data being prepared: say so, rather than show empty screens. */}
+        {wallet && waitingForData && (
+          <section className="frame data-wait">
+            <div className="cartouche">{t("data.prepareCartouche")}</div>
+            <DataPreparing status={dataStatus} />
+          </section>
+        )}
 
-        {tab === "boosterium" && wallet && (
+        {tab === "boosterium" && wallet && !waitingForData && (
           <Boosterium
             shop={shop}
             sets={sets}
@@ -677,7 +686,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
           />
         )}
 
-        {tab === "open" && wallet && (
+        {tab === "open" && wallet && !waitingForData && (
           <>
             {pack && cards && resultShown && !batch ? (
               <OpeningResult
@@ -848,7 +857,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
           <CardDetails setCode={detailsOf.setCode} uuid={detailsOf.uuid} onClose={() => setDetailsOf(null)} />
         )}
 
-        {tab === "collection" && (
+        {tab === "collection" && !waitingForData && (
           <Collection
             sets={sets}
             refreshKey={openings}

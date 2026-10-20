@@ -8,6 +8,8 @@ import { FAN_CONTENT_NOTICE } from "./legal";
 const DISCORD_URL = "https://discord.gg/B5P3NJYke";
 /** The game's source code. */
 const GITHUB_URL = "https://github.com/MrGrabazu/unsealed";
+/** The licenses: this file says what each one covers, and holds the Creative Commons text. */
+const LICENSE_URL = "https://github.com/MrGrabazu/unsealed/blob/main/LICENSE-ASSETS";
 
 /** Brand marks (Simple Icons, CC0), only used to label the links to these services. */
 const DISCORD_ICON =
@@ -80,6 +82,18 @@ export function About({ onBack }: { onBack: () => void }) {
         <li>{t("about.sources1")}</li>
         <li>{t("about.sources2")}</li>
       </ul>
+
+      <h3>{t("about.licenseTitle")}</h3>
+      <ul>
+        <li>{t("about.license1")}</li>
+        <li>{t("about.license2")}</li>
+        <li>{t("about.license3")}</li>
+      </ul>
+      <p>
+        <button onClick={() => void openUrl(LICENSE_URL)}>
+          {t("about.viewLicense")}
+        </button>
+      </p>
 
       <div className="about-footer">
         <button className="brand-link" onClick={() => void openUrl(GITHUB_URL)}>

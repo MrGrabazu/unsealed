@@ -77,6 +77,30 @@
 .res .v .money { gap: 7px; }
 .res .s { font: 700 12px var(--font-text); color: var(--accent); cursor: help; }
 .res .income-float { right: 12px; top: -6px; }
+/* The data refresh while the game is playable: a gilded strip with its gauge. */
+.data-status { display: flex; align-items: center; gap: 14px; margin: 0 0 16px; padding: 8px 16px; border: 1px solid var(--edge); border-radius: 8px;
+  background: linear-gradient(180deg, #2e1f15, #1f150e); box-shadow: inset 0 0 0 1px #d9a4411c, 0 4px 12px #0008; }
+.data-status-text { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; color: #e6d3ab; }
+.data-status .bar { flex: 1 1 160px; min-width: 120px; }
+.data-status.failed { display: block; color: var(--muted); font-size: 14px; }
+/* Above a screen of panels (which takes the stage's whole height), the strip takes its share. */
+.stage:has(> .data-status) > .split:not(.flow) { height: calc(100% - 56px); }
+
+/* The data being prepared (first launch): its own screen, or in place of an empty one. */
+.data-preparing { display: grid; justify-items: center; gap: 12px; text-align: center; }
+.data-preparing h2 { margin: 0; padding: 0; background: none; font-size: 24px; color: var(--gold-hi); }
+.data-preparing p { margin: 0; max-width: 560px; }
+.prepare-gauge { width: min(520px, 100%); display: flex; align-items: center; gap: 12px; }
+.prepare-gauge .bar { flex: 1; height: 14px; border-radius: 7px; }
+.prepare-gauge .bar i { border-radius: 7px; transition: width .4s ease; }
+.prepare-gauge b { min-width: 52px; text-align: right; font: 800 18px var(--font-title); color: var(--gold-hi); }
+.prepare-step { color: #e6d3ab; font-style: italic; }
+.data-preparing button.big { width: auto; padding: 12px 44px; }
+.preparing { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px; padding: 30px 20px; }
+.preparing .frame.preparing-frame { width: min(680px, 100%); padding: 34px 28px 26px; }
+.preparing-legal { max-width: 720px; font-size: 12px; color: var(--muted); text-align: center; }
+.frame.data-wait { max-width: 760px; margin: 40px auto; padding: 34px 28px 26px; }
+
 /* A newer version, in the corner of the home screen. */
 .update-notice.frame { position: fixed; z-index: 50; right: 24px; top: 30px; width: 280px; padding: 26px 18px 16px; display: grid; gap: 10px; text-align: center; }
 .update-notice p { margin: 0; color: #cdbb9b; }
