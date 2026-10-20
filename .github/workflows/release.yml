@@ -1,8 +1,8 @@
 # Publishes a version: pushing a tag "v0.3.0" builds the installers (Windows, macOS, Linux),
 # signs them for the in-app updater, and creates the GitHub release with them and
 # `latest.json` (what the app's updater reads, one entry per platform). Secrets:
-# TAURI_SIGNING_PRIVATE_KEY (the content of the private key) and
-# TAURI_SIGNING_PRIVATE_KEY_PASSWORD (empty if the key has none).
+# TAURI_SIGNING_PRIVATE_KEY (the content of the private key),
+# TAURI_SIGNING_PRIVATE_KEY_PASSWORD (left out: the key has none) and RELEASE_TOKEN.
 name: Release
 
 on:
@@ -69,7 +69,10 @@ jobs:
 
       - uses: tauri-apps/tauri-action@v0
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The release is created with a personal token (secret RELEASE_TOKEN, fine-grained,
+          # Contents: read and write on this repository): the workflow's own token was refused
+          # ("Resource not accessible by integration") even with write permissions.
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
