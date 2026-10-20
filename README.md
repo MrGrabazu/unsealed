@@ -14,6 +14,8 @@ watch your cards follow **real market prices**, and fill your binders. With virt
 [![Latest release](https://img.shields.io/github/v/release/MrGrabazu/unsealed?style=for-the-badge&label=version&color=a61f28&labelColor=2e1f15)](https://github.com/MrGrabazu/unsealed/releases/latest)
 &nbsp;
 [![Discord](https://img.shields.io/badge/Discord-The_Boosterium-5865F2?style=for-the-badge&logo=discord&logoColor=white&labelColor=2e1f15)](https://discord.gg/B5P3NJYke)
+&nbsp;
+[![License](https://img.shields.io/badge/license-GPL--3.0-d9a441?style=for-the-badge&labelColor=2e1f15)](LICENSE)
 
 **[🌐 mrgrabazu.github.io/unsealed](https://mrgrabazu.github.io/unsealed/)**: the showcase page, with the installer for your system.
 
@@ -104,6 +106,18 @@ A version is published by pushing a tag `vX.Y.Z`: GitHub Actions builds and sign
 systems and creates the release.
 
 </details>
+
+## ⚖️ License
+
+| What | License |
+|---|---|
+| **The source code** | [GNU GPL v3.0 or later](LICENSE): reuse and modify it freely, but any version you distribute stays under the GPL, with its source code published. |
+| **The artwork, visual identity and texts** (logo, icon, card back, wrappers, achievement cards, screenshots, page and README texts) | [CC BY-NC-SA 4.0](LICENSE-ASSETS): share and adapt them for non-commercial purposes, crediting *Unsealed, by MrGrabazu*, under the same license. |
+| **The name and logo as marks** | Not licensed: don't present another game or version as Unsealed. |
+
+The fonts (Cinzel, Alegreya) stay under the SIL Open Font License. Magic: The Gathering cards, images and names belong
+to Wizards of the Coast; card data and prices come from Scryfall and MTGJSON, under their own terms. See
+[LICENSE-ASSETS](LICENSE-ASSETS) for the details.
 
 ## 💬 Community
 

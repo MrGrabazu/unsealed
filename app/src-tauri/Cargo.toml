@@ -3,6 +3,7 @@ name = "unsealed-app"
 version = "0.3.1"
 edition = "2021"
 description = "Unsealed desktop app (Tauri shell around unsealed-core)"
+license = "GPL-3.0-or-later"
 
 [lib]
 name = "unsealed_app_lib"

@@ -31,6 +31,11 @@
   - ne pas placer leurs données derrière un paywall ;
   - respecter leurs limites de requêtes et envoyer les en-têtes `User-Agent` et `Accept` requis.
 
+### Licences du projet
+- **Code** : GNU GPL v3.0 ou ultérieure (`LICENSE`, champ `license` des `Cargo.toml` et de `app/package.json`).
+- **Créations** (logo, icône, dos des cartes, emballages, cartes d'achievement, captures, textes de la page et du README, noms et descriptions des achievements) : CC BY-NC-SA 4.0 (`LICENSE-ASSETS`, qui liste ce qu'elle couvre ; généré par `node .cache/make-assets-license.js` depuis le texte officiel).
+- Le nom « Unsealed » et le logo, comme marques, ne sont pas licenciés. Polices sous SIL OFL ; contenus de Wizards, Scryfall et MTGJSON sous leurs propres conditions.
+
 ### Cartes d'achievement (non-Magic)
 - Même **format** que les cartes Magic (ratio 63×88 mm, mêmes interactions dans la collection).
 - **Cadre et identité visuelle 100 % originaux** : ne jamais reproduire le cadre ou la mise en page des cartes Magic.

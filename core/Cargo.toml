@@ -3,6 +3,7 @@ name = "unsealed-core"
 version = "0.3.1"
 edition = "2021"
 description = "Unsealed: booster config parsing, seeded weighted draw and simulation"
+license = "GPL-3.0-or-later"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
