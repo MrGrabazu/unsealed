@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { getPinnedSets, setPinnedSets, type SetSummary, type ShopItem, type WalletView } from "./api";
+import { getArtifacts, getPinnedSets, setPinnedSets, type ArtifactView, type SetSummary, type ShopItem, type WalletView } from "./api";
+import { ArtifactGlyph, artifactMetal } from "./ArtifactGlyph";
 import { BackToTop } from "./BackToTop";
 import { kindLabel, kindRank } from "./boosterKinds";
 import { useI18n } from "./i18n";
-import { Money, useMoney, useMoneyText } from "./money";
+import { Money, useAmountsInText, useMoney, useMoneyText } from "./money";
 import { PriceTrend } from "./PriceTrend";
 import { SetIcon } from "./SetIcon";
 
@@ -15,9 +16,15 @@ interface Props {
   onBuy: (item: ShopItem, quantity: number, openNow: boolean) => void;
   onClaimCharity: () => void;
   busy: boolean;
-  /** A set to show on arrival (from its collection); `at` tells two requests apart. */
+  /** A set to show on arrival (from its collection, or `CURIOS`); `at` tells two requests apart. */
   focus?: { setCode: string; at: number } | null;
+  /** Bumped when an artifact is got: the curios on sale are read again. */
+  artifactsKey: number;
+  onBuyArtifact: (id: string) => void;
 }
+
+/** The curios' entry in the list (in place of a set code). */
+export const CURIOS = "__curios";
 
 /** Budget filter choices, in cents (0 = any price). */
 const PRICE_LIMITS = [0, 1_000, 2_500, 5_000];
@@ -34,10 +41,18 @@ interface SetGroup {
 
 /** The shop, laid out like a game's: every set as an illustrated slot (the favourites
  * first), and the chosen one beside them with its boosters and a single way to buy. */
-export function Boosterium({ shop, sets, wallet, onBuy, onClaimCharity, busy, focus }: Props) {
+export function Boosterium({ shop, sets, wallet, onBuy, onClaimCharity, busy, focus, artifactsKey, onBuyArtifact }: Props) {
   const money = useMoney();
   const moneyText = useMoneyText();
-  const { t, tx } = useI18n();
+  const { t, tx, lang, plural } = useI18n();
+  const amountsInText = useAmountsInText();
+  // The artifacts on sale (each one once: gone when bought).
+  const [curios, setCurios] = useState<ArtifactView[]>([]);
+  useEffect(() => {
+    getArtifacts(lang)
+      .then((all) => setCurios(all.filter((a) => a.status === "shop")))
+      .catch(() => setCurios([]));
+  }, [artifactsKey, lang]);
   const [search, setSearch] = useState("");
   const [year, setYear] = useState("all");
   const [maxPrice, setMaxPrice] = useState(0);
@@ -97,8 +112,9 @@ export function Boosterium({ shop, sets, wallet, onBuy, onClaimCharity, busy, fo
   const favorites = groups.filter((g) => pinned.includes(g.set.code));
   const others = groups.filter((g) => !pinned.includes(g.set.code));
 
-  // The chosen set: the one picked, else the first favourite, else the newest.
-  const current = groups.find((g) => g.set.code === chosen) ?? favorites[0] ?? others[0] ?? null;
+  // The chosen set: the one picked, else the first favourite, else the newest; or the curios.
+  const showCurios = chosen === CURIOS && curios.length > 0;
+  const current = showCurios ? null : (groups.find((g) => g.set.code === chosen) ?? favorites[0] ?? others[0] ?? null);
   const item = current?.products.find((p) => p.kind === kind) ?? current?.products[0] ?? null;
   const total = item ? item.priceCents * quantity : 0;
   const affordable = !!item && wallet.balanceCents >= total;
@@ -202,6 +218,24 @@ export function Boosterium({ shop, sets, wallet, onBuy, onClaimCharity, busy, fo
           </select>
         </div>
         <div className="scroll" ref={list}>
+          {/* The curios on sale: one entry, opening them in the panel. */}
+          {curios.length > 0 && (
+            <button
+              id={`shop-set-${CURIOS}`}
+              className={`slot curios-slot ${showCurios ? "sel" : ""}`}
+              onClick={() => setChosen(CURIOS)}
+            >
+              <span className="curios-row">
+                {curios.slice(0, 5).map((a) => (
+                  <ArtifactGlyph key={a.id} glyph={a.glyph} color={artifactMetal(a.glyph, a.rarity)} />
+                ))}
+              </span>
+              <span className="slot-plate">
+                <b>{t("curios.shopTitle")}</b>
+                <span>{plural("curios.onSaleCount", curios.length)}</span>
+              </span>
+            </button>
+          )}
           {groups.length === 0 && <p className="hint">{t("shop.noMatch")}</p>}
           {favorites.length > 0 && (
             <>
@@ -216,7 +250,33 @@ export function Boosterium({ shop, sets, wallet, onBuy, onClaimCharity, busy, fo
       </section>
 
       <section className="frame set-detail">
-        {current && item ? (
+        {showCurios ? (
+          <>
+            <div className="cartouche">{t("curios.shopTitle")}</div>
+            <div className="scroll">
+              <p className="hint">{t("curios.shopHint")}</p>
+              {curios.map((a) => {
+                const metal = artifactMetal(a.glyph, a.rarity);
+                const price = a.priceCents ?? 0;
+                return (
+                  <div key={a.id} className="curio-ware" style={{ ["--metal" as string]: metal }}>
+                    <span className="curio-ware-glyph">
+                      <ArtifactGlyph glyph={a.glyph} color={metal} />
+                    </span>
+                    <div>
+                      <b>{a.name}</b>
+                      <small style={{ color: metal }}>{t(`curios.rarity.${a.rarity}`)}</small>
+                      <p>{amountsInText(a.effect ?? "")}</p>
+                      <button className="big" disabled={busy || wallet.balanceCents < price} onClick={() => onBuyArtifact(a.id)}>
+                        {tx("shop.buyFor", { amount: money(price) })}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        ) : current && item ? (
           <>
             <div className="cartouche">{current.set.name}</div>
             <div className="scroll">

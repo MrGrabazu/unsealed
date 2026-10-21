@@ -23,7 +23,10 @@ pub struct IncomeView {
     pub earned_cents: i64,
     /// The time this call paid for, in minutes (capped).
     pub minutes: f64,
+    /// The share of its value it earns a minute (smaller as it grows).
     pub percent_per_minute: f64,
+    /// The most it can earn a minute, the artifacts' bonuses counted (none: no limit).
+    pub max_per_minute_cents: Option<f64>,
     pub offline_cap_minutes: u32,
 }
 
@@ -42,16 +45,24 @@ impl Game {
         };
         let paid_until = meta(PAID_UNTIL).and_then(|v| v.parse::<i64>().ok());
         let carry = meta(CARRY).and_then(|v| v.parse::<f64>().ok()).unwrap_or(0.0);
-        let rules = &self.economy.income;
+        // The artifacts': more per minute, for longer while away.
+        let completed = if self.bonuses().counts_completed_sets() { self.completed_sets() } else { 0 };
+        let bonus = f64::from(self.bonuses().income_bonus(completed));
+        let mut rules = self.economy.income.boosted((1.0 + bonus / 100.0) * f64::from(self.bonuses().income_factor));
+        rules.offline_cap_minutes = rules.offline_cap_minutes.max(self.bonuses().offline_cap_minutes.unwrap_or(0));
+        let rules = &rules;
         let minutes = paid_until.map_or(0.0, |at| (now - at).max(0) as f64 / 60.0);
         let total = rules.earned_cents(value, minutes) + carry;
         let earned = total.floor();
+        let per_minute = rules.per_minute_cents(value);
         let view = IncomeView {
             collection_value_cents: value,
-            per_minute_cents: rules.earned_cents(value, 1.0),
+            per_minute_cents: per_minute,
             earned_cents: earned as i64,
             minutes: minutes.min(f64::from(rules.offline_cap_minutes)),
-            percent_per_minute: rules.percent_per_minute,
+            // The share really earned: smaller as the collection grows.
+            percent_per_minute: if value > 0 { per_minute * 100.0 / value as f64 } else { rules.percent_per_minute },
+            max_per_minute_cents: rules.max_per_minute_cents,
             offline_cap_minutes: rules.offline_cap_minutes,
         };
         let saved = [(PAID_UNTIL, now.to_string()), (CARRY, (total - earned).to_string()), (VALUE, value.to_string())];
@@ -67,13 +78,14 @@ impl Game {
     /// What the collection would sell for at the Boosterium, on real market prices only:
     /// estimated prices (a limited card's multiplied ones among them) and rarity fallbacks
     /// earn nothing.
-    fn collection_resale_value(&self) -> Result<i64, String> {
+    pub(super) fn collection_resale_value(&self) -> Result<i64, String> {
         let Some(prices) = self.prices.as_ref() else { return Ok(0) };
         let mut value = 0i64;
         for (uuid, foil, quantity) in self.store.owned_cards().map_err(err)? {
             let Some(entry) = prices.cards.get(&uuid).filter(|p| !p.estimated) else { continue };
             if let Some(market) = self.economy.market_price_cents(entry, foil) {
-                value += i64::from(self.economy.sell_value_cents(market)) * i64::from(quantity);
+                // At the artifacts' better rates for the cards of the sets at hand.
+                value += i64::from(self.sell_value_of(&uuid, foil, market)) * i64::from(quantity);
             }
         }
         Ok(value)

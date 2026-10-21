@@ -103,7 +103,10 @@ export interface IncomeView {
   earnedCents: number;
   /** The time this call paid for, in minutes (capped). */
   minutes: number;
+  /** The share of its value it earns a minute (smaller as it grows). */
   percentPerMinute: number;
+  /** The most it can earn a minute, the artifacts' bonuses counted (null: no limit). */
+  maxPerMinuteCents: number | null;
   offlineCapMinutes: number;
 }
 
@@ -197,6 +200,24 @@ export interface OpenedBooster {
   cards: OpenedCard[];
   bets: SettledBet[];
   skipped: SkippedBet[];
+  /** The artifact found in it, if any: shown at the end of the opening. */
+  artifact: ArtifactView | null;
+}
+
+/** An artifact of the cabinet. One neither owned nor on sale keeps its secrets: no name,
+ * effect nor flavour, only its drawing (shown as a silhouette) and its source's kind. */
+export interface ArtifactView {
+  id: string;
+  number: number;
+  rarity: "common" | "uncommon" | "rare" | "mythic";
+  glyph: string;
+  status: "owned" | "shop" | "hidden";
+  name: string | null;
+  effect: string | null;
+  flavor: string | null;
+  source: "shop" | "booster" | "achievement" | "allOthers";
+  priceCents: number | null;
+  acquiredAt: number | null;
 }
 
 /** A binder on the library's shelves: a set the player owns cards of. */
@@ -278,6 +299,8 @@ export interface WalletView {
   currency: { sealsPerCent: number };
   charity: { amountCents: number; available: boolean };
   sealed: SealedStack[];
+  /** What the artifacts owned change in amounts the interface works out itself. */
+  artifactPerks: { duplicatesPercent: number; crowned: boolean };
 }
 
 export interface ShopItem {
@@ -375,6 +398,8 @@ export interface StatsView {
   distinctCards: number;
   /** Today's market value of the collection. */
   collectionValueCents: number;
+  /** What the Boosterium would pay for it, on real market prices only (as in the header). */
+  collectionSellValueCents: number;
   /** What the Boosterium would pay today for the sealed boosters. */
   sealedValueCents: number;
   bestBooster: OpeningView | null;
@@ -511,6 +536,10 @@ export const retryDataUpdate = () => invoke<void>("retry_data_update");
 /** `lang`: the interface language, for the achievements' names and descriptions. */
 export const getAchievements = (lang: string) => invoke<AchievementsView>("get_achievements", { lang });
 export const takeUnlocks = (lang: string) => invoke<AchievementView[]>("take_unlocks", { lang });
+export const getArtifacts = (lang: string) => invoke<ArtifactView[]>("get_artifacts", { lang });
+export const buyArtifact = (id: string, lang: string) => invoke<ArtifactView>("buy_artifact", { id, lang });
+/** Artifacts given since the last call (by achievements), to celebrate. */
+export const takeGivenArtifacts = (lang: string) => invoke<ArtifactView[]>("take_given_artifacts", { lang });
 export const listSets = () => invoke<SetSummary[]>("list_sets");
 export const getWallet = () => invoke<WalletView>("get_wallet");
 export const getShop = () => invoke<ShopItem[]>("get_shop");

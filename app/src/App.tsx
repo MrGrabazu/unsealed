@@ -27,9 +27,10 @@ export function App() {
   useEffect(checkData, [checkData]);
   const dataStatus = useDataStatus(checkData);
 
-  // The window opens in full screen: back in a window if the player chose so. F11 switches.
+  // The window opens in the display chosen; this keeps the app's copy of the choice in step
+  // with this window's (a choice made before the app kept one). F11 switches.
   useEffect(() => {
-    if (!getFullscreen()) void setFullscreen(false);
+    void setFullscreen(getFullscreen());
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "F11") return;
       e.preventDefault();

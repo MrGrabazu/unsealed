@@ -5,6 +5,7 @@ import { CARD_LANGUAGES, LANGUAGES, useI18n, type CardLangSetting, type Lang } f
 import { Loading } from "./Loading";
 import { getFullscreen, setFullscreen } from "./fullscreen";
 import { getOpening3d, setOpening3d } from "./settings";
+import { getMusicOn, getMusicVolume, refreshMusic, setMusicOn, setMusicVolume } from "./music";
 import { getSoundOn, getVolume, setSoundOn, setVolume, sounds } from "./sound";
 
 /** Settings: the language, and what the downloaded game data contains. */
@@ -15,6 +16,8 @@ export function Options({ onBack }: { onBack: () => void }) {
   const [fullscreen, setFullscreenState] = useState(getFullscreen);
   const [soundOn, setSoundOnState] = useState(getSoundOn);
   const [volume, setVolumeState] = useState(getVolume);
+  const [musicOn, setMusicOnState] = useState(getMusicOn);
+  const [musicVolume, setMusicVolumeState] = useState(getMusicVolume);
   const [error, setError] = useState<string | null>(null);
   const reload = () =>
     getDataInfo()
@@ -95,6 +98,7 @@ export function Options({ onBack }: { onBack: () => void }) {
           onChange={(e) => {
             setSoundOn(e.target.checked);
             setSoundOnState(e.target.checked);
+            refreshMusic();
             if (e.target.checked) sounds.coins();
           }}
         />
@@ -117,6 +121,34 @@ export function Options({ onBack }: { onBack: () => void }) {
           onKeyUp={() => setVolume(volume)}
         />
       </label>
+      <label className="checkbox">
+        <input
+          type="checkbox"
+          checked={musicOn}
+          disabled={!soundOn}
+          onChange={(e) => {
+            setMusicOn(e.target.checked);
+            setMusicOnState(e.target.checked);
+          }}
+        />
+        {t("options.musicOn")}
+      </label>
+      <label className="checkbox volume">
+        {t("options.musicVolume")}
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={Math.round(musicVolume * 100)}
+          disabled={!soundOn || !musicOn}
+          onChange={(e) => {
+            const v = Number(e.target.value) / 100;
+            setMusicVolumeState(v);
+            setMusicVolume(v);
+          }}
+        />
+      </label>
+      <p className="hint">{t("options.musicHint")}</p>
 
       <h3>{t("options.data")}</h3>
       <DataStatusBar status={dataStatus} />

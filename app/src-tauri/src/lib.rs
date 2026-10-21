@@ -11,6 +11,7 @@ use game::{
     Game, HistoryView, SaleRequest, SaleResult, SetSummary, ShopItem, StatsView, WalletView,
 };
 use saves::{SaveInfo, Saves};
+use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -18,6 +19,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{Manager, State};
 use unsealed_core::achievements::Engine;
+use unsealed_core::artifacts::{ArtifactTranslations, ArtifactsConfig};
 use unsealed_core::economy::EconomyConfig;
 use unsealed_core::limited::LimitedConfig;
 use unsealed_core::scryfall;
@@ -46,6 +48,16 @@ const ACHIEVEMENT_TRANSLATIONS: &[(&str, &str)] = &[
     ("it", include_str!("../../../config/achievements.it.json")),
 ];
 
+/// The artifacts (`artifacts.json`) and their translations (`artifacts.<lang>.json`),
+/// overridable the same way.
+const DEFAULT_ARTIFACTS: &str = include_str!("../../../config/artifacts.json");
+const ARTIFACT_TRANSLATIONS: &[(&str, &str)] = &[
+    ("fr", include_str!("../../../config/artifacts.fr.json")),
+    ("de", include_str!("../../../config/artifacts.de.json")),
+    ("es", include_str!("../../../config/artifacts.es.json")),
+    ("it", include_str!("../../../config/artifacts.it.json")),
+];
+
 /// What is running: the saves, and the game being played, if any (none on the home screen
 /// at launch).
 pub(crate) struct Session {
@@ -71,6 +83,8 @@ impl Session {
         let mut game = Game::new(self.data_dir.clone(), store, economy, engine)?;
         game.set_achievement_texts(load_achievement_texts(&self.data_dir).map_err(|e| e.to_string())?);
         game.set_limited(load_limited(&self.data_dir).map_err(|e| e.to_string())?);
+        game.set_artifacts(load_artifacts(&self.data_dir).map_err(|e| e.to_string())?);
+        game.set_artifact_texts(load_artifact_texts(&self.data_dir).map_err(|e| e.to_string())?);
         game.set_card_language(&self.card_lang);
         self.current = Some((info.clone(), game));
         Ok(info)
@@ -78,6 +92,30 @@ impl Session {
 }
 
 type SessionState = Mutex<Session>;
+
+/// Where the display chosen (full screen or a window) is kept, for the window to open in it.
+fn display_path(app: &tauri::AppHandle) -> Option<PathBuf> {
+    app.path().app_config_dir().ok().map(|d| d.join("display.json"))
+}
+
+/// Whether the window opens in full screen: yes unless the player chose a window.
+fn display_fullscreen(app: &tauri::AppHandle) -> bool {
+    display_path(app)
+        .and_then(|p| fs::read_to_string(p).ok())
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+        .and_then(|v| v["fullscreen"].as_bool())
+        .unwrap_or(true)
+}
+
+/// Remembers the display chosen, for the next launch.
+#[tauri::command]
+fn set_display_fullscreen(app: tauri::AppHandle, on: bool) -> Result<(), String> {
+    let path = display_path(&app).ok_or("no configuration directory")?;
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    fs::write(path, serde_json::json!({ "fullscreen": on }).to_string()).map_err(|e| e.to_string())
+}
 
 fn now() -> i64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0)
@@ -370,6 +408,23 @@ fn take_unlocks(state: State<'_, SessionState>, lang: String) -> Result<Vec<Achi
     with_game(&state, |g| Ok(g.take_unlocks(&lang)))
 }
 
+/// The cabinet of curiosities: every artifact, owned, on sale or still hidden.
+#[tauri::command]
+fn get_artifacts(state: State<'_, SessionState>, lang: String) -> Result<Vec<game::ArtifactView>, String> {
+    with_game(&state, |g| Ok(g.artifacts(&lang)))
+}
+
+#[tauri::command]
+fn buy_artifact(state: State<'_, SessionState>, id: String, lang: String) -> Result<game::ArtifactView, String> {
+    with_game(&state, |g| g.buy_artifact(&id, &lang))
+}
+
+/// Artifacts given since the last call (by achievements), to celebrate.
+#[tauri::command]
+fn take_given_artifacts(state: State<'_, SessionState>, lang: String) -> Result<Vec<game::ArtifactView>, String> {
+    with_game(&state, |g| Ok(g.take_given_artifacts(&lang)))
+}
+
 #[tauri::command]
 fn get_stats(state: State<'_, SessionState>) -> Result<StatsView, String> {
     with_game(&state, |g| g.stats())
@@ -476,6 +531,21 @@ fn load_achievement_texts(data_dir: &Path) -> Result<AchievementTexts, Box<dyn E
     Ok(texts)
 }
 
+fn load_artifacts(data_dir: &Path) -> Result<ArtifactsConfig, Box<dyn Error>> {
+    let json = fs::read_to_string(data_dir.join("artifacts.json")).unwrap_or_else(|_| DEFAULT_ARTIFACTS.to_string());
+    Ok(ArtifactsConfig::from_json(&json)?)
+}
+
+fn load_artifact_texts(data_dir: &Path) -> Result<HashMap<String, ArtifactTranslations>, Box<dyn Error>> {
+    let mut texts = HashMap::new();
+    for (lang, shipped) in ARTIFACT_TRANSLATIONS {
+        let json = fs::read_to_string(data_dir.join(format!("artifacts.{lang}.json"))).unwrap_or_else(|_| shipped.to_string());
+        let parsed: ArtifactTranslations = serde_json::from_str(&json).map_err(|e| format!("artifacts.{lang}.json: {e}"))?;
+        texts.insert(lang.to_string(), parsed);
+    }
+    Ok(texts)
+}
+
 fn load_data_config(data_dir: &Path) -> Result<DataConfig, Box<dyn Error>> {
     let json = fs::read_to_string(data_dir.join("data.json")).unwrap_or_else(|_| DEFAULT_DATA.to_string());
     Ok(DataConfig::from_json(&json)?)
@@ -498,12 +568,20 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
+            // The window opens hidden, then shows in the display the player chose: never full
+            // screen for a moment before going back to a window.
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_fullscreen(display_fullscreen(app.handle()));
+                let _ = window.show();
+            }
             let data_dir = resolve_data_dir(app.handle())?;
             // Fail early on a broken configuration rather than when a game is loaded.
             load_economy(&data_dir)?;
             load_achievements(&data_dir)?;
             load_achievement_texts(&data_dir)?;
             load_limited(&data_dir)?;
+            load_artifacts(&data_dir)?;
+            load_artifact_texts(&data_dir)?;
             let data_config = load_data_config(&data_dir)?;
 
             let saves = Saves::new(resolve_saves_dir(app.handle())?)?;
@@ -569,6 +647,10 @@ pub fn run() {
             claim_charity,
             get_achievements,
             take_unlocks,
+            get_artifacts,
+            buy_artifact,
+            take_given_artifacts,
+            set_display_fullscreen,
             get_stats,
             get_card_details,
             get_history,

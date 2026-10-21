@@ -18,6 +18,23 @@ fn shipped_config_matches_the_agreed_rules() {
 }
 
 #[test]
+fn the_income_share_shrinks_as_the_collection_grows_and_never_passes_its_limit() {
+    let income = config().income;
+    // A small collection earns about 0.1 % of its value a minute.
+    let small = income.per_minute_cents(10_000);
+    assert!((small - 10.0).abs() < 0.2, "{small}");
+    // A large one earns a smaller share, and nothing ever earns more than 500 a minute.
+    let large = income.per_minute_cents(1_000_000);
+    assert!(large < 1_000.0 * 0.5 && large > 400.0, "{large}");
+    assert!(income.per_minute_cents(1_000_000_000) <= 500.0);
+    assert!(income.per_minute_cents(2_000_000) > large);
+    // The artifacts' bonuses raise the limit with the rest.
+    let doubled = income.boosted(2.0);
+    assert!(doubled.per_minute_cents(1_000_000_000) > 999.0);
+    assert!((doubled.per_minute_cents(1_000_000) - 2.0 * large).abs() < 1e-6);
+}
+
+#[test]
 fn booster_price_uses_overrides_then_market_value_then_default() {
     let mut c = config();
     c.booster_prices.overrides.insert("BLB".into(), [("collector".to_string(), 2_500)].into());

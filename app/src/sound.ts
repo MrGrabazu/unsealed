@@ -20,11 +20,24 @@ export const setVolume = (v: number) => localStorage.setItem(VOLUME, String(v));
 let audio: AudioContext | null = null;
 let master: GainNode | null = null;
 
-/** The audio context, created on first use (browsers allow it after a user gesture). */
+/** The audio context shared by the sounds and the music, created on first use (browsers allow
+ * it after a user gesture); null where Web Audio is missing. */
+export function sharedAudio(): AudioContext | null {
+  try {
+    audio ??= new AudioContext();
+    if (audio.state === "suspended") void audio.resume();
+    return audio;
+  } catch {
+    return null;
+  }
+}
+
+/** The audio context and the sounds' output, when the sounds are on. */
 function context(): { ctx: AudioContext; out: GainNode } | null {
   if (!getSoundOn()) return null;
   try {
-    audio ??= new AudioContext();
+    audio = sharedAudio();
+    if (!audio) return null;
     if (!master) {
       master = audio.createGain();
       master.connect(audio.destination);

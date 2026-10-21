@@ -1,0 +1,252 @@
+{
+  "artifacts": [
+    {
+      "id": "jeweler-loupe", "rarity": "rare", "glyph": "loupe",
+      "name": "The Jeweler's Loupe",
+      "effect": "Rare and mythic cards sell at 85% of their market price, instead of 80%.",
+      "flavor": "Under the glass, every scratch has a price, and so has every gleam.",
+      "source": { "type": "shop", "priceCents": 25000 },
+      "effects": [{ "type": "sellRate", "percent": 85, "rarities": ["rare", "mythic"] }]
+    },
+    {
+      "id": "amber-hourglass", "rarity": "uncommon", "glyph": "hourglass",
+      "name": "The Amber Hourglass",
+      "effect": "While you are away, the collection earns for 12 hours instead of 8.",
+      "flavor": "Its sand runs slower when no one is watching.",
+      "source": { "type": "achievement", "id": "income-1000" },
+      "effects": [{ "type": "offlineCap", "minutes": 720 }]
+    },
+    {
+      "id": "velvet-purse", "rarity": "mythic", "glyph": "purse",
+      "name": "The Velvet Purse",
+      "effect": "The collection earns 25% more.",
+      "flavor": "Heavier every time you open it. No one knows why.",
+      "source": { "type": "booster", "oneIn": 225 },
+      "effects": [{ "type": "incomeBonus", "percent": 25 }]
+    },
+    {
+      "id": "merchant-token", "rarity": "rare", "glyph": "token",
+      "name": "The Merchant's Token",
+      "effect": "Every booster costs 5% less.",
+      "flavor": "Show it at the counter: the price comes down by itself.",
+      "source": { "type": "shop", "priceCents": 40000 },
+      "effects": [{ "type": "boosterDiscount", "percent": 5 }]
+    },
+    {
+      "id": "archivist-seal", "rarity": "rare", "glyph": "seal",
+      "name": "The Archivist's Seal",
+      "effect": "Boosters of sets released before 2000 cost 10% less.",
+      "flavor": "It opens the back room, where the old boxes wait.",
+      "source": { "type": "achievement", "id": "old-school" },
+      "effects": [{ "type": "boosterDiscount", "percent": 10, "releasedBefore": "2000-01-01" }]
+    },
+    {
+      "id": "collector-lectern", "rarity": "mythic", "glyph": "lectern",
+      "name": "The Collector's Lectern",
+      "effect": "The collection earns 2% more for every set completed, up to 40%.",
+      "flavor": "A book laid open at the right page: the one with nothing missing.",
+      "source": { "type": "achievement", "id": "set-complete" },
+      "effects": [{ "type": "incomePerCompletedSet", "percent": 2, "maxPercent": 40 }]
+    },
+    {
+      "id": "calligrapher-quill", "rarity": "uncommon", "glyph": "quill",
+      "name": "The Calligrapher's Quill",
+      "effect": "Tokens and art cards sell at their full market price.",
+      "flavor": "Every stroke it signs is worth its weight in ink.",
+      "source": { "type": "booster", "oneIn": 150, "kinds": ["set"] },
+      "effects": [{ "type": "sellRate", "percent": 100, "rarities": ["token", "art"] }]
+    },
+    {
+      "id": "honest-die", "rarity": "uncommon", "glyph": "die",
+      "name": "The Loaded Die… but Honest",
+      "effect": "A bet won pays 10% more. The odds stay fair.",
+      "flavor": "It never cheats. It just cheers.",
+      "source": { "type": "booster", "oneIn": 300 },
+      "effects": [{ "type": "betWinBonus", "percent": 10 }]
+    },
+    {
+      "id": "golden-horseshoe", "rarity": "mythic", "glyph": "horseshoe",
+      "name": "The Golden Horseshoe",
+      "effect": "Once a day, the stake of a bet lost is given back.",
+      "flavor": "Hang it points up, so the luck stays in.",
+      "source": { "type": "booster", "oneIn": 450 },
+      "effects": [{ "type": "dailyBetRefund" }]
+    },
+    {
+      "id": "wanderer-lantern", "rarity": "common", "glyph": "lantern",
+      "name": "The Wanderer's Lantern",
+      "effect": "The daily help of the Boosterium is doubled.",
+      "flavor": "For those who came back with empty pockets, and came back anyway.",
+      "source": { "type": "achievement", "id": "frequent-visitor" },
+      "effects": [{ "type": "charityMultiplier", "factor": 2 }]
+    },
+    {
+      "id": "doubles-coffer", "rarity": "common", "glyph": "coffer",
+      "name": "The Coffer of Doubles",
+      "effect": "Selling duplicates pays 10% more.",
+      "flavor": "Two of a kind? One for the binder, one for the coffer.",
+      "source": { "type": "shop", "priceCents": 15000 },
+      "effects": [{ "type": "duplicatesBonus", "percent": 10 }]
+    },
+    {
+      "id": "changer-scales", "rarity": "common", "glyph": "balance",
+      "name": "The Money Changer's Scales",
+      "effect": "Undoing a sale costs half the usual penalty.",
+      "flavor": "Second thoughts weigh less on these scales.",
+      "source": { "type": "shop", "priceCents": 12000 },
+      "effects": [{ "type": "undoPenalty", "percent": 50 }]
+    },
+    {
+      "id": "speculator-eye", "rarity": "uncommon", "glyph": "eye",
+      "name": "The Speculator's Eye",
+      "effect": "Cards worth {cents:5000} or more sell at 85% of their market price.",
+      "flavor": "It sees the big pulls coming, and the buyers too.",
+      "source": { "type": "shop", "priceCents": 30000 },
+      "effects": [{ "type": "sellRate", "percent": 85, "minMarketCents": 5000 }]
+    },
+    {
+      "id": "bronze-key", "rarity": "uncommon", "glyph": "key-bronze",
+      "name": "The Bronze Key",
+      "effect": "Collector boosters cost 10% less.",
+      "flavor": "The first of five. It opens the first drawer.",
+      "source": { "type": "booster", "oneIn": 30, "kinds": ["collector"] },
+      "effects": [{ "type": "boosterDiscount", "percent": 10, "kinds": ["collector"] }]
+    },
+    {
+      "id": "silver-key", "rarity": "rare", "glyph": "key-silver",
+      "name": "The Silver Key",
+      "effect": "Collector boosters cost a further 10% less. Found only by the bearer of the Bronze Key.",
+      "flavor": "The second drawer was locked from the inside.",
+      "source": { "type": "booster", "oneIn": 75, "kinds": ["collector"] },
+      "requires": ["bronze-key"],
+      "effects": [{ "type": "boosterDiscount", "percent": 10, "kinds": ["collector"] }]
+    },
+    {
+      "id": "gold-key", "rarity": "rare", "glyph": "key-gold",
+      "name": "The Gold Key",
+      "effect": "Collector boosters cost a further 10% less. Found only by the bearer of the Bronze and Silver Keys.",
+      "flavor": "Heavy, warm, and never quite where you left it.",
+      "source": { "type": "booster", "oneIn": 150, "kinds": ["collector"] },
+      "requires": ["bronze-key", "silver-key"],
+      "effects": [{ "type": "boosterDiscount", "percent": 10, "kinds": ["collector"] }]
+    },
+    {
+      "id": "diamond-key", "rarity": "mythic", "glyph": "key-diamond",
+      "name": "The Diamond Key",
+      "effect": "Collector boosters cost a further 10% less. Found only by the bearer of the Bronze, Silver and Gold Keys.",
+      "flavor": "It cuts the lock rather than turning it.",
+      "source": { "type": "booster", "oneIn": 225, "kinds": ["collector"] },
+      "requires": ["bronze-key", "silver-key", "gold-key"],
+      "effects": [{ "type": "boosterDiscount", "percent": 10, "kinds": ["collector"] }]
+    },
+    {
+      "id": "obsidian-key", "rarity": "mythic", "glyph": "key-obsidian",
+      "name": "The Obsidian Key",
+      "effect": "Collector boosters cost a further 10% less, half price with the five keys. Found only by the bearer of the four others.",
+      "flavor": "The last drawer holds nothing. The key was the treasure.",
+      "source": { "type": "booster", "oneIn": 375, "kinds": ["collector"] },
+      "requires": ["bronze-key", "silver-key", "gold-key", "diamond-key"],
+      "effects": [{ "type": "boosterDiscount", "percent": 10, "kinds": ["collector"] }]
+    },
+    {
+      "id": "cartographer-compass", "rarity": "common", "glyph": "compass",
+      "name": "The Cartographer's Compass",
+      "effect": "Draft boosters cost 5% less.",
+      "flavor": "Its needle points to the next table, where the packs are being passed.",
+      "source": { "type": "achievement", "id": "world-traveler" },
+      "effects": [{ "type": "boosterDiscount", "percent": 5, "kinds": ["draft"] }]
+    },
+    {
+      "id": "broken-seal", "rarity": "uncommon", "glyph": "broken-seal",
+      "name": "The Broken Seal",
+      "effect": "Selling duplicates pays a further 10% more.",
+      "flavor": "A thousand cards sold, and the wax still remembers each one.",
+      "source": { "type": "achievement", "id": "sold-1000" },
+      "effects": [{ "type": "duplicatesBonus", "percent": 10 }]
+    },
+    {
+      "id": "grimoire-of-myths", "rarity": "rare", "glyph": "grimoire",
+      "name": "The Grimoire of Myths",
+      "effect": "Mythic cards sell at 90% of their market price.",
+      "flavor": "A hundred legends between its covers, and a buyer for every one.",
+      "source": { "type": "achievement", "id": "mythics-100" },
+      "effects": [{ "type": "sellRate", "percent": 90, "rarities": ["mythic"] }]
+    },
+    {
+      "id": "lapidary-prism", "rarity": "rare", "glyph": "prism",
+      "name": "The Lapidary's Prism",
+      "effect": "Foil cards sell at 90% of their market price.",
+      "flavor": "It splits the light the way foils do, and doubles the shine.",
+      "source": { "type": "achievement", "id": "foils-1000" },
+      "effects": [{ "type": "sellRate", "percent": 90, "foil": true }]
+    },
+    {
+      "id": "antiquarian-monocle", "rarity": "rare", "glyph": "monocle",
+      "name": "The Antiquarian's Monocle",
+      "effect": "Cards of sets released before 2000 sell at 90% of their market price.",
+      "flavor": "Through it, old cardboard looks like what it is: history.",
+      "source": { "type": "booster", "oneIn": 225, "releasedBefore": "2000-01-01" },
+      "effects": [{ "type": "sellRate", "percent": 90, "releasedBefore": "2000-01-01" }]
+    },
+    {
+      "id": "master-key", "rarity": "rare", "glyph": "master-key",
+      "name": "The Merchant's Master Key",
+      "effect": "Every booster costs a further 5% less. For sale to the bearer of the Merchant's Token.",
+      "flavor": "It opens every door of the shop, even the one to the stockroom.",
+      "source": { "type": "shop", "priceCents": 150000 },
+      "requires": ["merchant-token"],
+      "effects": [{ "type": "boosterDiscount", "percent": 5 }]
+    },
+    {
+      "id": "horn-of-plenty", "rarity": "rare", "glyph": "horn",
+      "name": "The Horn of Plenty",
+      "effect": "The collection earns 15% more.",
+      "flavor": "Tip it gently: Seals pour out, and never quite run dry.",
+      "source": { "type": "shop", "priceCents": 250000 },
+      "effects": [{ "type": "incomeBonus", "percent": 15 }]
+    },
+    {
+      "id": "obsidian-clepsydra", "rarity": "mythic", "glyph": "clepsydra",
+      "name": "The Obsidian Clepsydra",
+      "effect": "While you are away, the collection earns for 24 hours. Given to the bearer of the Amber Hourglass.",
+      "flavor": "Black water, dripping one Seal at a time, all night long.",
+      "source": { "type": "achievement", "id": "open-1000" },
+      "requires": ["amber-hourglass"],
+      "effects": [{ "type": "offlineCap", "minutes": 1440 }]
+    },
+    {
+      "id": "shepherd-star", "rarity": "mythic", "glyph": "star",
+      "name": "The Shepherd's Star",
+      "effect": "The collection earns 1% more for every set completed, up to 30%, on top of the Lectern.",
+      "flavor": "It shines brighter over every binder that is full.",
+      "source": { "type": "achievement", "id": "three-sets" },
+      "effects": [{ "type": "incomePerCompletedSet", "percent": 1, "maxPercent": 30 }]
+    },
+    {
+      "id": "four-leaf-clover", "rarity": "mythic", "glyph": "clover",
+      "name": "The Four-Leaf Clover",
+      "effect": "A bet won pays 25% more. Found only by the bearer of the Honest Die.",
+      "flavor": "Pressed between two commons, it has brought luck to every pack since.",
+      "source": { "type": "booster", "oneIn": 1200 },
+      "requires": ["honest-die"],
+      "effects": [{ "type": "betWinBonus", "percent": 25 }]
+    },
+    {
+      "id": "dragon-egg", "rarity": "mythic", "glyph": "egg",
+      "name": "The Dragon's Egg",
+      "effect": "The collection earns twice as much, every other bonus counted. Found in Collector boosters, only by the bearer of the five keys.",
+      "flavor": "Warm to the touch. Something inside is counting your cards.",
+      "source": { "type": "booster", "oneIn": 750, "kinds": ["collector"] },
+      "requires": ["obsidian-key"],
+      "effects": [{ "type": "incomeMultiplier", "factor": 2 }]
+    },
+    {
+      "id": "counter-crown", "rarity": "mythic", "glyph": "crown",
+      "name": "The Crown of the Counter",
+      "effect": "The collection earns 10% more, and your balance wears a golden frame.",
+      "flavor": "Every curio in its place, and the Counter has a new master.",
+      "source": { "type": "allOthers" },
+      "effects": [{ "type": "incomeBonus", "percent": 10 }]
+    }
+  ]
+}

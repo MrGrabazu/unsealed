@@ -113,10 +113,13 @@ impl Game {
                 until: Some(record.at + i64::from(rules.purchase_within_minutes) * 60),
             });
         }
-        let cost = rules.sale_cancel_cost_cents(record.amount_cents, age);
+        // An artifact may lighten the penalty (a share of the usual one).
+        let lighter = self.bonuses().undo_penalty_percent;
+        let usual = rules.sale_cancel_cost_cents(record.amount_cents, age);
+        let cost = record.amount_cents + (usual - record.amount_cents) * i64::from(lighter) / 100;
         Some(UndoOffer {
             amount_cents: cost,
-            penalty_percent: rules.sale_penalty_percent(age),
+            penalty_percent: rules.sale_penalty_percent(age) * lighter / 100,
             affordable: balance >= cost,
             until: None,
         })

@@ -24,6 +24,8 @@ const KINDS = [
   "advance",
   "income",
   "debt_repaid",
+  "artifact_purchase",
+  "bet_refund",
 ] as const;
 
 const ICONS: Record<string, IconName> = {
@@ -36,15 +38,17 @@ const ICONS: Record<string, IconName> = {
   income: "chart",
   bet_stake: "dice",
   bet_win: "dice",
+  bet_refund: "dice",
+  artifact_purchase: "curio",
 };
 
 /** The ledger's filters, by kind of movement. */
 const FILTERS = {
   all: null,
-  purchases: ["booster_purchase", "purchase_undone"],
+  purchases: ["booster_purchase", "purchase_undone", "artifact_purchase"],
   sales: ["card_sale", "booster_sale", "sale_undone"],
   income: ["income", "charity", "achievement_reward", "starting_balance", "advance", "debt_repaid"],
-  bets: ["bet_stake", "bet_win"],
+  bets: ["bet_stake", "bet_win", "bet_refund"],
 } as const;
 type Filter = keyof typeof FILTERS;
 

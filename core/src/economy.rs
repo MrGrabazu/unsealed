@@ -31,14 +31,19 @@ pub struct EconomyConfig {
     pub income: Income,
 }
 
-/// What the collection earns by itself: each minute, a small share of what it would sell for.
-/// No strings attached: the more it is worth, the more it earns, which rewards keeping one's
-/// best cards.
+/// What the collection earns by itself: each minute, a share of what it would sell for. No
+/// strings attached: the more it is worth, the more it earns, which rewards keeping one's best
+/// cards; but the share shrinks as it grows, the income never passing `max_per_minute_cents`
+/// (else it would buy boosters that make it earn more, and so on without end).
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Income {
-    /// Earned each minute, in percent of the collection's resale value (real prices only).
+    /// Earned each minute by a small collection, in percent of its resale value (real prices
+    /// only).
     pub percent_per_minute: f64,
+    /// The most the collection earns in a minute, however much it is worth (none: no limit).
+    #[serde(default)]
+    pub max_per_minute_cents: Option<f64>,
     /// The collection earns for this long at most between two visits (while the game is
     /// closed, or left on another screen).
     pub offline_cap_minutes: u32,
@@ -46,16 +51,37 @@ pub struct Income {
 
 impl Default for Income {
     fn default() -> Self {
-        Self { percent_per_minute: 0.1, offline_cap_minutes: 480 }
+        Self { percent_per_minute: 0.1, max_per_minute_cents: None, offline_cap_minutes: 480 }
     }
 }
 
 impl Income {
-    /// What a collection worth `value_cents` earns over `minutes` (capped), in cents with their
-    /// fraction (kept from one payment to the next).
+    /// What a collection worth `value_cents` earns in a minute, in cents with their fraction:
+    /// `percent_per_minute` of it while it is small, then less and less, nearing
+    /// `max_per_minute_cents` without ever passing it (max × (1 − e^(−share × value / max))).
+    pub fn per_minute_cents(&self, value_cents: i64) -> f64 {
+        let linear = value_cents.max(0) as f64 * self.percent_per_minute / 100.0;
+        match self.max_per_minute_cents {
+            Some(max) if max > 0.0 => max * (1.0 - (-linear / max).exp()),
+            Some(_) => 0.0,
+            None => linear,
+        }
+    }
+
+    /// What it earns over `minutes` (capped), in cents with their fraction (kept from one
+    /// payment to the next).
     pub fn earned_cents(&self, value_cents: i64, minutes: f64) -> f64 {
         let minutes = minutes.clamp(0.0, f64::from(self.offline_cap_minutes));
-        value_cents.max(0) as f64 * self.percent_per_minute / 100.0 * minutes
+        self.per_minute_cents(value_cents) * minutes
+    }
+
+    /// The same, with the artifacts' income bonuses: everything multiplied, the limit too.
+    pub fn boosted(&self, multiplier: f64) -> Self {
+        Self {
+            percent_per_minute: self.percent_per_minute * multiplier,
+            max_per_minute_cents: self.max_per_minute_cents.map(|m| m * multiplier),
+            offline_cap_minutes: self.offline_cap_minutes,
+        }
     }
 }
 
@@ -223,6 +249,9 @@ impl EconomyConfig {
         if !(0.0..=100.0).contains(&self.income.percent_per_minute) {
             return Err(ConfigError::Invalid("income.percentPerMinute must be between 0 and 100".into()));
         }
+        if self.income.max_per_minute_cents.is_some_and(|m| !(m > 0.0)) {
+            return Err(ConfigError::Invalid("income.maxPerMinuteCents must be positive".into()));
+        }
         if self.booster_prices.default_cents == 0 || self.booster_prices.ev_markup_percent == 0 {
             return Err(ConfigError::Invalid(
                 "boosterPrices.defaultCents and evMarkupPercent must be positive".into(),
@@ -269,7 +298,12 @@ impl EconomyConfig {
 
     /// What the Boosterium pays for a card worth `market_cents` (rounded down).
     pub fn sell_value_cents(&self, market_cents: u32) -> u32 {
-        (u64::from(market_cents) * u64::from(self.sell_rate_percent) / 100) as u32
+        Self::sell_value_at(market_cents, self.sell_rate_percent)
+    }
+
+    /// What a card worth `market_cents` sells for at `rate_percent` (an artifact's better rate).
+    pub fn sell_value_at(market_cents: u32, rate_percent: u32) -> u32 {
+        (u64::from(market_cents) * u64::from(rate_percent) / 100) as u32
     }
 }
 

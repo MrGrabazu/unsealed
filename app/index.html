@@ -6,12 +6,13 @@
     <title>Unsealed — Crack &amp; Collect</title>
     <!-- Inline, so the splash shows at once, before the app's scripts and styles load. -->
     <style>
-      /* The Grimoire theme's colours (theme.css), before its fonts and styles load. */
+      /* The Grimoire theme's colours (theme.css), and the logo's font, before the app's styles
+         load. The logo waits for its font (bundled, so at once) rather than show another. */
+      @font-face { font-family: "Cinzel"; src: url("./src/assets/fonts/Cinzel-VF.ttf") format("truetype"); font-weight: 400 900; font-display: block; }
       html, body { margin: 0; background: #140d08; color: #efe3c8; font-family: Georgia, "Times New Roman", serif; }
       .splash { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
         background: radial-gradient(ellipse at 50% -10%, #4a2f1b 0%, transparent 60%); }
-      .splash h1 { margin: 0; font-size: 52px; letter-spacing: 0.12em; color: #f0c35e; text-shadow: 0 3px 0 #1b0f05; font-variant: small-caps; }
-      .splash p { margin: 0; color: #d9a441; letter-spacing: 0.3em; text-transform: uppercase; font-size: 14px; }
+      .splash svg { width: min(560px, 80vw); height: auto; filter: drop-shadow(0 6px 14px #000a); }
       .splash .spinner { margin-top: 18px; width: 28px; height: 28px; border-radius: 50%; border: 3px solid #3d2b1b; border-top-color: #a61f28; animation: splash-spin 0.9s linear infinite; }
       @keyframes splash-spin { to { transform: rotate(360deg); } }
     </style>
@@ -20,8 +21,7 @@
     <div id="root">
       <!-- Replaced by the app once it has started. -->
       <div class="splash">
-        <h1>Unsealed</h1>
-        <p>Crack &amp; Collect</p>
+        <!-- splash-logo -->
         <div class="spinner"></div>
       </div>
     </div>

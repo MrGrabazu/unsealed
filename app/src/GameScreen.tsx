@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useContext, useEffect, useRef, useState } from "react";
 import {
+  buyArtifact,
   buyBoosters,
   checkSetImages,
   claimCharity,
@@ -14,8 +15,10 @@ import {
   revealCards,
   sellBoosters,
   setKeptBets as saveKeptBets,
+  takeGivenArtifacts,
   takeUnlocks,
   type AchievementView,
+  type ArtifactView,
   type IncomeView,
   type SkippedBet,
   type KeptBet,
@@ -35,6 +38,7 @@ import { activeBets, keptFor, namedCard } from "./bets";
 import { BetSlip } from "./BetSlip";
 import { CardDetails } from "./CardDetails";
 import { Logo } from "./Logo";
+import { refreshMusic } from "./music";
 import { getSoundOn, setSoundOn, sounds } from "./sound";
 import { PackOpening } from "./PackOpening";
 import { OpeningResult } from "./OpeningResult";
@@ -42,7 +46,7 @@ import { canUseWebGL, getOpening3d } from "./settings";
 
 // The 3D opening brings three.js along: loaded the first time a booster is opened.
 const PackOpening3D = lazy(() => import("./PackOpening3D").then((m) => ({ default: m.PackOpening3D })));
-import { Boosterium } from "./Boosterium";
+import { Boosterium, CURIOS } from "./Boosterium";
 import { Collection } from "./Collection";
 import { kindLabel, rewardText } from "./boosterKinds";
 import { DataPreparing, DataStatusBar, useDataStatus } from "./DataStatus";
@@ -55,10 +59,12 @@ import { Loading } from "./Loading";
 import { Coin, CurrencyContext, DEFAULT_CURRENCY, useMoneyText } from "./money";
 import { SealedBoosters } from "./SealedBoosters";
 import { Stats } from "./Stats";
+import { ArtifactReveal } from "./ArtifactReveal";
+import { Curiosities } from "./Curiosities";
 
-type Tab = "boosterium" | "open" | "collection" | "achievements" | "stats" | "history";
+type Tab = "boosterium" | "open" | "collection" | "achievements" | "curiosities" | "stats" | "history";
 
-const TABS: Tab[] = ["boosterium", "open", "collection", "achievements", "stats", "history"];
+const TABS: Tab[] = ["boosterium", "open", "collection", "achievements", "curiosities", "stats", "history"];
 
 /** How long a notification stays on screen. */
 const TOAST_MS = 8000;
@@ -81,6 +87,7 @@ const TAB_ICONS: Record<Tab, IconName> = {
   open: "pack",
   collection: "book",
   achievements: "trophy",
+  curiosities: "curio",
   stats: "chart",
   history: "scroll",
 };
@@ -135,7 +142,8 @@ function Resources({
   const sealed = wallet.sealed.reduce((n, s) => n + s.quantity, 0);
   return (
     <div className="resources">
-      <div className="res" title={t("game.balanceTitle")}>
+      {/* With the Crown of the Counter, the balance wears a golden frame. */}
+      <div className={`res ${wallet.artifactPerks.crowned ? "crowned" : ""}`} title={t("game.balanceTitle")}>
         {/* The coin in its medallion before the amount, as the other resources have theirs. */}
         <span className="ico coin-ico">
           <Coin />
@@ -149,9 +157,9 @@ function Resources({
             className="s"
             title={t("income.rateTitle", {
               value: moneyText(income.collectionValueCents),
-              percent: formatNumber(income.percentPerMinute),
+              percent: formatNumber(Number(income.percentPerMinute.toPrecision(2))),
               hours: formatNumber(income.offlineCapMinutes / 60),
-            })}
+            }) + (income.maxPerMinuteCents == null ? "" : " " + t("income.rateMax", { max: moneyText(income.maxPerMinuteCents) }))}
           >
             {/* Whole Seals only: there is no such thing as a fraction of one. */}
             {t("income.rate", { rate: formatNumber(Math.ceil(perMinute)) })}
@@ -231,6 +239,12 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   const [awayIncome, setAwayIncome] = useState<IncomeView | null>(null);
   // The "+N" floating up from the balance, one per payment.
   const [incomeFloats, setIncomeFloats] = useState<IncomeFloat[]>([]);
+  // An artifact found in the booster being opened: revealed once its result shows.
+  const [foundArtifact, setFoundArtifact] = useState<ArtifactView | null>(null);
+  // Artifacts to reveal, one after the other (found, or given by achievements).
+  const [artifactQueue, setArtifactQueue] = useState<ArtifactView[]>([]);
+  // Bumped when an artifact is got: the cabinet and the shop read them again.
+  const [artifactCount, setArtifactCount] = useState(0);
   const floatId = useRef(0);
   // A set to show open in the Boosterium (asked for from its collection).
   const [shopFocus, setShopFocus] = useState<{ setCode: string; at: number } | null>(null);
@@ -307,6 +321,12 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
       const unlocked = await takeUnlocks(lang);
       if (holdingToasts.current) heldToasts.current.push(...unlocked);
       else showToasts(unlocked);
+      // Artifacts these achievements gave: their own moment.
+      const given = await takeGivenArtifacts(lang);
+      if (given.length > 0) {
+        setArtifactQueue((queue) => [...queue, ...given]);
+        setArtifactCount((n) => n + 1);
+      }
     } catch (e) {
       setError(String(e));
     }
@@ -393,6 +413,29 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     loadAll();
   }, [loadAll]);
 
+  // An artifact got may change prices (a discount): the shop is read again.
+  useEffect(() => {
+    if (artifactCount > 0) loadAll();
+  }, [artifactCount, loadAll]);
+
+  /** Buys an artifact at the Boosterium: it is revealed at once, and the prices it changes
+   * (discounts) are read again. */
+  async function buyCurio(id: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const bought = await buyArtifact(id, lang);
+      sounds.coins();
+      setArtifactQueue((queue) => [...queue, bought]);
+      setArtifactCount((n) => n + 1);
+      await refreshWallet();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   // The backend refreshes the card data in the background; reload everything once it is done.
   const dataStatus = useDataStatus(loadAll);
   // No set yet while the data is being prepared (or failed to be): the screens that need
@@ -431,6 +474,11 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     resetBets();
     const opened = await openBoosters(setCode, kind, quantity, activeBets(keptFor(kept, setCode)));
     setBatch(opened.map((b) => b.cards));
+    const found = opened.flatMap((b) => (b.artifact ? [b.artifact] : []));
+    if (found.length > 0) {
+      setArtifactQueue((queue) => [...queue, ...found]);
+      setArtifactCount((n) => n + 1);
+    }
     setBetResults(opened.flatMap((b) => b.bets));
     // The same bets on every booster: those left out of any booster, once each.
     const skipped = new Map(opened.flatMap((b) => b.skipped).map((s) => [`${JSON.stringify(s.bet)}:${s.reason}`, s]));
@@ -470,6 +518,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
       await checkSetImages(setCode).catch(() => {});
       const opened = await openBooster(setCode, kind, false, bets);
       setCards(opened.cards);
+      setFoundArtifact(opened.artifact);
       setBetResults(opened.bets);
       setBetSkipped(opened.skipped);
       setOpenings((n) => n + 1);
@@ -494,6 +543,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     try {
       const opened = await openBooster(pack.setCode, pack.kind, true, activeBets(slip));
       setCards(opened.cards);
+      setFoundArtifact(opened.artifact);
       setBetResults(opened.bets);
       setBetSkipped(opened.skipped);
       setOpenings((n) => n + 1);
@@ -507,10 +557,24 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     }
   }
 
+  // The artifact a booster hid comes out once its result shows (or as the opening is left).
+  useEffect(() => {
+    if (resultShown && foundArtifact) {
+      setArtifactQueue((queue) => [...queue, foundArtifact]);
+      setArtifactCount((n) => n + 1);
+      setFoundArtifact(null);
+    }
+  }, [resultShown, foundArtifact]);
+
   /** Leaves the opening view: an opening is shown once, never replayed. */
   function closeOpening() {
     // Leaving before every card is seen: what they unlock shows up now.
     if (cards) void reveal(Number.MAX_SAFE_INTEGER);
+    if (foundArtifact) {
+      setArtifactQueue((queue) => [...queue, foundArtifact]);
+      setArtifactCount((n) => n + 1);
+      setFoundArtifact(null);
+    }
     releaseToasts();
     setDetailsOf(null);
     setPack(null);
@@ -570,7 +634,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   // What the keys do on this screen (shown by the last bookmark of the rail).
   const opening = tab === "open" && !!(pack || batch);
   const hints: [string, string][] = [
-    ["1–6", t("keys.tabs")],
+    ["1–7", t("keys.tabs")],
     ...((tab === "boosterium"
       ? [
           ["⏎", t("keys.buy")],
@@ -623,6 +687,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
               onClick={() => {
                 setSoundOn(!soundOn);
                 setSoundOnState(!soundOn);
+                refreshMusic();
                 if (!soundOn) sounds.click();
               }}
               title={t(soundOn ? "game.soundOn" : "game.soundOff")}
@@ -683,6 +748,8 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
             onClaimCharity={() => run(() => claimCharity())}
             busy={busy}
             focus={shopFocus}
+            artifactsKey={artifactCount}
+            onBuyArtifact={(id) => void buyCurio(id)}
           />
         )}
 
@@ -862,6 +929,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
             sets={sets}
             refreshKey={openings}
             onChanged={refreshWallet}
+            duplicatesBonus={wallet?.artifactPerks.duplicatesPercent ?? 0}
             onShop={(setCode) => {
               setShopFocus({ setCode, at: Date.now() });
               switchTab("boosterium");
@@ -870,6 +938,16 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
         )}
 
         {tab === "achievements" && <Achievements refreshKey={unlockCount} />}
+
+        {tab === "curiosities" && (
+          <Curiosities
+            refreshKey={artifactCount}
+            onShop={() => {
+              setShopFocus({ setCode: CURIOS, at: Date.now() });
+              switchTab("boosterium");
+            }}
+          />
+        )}
 
         {tab === "stats" && <Stats refreshKey={`${openings}-${wallet?.balanceCents}`} />}
 
@@ -885,6 +963,9 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
         </main>
 
         <Ambience />
+        {artifactQueue.length > 0 && (
+          <ArtifactReveal item={artifactQueue[0]} onClose={() => setArtifactQueue((queue) => queue.slice(1))} />
+        )}
 
         <div className="toasts" aria-live="polite">
           {toasts.map((a) => (

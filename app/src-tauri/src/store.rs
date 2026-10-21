@@ -113,7 +113,17 @@ const MIGRATIONS: &[&str] = &[
         cents INTEGER NOT NULL,
         day TEXT
     );",
+    // 12: the artifacts owned (each one once at most), with how they were got ("shop",
+    // "booster", "achievement", "allOthers")
+    "CREATE TABLE artifacts (
+        id TEXT PRIMARY KEY,
+        acquired_at INTEGER NOT NULL,
+        source TEXT NOT NULL
+    );",
 ];
+
+/// Key of `save_meta`: the last day a lost bet's stake was given back (an artifact's effect).
+const BET_REFUND_DAY: &str = "bet_refund_day";
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
@@ -736,19 +746,73 @@ impl Store {
 
     /// Pays the bets won and not paid yet (those of the booster whose cards were all seen, or
     /// left from a game closed before), returning what they brought in. Paid once.
-    pub fn pay_bets(&mut self, now: i64) -> StoreResult<i64> {
+    /// Pays the bets won and settled, `win_bonus_percent` more (an artifact's). With
+    /// `refund_day` ("YYYY-MM-DD", an artifact's), the stake of one bet lost among them is
+    /// given back, once that day.
+    pub fn pay_bets(&mut self, now: i64, win_bonus_percent: u32, refund_day: Option<&str>) -> StoreResult<i64> {
         let tx = self.conn.transaction()?;
         let won: Vec<(i64, i64)> = {
             let mut stmt = tx.prepare("SELECT opening_id, SUM(payout_cents) FROM bets WHERE paid_at IS NULL AND won = 1 GROUP BY opening_id")?;
             let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
             rows.collect::<Result<_, _>>()?
         };
+        let mut paid = 0;
         for &(opening_id, payout) in &won {
+            let payout = payout + payout * i64::from(win_bonus_percent) / 100;
             add_ledger(&tx, now, "bet_win", payout, Some(&opening_id.to_string()))?;
+            paid += payout;
+        }
+        if let Some(day) = refund_day {
+            let used: Option<String> =
+                tx.query_row("SELECT value FROM save_meta WHERE key = ?1", [BET_REFUND_DAY], |r| r.get(0)).optional()?;
+            let lost: Option<(i64, i64)> = tx
+                .query_row(
+                    "SELECT opening_id, stake_cents FROM bets WHERE paid_at IS NULL AND won = 0 ORDER BY stake_cents DESC LIMIT 1",
+                    [],
+                    |r| Ok((r.get(0)?, r.get(1)?)),
+                )
+                .optional()?;
+            if let (Some((opening_id, stake)), true) = (lost, used.as_deref() != Some(day)) {
+                add_ledger(&tx, now, "bet_refund", stake, Some(&opening_id.to_string()))?;
+                tx.execute(
+                    "INSERT INTO save_meta (key, value) VALUES (?1, ?2) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+                    params![BET_REFUND_DAY, day],
+                )?;
+                paid += stake;
+            }
         }
         tx.execute("UPDATE bets SET paid_at = ?1 WHERE paid_at IS NULL", [now])?;
         tx.commit()?;
-        Ok(won.iter().map(|(_, p)| p).sum())
+        Ok(paid)
+    }
+
+    // ---- artifacts ----------------------------------------------------------------------
+
+    /// The artifacts owned: (id, when, how it was got), oldest first.
+    pub fn artifacts(&self) -> StoreResult<Vec<(String, i64, String)>> {
+        let mut stmt = self.conn.prepare("SELECT id, acquired_at, source FROM artifacts ORDER BY acquired_at, id")?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    /// Records an artifact got for free (found, or given): false if it was already owned.
+    pub fn add_artifact(&mut self, id: &str, source: &str, now: i64) -> StoreResult<bool> {
+        let added = self.conn.execute("INSERT OR IGNORE INTO artifacts (id, acquired_at, source) VALUES (?1, ?2, ?3)", params![id, now, source])?;
+        Ok(added == 1)
+    }
+
+    /// Buys an artifact: pays its price and records it, atomically.
+    pub fn buy_artifact(&mut self, id: &str, price_cents: u32, now: i64) -> StoreResult<()> {
+        let tx = self.conn.transaction()?;
+        let price = i64::from(price_cents);
+        let available = balance_of(&tx)?;
+        if available < price {
+            return Err(StoreError::InsufficientFunds { needed: price, available });
+        }
+        add_ledger(&tx, now, "artifact_purchase", -price, Some(id))?;
+        tx.execute("INSERT INTO artifacts (id, acquired_at, source) VALUES (?1, ?2, 'shop')", params![id, now])?;
+        tx.commit()?;
+        Ok(())
     }
 
     /// Copies ever pulled of each card of a limited print run, by uuid.
@@ -1198,6 +1262,37 @@ mod tests {
         let owned = store.owned_in_set("TST").unwrap();
         assert_eq!(owned["a"], Owned { normal: 2, foil: 1 });
         assert!(store.owned_in_set("OTHER").unwrap().is_empty());
+    }
+
+    #[test]
+    fn artifacts_add_to_bets_won_and_give_back_one_lost_stake_a_day() {
+        let mut store = store_with(3);
+        let bet = |won: bool, stake: u32| PlacedBet { bet: "{}".into(), stake_cents: stake, probability: 0.5, won, payout_cents: if won { 400 } else { 0 } };
+        let start = store.balance().unwrap();
+        // One booster: a bet won (400) and two lost (100 and 300).
+        store.open_sealed_with_bets("TST", "play", &[card("a", false, Some(25))], &[bet(true, 200), bet(false, 100), bet(false, 300)], 10).unwrap();
+        assert_eq!(store.balance().unwrap(), start - 600);
+        // +10 % on the win, and the larger lost stake back: 440 + 300.
+        assert_eq!(store.pay_bets(20, 10, Some("2026-10-21")).unwrap(), 740);
+        // Another lost bet the same day: nothing back.
+        store.open_sealed_with_bets("TST", "play", &[card("a", false, Some(25))], &[bet(false, 100)], 30).unwrap();
+        assert_eq!(store.pay_bets(40, 10, Some("2026-10-21")).unwrap(), 0);
+        // The next day, again.
+        store.open_sealed_with_bets("TST", "play", &[card("a", false, Some(25))], &[bet(false, 100)], 50).unwrap();
+        assert_eq!(store.pay_bets(60, 10, Some("2026-10-22")).unwrap(), 100);
+    }
+
+    #[test]
+    fn an_artifact_is_owned_once_and_bought_with_the_balance() {
+        let mut store = store_with(0);
+        assert!(store.add_artifact("bronze", "booster", 5).unwrap());
+        assert!(!store.add_artifact("bronze", "booster", 6).unwrap());
+        assert!(store.buy_artifact("loupe", 20_000, 7).is_err(), "too expensive");
+        store.buy_artifact("loupe", 4_000, 8).unwrap();
+        assert!(store.buy_artifact("loupe", 4_000, 9).is_err(), "already owned");
+        assert_eq!(store.balance().unwrap(), 6_000);
+        let owned: Vec<(String, String)> = store.artifacts().unwrap().into_iter().map(|(id, _, source)| (id, source)).collect();
+        assert_eq!(owned, [("bronze".to_string(), "booster".to_string()), ("loupe".to_string(), "shop".to_string())]);
     }
 
     #[test]

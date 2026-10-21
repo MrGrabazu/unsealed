@@ -121,7 +121,17 @@ export function Stats({ refreshKey }: { refreshKey: string }) {
         >
           <Money cents={s.spentOnBoostersCents} />
         </Tile>
-        <Tile label={t("stats.collectionValue")} hint={t("stats.collectionValueHint")} sub={tx("stats.netWorthShort", { amount: money(netWorth) })}>
+        <Tile
+          label={t("stats.collectionValue")}
+          hint={t("stats.collectionValueHint")}
+          sub={
+            <>
+              {tx("stats.collectionSellShort", { amount: money(s.collectionSellValueCents) })}
+              <br />
+              {tx("stats.netWorthShort", { amount: money(netWorth) })}
+            </>
+          }
+        >
           <Money cents={s.collectionValueCents} />
         </Tile>
         {s.bestBooster && (

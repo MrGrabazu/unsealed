@@ -1,5 +1,7 @@
-// The window in full screen, as a game: on by default (the window opens so, see
-// `tauri.conf.json`), kept in the browser storage of the window. F11 switches it.
+// The window in full screen, as a game: on by default. Kept in the browser storage of the
+// window, and given to the app (`set_display_fullscreen`), which opens the window hidden and
+// shows it straight in the display chosen. F11 switches it.
+import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 const FULLSCREEN = "unsealed.fullscreen";
@@ -10,6 +12,7 @@ export const getFullscreen = () => localStorage.getItem(FULLSCREEN) !== "off";
 export async function setFullscreen(on: boolean) {
   localStorage.setItem(FULLSCREEN, on ? "on" : "off");
   // Outside Tauri (the preview), there is no window to change.
+  await invoke("set_display_fullscreen", { on }).catch(() => {});
   await getCurrentWindow()
     .setFullscreen(on)
     .catch(() => {});

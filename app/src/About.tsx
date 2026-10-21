@@ -5,7 +5,7 @@ import { useI18n } from "./i18n";
 import { FAN_CONTENT_NOTICE } from "./legal";
 
 /** The players' community, "The Boosterium", on Discord. */
-const DISCORD_URL = "https://discord.gg/B5P3NJYke";
+const DISCORD_URL = "https://discord.gg/YVRdaBGWvb";
 /** The game's source code. */
 const GITHUB_URL = "https://github.com/MrGrabazu/unsealed";
 /** The licenses: this file says what each one covers, and holds the Creative Commons text. */

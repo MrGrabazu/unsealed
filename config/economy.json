@@ -28,6 +28,7 @@
   },
   "income": {
     "percentPerMinute": 0.1,
+    "maxPerMinuteCents": 500,
     "offlineCapMinutes": 480
   },
   "charity": {

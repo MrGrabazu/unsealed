@@ -3,6 +3,7 @@
 //! compact catalog files and update planning.
 
 pub mod achievements;
+pub mod artifacts;
 pub mod betting;
 pub mod booster;
 pub mod builder;

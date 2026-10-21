@@ -372,6 +372,89 @@ button.ach-item.sel { transform: translateY(-4px); filter: drop-shadow(0 0 14px 
 .ach-side .meta { color: var(--muted); font-size: 13px; margin: 0; }
 .ach-side .ready-line b { text-align: right; font: 700 14.5px var(--font-text); }
 
+/* ---- curiosities: the cabinet of artifacts, and the one chosen beside it ------------------ */
+/* A glyph: filled shapes, and lines where a part has a stroke width; holes in the wood colour. */
+.artifact-glyph [stroke-width] { fill: none; stroke: currentColor; }
+.artifact-glyph .hole { fill: #2a1a0c; }
+.artifact-glyph .hole-line { fill: none; stroke: #2a1a0c; }
+.artifact-glyph.silhouette { color: #000; opacity: .55; filter: drop-shadow(0 0 1px #d9a44155); }
+.artifact-glyph.silhouette .hole, .artifact-glyph.silhouette .hole-line { fill: #000; stroke: #000; }
+.curios-split { grid-template-columns: minmax(0, 1fr) 340px; }
+/* A glass case of dark wood, shelves of niches lined with velvet. */
+.cabinet { position: relative; padding: 14px 16px 12px; border-radius: 6px; background: linear-gradient(90deg, #2a1709, #3a220f 50%, #2a1709);
+  box-shadow: inset 0 0 0 3px #1a0d05, inset 0 0 0 4px #8a5a2b, 0 8px 18px #000c; }
+.cabinet::after { content: ""; position: absolute; inset: 14px 16px 12px; pointer-events: none; border-radius: 3px;
+  background: linear-gradient(115deg, #ffffff10 0%, transparent 22%, #ffffff0a 40%, transparent 60%); }
+.cabinet-shelf { position: relative; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; padding: 12px 10px 0; margin-bottom: 18px;
+  background: linear-gradient(180deg, #3b0f17, #1f070b); box-shadow: inset 0 6px 14px #000c; border-radius: 3px 3px 0 0; }
+.cabinet-shelf::after { content: ""; position: absolute; left: -6px; right: -6px; bottom: -8px; height: 10px; border-radius: 2px;
+  background: linear-gradient(180deg, #a87440, #5e3a18); box-shadow: 0 4px 6px #000a; }
+.cabinet .hint { position: relative; margin: 20px; text-align: center; }
+button.niche { position: relative; height: 158px; padding: 0 0 4px; border: none; border-radius: 0; background: none; box-shadow: none; display: grid; justify-items: center; align-content: end; gap: 4px;
+  color: var(--metal); font: inherit; letter-spacing: 0; text-transform: none; }
+button.niche:hover:not(:disabled) { box-shadow: none; transform: none; }
+.niche .bell, .showcase .bell { position: absolute; left: 14%; right: 14%; top: 4px; bottom: 38px; border-radius: 40px 40px 4px 4px; pointer-events: none;
+  background: linear-gradient(120deg, #ffffff16, #ffffff05 40%, #ffffff10 70%, #ffffff03); box-shadow: inset 0 0 0 1px #ffffff22; transition: box-shadow .15s; }
+.niche .artifact-glyph { position: relative; width: 52px; height: 52px; filter: drop-shadow(0 0 10px color-mix(in srgb, var(--metal) 55%, transparent)); transition: transform .2s; }
+.niche:hover .artifact-glyph { transform: translateY(-3px); }
+.niche .plinth { width: 70px; height: 12px; border-radius: 2px; background: linear-gradient(180deg, #e9c271, #8a5a1c); box-shadow: 0 3px 4px #000a; }
+.niche-label { max-width: 100%; height: 26px; padding: 0 4px; overflow: hidden; font: 700 10.5px/1.2 var(--font-title); letter-spacing: .03em; color: #e6d3ab; text-align: center; }
+.niche-tag { position: absolute; top: 10px; right: 10%; padding: 1px 6px; border-radius: 9px; font: 700 9px var(--font-title); letter-spacing: .06em; color: #1a0d03; background: #cdbb9b; }
+.niche-tag.on { background: linear-gradient(180deg, #fbe7ac, #d9a441); }
+.niche.is-shop .artifact-glyph { filter: none; opacity: .75; }
+.niche.is-hidden .artifact-glyph { filter: drop-shadow(0 0 1px #d9a44155); }
+.niche.is-hidden .niche-label { color: #7a6650; letter-spacing: .3em; }
+.niche:hover .bell { box-shadow: inset 0 0 0 1px #f5d68a88; }
+.niche.sel .bell { box-shadow: inset 0 0 0 1px #f5d68a, 0 0 18px #f5d68a66; }
+.niche.sel .niche-label { color: #f5d68a; }
+/* The one chosen, under the light. */
+.showcase { position: relative; flex: none; height: 210px; display: grid; place-items: center; overflow: hidden; border-radius: 6px;
+  background: radial-gradient(ellipse at 50% 70%, #3b0f17, #160609 70%); box-shadow: inset 0 0 0 1px #6b4d2a, inset 0 0 30px #000; }
+.showcase-light { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 0, #ffe7a840, transparent 60%); }
+.showcase .artifact-glyph { position: relative; width: 120px; height: 120px; margin-bottom: 30px; filter: drop-shadow(0 0 24px color-mix(in srgb, var(--metal) 55%, transparent)); }
+.showcase .artifact-glyph.silhouette { filter: drop-shadow(0 0 1px #d9a44155); }
+.showcase .plinth { position: absolute; bottom: 26px; width: 150px; height: 16px; border-radius: 2px; background: linear-gradient(180deg, #e9c271, #8a5a1c); box-shadow: 0 6px 8px #000a; }
+.showcase .bell { left: 26%; right: 26%; top: 18px; bottom: 42px; border-radius: 70px 70px 6px 6px; }
+.curio-side h2, .artifact-reveal h2 { margin: 14px 0 2px; padding: 0; background: none; text-align: center; font-size: 21px; color: var(--gold-hi); letter-spacing: .03em; }
+.curio-side .meta, .artifact-reveal .meta { text-align: center; color: var(--muted); font-size: 14px; }
+.curio-side .meta b, .artifact-reveal .meta b { font: 700 13px var(--font-title); }
+.curio-effect { margin: 14px 0 6px; padding: 12px 14px; border-radius: 6px; background: #120b07aa; box-shadow: inset 0 0 0 1px #d9a44144; font-size: 16.5px; line-height: 1.35; text-align: center; color: #fff1c7; }
+.curio-flavor { margin: 12px 0 0; font-style: italic; color: var(--muted); font-size: 14px; text-align: center; }
+.curio-side .ready-line b { text-align: right; }
+.curio-active { padding: 10px; text-align: center; border-radius: 6px; font: 700 13px var(--font-title); letter-spacing: .12em; text-transform: uppercase; color: #1a0d03;
+  background: linear-gradient(180deg, #fbe7ac, #d9a441); box-shadow: 0 0 14px #f5b84a55; }
+.curio-side .buy-bar .hint { margin: 0; text-align: center; }
+/* The moment one is got: it rises under its bell, rays turning behind it. */
+.artifact-reveal { width: min(440px, calc(100vw - 48px)); padding: 30px 26px 22px; display: flex; flex-direction: column; animation: reveal-in .45s ease-out; }
+.artifact-reveal > button.big { margin-top: 18px; align-self: center; }
+.showcase.reveal { height: 240px; }
+.reveal-rays { position: absolute; left: 50%; top: 42%; width: 520px; height: 520px; margin: -260px 0 0 -260px; pointer-events: none; opacity: .5;
+  background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--metal) 40%, transparent) 0 6deg, transparent 6deg 20deg);
+  -webkit-mask: radial-gradient(circle, #000 10%, transparent 60%); mask: radial-gradient(circle, #000 10%, transparent 60%); animation: rays-turn 24s linear infinite; }
+.showcase.reveal .artifact-glyph { animation: curio-rise 1s cubic-bezier(.2, .8, .3, 1) both; }
+@keyframes rays-turn { to { transform: rotate(360deg); } }
+@keyframes curio-rise { from { transform: translateY(40px) scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes reveal-in { from { transform: scale(.92); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .reveal-rays, .showcase.reveal .artifact-glyph, .artifact-reveal { animation: none; }
+}
+/* In the Boosterium: their entry above the sets, and the wares in the panel. */
+button.curios-slot { display: block; width: 100%; height: 96px; margin-bottom: 18px; background: radial-gradient(ellipse at 70% 50%, #3b0f17, #160609 75%); }
+.curios-slot::after { background: linear-gradient(90deg, #120b07ee 20%, #0000 60%); }
+.curios-row { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); display: flex; gap: 14px; }
+.curios-row .artifact-glyph { width: 40px; height: 40px; filter: drop-shadow(0 0 8px #0008); }
+.curios-slot .slot-plate { top: 50%; bottom: auto; transform: translateY(-50%); right: auto; }
+.curios-slot .slot-plate b { font-size: 16px; }
+.curio-ware { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 14px; align-items: start; margin-top: 12px; padding: 12px; border-radius: 6px; background: #1a110a; box-shadow: inset 0 0 0 1px #3d2b1b; }
+.curio-ware-glyph { display: grid; place-items: center; height: 76px; border-radius: 6px; background: radial-gradient(ellipse at 50% 70%, #3b0f17, #160609 75%); box-shadow: inset 0 0 0 1px #6b4d2a; }
+.curio-ware-glyph .artifact-glyph { width: 48px; height: 48px; filter: drop-shadow(0 0 10px color-mix(in srgb, var(--metal) 50%, transparent)); }
+.curio-ware b { display: block; font: 700 15px var(--font-title); color: #fff1c7; }
+.curio-ware small { font: 700 11px var(--font-title); letter-spacing: .08em; text-transform: uppercase; }
+.curio-ware p { margin: 6px 0 10px; font-size: 14.5px; line-height: 1.35; }
+.curio-ware button.big { padding: 7px 16px; font-size: 13px; }
+/* The counter's crown: the balance in a golden frame. */
+.res.crowned { box-shadow: 0 0 0 1px #000, 0 0 0 2px var(--gold-hi), 0 0 14px #f5b84a77; }
+
 /* ---- history: the account book, and the movement chosen beside it ----------------------- */
 .history-split { grid-template-columns: minmax(0, 1fr) 360px; }
 .ledger { width: 100%; border-collapse: collapse; font-size: 14.5px; }

@@ -89,10 +89,15 @@ interface Props {
   onChanged: () => void;
   /** Takes the player to the Boosterium, on a set's boosters. */
   onShop: (setCode: string) => void;
+  /** Selling a binder's duplicates pays this much more, in percent (an artifact's). */
+  duplicatesBonus: number;
 }
 
 /** Collection of one set: completion progress, missing cards greyed out, selling. */
-export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
+export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonus }: Props) {
+  // A binder's duplicates, at the price `sell_duplicates` pays (the artifact's bonus on top).
+  const binderDuplicates = (cards: CollectionCard[]): SoldLine[] =>
+    duplicatesOf(cards).map((l) => ({ ...l, unitCents: l.unitCents + Math.floor((l.unitCents * duplicatesBonus) / 100) }));
   const money = useMoney();
   const moneyText = useMoneyText();
   const { t, tx, plural } = useI18n();
@@ -194,7 +199,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
   async function sellExtras() {
     try {
       // What is about to go, read before the collection changes (shown in the sale's window).
-      const lines = view ? duplicatesOf(sectionsOf(view)) : [];
+      const lines = view ? binderDuplicates(sectionsOf(view)) : [];
       const result = await sellDuplicates(setCode);
       if (result.soldCount > 0) {
         sounds.coins();
@@ -611,7 +616,8 @@ export function Collection({ sets, refreshKey, onChanged, onShop }: Props) {
     : [];
   const ownedValueCents = panelCards.reduce((n, c) => n + c.quantity * (c.priceCents ?? 0) + c.foilQuantity * (c.foilPriceCents ?? 0), 0);
   const resaleCents = panelCards.reduce((n, c) => n + c.quantity * c.sellValueCents + c.foilQuantity * c.foilSellValueCents, 0);
-  const duplicates = duplicatesOf(panelCards);
+  // An artist's duplicates sell card by card (`sell_cards`), without the binder's bonus.
+  const duplicates = byArtist ? duplicatesOf(panelCards) : binderDuplicates(panelCards);
   const duplicatesCents = duplicates.reduce((n, l) => n + l.quantity * l.unitCents, 0);
   // A set's rows count its main cards (its tokens and arts have their own binder sections); an
   // artist's count every card, tokens and arts included, as its completion does.

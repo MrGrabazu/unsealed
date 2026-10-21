@@ -13,7 +13,7 @@ watch your cards follow **real market prices**, and fill your binders. With virt
 &nbsp;
 [![Latest release](https://img.shields.io/github/v/release/MrGrabazu/unsealed?style=for-the-badge&label=version&color=a61f28&labelColor=2e1f15)](https://github.com/MrGrabazu/unsealed/releases/latest)
 &nbsp;
-[![Discord](https://img.shields.io/badge/Discord-The_Boosterium-5865F2?style=for-the-badge&logo=discord&logoColor=white&labelColor=2e1f15)](https://discord.gg/B5P3NJYke)
+[![Discord](https://img.shields.io/badge/Discord-The_Boosterium-5865F2?style=for-the-badge&logo=discord&logoColor=white&labelColor=2e1f15)](https://discord.gg/YVRdaBGWvb)
 &nbsp;
 [![License](https://img.shields.io/badge/license-GPL--3.0-d9a441?style=for-the-badge&labelColor=2e1f15)](LICENSE)
 
@@ -121,7 +121,7 @@ to Wizards of the Coast; card data and prices come from Scryfall and MTGJSON, un
 
 ## 💬 Community
 
-Join **The Boosterium** on [Discord](https://discord.gg/B5P3NJYke) to share your best pulls, report a bug or suggest a feature.
+Join **The Boosterium** on [Discord](https://discord.gg/YVRdaBGWvb) to share your best pulls, report a bug or suggest a feature.
 Issues and ideas are welcome here too.
 
 <details>
@@ -135,7 +135,7 @@ bibliothèque de classeurs à compléter, 96 succès avec leurs propres cartes, 
 que rien ne convertit en argent réel. Interface en français, anglais, allemand, espagnol et italien.
 
 **Téléchargement** pour Windows, macOS et Linux sur la [page du jeu](https://mrgrabazu.github.io/unsealed/) ;
-la communauté se retrouve sur [Discord](https://discord.gg/B5P3NJYke).
+la communauté se retrouve sur [Discord](https://discord.gg/YVRdaBGWvb).
 
 </details>
 

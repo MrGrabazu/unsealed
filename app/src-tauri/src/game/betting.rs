@@ -64,6 +64,8 @@ pub struct OpenedBooster {
     pub cards: Vec<super::OpenedCard>,
     pub bets: Vec<SettledBet>,
     pub skipped: Vec<SkippedBet>,
+    /// The artifact found in it, if any (see `Game::find_artifact`).
+    pub artifact: Option<super::ArtifactView>,
 }
 
 /// A bet left out of an opening, and why. The booster opens all the same.

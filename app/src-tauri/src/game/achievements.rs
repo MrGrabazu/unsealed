@@ -138,12 +138,18 @@ impl Game {
         if events.is_empty() {
             return;
         }
-        if let Err(e) = self.try_emit(events) {
-            eprintln!("achievement engine: {e}");
+        match self.try_emit(events) {
+            // The artifacts these achievements give, whose own events may unlock more.
+            Ok(unlocked) => {
+                let given = self.give_achievement_artifacts(&unlocked);
+                self.emit(given);
+            }
+            Err(e) => eprintln!("achievement engine: {e}"),
         }
     }
 
-    fn try_emit(&mut self, events: Vec<Event>) -> Result<(), String> {
+    /// Returns the achievements just unlocked.
+    fn try_emit(&mut self, events: Vec<Event>) -> Result<Vec<String>, String> {
         let now = (self.clock)().now;
         let mut progress = self.store.load_progress().map_err(err)?;
         let before = progress.clone();
@@ -152,14 +158,14 @@ impl Game {
             unlocked.extend(self.engine.handle(&mut progress, event, now).into_iter().map(|u| u.id));
         }
         if progress == before {
-            return Ok(());
+            return Ok(Vec::new());
         }
         self.ensure_prices();
         let sets = self.list_sets().unwrap_or_default();
         let rewards: Vec<GrantedReward> = unlocked.iter().filter_map(|id| self.resolve_reward(id, &sets)).collect();
         self.store.save_progress(&progress, &rewards, now).map_err(err)?;
-        self.notifications.extend(unlocked);
-        Ok(())
+        self.notifications.extend(unlocked.iter().cloned());
+        Ok(unlocked)
     }
 
     pub(super) fn balance_event(&self) -> Option<Event> {

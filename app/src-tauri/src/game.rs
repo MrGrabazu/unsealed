@@ -1,6 +1,7 @@
 //! Game logic exposed to the UI. Independent from Tauri so it can be unit tested.
 
 mod achievements;
+mod artifacts;
 mod artists;
 mod betting;
 mod details;
@@ -8,8 +9,11 @@ mod guests;
 mod history;
 mod income;
 mod library;
+#[cfg(test)]
+mod pace;
 
 pub use income::IncomeView;
+pub use artifacts::{ArtifactPerks, ArtifactView};
 pub use artists::{ArtistCardView, ArtistSummary, ArtistView};
 pub use betting::{BetChance, BetContext, BetRequest, KeptBet, OpenedBooster};
 pub use library::LibraryBinder;
@@ -32,6 +36,7 @@ use unsealed_core::catalog::{CardEntry, Manifest, PriceFile, SetFile, COLLECTOR_
 use unsealed_core::import::ART_RARITY;
 use unsealed_core::economy::{charity_available, EconomyConfig};
 use unsealed_core::limited::LimitedConfig;
+use unsealed_core::artifacts::SoldCard;
 use unsealed_core::{open_booster_excluding, ColorIndex};
 
 /// Largest number of boosters bought in one purchase.
@@ -193,6 +198,8 @@ pub struct WalletView {
     pub currency: CurrencyView,
     pub charity: CharityStatus,
     pub sealed: Vec<SealedStack>,
+    /// What the artifacts owned change in amounts the interface works out itself.
+    pub artifact_perks: ArtifactPerks,
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
@@ -265,6 +272,9 @@ pub struct StatsView {
     pub distinct_cards: u32,
     /// Today's market value of the collection.
     pub collection_value_cents: i64,
+    /// What the Boosterium would pay today for it, on real market prices only (as in the
+    /// header and for the income).
+    pub collection_sell_value_cents: i64,
     /// What the Boosterium would pay today for the sealed boosters.
     pub sealed_value_cents: i64,
     pub best_booster: Option<OpeningView>,
@@ -343,6 +353,12 @@ pub struct Game {
     artists: Option<unsealed_core::catalog::ArtistIndex>,
     /// The guest series (see `guests`), read when first needed.
     guests: Option<unsealed_core::catalog::GuestIndex>,
+    /// The artifacts owned and their effects (see `artifacts`).
+    artifacts: artifacts::Artifacts,
+    /// Sets complete, counted at most once a minute: (when, how many).
+    completed_sets_cache: Option<(i64, usize)>,
+    /// Release date of each set offered, read when first needed (booster discounts).
+    release_dates: Option<HashMap<String, String>>,
     /// Whether each translated printing checked has a good scan (see `localized`).
     image_quality: HashMap<String, bool>,
     prices: Option<PriceFile>,
@@ -387,7 +403,8 @@ impl Game {
     ) -> Result<Self, String> {
         store.ensure_starting_balance(economy.starting_balance_cents, clock().now).map_err(err)?;
         // Bets of a booster left unseen when the game was last closed.
-        store.pay_bets(clock().now).map_err(err)?;
+        // (Without the artifacts' bonuses: they are not known yet.)
+        store.pay_bets(clock().now, 0, None).map_err(err)?;
         let image_quality = read_json(&data_dir.join(IMAGE_QUALITY_FILE)).unwrap_or_default();
         Ok(Self {
             data_dir,
@@ -403,6 +420,9 @@ impl Game {
             print_runs: HashMap::new(),
             artists: None,
             guests: None,
+            artifacts: artifacts::Artifacts::default(),
+            completed_sets_cache: None,
+            release_dates: None,
             image_quality,
             prices: None,
             prices_stamp: None,
@@ -418,6 +438,8 @@ impl Game {
         self.print_runs.clear();
         self.artists = None;
         self.guests = None;
+        self.completed_sets_cache = None;
+        self.release_dates = None;
         self.prices = None;
         self.prices_stamp = None;
         self.bet_tables.clear();
@@ -507,7 +529,8 @@ impl Game {
         Ok(WalletView {
             balance_cents: balance,
             currency: CurrencyView { seals_per_cent: self.economy.currency.seals_per_cent },
-            charity: CharityStatus { amount_cents: self.economy.charity.amount_cents, available: charity_open },
+            charity: CharityStatus { amount_cents: self.charity_amount(), available: charity_open },
+            artifact_perks: self.artifact_perks(),
             sealed,
         })
     }
@@ -571,7 +594,11 @@ impl Game {
             .as_ref()
             .and_then(|p| p.boosters.get(&format!("{set_code}/{kind}")))
             .map(|v| if self.economy.currency.market == "EUR" { v.eur } else { v.usd });
-        self.economy.booster_price_cents(set_code, kind, ev)
+        let price = self.economy.booster_price_cents(set_code, kind, ev);
+        // The artifacts' discounts (on the kind, or on old sets).
+        let released = self.release_dates.as_ref().and_then(|d| d.get(set_code)).map_or("", String::as_str);
+        let discount = self.bonuses().booster_discount(kind, released);
+        (u64::from(price) * u64::from(100 - discount) / 100) as u32
     }
 
     fn price_history(&self, set_code: &str, kind: &str) -> Vec<u32> {
@@ -586,13 +613,18 @@ impl Game {
             return Err("charity is not available".to_string());
         }
         let clock = (self.clock)();
-        let amount = self.economy.charity.amount_cents;
+        let amount = self.charity_amount();
         self.store.claim_charity(amount, &clock.day, clock.now).map_err(err)?;
 
         let mut events = vec![Event::new("CharityClaimed").with("amountCents", amount)];
         events.extend(self.balance_event());
         self.emit(events);
         Ok(())
+    }
+
+    /// The daily help, multiplied by an artifact's.
+    fn charity_amount(&self) -> u32 {
+        self.economy.charity.amount_cents.saturating_mul(self.bonuses().charity_factor)
     }
 
     fn charity_open(&mut self, balance: i64) -> Result<bool, String> {
@@ -664,7 +696,7 @@ impl Game {
             .filter(|(uuid, pulled)| self.print_runs.get(uuid).is_some_and(|run| pulled >= run))
             .map(|(uuid, _)| uuid)
             .collect();
-        let Self { sets, prices, rng, economy, clock, card_lang, print_runs, limited, image_quality, .. } = self;
+        let Self { sets, prices, rng, economy, card_lang, print_runs, limited, image_quality, .. } = self;
         let set = &sets[set_code];
         let cfg = set
             .file
@@ -705,10 +737,14 @@ impl Game {
             })
             .collect();
         cards.sort_by_key(|c| reveal_rank(kind, c));
+        // As `Game::sale_value` reckons it: an artifact's better rate, if any.
+        for card in &mut cards {
+            card.sell_value_cents = card.price_cents.map_or(0, |p| self.sell_value_of(&card.uuid, card.foil, p));
+        }
 
         let drawn: Vec<(String, bool)> = cards.iter().map(|c| (c.uuid.clone(), c.foil)).collect();
-        let limited: Vec<bool> = cards.iter().map(|c| print_runs.contains_key(&c.uuid)).collect();
-        let now = clock().now;
+        let limited: Vec<bool> = cards.iter().map(|c| self.print_runs.contains_key(&c.uuid)).collect();
+        let now = (self.clock)().now;
         let (settled, placed) = self.settle_bets(set_code, kind, &bets, &drawn)?;
 
         let outcome = {
@@ -731,7 +767,11 @@ impl Game {
 
         let mut events = self.opening_events(set_code, kind, &cards, outcome.cost_cents, animated);
         events.booster.extend(settled.iter().map(betting::bet_event));
-        Ok((OpenedBooster { cards, bets: settled, skipped }, events))
+        // An artifact may hide in the booster: drawn apart, after its cards (never affecting
+        // them), and shown at the end of the opening.
+        let (artifact, found) = self.find_artifact(set_code, kind);
+        events.booster.extend(found);
+        Ok((OpenedBooster { cards, bets: settled, skipped, artifact }, events))
     }
 
     /// Opens up to `quantity` sealed boosters in a row. Each opening is its own transaction, so
@@ -771,9 +811,11 @@ impl Game {
 
     /// Pays the bets won whose boosters were seen (and any left from an earlier session).
     fn pay_bets(&mut self) {
-        let now = (self.clock)().now;
+        let clock = (self.clock)();
+        let bonuses = self.bonuses();
+        let (bonus, refund) = (bonuses.bet_win_percent, bonuses.daily_bet_refund);
         // Kept unpaid on failure: paid on the next try.
-        let _ = self.store.pay_bets(now);
+        let _ = self.store.pay_bets(clock.now, bonus, refund.then_some(clock.day.as_str()));
     }
 
     // ---- collection and selling ------------------------------------------------------
@@ -890,6 +932,11 @@ impl Game {
 
     /// Sells cards at the Boosterium's price. Nothing is sold if any request is invalid.
     pub fn sell_cards(&mut self, requests: &[SaleRequest]) -> Result<SaleResult, String> {
+        self.sell_cards_at(requests, 0)
+    }
+
+    /// `sell_cards`, `bonus_percent` above the Boosterium's price (an artifact's, on duplicates).
+    fn sell_cards_at(&mut self, requests: &[SaleRequest], bonus_percent: u32) -> Result<SaleResult, String> {
         self.flush_reveal();
         self.ensure_prices();
         let mut sales = Vec::with_capacity(requests.len());
@@ -897,7 +944,8 @@ impl Game {
             if r.quantity == 0 {
                 return Err("cannot sell zero cards".to_string());
             }
-            let unit_cents = self.sale_value(&r.uuid, r.foil);
+            let base = self.sale_value(&r.uuid, r.foil);
+            let unit_cents = base + base * bonus_percent / 100;
             if unit_cents == 0 {
                 return Err(format!("card {} has no market value and cannot be sold", r.uuid));
             }
@@ -955,7 +1003,8 @@ impl Game {
         if requests.is_empty() {
             return Ok(SaleResult { sold_count: 0, total_cents: 0 });
         }
-        self.sell_cards(&requests)
+        let bonus = self.bonuses().duplicates_percent;
+        self.sell_cards_at(&requests, bonus)
     }
 
     // ---- statistics ------------------------------------------------------------------
@@ -991,6 +1040,8 @@ impl Game {
                 i64::from(unit) * i64::from(s.quantity)
             })
             .sum();
+        // As the header shows it, and as the income counts it.
+        let collection_sell_value_cents = self.collection_resale_value()?;
 
         let best_booster = self.top_opening(OpeningOrder::MostValuable, &names)?;
         let worst_booster = self.top_opening(OpeningOrder::LeastValuable, &names)?;
@@ -1044,6 +1095,7 @@ impl Game {
             balance_cents: self.store.balance().map_err(err)?,
             distinct_cards,
             collection_value_cents,
+            collection_sell_value_cents,
             sealed_value_cents,
             best_booster,
             worst_booster,
@@ -1131,7 +1183,19 @@ impl Game {
 
     /// What the Boosterium pays for one copy; 0 when the card has no market price.
     fn sale_value(&self, uuid: &str, foil: bool) -> u32 {
-        self.market_price(uuid, foil).map_or(0, |m| self.economy.sell_value_cents(m))
+        self.market_price(uuid, foil).map_or(0, |m| self.sell_value_of(uuid, foil, m))
+    }
+
+    /// What a copy of a card worth `market_cents` sells for: at the economy's rate, or an
+    /// artifact's better one (by its rarity, finish and the release of its set).
+    fn sell_value_of(&self, uuid: &str, foil: bool, market_cents: u32) -> u32 {
+        let card = self.sets.values().find_map(|s| s.index.get(uuid).map(|&i| &s.file.cards[i]));
+        let released = card
+            .and_then(|c| self.release_dates.as_ref().and_then(|d| d.get(&c.set_code)))
+            .map_or("", String::as_str);
+        let sold = SoldCard { rarity: card.map_or("", |c| c.rarity.as_str()), market_cents, foil, released };
+        let rate = self.bonuses().sell_rate(self.economy.sell_rate_percent, sold);
+        EconomyConfig::sell_value_at(market_cents, rate)
     }
 
     // ---- data loading ---------------------------------------------------------------
@@ -1170,6 +1234,13 @@ impl Game {
     /// a manual `data-builder` run), so market moves reach the game while it is open.
     /// Prices are optional: the game stays playable without them.
     fn ensure_prices(&mut self) {
+        if self.release_dates.is_none() {
+            // Booster prices need them (the artifacts' discounts on old sets).
+            self.release_dates = read_manifest(&self.data_dir)
+                .ok()
+                .flatten()
+                .map(|m| m.sets.into_iter().map(|(code, s)| (code, s.release_date)).collect());
+        }
         let path = self.data_dir.join("prices.json");
         let stamp = fs::metadata(&path).and_then(|m| m.modified()).ok();
         if self.prices.is_some() && stamp == self.prices_stamp {
@@ -1586,6 +1657,91 @@ mod tests {
         let mut g = game(name);
         g.buy_boosters("TST", "play", 1).unwrap();
         g
+    }
+
+    /// Artifacts for the tests: one on sale, one hidden in every play booster, one that
+    /// needs it first, one given by an achievement, and the one for owning all the others.
+    const ARTIFACTS: &str = r#"{ "artifacts": [
+      { "id": "loupe", "rarity": "rare", "glyph": "loupe", "name": "Loupe", "effect": "e", "flavor": "f",
+        "source": { "type": "shop", "priceCents": 1000 },
+        "effects": [{ "type": "sellRate", "percent": 90, "rarities": ["mythic"] }, { "type": "boosterDiscount", "percent": 25 }] },
+      { "id": "bronze", "rarity": "uncommon", "glyph": "key", "name": "Bronze", "effect": "e", "flavor": "f",
+        "source": { "type": "booster", "oneIn": 1, "kinds": ["play"] },
+        "effects": [{ "type": "duplicatesBonus", "percent": 50 }] },
+      { "id": "silver", "rarity": "rare", "glyph": "key", "name": "Silver", "effect": "e", "flavor": "f",
+        "source": { "type": "booster", "oneIn": 1, "kinds": ["play"] }, "requires": ["bronze"],
+        "effects": [{ "type": "incomeBonus", "percent": 100 }] },
+      { "id": "medal", "rarity": "common", "glyph": "seal", "name": "Medal", "effect": "e", "flavor": "f",
+        "source": { "type": "achievement", "id": "first" },
+        "effects": [{ "type": "charityMultiplier", "factor": 3 }] },
+      { "id": "crown", "rarity": "mythic", "glyph": "crown", "name": "Crown", "effect": "e", "flavor": "f",
+        "source": { "type": "allOthers" }, "effects": [{ "type": "incomeBonus", "percent": 10 }] }
+    ] }"#;
+
+    fn with_artifacts(mut g: Game) -> Game {
+        g.set_artifacts(unsealed_core::artifacts::ArtifactsConfig::from_json(ARTIFACTS).unwrap());
+        g
+    }
+
+    fn status_of(g: &Game, id: &str) -> &'static str {
+        g.artifacts("en").into_iter().find(|a| a.id == id).unwrap().status
+    }
+
+    #[test]
+    fn artifacts_are_bought_found_once_in_their_order_and_given_by_achievements() {
+        let first = r#"{ "id": "first", "name": "First", "description": "Open a booster.", "rarity": "common",
+            "emblem": "pack", "palette": "ember", "condition": { "type": "metric", "metric": "opened", "atLeast": 1 } }"#;
+        let (g, _) = game_with_engine("artifacts", PRICES, achievements(first));
+        let mut g = with_artifacts(g);
+        // Only the one on sale is told; the others keep their secrets.
+        let cabinet = g.artifacts("en");
+        assert_eq!(cabinet.iter().map(|a| a.status).collect::<Vec<_>>(), ["shop", "hidden", "hidden", "hidden", "hidden"]);
+        assert!(cabinet[1].name.is_none() && cabinet[1].effect.is_none() && cabinet[0].price_cents == Some(1000));
+
+        // Bought: paid for, owned, and its effects play (a quarter off the boosters).
+        let before = g.wallet().unwrap().balance_cents;
+        let full = g.shop().unwrap()[0].price_cents;
+        g.buy_artifact("loupe", "en").unwrap();
+        assert_eq!(g.wallet().unwrap().balance_cents, before - 1000);
+        assert_eq!(status_of(&g, "loupe"), "owned");
+        assert!(g.buy_artifact("loupe", "en").is_err(), "once only");
+        assert_eq!(g.shop().unwrap()[0].price_cents, full * 75 / 100);
+
+        // The first play booster hides the bronze key, the second the silver one (it needed
+        // the bronze), the third nothing: each is found once.
+        g.buy_boosters("TST", "play", 3).unwrap();
+        let found: Vec<Option<String>> = (0..3)
+            .map(|_| {
+                let opened = g.open_booster_with_bets("TST", "play", true, &[]).unwrap();
+                g.reveal_cards(usize::MAX);
+                opened.artifact.map(|a| a.id)
+            })
+            .collect();
+        assert_eq!(found, [Some("bronze".to_string()), Some("silver".to_string()), None]);
+
+        // The achievement unlocked by the first opening gave the medal; with it, every
+        // artifact but the crown was owned: the crown came too.
+        let given: Vec<String> = g.take_given_artifacts("en").into_iter().map(|a| a.id).collect();
+        assert_eq!(given, ["medal", "crown"]);
+        assert!(g.artifacts("en").iter().all(|a| a.status == "owned"));
+        assert_eq!(g.wallet().unwrap().charity.amount_cents, g.economy.charity.amount_cents * 3);
+        assert_eq!(g.wallet().unwrap().artifact_perks, ArtifactPerks { duplicates_percent: 50, crowned: false });
+    }
+
+    #[test]
+    fn artifacts_raise_what_cards_sell_for() {
+        let mut g = with_artifacts(game_with_booster("artifact-sales"));
+        g.open_booster("TST", "play").unwrap(); // m1 and two c1, and the bronze key
+        let rows = |g: &mut Game| -> Vec<(String, u32)> {
+            g.collection("TST").unwrap().cards.into_iter().map(|c| (c.name, c.sell_value_cents)).collect()
+        };
+        assert_eq!(rows(&mut g), [("Mythic".to_string(), 800), ("Common".to_string(), 80)]);
+        g.store.add_artifact("loupe", "shop", 0).unwrap();
+        g.refresh_artifacts();
+        // The loupe sells mythics at 90 %; commons stay at 80 %.
+        assert_eq!(rows(&mut g), [("Mythic".to_string(), 900), ("Common".to_string(), 80)]);
+        // The bronze key's bonus on duplicates: the extra common sells for 80 + 50 %.
+        assert_eq!(g.sell_duplicates("TST").unwrap().total_cents, 120);
     }
 
     #[test]
@@ -2412,7 +2568,7 @@ mod tests {
         let clock_now = now.clone();
         let mut economy = test_economy();
         economy.starting_balance_cents = 1_200;
-        economy.income = unsealed_core::economy::Income { percent_per_minute: 0.1, offline_cap_minutes: 480 };
+        economy.income = unsealed_core::economy::Income { percent_per_minute: 0.1, max_per_minute_cents: None, offline_cap_minutes: 480 };
         let mut g = Game::with_parts(
             data_dir("income", PRICES),
             Store::open_in_memory().unwrap(),
