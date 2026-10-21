@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import type { WrapperFinish } from "../boosterKinds";
 import { cardBackCanvas, cardBackReady, drawSeal, gold, TITLE_FONT } from "../canvasArt";
 
 // Textures of the 3D opening, drawn on canvases: the original wrapper (with the set's art
@@ -45,6 +46,8 @@ export interface PackLook {
   hue: number;
   setName: string;
   kindLabel: string;
+  /** The booster kind's material (see `wrapperFinish`). */
+  finish: WrapperFinish;
   artUrl: string | null;
   /** The expansion symbol, for a set without art. */
   iconUrl: string | null;
@@ -113,10 +116,34 @@ async function drawArtFallback(g: CanvasRenderingContext2D, look: PackLook, win:
   g.restore();
 }
 
+/** Brushed silver, as `gold`: the trims of the set boosters. */
+function silver(g: CanvasRenderingContext2D, y0: number, y1: number) {
+  const gradient = g.createLinearGradient(0, y0, 0, y1);
+  gradient.addColorStop(0, "#ffffff");
+  gradient.addColorStop(0.35, "#d6dae2");
+  gradient.addColorStop(0.55, "#7d838d");
+  gradient.addColorStop(0.65, "#c9ced6");
+  gradient.addColorStop(1, "#4a5058");
+  return gradient;
+}
+
+/** The trims' metal for a finish: bronze on matte paper, silver on a set booster, else gold. */
+function trim(g: CanvasRenderingContext2D, finish: WrapperFinish, y0: number, y1: number): CanvasGradient | string {
+  if (finish === "matte") return "#b9a37a";
+  return finish === "silver" ? silver(g, y0, y1) : gold(g, y0, y1);
+}
+
+/** The holographic rainbow of the collector boosters, across `w`. */
+function holo(g: CanvasRenderingContext2D, w: number, h: number) {
+  const gradient = g.createLinearGradient(0, 0, w, h);
+  ["#ff7eb3", "#ffd36e", "#7effc6", "#7ec8ff", "#c58bff", "#ff7eb3"].forEach((c, i, all) => gradient.addColorStop(i / (all.length - 1), c));
+  return gradient;
+}
+
 /** A gilded frame inside the wrapper's edges, with a flourish in each corner. */
-function drawFrame(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
+function drawFrame(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, finish: WrapperFinish) {
   g.save();
-  g.strokeStyle = gold(g, y, y + h);
+  g.strokeStyle = trim(g, finish, y, y + h);
   g.lineWidth = 4;
   g.strokeRect(x, y, w, h);
   g.lineWidth = 1.5;
@@ -134,7 +161,7 @@ function drawFrame(g: CanvasRenderingContext2D, x: number, y: number, w: number,
     g.moveTo(14, 30);
     g.quadraticCurveTo(14, 14, 30, 14);
     g.stroke();
-    g.fillStyle = "#f5d68a";
+    g.fillStyle = finish === "silver" ? "#f2f4f8" : finish === "matte" ? "#d8c8a6" : "#f5d68a";
     g.beginPath();
     g.arc(20, 20, 4.5, 0, Math.PI * 2);
     g.fill();
@@ -153,39 +180,60 @@ export async function packTexture(look: PackLook): Promise<THREE.CanvasTexture> 
   canvas.width = w;
   canvas.height = h;
   const g = canvas.getContext("2d")!;
-  const { hue } = look;
+  const { hue, finish } = look;
   // Canvas text only uses fonts already loaded.
   await Promise.all([document.fonts.load(`700 34px Cinzel`), document.fonts.load(`900 84px Cinzel`)]).catch(() => {});
 
+  // The material: matte paper (draft), foil in the set's colour (play), a brighter foil (set),
+  // black lacquer (collector).
   const bg = g.createLinearGradient(0, 0, w, h);
-  bg.addColorStop(0, `hsl(${hue} 70% 46%)`);
-  bg.addColorStop(0.5, `hsl(${(hue + 25) % 360} 75% 24%)`);
-  bg.addColorStop(1, `hsl(${hue} 65% 38%)`);
+  const stops: [number, string][] =
+    finish === "matte"
+      ? [[0, `hsl(${hue} 26% 32%)`], [0.5, `hsl(${hue} 28% 20%)`], [1, `hsl(${hue} 24% 26%)`]]
+      : finish === "collector"
+        ? [[0, "#2a241d"], [0.5, "#0a0806"], [1, "#1c1813"]]
+        : finish === "silver"
+          ? [[0, `hsl(${hue} 70% 54%)`], [0.5, `hsl(${(hue + 25) % 360} 75% 28%)`], [1, `hsl(${hue} 65% 46%)`]]
+          : [[0, `hsl(${hue} 70% 46%)`], [0.5, `hsl(${(hue + 25) % 360} 75% 24%)`], [1, `hsl(${hue} 65% 38%)`]];
+  for (const [at, color] of stops) bg.addColorStop(at, color);
   g.fillStyle = bg;
   g.fillRect(0, 0, w, h);
-  // A sheen across the wrapper.
-  const sheen = g.createLinearGradient(0, h * 0.2, w, h * 0.5);
-  sheen.addColorStop(0, "#fff0");
-  sheen.addColorStop(0.5, "#ffffff2a");
-  sheen.addColorStop(1, "#fff0");
-  g.fillStyle = sheen;
-  g.fillRect(0, 0, w, h);
-  // Fine diagonal ridges, like a foil wrapper.
-  g.strokeStyle = `hsl(${hue} 70% 80% / 0.08)`;
-  g.lineWidth = 2;
-  for (let x = -h; x < w; x += 9) {
-    g.beginPath();
-    g.moveTo(x, h);
-    g.lineTo(x + h, 0);
-    g.stroke();
+  if (finish !== "matte") {
+    // A sheen across the wrapper (brighter on a set booster).
+    const sheen = g.createLinearGradient(0, h * 0.2, w, h * 0.5);
+    sheen.addColorStop(0, "#fff0");
+    sheen.addColorStop(0.5, finish === "silver" ? "#ffffff44" : "#ffffff2a");
+    sheen.addColorStop(1, "#fff0");
+    g.fillStyle = sheen;
+    g.fillRect(0, 0, w, h);
+    // Fine diagonal ridges, like a foil wrapper.
+    g.strokeStyle = finish === "collector" ? "#ffffff0d" : `hsl(${hue} 70% 80% / 0.08)`;
+    g.lineWidth = 2;
+    for (let x = -h; x < w; x += 9) {
+      g.beginPath();
+      g.moveTo(x, h);
+      g.lineTo(x + h, 0);
+      g.stroke();
+    }
   }
-  // Crimped bottom edge.
+  // Crimped bottom edge: gilded on a collector booster.
+  const crimp = edgeColours(hue, finish);
   for (let x = 0; x < w; x += 8) {
-    g.fillStyle = x % 16 === 0 ? `hsl(${hue} 35% 62%)` : `hsl(${hue} 40% 38%)`;
+    g.fillStyle = x % 16 === 0 ? crimp[0] : crimp[1];
     g.fillRect(x, h - 46, 8, 46);
   }
+  if (finish === "collector") {
+    // A holographic rule just inside the edges.
+    g.strokeStyle = holo(g, w, h);
+    g.lineWidth = 5;
+    g.strokeRect(6, 6, w - 12, h - 58);
+  } else if (finish === "silver") {
+    g.strokeStyle = "#e8e8f0aa";
+    g.lineWidth = 3;
+    g.strokeRect(6, 6, w - 12, h - 58);
+  }
 
-  drawFrame(g, 14, 14, w - 28, h - 74);
+  drawFrame(g, 14, 14, w - 28, h - 74, finish);
 
   g.textAlign = "center";
   g.shadowColor = "#000";
@@ -228,9 +276,14 @@ export async function packTexture(look: PackLook): Promise<THREE.CanvasTexture> 
   g.strokeStyle = "#1b0f05";
   g.lineWidth = 10;
   g.strokeRect(win.x, win.y, win.w, win.h);
-  g.strokeStyle = gold(g, win.y, win.y + win.h);
+  g.strokeStyle = trim(g, finish, win.y, win.y + win.h);
   g.lineWidth = 5;
+  if (finish === "collector") {
+    g.shadowColor = "#f5b84a";
+    g.shadowBlur = 18;
+  }
   g.strokeRect(win.x - 1, win.y - 1, win.w + 2, win.h + 2);
+  g.shadowBlur = 0;
 
   // The booster kind on a leather ribbon with swallowtail ends.
   const ribbon = { y: 618, h: 48, half: 170 };
@@ -242,41 +295,59 @@ export async function packTexture(look: PackLook): Promise<THREE.CanvasTexture> 
   g.lineTo(w / 2 - ribbon.half - 24, ribbon.y + ribbon.h);
   g.lineTo(w / 2 - ribbon.half - 8, ribbon.y + ribbon.h / 2);
   g.closePath();
+  // Leather (plain on matte paper), brushed silver on a set booster, a rainbow on a collector.
   const leather = g.createLinearGradient(0, ribbon.y, 0, ribbon.y + ribbon.h);
-  leather.addColorStop(0, "#4a2f1b");
-  leather.addColorStop(1, "#24160c");
-  g.fillStyle = leather;
+  if (finish === "silver") {
+    leather.addColorStop(0, "#9aa0ab");
+    leather.addColorStop(1, "#4a5058");
+  } else if (finish === "matte") {
+    leather.addColorStop(0, "#33251a");
+    leather.addColorStop(1, "#22180f");
+  } else {
+    leather.addColorStop(0, "#4a2f1b");
+    leather.addColorStop(1, "#24160c");
+  }
+  g.fillStyle = finish === "collector" ? holo(g, w, 0) : leather;
   g.shadowColor = "#000";
   g.shadowBlur = 10;
   g.fill();
   g.shadowBlur = 0;
-  g.strokeStyle = gold(g, ribbon.y, ribbon.y + ribbon.h);
+  g.strokeStyle = trim(g, finish, ribbon.y, ribbon.y + ribbon.h);
   g.lineWidth = 2.5;
   g.stroke();
   g.font = `700 24px ${TITLE_FONT}`;
-  g.fillStyle = gold(g, ribbon.y + 12, ribbon.y + 40);
+  g.fillStyle = finish === "collector" ? "#1a0d03" : finish === "silver" ? "#ffffff" : finish === "matte" ? "#d8c8a6" : gold(g, ribbon.y + 12, ribbon.y + 40);
   g.fillText(look.kindLabel.toUpperCase(), w / 2, ribbon.y + 34, ribbon.half * 2 - 20);
 
-  // The seal, and the game's name.
-  drawSeal(g, w / 2, 712, 66);
+  // The seal (gold on a collector booster), and the game's name.
+  drawSeal(g, w / 2, 712, 66, finish === "collector");
   g.font = `700 19px ${TITLE_FONT}`;
-  g.fillStyle = gold(g, 752, 770);
+  g.fillStyle = trim(g, finish, 752, 770);
   g.fillText("U N S E A L E D", w / 2, 768);
   return canvasTexture(canvas);
 }
 
-/** The crimped strip at the top of the wrapper, torn off to open it: the set's colour,
- * crimped, with a gilded seam along its lower edge. */
-export function stripTexture(hue: number): THREE.CanvasTexture {
+/** The two colours of a crimped edge: the set's colour, muted on matte paper, gilded on a
+ * collector booster. */
+function edgeColours(hue: number, finish: WrapperFinish): [string, string] {
+  if (finish === "collector") return ["#e2b45a", "#b07d2c"];
+  if (finish === "matte") return [`hsl(${hue} 22% 46%)`, `hsl(${hue} 25% 28%)`];
+  return [`hsl(${hue} 35% 64%)`, `hsl(${hue} 40% 40%)`];
+}
+
+/** The crimped strip at the top of the wrapper, torn off to open it: the set's colour (or the
+ * finish's), crimped, with a seam along its lower edge in the finish's metal. */
+export function stripTexture(hue: number, finish: WrapperFinish): THREE.CanvasTexture {
   const canvas = document.createElement("canvas");
   canvas.width = 512;
   canvas.height = 48;
   const g = canvas.getContext("2d")!;
+  const [light, dark] = edgeColours(hue, finish);
   for (let x = 0; x < 512; x += 8) {
-    g.fillStyle = x % 16 === 0 ? `hsl(${hue} 35% 64%)` : `hsl(${hue} 40% 40%)`;
+    g.fillStyle = x % 16 === 0 ? light : dark;
     g.fillRect(x, 0, 8, 48);
   }
-  g.fillStyle = gold(g, 36, 44);
+  g.fillStyle = trim(g, finish, 36, 44);
   g.fillRect(0, 38, 512, 5);
   return canvasTexture(canvas);
 }

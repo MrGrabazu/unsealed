@@ -9,6 +9,24 @@ export const kindRank = (kind: string) => {
   return i === -1 ? KIND_ORDER.length : i;
 };
 
+/** How a booster's wrapper looks, by kind, so the kinds of a set tell apart at a glance and
+ * rise with their price: matte paper (draft), foil (play, and the oldest sets' single kind),
+ * brighter foil with silver (set), black lacquer with gold and a holographic rule (collector). */
+export type WrapperFinish = "matte" | "foil" | "silver" | "collector";
+
+export function wrapperFinish(kind: string): WrapperFinish {
+  switch (kind) {
+    case "draft":
+      return "matte";
+    case "set":
+      return "silver";
+    case "collector":
+      return "collector";
+    default:
+      return "foil";
+  }
+}
+
 /** "Draft booster", or just "Booster" for the oldest sets, which had a single kind ("default"). */
 export function kindLabel(t: I18n["t"], kind: string): string {
   switch (kind) {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { SealedStack, SetSummary } from "./api";
 import { BackToTop } from "./BackToTop";
-import { kindLabel } from "./boosterKinds";
+import { kindLabel, wrapperFinish } from "./boosterKinds";
 import { useI18n } from "./i18n";
 import { Money, useMoney } from "./money";
 import { hueOf } from "./Pack";
@@ -31,7 +31,8 @@ export function Wrapper({ stack, set, large = false }: { stack: SealedStack; set
   const { t } = useI18n();
   const style = { "--hue": hueOf(stack.setCode) } as CSSProperties;
   return (
-    <span className={`wrapper ${large ? "large" : ""}`} style={style} aria-hidden="true">
+    <span className={`wrapper finish-${wrapperFinish(stack.kind)} ${large ? "large" : ""}`} style={style} aria-hidden="true">
+      <span className="wrapper-holo" />
       <span className="wrapper-name">{stack.setName}</span>
       <span className="wrapper-window">
         {set?.art ? <img src={set.art.imageUrl} alt="" draggable={false} /> : <SetIcon url={set?.iconUrl ?? null} name={stack.setName} />}

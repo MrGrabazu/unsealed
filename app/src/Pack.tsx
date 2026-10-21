@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import type { CSSProperties } from "react";
 import type { SetSummary } from "./api";
-import { kindLabel } from "./boosterKinds";
+import { kindLabel, wrapperFinish } from "./boosterKinds";
 import { useI18n } from "./i18n";
 import { SetIcon } from "./SetIcon";
 
@@ -51,7 +51,7 @@ export function Pack({ setCode, set, kind, torn, onTear, disabled }: Props) {
     <div className="pack-stage">
       <motion.button
         type="button"
-        className="pack"
+        className={`pack finish-${wrapperFinish(kind)}`}
         style={style}
         onClick={() => !torn && !disabled && onTear()}
         disabled={disabled || torn}

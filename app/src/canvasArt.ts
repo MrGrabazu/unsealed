@@ -17,8 +17,9 @@ export function gold(g: CanvasRenderingContext2D, y0: number, y1: number) {
   return gradient;
 }
 
-/** The logo's wax seal, a U pressed in it, at `cx`, `cy`, `size` wide. */
-export function drawSeal(g: CanvasRenderingContext2D, cx: number, cy: number, size: number) {
+/** The logo's wax seal, a U pressed in it, at `cx`, `cy`, `size` wide; in gold rather than
+ * red wax when `golden` (the collector boosters'). */
+export function drawSeal(g: CanvasRenderingContext2D, cx: number, cy: number, size: number, golden = false) {
   const outline = new Path2D(SEAL_PATH);
   g.save();
   g.translate(cx, cy);
@@ -29,22 +30,24 @@ export function drawSeal(g: CanvasRenderingContext2D, cx: number, cy: number, si
   g.fill(outline);
   g.restore();
   const wax = g.createRadialGradient(-20, -25, 5, 0, 0, 80);
-  wax.addColorStop(0, "#e2545a");
-  wax.addColorStop(0.45, "#a61f28");
-  wax.addColorStop(1, "#4f080e");
+  for (const [at, color] of golden
+    ? ([[0, "#fff4c8"], [0.45, "#d9a441"], [1, "#6d4512"]] as const)
+    : ([[0, "#e2545a"], [0.45, "#a61f28"], [1, "#4f080e"]] as const)) {
+    wax.addColorStop(at, color);
+  }
   g.fillStyle = wax;
   g.fill(outline);
-  g.strokeStyle = "#3d060b";
+  g.strokeStyle = golden ? "#3a2108" : "#3d060b";
   g.lineWidth = 2.5;
   g.stroke(outline);
   g.beginPath();
   g.arc(0, 0, 45, 0, Math.PI * 2);
-  g.strokeStyle = gold(g, -45, 45);
+  g.strokeStyle = golden ? "#3a2108" : gold(g, -45, 45);
   g.lineWidth = 3;
   g.stroke();
   g.font = `900 84px ${TITLE_FONT}`;
   g.textAlign = "center";
-  g.fillStyle = gold(g, -30, 30);
+  g.fillStyle = golden ? "#3a2108" : gold(g, -30, 30);
   g.fillText("U", 0, 29);
   g.restore();
 }

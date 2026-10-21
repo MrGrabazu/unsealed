@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { OpenedCard, SetSummary } from "./api";
-import { kindLabel } from "./boosterKinds";
+import { kindLabel, wrapperFinish } from "./boosterKinds";
 import { SellBoosterButton, useBoosterSale } from "./BoosterSale";
 import { useI18n } from "./i18n";
 import { CardImage } from "./CardImage";
@@ -51,6 +51,7 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
       setName: set?.name ?? setCode,
       setCode,
       kindLabel: kindLabel(t, kind),
+      finish: wrapperFinish(kind),
       artUrl: set?.art?.imageUrl ?? null,
       iconUrl: set?.iconUrl ?? null,
     }),
