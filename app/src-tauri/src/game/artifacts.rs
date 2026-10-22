@@ -34,6 +34,8 @@ pub struct ArtifactView {
 pub struct ArtifactPerks {
     /// Selling duplicates pays this much more, in percent.
     pub duplicates_percent: u32,
+    /// The best share of the market price a card sells for, that bonus included.
+    pub max_sell_rate_percent: u32,
     /// The balance wears a golden frame (the crown).
     pub crowned: bool,
 }
@@ -81,6 +83,7 @@ impl Game {
     pub(super) fn artifact_perks(&self) -> ArtifactPerks {
         ArtifactPerks {
             duplicates_percent: self.bonuses().duplicates_percent,
+            max_sell_rate_percent: self.bonuses().max_sell_rate_percent,
             crowned: self.artifacts.owned.contains_key(CROWN),
         }
     }

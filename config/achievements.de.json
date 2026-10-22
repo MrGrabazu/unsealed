@@ -94,5 +94,21 @@
   "signed-10": { "name": "Autogrammbuch", "description": "Ziehe 10 Kunstkarten mit goldener Signatur." },
   "signed-set": { "name": "Ruhmeshalle", "description": "Besitze alle Kunstkarten eines Sets mit ihrer goldenen Signatur." },
   "frequent-visitor": { "name": "Stammgast", "description": "Nimm 10-mal die Hilfe des Boosteriums an." },
-  "overachiever": { "name": "Streber", "description": "Schalte 50 Erfolge frei." }
+  "overachiever": { "name": "Streber", "description": "Schalte 50 Erfolge frei." },
+  "cycle-1": { "name": "Erster Zyklus", "description": "Vervollständige einen Zyklus eines Sets." },
+  "cycle-5": { "name": "Radfahrer", "description": "Vervollständige 5 Zyklen." },
+  "cycle-25": { "name": "Große Runde", "description": "Vervollständige 25 Zyklen." },
+  "cycle-100": { "name": "Glücksrad", "description": "Vervollständige 100 Zyklen." },
+  "cycle-250": { "name": "Meister der Zyklen", "description": "Vervollständige 250 Zyklen." },
+  "cycle-500": { "name": "Ewige Wiederkehr", "description": "Vervollständige 500 Zyklen." },
+  "cycle-set": { "name": "Der Kreis schließt sich", "description": "Vervollständige alle Zyklen eines Sets." },
+  "cycle-sets-5": { "name": "Fünf Runden", "description": "Vervollständige alle Zyklen von 5 Sets." },
+  "cycle-prestige": { "name": "Prestige-Zyklus", "description": "Vervollständige einen Zyklus, jede Karte in ihrer edelsten Version, als Foil, wenn es sie gibt." },
+  "cycle-prestige-10": { "name": "Prestige-Galerie", "description": "Vervollständige 10 Prestige-Zyklen." },
+  "cycle-vintage": { "name": "Zyklus von einst", "description": "Vervollständige einen Zyklus eines Sets, das vor 2000 erschienen ist." },
+  "cycle-double": { "name": "Doppelzyklus", "description": "Vervollständige einen Zyklus mit 10 oder mehr Karten." },
+  "cycle-mythic": { "name": "Mythischer Zyklus", "description": "Vervollständige einen Zyklus, dessen Karten alle mythisch selten sind." },
+  "cycle-lands": { "name": "Landvermesser", "description": "Vervollständige einen Zyklus aus Ländern." },
+  "the-nine": { "name": "Die Neun", "description": "Versammle die neun Nazgûl aus Der Herr der Ringe, jeden in seiner eigenen Illustration." },
+  "the-nine-prestige": { "name": "Neun den Sterblichen Menschen", "description": "Versammle die neun Nazgûl, jeden in seiner randlosen Foil-Version." }
 }

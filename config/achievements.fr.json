@@ -94,5 +94,21 @@
   "signed-10": { "name": "Carnet d'autographes", "description": "Tirez 10 cartes d'art à signature dorée." },
   "signed-set": { "name": "Panthéon", "description": "Possédez toutes les cartes d'art d'un set avec leur signature dorée." },
   "frequent-visitor": { "name": "Habitué", "description": "Acceptez l'aide du Boosterium 10 fois." },
-  "overachiever": { "name": "Bourreau de travail", "description": "Débloquez 50 succès." }
+  "overachiever": { "name": "Bourreau de travail", "description": "Débloquez 50 succès." },
+  "cycle-1": { "name": "Premier cycle", "description": "Complétez un cycle d'un set." },
+  "cycle-5": { "name": "Cycliste", "description": "Complétez 5 cycles." },
+  "cycle-25": { "name": "Grand tour", "description": "Complétez 25 cycles." },
+  "cycle-100": { "name": "Roue de la fortune", "description": "Complétez 100 cycles." },
+  "cycle-250": { "name": "Maître des cycles", "description": "Complétez 250 cycles." },
+  "cycle-500": { "name": "Éternel retour", "description": "Complétez 500 cycles." },
+  "cycle-set": { "name": "Le set en boucle", "description": "Complétez tous les cycles d'un set." },
+  "cycle-sets-5": { "name": "Cinq fois la boucle", "description": "Complétez tous les cycles de 5 sets." },
+  "cycle-prestige": { "name": "Cycle de prestige", "description": "Complétez un cycle dont chaque carte est dans sa version la plus premium, en foil quand elle existe." },
+  "cycle-prestige-10": { "name": "Galerie de prestige", "description": "Complétez 10 cycles de prestige." },
+  "cycle-vintage": { "name": "Cycle d'antan", "description": "Complétez un cycle d'un set sorti avant 2000." },
+  "cycle-double": { "name": "Double cycle", "description": "Complétez un cycle de 10 cartes ou plus." },
+  "cycle-mythic": { "name": "Cycle mythique", "description": "Complétez un cycle dont toutes les cartes sont des rares mythiques." },
+  "cycle-lands": { "name": "Arpenteur", "description": "Complétez un cycle de terrains." },
+  "the-nine": { "name": "Les Neuf", "description": "Réunissez les neuf Nazgûl du Seigneur des Anneaux, chacun dans son illustration." },
+  "the-nine-prestige": { "name": "Neuf furent donnés aux Hommes", "description": "Réunissez les neuf Nazgûl, chacun dans sa version sans bordure foil." }
 }

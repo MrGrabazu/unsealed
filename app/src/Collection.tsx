@@ -3,6 +3,7 @@ import {
   checkSetImages,
   getArtistCollection,
   getCollection,
+  getCycles,
   getOwnedCards,
   listArtists,
   listGuestSeries,
@@ -13,6 +14,7 @@ import {
   type ArtistView,
   type CollectionCard,
   type CollectionView,
+  type CyclesView,
   type SetSummary,
 } from "./api";
 
@@ -68,6 +70,7 @@ const fold = (text: string) => text.normalize("NFD").replace(/\p{Diacritic}/gu, 
 import { Binder, type BinderSection } from "./Binder";
 import { CardDetails } from "./CardDetails";
 import { CardImage } from "./CardImage";
+import { CyclesList, CyclesPanel } from "./Cycles";
 import { useI18n } from "./i18n";
 import { Library } from "./Library";
 import { Loading } from "./Loading";
@@ -91,18 +94,29 @@ interface Props {
   onShop: (setCode: string) => void;
   /** Selling a binder's duplicates pays this much more, in percent (an artifact's). */
   duplicatesBonus: number;
+  /** The best share of a card's market price a sale can reach, that bonus included. */
+  maxSellRate: number;
 }
 
 /** Collection of one set: completion progress, missing cards greyed out, selling. */
-export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonus }: Props) {
-  // A binder's duplicates, at the price `sell_duplicates` pays (the artifact's bonus on top).
+export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonus, maxSellRate }: Props) {
+  // A binder's duplicates, at the price `sell_duplicates` pays (the artifact's bonus on top,
+  // never above the best rate on the market price: `Bonuses::duplicate_value`).
   const binderDuplicates = (cards: CollectionCard[]): SoldLine[] =>
-    duplicatesOf(cards).map((l) => ({ ...l, unitCents: l.unitCents + Math.floor((l.unitCents * duplicatesBonus) / 100) }));
+    duplicatesOf(cards).map((l) => {
+      const boosted = l.unitCents + Math.floor((l.unitCents * duplicatesBonus) / 100);
+      const market = l.foil ? l.card.foilPriceCents : l.card.priceCents;
+      const best = market == null ? boosted : Math.floor((market * maxSellRate) / 100);
+      return { ...l, unitCents: Math.max(l.unitCents, Math.min(boosted, best)) };
+    });
   const money = useMoney();
   const moneyText = useMoneyText();
-  const { t, tx, plural } = useI18n();
+  const { t, tx, plural, lang } = useI18n();
   const [setCode, setSetCode] = useState("");
   const [view, setView] = useState<CollectionView | null>(null);
+  // The set's cycles, and whether they are shown in place of its binder or grid.
+  const [cycles, setCycles] = useState<CyclesView | null>(null);
+  const [showCycles, setShowCycles] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -163,14 +177,18 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
         setOwnedAll(await getOwnedCards());
       } else if (setCode) {
         setView(await getCollection(setCode));
+        setCycles(await getCycles(setCode, lang).catch(() => null));
         // Translated images: shown once known as good scans (checked once per card).
-        if ((await checkSetImages(setCode).catch(() => 0)) > 0) setView(await getCollection(setCode));
+        if ((await checkSetImages(setCode).catch(() => 0)) > 0) {
+          setView(await getCollection(setCode));
+          setCycles(await getCycles(setCode, lang).catch(() => null));
+        }
       }
       setError(null);
     } catch (e) {
       setError(String(e));
     }
-  }, [source, setCode, artist]);
+  }, [source, setCode, artist, lang]);
 
   useEffect(() => {
     void reload();
@@ -299,6 +317,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
   }, [artists, artistSearch]);
 
   function changeLayout(next: CollectionLayout) {
+    setShowCycles(false);
     setLayout(next);
     setCollectionLayout(next);
   }
@@ -377,6 +396,9 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
 
   // One set's collection: its binder (or grid) beside a panel with its completion and sales.
   const oneSet = source === "sets" && !allSets && !!view;
+  // Its cycles instead, when it has some and they are asked for.
+  const hasCycles = oneSet && !!cycles && cycles.setCode === view?.setCode && cycles.total > 0;
+  const cyclesShown = hasCycles && showCycles;
 
   const bar = (
     <>
@@ -441,7 +463,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
             <option value="quantity">{t("collection.sortQuantity")}</option>
           </select>
         )}
-        {layout === "grid" && !allSets && !library && (
+        {layout === "grid" && !allSets && !library && !cyclesShown && (
           <select value={filter} onChange={(e) => setFilter(e.target.value as Filter)}>
             <option value="all">{t("collection.allCards")}</option>
             <option value="owned">{t("collection.owned")}</option>
@@ -452,12 +474,17 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
         <div className="collection-bar-right">
           {!allSets && !library && (
             <div className="segmented" role="group" aria-label={t("collection.layout")}>
-              <button className={layout === "binder" ? "active" : ""} onClick={() => changeLayout("binder")}>
+              <button className={layout === "binder" && !cyclesShown ? "active" : ""} onClick={() => changeLayout("binder")}>
                 {t("collection.layoutBinder")}
               </button>
-              <button className={layout === "grid" ? "active" : ""} onClick={() => changeLayout("grid")}>
+              <button className={layout === "grid" && !cyclesShown ? "active" : ""} onClick={() => changeLayout("grid")}>
                 {t("collection.layoutGrid")}
               </button>
+              {hasCycles && (
+                <button className={cyclesShown ? "active" : ""} onClick={() => setShowCycles(true)}>
+                  {t("collection.layoutCycles")}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -502,7 +529,8 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
           )}
         </>
       )}
-      {source === "sets" && !allSets && view && (
+      {cyclesShown && cycles && <CyclesList view={cycles} onOpen={setDetailsOf} />}
+      {source === "sets" && !allSets && view && !cyclesShown && (
         <>
           {layout === "binder" ? (
             <Binder
@@ -665,6 +693,9 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
         {bar}
         {content}
       </section>
+      {cyclesShown && cycles ? (
+        <CyclesPanel view={cycles} onShop={view && !ofSeries ? () => onShop(view.setCode) : undefined} />
+      ) : (
       <aside className="frame set-side">
         <div className="cartouche">{t("collection.completion")}</div>
         <div className="scroll">
@@ -745,6 +776,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
           </div>
         </div>
       </aside>
+      )}
       {dialogs}
     </div>
   );

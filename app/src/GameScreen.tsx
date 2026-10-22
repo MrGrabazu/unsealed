@@ -930,6 +930,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
             refreshKey={openings}
             onChanged={refreshWallet}
             duplicatesBonus={wallet?.artifactPerks.duplicatesPercent ?? 0}
+            maxSellRate={wallet?.artifactPerks.maxSellRatePercent ?? 100}
             onShop={(setCode) => {
               setShopFocus({ setCode, at: Date.now() });
               switchTab("boosterium");

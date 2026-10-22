@@ -20,6 +20,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{Manager, State};
 use unsealed_core::achievements::Engine;
 use unsealed_core::artifacts::{ArtifactTranslations, ArtifactsConfig};
+use unsealed_core::cycles::Cycles;
 use unsealed_core::economy::EconomyConfig;
 use unsealed_core::limited::LimitedConfig;
 use unsealed_core::scryfall;
@@ -58,6 +59,15 @@ const ARTIFACT_TRANSLATIONS: &[(&str, &str)] = &[
     ("it", include_str!("../../../config/artifacts.it.json")),
 ];
 
+const DEFAULT_CYCLES: &str = include_str!("../../../config/cycles.json");
+const DEFAULT_CUSTOM_CYCLES: &str = include_str!("../../../config/cycles.custom.json");
+const CYCLE_TRANSLATIONS: &[(&str, &str)] = &[
+    ("fr", include_str!("../../../config/cycles.fr.json")),
+    ("de", include_str!("../../../config/cycles.de.json")),
+    ("es", include_str!("../../../config/cycles.es.json")),
+    ("it", include_str!("../../../config/cycles.it.json")),
+];
+
 /// What is running: the saves, and the game being played, if any (none on the home screen
 /// at launch).
 pub(crate) struct Session {
@@ -66,6 +76,8 @@ pub(crate) struct Session {
     current: Option<(SaveInfo, Game)>,
     /// Language of card and set names (a setting of the app, not of a game).
     card_lang: String,
+    /// The sets' cycles, read once and shared by the games.
+    cycles: Arc<Cycles>,
 }
 
 impl Session {
@@ -85,6 +97,7 @@ impl Session {
         game.set_limited(load_limited(&self.data_dir).map_err(|e| e.to_string())?);
         game.set_artifacts(load_artifacts(&self.data_dir).map_err(|e| e.to_string())?);
         game.set_artifact_texts(load_artifact_texts(&self.data_dir).map_err(|e| e.to_string())?);
+        game.set_cycles(self.cycles.clone());
         game.set_card_language(&self.card_lang);
         self.current = Some((info.clone(), game));
         Ok(info)
@@ -408,6 +421,12 @@ fn take_unlocks(state: State<'_, SessionState>, lang: String) -> Result<Vec<Achi
     with_game(&state, |g| Ok(g.take_unlocks(&lang)))
 }
 
+/// A set's cycles, as far as the player is, their names in `lang`.
+#[tauri::command]
+fn get_cycles(state: State<'_, SessionState>, set_code: String, lang: String) -> Result<game::CyclesView, String> {
+    with_game(&state, |g| g.cycles(&set_code, &lang))
+}
+
 /// The cabinet of curiosities: every artifact, owned, on sale or still hidden.
 #[tauri::command]
 fn get_artifacts(state: State<'_, SessionState>, lang: String) -> Result<Vec<game::ArtifactView>, String> {
@@ -546,6 +565,18 @@ fn load_artifact_texts(data_dir: &Path) -> Result<HashMap<String, ArtifactTransl
     Ok(texts)
 }
 
+/// The cycles: the MTG Wiki's and ours, their names translated. A file of the same name in
+/// the data directory replaces the shipped one.
+fn load_cycles(data_dir: &Path) -> Result<Cycles, Box<dyn Error>> {
+    let read = |name: &str, shipped: &str| fs::read_to_string(data_dir.join(name)).unwrap_or_else(|_| shipped.to_string());
+    let wiki = read("cycles.json", DEFAULT_CYCLES);
+    let custom = read("cycles.custom.json", DEFAULT_CUSTOM_CYCLES);
+    let texts: Vec<(&str, String)> =
+        CYCLE_TRANSLATIONS.iter().map(|(lang, shipped)| (*lang, read(&format!("cycles.{lang}.json"), shipped))).collect();
+    let texts: Vec<(&str, &str)> = texts.iter().map(|(lang, text)| (*lang, text.as_str())).collect();
+    Ok(Cycles::from_json(&wiki, &custom, &texts)?)
+}
+
 fn load_data_config(data_dir: &Path) -> Result<DataConfig, Box<dyn Error>> {
     let json = fs::read_to_string(data_dir.join("data.json")).unwrap_or_else(|_| DEFAULT_DATA.to_string());
     Ok(DataConfig::from_json(&json)?)
@@ -593,6 +624,7 @@ pub fn run() {
                 saves,
                 current: None,
                 card_lang: "en".to_string(),
+                cycles: Arc::new(load_cycles(&data_dir)?),
             }));
 
             app.manage(Arc::new(scryfall::Client::default()));
@@ -647,6 +679,7 @@ pub fn run() {
             claim_charity,
             get_achievements,
             take_unlocks,
+            get_cycles,
             get_artifacts,
             buy_artifact,
             take_given_artifacts,

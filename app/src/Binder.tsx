@@ -165,7 +165,7 @@ const INKS = ["#1d2b5c", "#202020", "#2a3f8f", "#3a3a46", "#1f3d6b"];
 
 /** Where a card is still missing: a scrap of paper cut in a hurry, its name (in the card
  * language) and number written by hand, slanted, as collectors do in real binders. */
-function Placeholder({ card }: { card: CollectionCard }) {
+export function Placeholder({ card }: { card: CollectionCard }) {
   const r = (salt: number) => seeded(card.uuid, salt);
   const style = {
     "--paper-tilt": `${(r(1) - 0.5) * 9}deg`,

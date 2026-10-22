@@ -4,6 +4,7 @@ mod achievements;
 mod artifacts;
 mod artists;
 mod betting;
+mod cycles;
 mod details;
 mod guests;
 mod history;
@@ -16,6 +17,7 @@ pub use income::IncomeView;
 pub use artifacts::{ArtifactPerks, ArtifactView};
 pub use artists::{ArtistCardView, ArtistSummary, ArtistView};
 pub use betting::{BetChance, BetContext, BetRequest, KeptBet, OpenedBooster};
+pub use cycles::CyclesView;
 pub use library::LibraryBinder;
 
 pub use achievements::{AchievementTexts, AchievementView, AchievementsView};
@@ -357,6 +359,8 @@ pub struct Game {
     artifacts: artifacts::Artifacts,
     /// Sets complete, counted at most once a minute: (when, how many).
     completed_sets_cache: Option<(i64, usize)>,
+    /// The sets' cycles (see `cycles`), shared by the games of a session.
+    cycles: Option<std::sync::Arc<unsealed_core::cycles::Cycles>>,
     /// Release date of each set offered, read when first needed (booster discounts).
     release_dates: Option<HashMap<String, String>>,
     /// Whether each translated printing checked has a good scan (see `localized`).
@@ -422,6 +426,7 @@ impl Game {
             guests: None,
             artifacts: artifacts::Artifacts::default(),
             completed_sets_cache: None,
+            cycles: None,
             release_dates: None,
             image_quality,
             prices: None,
@@ -932,11 +937,12 @@ impl Game {
 
     /// Sells cards at the Boosterium's price. Nothing is sold if any request is invalid.
     pub fn sell_cards(&mut self, requests: &[SaleRequest]) -> Result<SaleResult, String> {
-        self.sell_cards_at(requests, 0)
+        self.sell_cards_at(requests, false)
     }
 
-    /// `sell_cards`, `bonus_percent` above the Boosterium's price (an artifact's, on duplicates).
-    fn sell_cards_at(&mut self, requests: &[SaleRequest], bonus_percent: u32) -> Result<SaleResult, String> {
+    /// `sell_cards`; `duplicates`: with the artifacts' bonus on duplicates, within the best
+    /// sell rate.
+    fn sell_cards_at(&mut self, requests: &[SaleRequest], duplicates: bool) -> Result<SaleResult, String> {
         self.flush_reveal();
         self.ensure_prices();
         let mut sales = Vec::with_capacity(requests.len());
@@ -945,7 +951,10 @@ impl Game {
                 return Err("cannot sell zero cards".to_string());
             }
             let base = self.sale_value(&r.uuid, r.foil);
-            let unit_cents = base + base * bonus_percent / 100;
+            let unit_cents = match self.market_price(&r.uuid, r.foil) {
+                Some(market) if duplicates => self.bonuses().duplicate_value(base, market),
+                _ => base,
+            };
             if unit_cents == 0 {
                 return Err(format!("card {} has no market value and cannot be sold", r.uuid));
             }
@@ -1003,8 +1012,7 @@ impl Game {
         if requests.is_empty() {
             return Ok(SaleResult { sold_count: 0, total_cents: 0 });
         }
-        let bonus = self.bonuses().duplicates_percent;
-        self.sell_cards_at(&requests, bonus)
+        self.sell_cards_at(&requests, true)
     }
 
     // ---- statistics ------------------------------------------------------------------
@@ -1659,6 +1667,59 @@ mod tests {
         g
     }
 
+    /// Cycles of the test set: the mythic and the common (complete after a booster); the
+    /// common and the card no booster gives; and a slot whose better printing (#3) is not
+    /// owned. Ours replaces the wiki's "pair".
+    fn test_cycles() -> Arc<unsealed_core::cycles::Cycles> {
+        Arc::new(
+            unsealed_core::cycles::Cycles::from_json(
+                r#"{ "sets": { "TST": [
+                  { "id": "pair", "name": "Pair", "slots": [["2"], ["10"]] },
+                  { "id": "missing", "name": "Missing", "slots": [["10"], ["3"]] },
+                  { "id": "upgrade", "name": "Upgrade", "slots": [["10", "3"], ["2"]] } ] } }"#,
+                r#"{ "sets": { "TST": [ { "id": "pair", "name": { "en": "Our Pair", "fr": "Notre paire" }, "slots": [["2"], ["10"]] } ] } }"#,
+                &[("fr", r#"{ "Missing": "Manquant" }"#)],
+            )
+            .unwrap(),
+        )
+    }
+
+    #[test]
+    fn cycles_fill_their_slots_with_the_best_copy_and_tell_the_achievements() {
+        let engine = Engine::from_json(
+            r#"{ "metrics": { "cycles": { "event": "CycleCompleted", "op": "distinct", "field": "cycle" } },
+                 "achievements": [
+                   { "id": "first", "name": "First", "description": "d", "rarity": "common", "emblem": "cards", "palette": "forest",
+                     "condition": { "type": "metric", "metric": "cycles", "atLeast": 1 } },
+                   { "id": "prestige", "name": "Prestige", "description": "d", "rarity": "rare", "emblem": "gem", "palette": "rose",
+                     "condition": { "type": "event", "event": "CycleCompleted", "where": [{ "field": "prestige", "op": "eq", "value": true }] } } ] }"#,
+        )
+        .unwrap();
+        let (mut g, _) = game_with_engine("cycles", PRICES, engine);
+        g.set_cycles(test_cycles());
+        let before = g.cycles("TST", "fr").unwrap();
+        assert_eq!((before.completed, before.total, before.slots_owned, before.slots_total), (0, 3, 0, 6));
+        // Ours replaced the wiki's, in French; the wiki's translated; the English otherwise.
+        let names: Vec<(&str, bool)> = before.cycles.iter().map(|c| (c.name.as_str(), c.custom)).collect();
+        assert_eq!(names, [("Notre paire", true), ("Manquant", false), ("Upgrade", false)]);
+        // A missing slot shows its first printing.
+        assert_eq!((before.cycles[2].slots[0].card.number.as_str(), before.cycles[2].slots[0].owned), ("10", false));
+
+        g.buy_boosters("TST", "play", 1).unwrap();
+        g.open_booster("TST", "play").unwrap(); // the mythic and two commons
+        g.reveal_cards(usize::MAX);
+        let after = g.cycles("TST", "en").unwrap();
+        assert_eq!((after.completed, after.slots_owned), (2, 5));
+        let [pair, missing, upgrade] = &after.cycles[..] else { panic!() };
+        assert!(pair.complete && pair.prestige, "each slot's only printing, which has no foil");
+        assert!(!missing.complete && missing.slots[1].card.number == "3");
+        // Complete, but the common is not its slot's best printing.
+        assert!(upgrade.complete && !upgrade.prestige && !upgrade.slots[0].prestige);
+        assert_eq!(upgrade.slots[0].printings, 2);
+        let unlocked: Vec<String> = g.take_unlocks("en").into_iter().map(|a| a.id).collect();
+        assert_eq!(unlocked, ["first", "prestige"]);
+    }
+
     /// Artifacts for the tests: one on sale, one hidden in every play booster, one that
     /// needs it first, one given by an achievement, and the one for owning all the others.
     const ARTIFACTS: &str = r#"{ "artifacts": [
@@ -1725,7 +1786,7 @@ mod tests {
         assert_eq!(given, ["medal", "crown"]);
         assert!(g.artifacts("en").iter().all(|a| a.status == "owned"));
         assert_eq!(g.wallet().unwrap().charity.amount_cents, g.economy.charity.amount_cents * 3);
-        assert_eq!(g.wallet().unwrap().artifact_perks, ArtifactPerks { duplicates_percent: 50, crowned: false });
+        assert_eq!(g.wallet().unwrap().artifact_perks, ArtifactPerks { duplicates_percent: 50, max_sell_rate_percent: 100, crowned: false });
     }
 
     #[test]
@@ -1740,8 +1801,9 @@ mod tests {
         g.refresh_artifacts();
         // The loupe sells mythics at 90 %; commons stay at 80 %.
         assert_eq!(rows(&mut g), [("Mythic".to_string(), 900), ("Common".to_string(), 80)]);
-        // The bronze key's bonus on duplicates: the extra common sells for 80 + 50 %.
-        assert_eq!(g.sell_duplicates("TST").unwrap().total_cents, 120);
+        // The bronze key's bonus on duplicates: the extra common sells for 80 + 50 %, held to
+        // the best rate (no limits in this config: 100 % of its market price, 100).
+        assert_eq!(g.sell_duplicates("TST").unwrap().total_cents, 100);
     }
 
     #[test]

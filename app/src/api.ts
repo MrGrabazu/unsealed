@@ -59,6 +59,40 @@ export interface CollectionCard {
   boosters?: string[];
 }
 
+/** A card of a cycle: the best copy owned of its printings, else its regular printing. */
+export interface CycleSlot {
+  card: CollectionCard;
+  owned: boolean;
+  /** The copy shown is a foil. */
+  foil: boolean;
+  /** Owned in its most premium printing and finish. */
+  prestige: boolean;
+  /** How many printings the slot has, the regular one included. */
+  printings: number;
+}
+
+/** A cycle of a set (the MTG Wiki's, or one of ours). */
+export interface CycleView {
+  id: string;
+  name: string;
+  custom: boolean;
+  owned: number;
+  total: number;
+  complete: boolean;
+  /** Every card in its most premium printing. */
+  prestige: boolean;
+  slots: CycleSlot[];
+}
+
+export interface CyclesView {
+  setCode: string;
+  completed: number;
+  total: number;
+  slotsOwned: number;
+  slotsTotal: number;
+  cycles: CycleView[];
+}
+
 /** In a set's completion panel: a guest series its boosters give, with its own binder. */
 export interface GuestLink {
   code: string;
@@ -300,7 +334,9 @@ export interface WalletView {
   charity: { amountCents: number; available: boolean };
   sealed: SealedStack[];
   /** What the artifacts owned change in amounts the interface works out itself. */
-  artifactPerks: { duplicatesPercent: number; crowned: boolean };
+  /** What the artifacts change in amounts the interface works out: the duplicates' bonus, and
+   * the best share of a card's market price it can reach. */
+  artifactPerks: { duplicatesPercent: number; maxSellRatePercent: number; crowned: boolean };
 }
 
 export interface ShopItem {
@@ -575,6 +611,8 @@ export const checkSetImages = (setCode: string) => invoke<number>("check_set_ima
 /** Every card owned, across the sets, with the set it comes from. */
 export const getOwnedCards = () => invoke<ArtistCard[]>("get_owned_cards");
 export const getLibrary = () => invoke<LibraryBinder[]>("get_library");
+/** A set's cycles, as far as the player is, their names in `lang`. */
+export const getCycles = (setCode: string, lang: string) => invoke<CyclesView>("get_cycles", { setCode, lang });
 export const listArtists = () => invoke<ArtistSummary[]>("list_artists");
 /** The guest series with a binder of their own (no boosters, no art). */
 export const listGuestSeries = () => invoke<SetSummary[]>("list_guest_series");

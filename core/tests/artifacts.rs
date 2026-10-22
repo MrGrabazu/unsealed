@@ -56,8 +56,9 @@ fn invalid_configs_are_refused() {
     let bad = |from: &str, to: &str| ArtifactsConfig::from_json(&CONFIG.replacen(from, to, 1)).is_err();
     assert!(bad(r#""id": "silver-key""#, r#""id": "bronze-key""#), "duplicate id");
     assert!(bad(r#""requires": ["bronze-key"]"#, r#""requires": ["copper-key"]"#), "unknown requirement");
-    assert!(bad(r#""priceCents": 25000"#, r#""priceCents": 0"#), "free in the shop");
-    assert!(bad(r#""oneIn": 30"#, r#""oneIn": 0"#), "never found");
+    assert!(bad(r#""priceCents": 60000"#, r#""priceCents": 0"#), "free in the shop");
+    assert!(bad(r#""oneIn": 75"#, r#""oneIn": 0"#), "never found");
+    assert!(bad(r#""sellRatePercent": 88"#, r#""sellRatePercent": 120"#), "selling above the market");
     assert!(bad(r#""releasedBefore": "2000-01-01""#, r#""releasedBefore": "2000""#), "invalid date");
     assert!(bad(r#""rarity": "rare""#, r#""rarity": "legendary""#), "unknown rarity");
 }
@@ -73,15 +74,22 @@ fn effects_add_up_and_the_best_sell_rate_wins() {
     assert_eq!(b.sell_rate(80, sold("rare", 100)), 85);
     assert_eq!(b.sell_rate(80, sold("common", 100)), 80);
     assert_eq!(b.sell_rate(80, sold("common", 5000)), 85); // worth 50 Seals or more
-    assert_eq!(b.sell_rate(80, sold("token", 10)), 100);
+    assert_eq!(b.sell_rate(80, sold("token", 10)), 88);
 
-    // The five keys: half price on collectors, and only on them; the token on every booster;
-    // the archivist's seal on old sets only.
+    // The five keys: 10 % on collectors, and only on them; the token on every booster; the
+    // archivist's seal on old sets only. Together, never more than the limit.
     let keys = ["bronze-key", "silver-key", "gold-key", "diamond-key", "obsidian-key"];
     let b = config.bonuses(&owned(&[&keys[..], &["merchant-token", "archivist-seal"]].concat()));
-    assert_eq!(b.booster_discount("collector", "2024-01-01"), 55);
-    assert_eq!(b.booster_discount("play", "2024-01-01"), 5);
-    assert_eq!(b.booster_discount("default", "1994-06-01"), 15);
+    assert_eq!(b.booster_discount("collector", "2024-01-01"), 12);
+    assert_eq!(b.booster_discount("play", "2024-01-01"), 2);
+    assert_eq!(b.booster_discount("default", "1994-06-01"), 8);
+    let b = config.bonuses(&owned(&[&keys[..], &["merchant-token", "master-key"]].concat()));
+    assert_eq!(b.booster_discount("collector", "2024-01-01"), 12, "10 + 2 + 2, held to the limit");
+
+    // Duplicates: their bonus on top, never above the best rate on the market price.
+    let b = config.bonuses(&owned(&["doubles-coffer", "broken-seal"]));
+    assert_eq!(b.duplicate_value(800, 1000), 880);
+    assert_eq!(b.duplicate_value(850, 1000), 880);
 
     let b = config.bonuses(&owned(&["collector-lectern", "velvet-purse"]));
     assert!(b.counts_completed_sets());
@@ -93,11 +101,26 @@ fn effects_add_up_and_the_best_sell_rate_wins() {
     // Sell rates by finish and by the age of the set; an unknown date is never old.
     let b = config.bonuses(&owned(&["lapidary-prism", "antiquarian-monocle", "grimoire-of-myths"]));
     let card = |rarity, foil, released| SoldCard { rarity, market_cents: 100, foil, released };
-    assert_eq!(b.sell_rate(80, card("common", true, "2024-01-01")), 90);
+    assert_eq!(b.sell_rate(80, card("common", true, "2024-01-01")), 88);
     assert_eq!(b.sell_rate(80, card("common", false, "2024-01-01")), 80);
-    assert_eq!(b.sell_rate(80, card("common", false, "1994-06-01")), 90);
+    assert_eq!(b.sell_rate(80, card("common", false, "1994-06-01")), 88);
     assert_eq!(b.sell_rate(80, card("common", false, "")), 80);
-    assert_eq!(b.sell_rate(80, card("mythic", false, "2024-01-01")), 90);
+    assert_eq!(b.sell_rate(80, card("mythic", false, "2024-01-01")), 88);
+}
+
+#[test]
+fn opening_never_makes_money_whatever_the_artifacts() {
+    // A booster costs what it is expected to be worth; the best rate it sells back for must
+    // stay at or below what is left to pay after the best discount.
+    let config = ArtifactsConfig::from_json(CONFIG).unwrap();
+    let all: HashSet<String> = config.artifacts.iter().map(|a| a.id.clone()).collect();
+    let b = config.bonuses(&all);
+    let best_rate = b.sell_rate(80, SoldCard { rarity: "mythic", market_cents: 100_000, foil: true, released: "1994-06-01" });
+    for (kind, released) in [("collector", "2024-01-01"), ("play", "2024-01-01"), ("draft", "1999-01-01"), ("default", "1994-06-01")] {
+        let paid = 100 - b.booster_discount(kind, released);
+        assert!(best_rate <= paid, "{kind} of {released}: paid {paid} %, sold back {best_rate} %");
+        assert!(b.duplicate_value(80_000, 100_000) <= paid * 1000, "{kind}: duplicates above what was paid");
+    }
 }
 
 #[test]
@@ -141,7 +164,7 @@ fn each_key_is_found_only_by_the_bearer_of_the_ones_before() {
         }
     }
     assert_eq!(found, ["bronze-key", "silver-key", "gold-key", "diamond-key", "obsidian-key"]);
-    // Hundreds of collectors (about 855 expected): a reward of weeks, not of the first hour.
+    // Hundreds of collectors (about 1,200 expected): a reward of months, not of the first hour.
     assert!(opened > 300, "found in {opened} boosters");
 
     // A play booster never gives a key; nothing is found twice.

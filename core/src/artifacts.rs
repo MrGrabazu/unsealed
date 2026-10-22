@@ -5,13 +5,34 @@
 //! Adding an artifact takes no code, as long as its effects are of the kinds below.
 
 use crate::booster::ConfigError;
+use crate::economy::EconomyConfig;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ArtifactsConfig {
+    #[serde(default)]
+    pub limits: Limits,
     pub artifacts: Vec<ArtifactDef>,
+}
+
+/// What all the artifacts together can never pass. A booster costs what it is expected to be
+/// worth: if a discount went below what its cards sell back for, opening would make money by
+/// itself. With `1 − discount ≥ sell rate`, the best equipped player at best breaks even.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Limits {
+    /// The most a booster's price comes down, every discount added up.
+    pub booster_discount_percent: u32,
+    /// The best share of the market price a card sells for, duplicates' bonus included.
+    pub sell_rate_percent: u32,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self { booster_discount_percent: 90, sell_rate_percent: 100 }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -140,6 +161,9 @@ pub struct Bonuses {
     pub undo_penalty_percent: u32,
     pub bet_win_percent: u32,
     pub daily_bet_refund: bool,
+    max_discount_percent: u32,
+    /// The best share of the market price a card can sell for (see `Limits`).
+    pub max_sell_rate_percent: u32,
 }
 
 impl Default for Bonuses {
@@ -156,6 +180,8 @@ impl Default for Bonuses {
             undo_penalty_percent: 100,
             bet_win_percent: 0,
             daily_bet_refund: false,
+            max_discount_percent: 90,
+            max_sell_rate_percent: 100,
         }
     }
 }
@@ -173,10 +199,18 @@ impl Bonuses {
             })
             .map(|r| r.percent)
             .fold(base, u32::max)
+            .min(self.max_sell_rate_percent.max(base))
+    }
+
+    /// What a duplicate worth `value_cents` (its usual sale value) sells for, the duplicates'
+    /// bonus on top, never above the best rate on its `market_cents`.
+    pub fn duplicate_value(&self, value_cents: u32, market_cents: u32) -> u32 {
+        let boosted = value_cents.saturating_add(value_cents * self.duplicates_percent / 100);
+        boosted.min(EconomyConfig::sell_value_at(market_cents, self.max_sell_rate_percent)).max(value_cents)
     }
 
     /// The discount on a booster of `kind` from a set released on `released` ("YYYY-MM-DD"),
-    /// in percent (90 at most).
+    /// in percent (the limit at most).
     pub fn booster_discount(&self, kind: &str, released: &str) -> u32 {
         self.discounts
             .iter()
@@ -185,7 +219,7 @@ impl Bonuses {
             })
             .map(|(percent, _, _)| *percent)
             .sum::<u32>()
-            .min(90)
+            .min(self.max_discount_percent)
     }
 
     /// The bonus on the collection's income, in percent, with `completed_sets` sets complete.
@@ -209,6 +243,9 @@ impl ArtifactsConfig {
 
     fn validate(&self) -> Result<(), ConfigError> {
         let bad = |msg: String| Err(ConfigError::Invalid(format!("artifacts: {msg}")));
+        if self.limits.booster_discount_percent > 90 || self.limits.sell_rate_percent > 100 {
+            return bad("limits: a discount of 90% and a sell rate of 100% at most".to_string());
+        }
         let mut ids = HashSet::new();
         for a in &self.artifacts {
             if a.id.is_empty() || !a.id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
@@ -264,7 +301,11 @@ impl ArtifactsConfig {
 
     /// The effects of the artifacts owned, put together.
     pub fn bonuses(&self, owned: &HashSet<String>) -> Bonuses {
-        let mut b = Bonuses::default();
+        let mut b = Bonuses {
+            max_discount_percent: self.limits.booster_discount_percent,
+            max_sell_rate_percent: self.limits.sell_rate_percent,
+            ..Bonuses::default()
+        };
         for effect in self.artifacts.iter().filter(|a| owned.contains(&a.id)).flat_map(|a| &a.effects) {
             match effect {
                 ArtifactEffect::SellRate { percent, rarities, min_market_cents, foil, released_before } => {

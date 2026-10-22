@@ -256,5 +256,21 @@
   "signed-10": { "name": "Libro de autógrafos", "description": "Consigue 10 cartas de arte con firma dorada." },
   "signed-set": { "name": "Salón de la fama", "description": "Ten todas las cartas de arte de una edición con su firma dorada." },
   "frequent-visitor": { "name": "Visitante asiduo", "description": "Acepta la ayuda del Boosterium 10 veces." },
-  "overachiever": { "name": "Superdotado", "description": "Desbloquea 50 logros." }
+  "overachiever": { "name": "Superdotado", "description": "Desbloquea 50 logros." },
+  "cycle-1": { "name": "Primer ciclo", "description": "Completa un ciclo de una edición." },
+  "cycle-5": { "name": "Ciclista", "description": "Completa 5 ciclos." },
+  "cycle-25": { "name": "Gran vuelta", "description": "Completa 25 ciclos." },
+  "cycle-100": { "name": "Rueda de la fortuna", "description": "Completa 100 ciclos." },
+  "cycle-250": { "name": "Maestro de los ciclos", "description": "Completa 250 ciclos." },
+  "cycle-500": { "name": "Eterno retorno", "description": "Completa 500 ciclos." },
+  "cycle-set": { "name": "El círculo completo", "description": "Completa todos los ciclos de una edición." },
+  "cycle-sets-5": { "name": "Cinco vueltas", "description": "Completa todos los ciclos de 5 ediciones." },
+  "cycle-prestige": { "name": "Ciclo de prestigio", "description": "Completa un ciclo con cada carta en su versión más premium, en foil cuando existe." },
+  "cycle-prestige-10": { "name": "Galería de prestigio", "description": "Completa 10 ciclos de prestigio." },
+  "cycle-vintage": { "name": "Ciclo de antaño", "description": "Completa un ciclo de una edición anterior al 2000." },
+  "cycle-double": { "name": "Ciclo doble", "description": "Completa un ciclo de 10 cartas o más." },
+  "cycle-mythic": { "name": "Ciclo mítico", "description": "Completa un ciclo cuyas cartas son todas raras míticas." },
+  "cycle-lands": { "name": "Agrimensor", "description": "Completa un ciclo de tierras." },
+  "the-nine": { "name": "Los Nueve", "description": "Reúne a los nueve Nazgûl de El Señor de los Anillos, cada uno con su propia ilustración." },
+  "the-nine-prestige": { "name": "Nueve para los Hombres Mortales", "description": "Reúne a los nueve Nazgûl, cada uno en su versión sin bordes foil." }
 }

@@ -58,6 +58,14 @@
       "where": [{ "field": "rarity", "op": "eq", "value": "art" }, { "field": "foil", "op": "eq", "value": true }],
       "op": "sum"
     },
+    "cycles_completed": { "event": "CycleCompleted", "op": "distinct", "field": "cycle" },
+    "prestige_cycles": { "event": "CycleCompleted", "where": [{ "field": "prestige", "op": "eq", "value": true }], "op": "distinct", "field": "cycle" },
+    "cycle_sets_completed": {
+      "event": "CyclesProgress",
+      "where": [{ "field": "allComplete", "op": "eq", "value": true }],
+      "op": "distinct",
+      "field": "setCode"
+    },
     "boosters_watched": { "event": "BoosterOpened", "where": [{ "field": "animated", "op": "eq", "value": true }], "op": "sum" },
     "boosters_rushed": { "event": "BoosterOpened", "where": [{ "field": "animated", "op": "eq", "value": false }], "op": "sum" }
   },
@@ -624,6 +632,103 @@
       "rarity": "uncommon", "emblem": "key", "palette": "onyx",
       "condition": { "type": "metric", "metric": "charity_claims", "atLeast": 10 },
       "reward": { "cashCents": 500 }
+    },
+
+    {
+      "id": "cycle-1", "name": "First Cycle", "description": "Complete a cycle of a set.",
+      "rarity": "common", "emblem": "cards", "palette": "forest",
+      "condition": { "type": "metric", "metric": "cycles_completed", "atLeast": 1 },
+      "reward": { "cashCents": 500 }
+    },
+    {
+      "id": "cycle-5", "name": "Cyclist", "description": "Complete 5 cycles.",
+      "rarity": "uncommon", "emblem": "cards", "palette": "ocean",
+      "condition": { "type": "metric", "metric": "cycles_completed", "atLeast": 5 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 2 } }
+    },
+    {
+      "id": "cycle-25", "name": "Grand Tour", "description": "Complete 25 cycles.",
+      "rarity": "rare", "emblem": "cards", "palette": "royal",
+      "condition": { "type": "metric", "metric": "cycles_completed", "atLeast": 25 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 5 } }
+    },
+    {
+      "id": "cycle-100", "name": "Wheel of Fortune", "description": "Complete 100 cycles.",
+      "rarity": "rare", "emblem": "coin", "palette": "gold",
+      "condition": { "type": "metric", "metric": "cycles_completed", "atLeast": 100 },
+      "reward": { "cashCents": 10000, "sealed": { "setCode": "latest", "kind": "collector", "quantity": 1 } }
+    },
+    {
+      "id": "cycle-250", "name": "Master of Cycles", "description": "Complete 250 cycles.",
+      "rarity": "rare", "emblem": "crown", "palette": "royal",
+      "condition": { "type": "metric", "metric": "cycles_completed", "atLeast": 250 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "collector", "quantity": 5 } }
+    },
+    {
+      "id": "cycle-500", "name": "Eternal Return", "description": "Complete 500 cycles.",
+      "rarity": "mythic", "emblem": "hourglass", "palette": "gold",
+      "condition": { "type": "metric", "metric": "cycles_completed", "atLeast": 500 },
+      "reward": { "cashCents": 25000, "sealed": { "setCode": "latest", "kind": "collector", "quantity": 5 } }
+    },
+    {
+      "id": "cycle-set", "name": "Full Circle", "description": "Complete every cycle of a set.",
+      "rarity": "rare", "emblem": "trophy", "palette": "forest",
+      "condition": { "type": "metric", "metric": "cycle_sets_completed", "atLeast": 1 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 5 } }
+    },
+    {
+      "id": "cycle-sets-5", "name": "Five Times Around", "description": "Complete every cycle of 5 sets.",
+      "rarity": "mythic", "emblem": "trophy", "palette": "gold",
+      "condition": { "type": "metric", "metric": "cycle_sets_completed", "atLeast": 5 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "collector", "quantity": 3 } }
+    },
+    {
+      "id": "cycle-prestige", "name": "Prestige Cycle", "description": "Complete a cycle with every card in its most premium printing, in foil when it has one.",
+      "rarity": "rare", "emblem": "gem", "palette": "rose",
+      "condition": { "type": "metric", "metric": "prestige_cycles", "atLeast": 1 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "collector", "quantity": 2 } }
+    },
+    {
+      "id": "cycle-prestige-10", "name": "Prestige Gallery", "description": "Complete 10 prestige cycles.",
+      "rarity": "mythic", "emblem": "gem", "palette": "ice",
+      "condition": { "type": "metric", "metric": "prestige_cycles", "atLeast": 10 },
+      "reward": { "sealed": { "setCode": "latest", "kind": "collector", "quantity": 5 } }
+    },
+    {
+      "id": "cycle-vintage", "name": "Cycle of Old", "description": "Complete a cycle of a set released before 2000.",
+      "rarity": "uncommon", "emblem": "book", "palette": "onyx",
+      "condition": { "type": "event", "event": "CycleCompleted", "where": [{ "field": "releasedYear", "op": "lt", "value": 2000 }, { "field": "releasedYear", "op": "gt", "value": 0 }] },
+      "reward": { "cashCents": 1000 }
+    },
+    {
+      "id": "cycle-double", "name": "Double Cycle", "description": "Complete a cycle of 10 cards or more.",
+      "rarity": "uncommon", "emblem": "cards", "palette": "rose",
+      "condition": { "type": "event", "event": "CycleCompleted", "where": [{ "field": "slots", "op": "gte", "value": 10 }] },
+      "reward": { "sealed": { "setCode": "latest", "kind": "play", "quantity": 2 } }
+    },
+    {
+      "id": "cycle-mythic", "name": "Mythic Cycle", "description": "Complete a cycle whose cards are all mythic rares.",
+      "rarity": "rare", "emblem": "flame", "palette": "ember",
+      "condition": { "type": "event", "event": "CycleCompleted", "where": [{ "field": "allMythic", "op": "eq", "value": true }] },
+      "reward": { "sealed": { "setCode": "latest", "kind": "collector", "quantity": 1 } }
+    },
+    {
+      "id": "cycle-lands", "name": "Land Surveyor", "description": "Complete a cycle of lands.",
+      "rarity": "common", "emblem": "book", "palette": "forest",
+      "condition": { "type": "event", "event": "CycleCompleted", "where": [{ "field": "allLands", "op": "eq", "value": true }] },
+      "reward": { "cashCents": 1000 }
+    },
+    {
+      "id": "the-nine", "name": "The Nine", "secret": true, "description": "Gather the nine Nazgûl of The Lord of the Rings, each in its own art.",
+      "rarity": "rare", "emblem": "skull", "palette": "onyx",
+      "condition": { "type": "event", "event": "CycleCompleted", "where": [{ "field": "cycle", "op": "eq", "value": "LTR/the-nine" }] },
+      "reward": { "sealed": { "setCode": "LTR", "kind": "collector", "quantity": 1 } }
+    },
+    {
+      "id": "the-nine-prestige", "name": "Nine for Mortal Men", "secret": true, "description": "Gather the nine Nazgûl, each in its borderless foil.",
+      "rarity": "mythic", "emblem": "crown", "palette": "onyx",
+      "condition": { "type": "event", "event": "CycleCompleted", "where": [{ "field": "cycle", "op": "eq", "value": "LTR/the-nine" }, { "field": "prestige", "op": "eq", "value": true }] },
+      "reward": { "sealed": { "setCode": "LTR", "kind": "collector", "quantity": 3 } }
     },
 
     {

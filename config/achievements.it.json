@@ -256,5 +256,21 @@
   "signed-10": { "name": "Libro degli autografi", "description": "Trova 10 carte illustrazione con firma dorata." },
   "signed-set": { "name": "Albo d'oro", "description": "Possiedi tutte le carte illustrazione di un set con la loro firma dorata." },
   "frequent-visitor": { "name": "Visitatore assiduo", "description": "Accetta l'aiuto del Boosterium 10 volte." },
-  "overachiever": { "name": "Primo della classe", "description": "Sblocca 50 obiettivi." }
+  "overachiever": { "name": "Primo della classe", "description": "Sblocca 50 obiettivi." },
+  "cycle-1": { "name": "Primo ciclo", "description": "Completa un ciclo di un'espansione." },
+  "cycle-5": { "name": "Ciclista", "description": "Completa 5 cicli." },
+  "cycle-25": { "name": "Grande giro", "description": "Completa 25 cicli." },
+  "cycle-100": { "name": "Ruota della fortuna", "description": "Completa 100 cicli." },
+  "cycle-250": { "name": "Maestro dei cicli", "description": "Completa 250 cicli." },
+  "cycle-500": { "name": "Eterno ritorno", "description": "Completa 500 cicli." },
+  "cycle-set": { "name": "Il cerchio si chiude", "description": "Completa tutti i cicli di un'espansione." },
+  "cycle-sets-5": { "name": "Cinque giri", "description": "Completa tutti i cicli di 5 espansioni." },
+  "cycle-prestige": { "name": "Ciclo di prestigio", "description": "Completa un ciclo con ogni carta nella sua versione più pregiata, foil quando esiste." },
+  "cycle-prestige-10": { "name": "Galleria di prestigio", "description": "Completa 10 cicli di prestigio." },
+  "cycle-vintage": { "name": "Ciclo d'altri tempi", "description": "Completa un ciclo di un'espansione uscita prima del 2000." },
+  "cycle-double": { "name": "Ciclo doppio", "description": "Completa un ciclo di 10 carte o più." },
+  "cycle-mythic": { "name": "Ciclo mitico", "description": "Completa un ciclo le cui carte sono tutte rare mitiche." },
+  "cycle-lands": { "name": "Agrimensore", "description": "Completa un ciclo di terre." },
+  "the-nine": { "name": "I Nove", "description": "Riunisci i nove Nazgûl de Il Signore degli Anelli, ognuno nella sua illustrazione." },
+  "the-nine-prestige": { "name": "Nove agli Uomini Mortali", "description": "Riunisci i nove Nazgûl, ognuno nella sua versione senza bordo foil." }
 }
