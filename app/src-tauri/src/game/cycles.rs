@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use unsealed_core::achievements::Event;
 use unsealed_core::catalog::CardEntry;
-use unsealed_core::cycles::{Cycle, Cycles};
+use unsealed_core::cycles::{Cycle, Cycles, GroupKind};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -30,6 +30,8 @@ pub struct CycleView {
     pub name: String,
     /// One of ours, not the MTG Wiki's.
     pub custom: bool,
+    /// "cycle" or "story" (a set's Story Spotlights).
+    pub kind: &'static str,
     pub owned: u32,
     pub total: u32,
     pub complete: bool,
@@ -107,6 +109,7 @@ impl Game {
                 id: cycle.id.clone(),
                 name: cycle.name(lang).to_string(),
                 custom: cycle.custom,
+                kind: cycle.kind.as_str(),
                 owned: have,
                 total,
                 complete: state.complete(),
@@ -157,8 +160,9 @@ impl Game {
         Some(CycleState { slots })
     }
 
-    /// The events of a set's cycles, for the achievements: one `CycleCompleted` per complete
-    /// cycle (achievements count them once by their key), then the set's `CyclesProgress`.
+    /// The events of a set's groups, for the achievements: one `CycleCompleted` per complete
+    /// cycle, or `StoryCompleted` per complete story (achievements count them once by their
+    /// key), then the set's `CyclesProgress` (its cycles only).
     pub(super) fn cycle_events(&self, set_code: &str) -> Vec<Event> {
         let Some(cycles) = self.cycles.clone() else { return Vec::new() };
         let list = cycles.of_set(set_code);
@@ -177,14 +181,15 @@ impl Game {
         let (mut complete, mut total) = (0i64, 0i64);
         for cycle in list {
             let Some(state) = self.cycle_state(set_code, cycle, &owned) else { continue };
-            total += 1;
+            let story = cycle.kind == GroupKind::Story;
+            total += i64::from(!story);
             if !state.complete() {
                 continue;
             }
-            complete += 1;
+            complete += i64::from(!story);
             let cards: Vec<&CardEntry> = state.slots.iter().map(|s| s.0).collect();
             events.push(
-                Event::new("CycleCompleted")
+                Event::new(if story { "StoryCompleted" } else { "CycleCompleted" })
                     .with("cycle", format!("{set_code}/{}", cycle.id))
                     .with("setCode", set_code)
                     .with("custom", cycle.custom)

@@ -474,6 +474,7 @@ button.curios-slot { display: block; width: 100%; height: 96px; margin-bottom: 1
 .cycle header b { font: 700 15px var(--font-title); letter-spacing: .04em; color: #fff1c7; }
 .cycle-badge { width: 20px; height: 20px; display: inline-grid; place-items: center; flex: none; border-radius: 50%; font: 800 10px var(--font-title); vertical-align: middle; }
 .cycle-badge.official { color: #3a2108; background: radial-gradient(circle at 35% 30%, #fbe7ac, #d9a441 60%, #8a5a1c); }
+.cycle-badge.story { color: #2a1a0c; background: radial-gradient(circle at 35% 30%, #fbf3dc, #d8cba8 60%, #9c8a63); font-family: var(--font-text); font-size: 13px; }
 .cycle-badge.ours { color: #fbe7ac; background: radial-gradient(circle at 35% 30%, #e2545a, #a61f28 55%, #4f080e); box-shadow: 0 0 0 1px #3d060b; }
 .cycle-count { margin-left: auto; font: 700 13px var(--font-title); color: var(--gold-hi); white-space: nowrap; }
 .cycle-bar { width: 120px; flex: none; }

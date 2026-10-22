@@ -1,5 +1,5 @@
 use std::collections::BTreeSet;
-use unsealed_core::cycles::{Cycles, WikiCycles};
+use unsealed_core::cycles::{Cycles, GroupKind, WikiCycles};
 
 const WIKI: &str = include_str!("../../config/cycles.json");
 const CUSTOM: &str = include_str!("../../config/cycles.custom.json");
@@ -27,6 +27,11 @@ fn the_shipped_cycles_are_valid_and_every_name_is_translated() {
     let nine = cycles.of_set("LTR").iter().find(|c| c.id == "the-nine").unwrap();
     assert!(nine.custom && nine.slots.len() == 9 && nine.slots.iter().all(|s| s.len() == 2));
     assert_eq!((nine.name("fr"), nine.name("ja")), ("Les Neuf", "The Nine"));
+    // The Story Spotlights: a story per set, in the story's order; War of the Spark's in acts.
+    let story = cycles.of_set("KLD").iter().find(|c| c.kind == GroupKind::Story).unwrap();
+    assert_eq!((story.slots.len(), story.name("fr")), (5, "Moments clés du récit"));
+    let acts = cycles.of_set("WAR").iter().filter(|c| c.kind == GroupKind::Story).count();
+    assert_eq!(acts, 3);
     // A wiki cycle, translated.
     let lands = cycles.of_set("LTR").iter().find(|c| c.id == "legendary-lands").unwrap();
     assert!(!lands.custom && lands.name("fr") != lands.name("en"));

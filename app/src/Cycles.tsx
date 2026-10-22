@@ -7,6 +7,10 @@ import { sheenClass } from "./RevealedCards";
 
 type Filter = "all" | "progress" | "complete" | "todo";
 const FILTERS: Filter[] = ["all", "progress", "complete", "todo"];
+/** A group's sort, as the player tells them apart: the wiki's cycles, its stories, ours. */
+type Kind = "cycle" | "story" | "ours";
+const KINDS: Kind[] = ["cycle", "story", "ours"];
+const kindOf = (c: CycleView): Kind => (c.custom ? "ours" : c.kind);
 
 const matches = (c: CycleView, filter: Filter) =>
   filter === "all" ||
@@ -14,15 +18,40 @@ const matches = (c: CycleView, filter: Filter) =>
   (filter === "progress" && !c.complete && c.owned > 0) ||
   (filter === "todo" && c.owned === 0);
 
-/** A set's cycles: each one a plaque with its name and progress, its cards side by side (the
- * best copy owned of each, else a scrap of paper as in the binder). */
+/** A group's badge: a gold diamond for the wiki's cycles, a pilcrow for its stories, our
+ * red seal for ours. */
+function Badge({ group }: { group: CycleView }) {
+  const { t } = useI18n();
+  const kind = kindOf(group);
+  const [mark, title] = kind === "ours" ? ["U", t("cycles.ours")] : kind === "story" ? ["¶", t("cycles.story")] : ["◆", t("cycles.official")];
+  return (
+    <span className={`cycle-badge ${kind === "ours" ? "ours" : kind === "story" ? "story" : "official"}`} title={title}>
+      {mark}
+    </span>
+  );
+}
+
+/** A set's groups (cycles, stories, ours): each one a plaque with its name and progress, its
+ * cards side by side (the best copy owned of each, else a scrap of paper as in the binder). */
 export function CyclesList({ view, onOpen }: { view: CyclesView; onOpen: (uuid: string) => void }) {
   const { t, plural } = useI18n();
   const [filter, setFilter] = useState<Filter>("all");
-  const shown = view.cycles.filter((c) => matches(c, filter));
+  const [kind, setKind] = useState<Kind | "all">("all");
+  // The sorts the set has: the choice is only offered when there are several.
+  const kinds = KINDS.filter((k) => view.cycles.some((c) => kindOf(c) === k));
+  const shown = view.cycles.filter((c) => matches(c, filter) && (kind === "all" || kindOf(c) === kind));
   return (
     <div className="cycles">
       <div className="cycles-tools">
+        {kinds.length > 1 && (
+          <div className="segmented" role="group">
+            {(["all", ...kinds] as const).map((k) => (
+              <button key={k} className={kind === k ? "active" : ""} onClick={() => setKind(k)}>
+                {t(`cycles.kind.${k}`)}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="segmented" role="group">
           {FILTERS.map((f) => (
             <button key={f} className={filter === f ? "active" : ""} onClick={() => setFilter(f)}>
@@ -39,9 +68,7 @@ export function CyclesList({ view, onOpen }: { view: CyclesView; onOpen: (uuid: 
       {shown.map((c) => (
         <article key={c.id} className={`cycle ${c.complete ? "done" : ""} ${c.prestige ? "prestige" : ""}`}>
           <header>
-            <span className={`cycle-badge ${c.custom ? "ours" : "official"}`} title={t(c.custom ? "cycles.ours" : "cycles.official")}>
-              {c.custom ? "U" : "◆"}
-            </span>
+            <Badge group={c} />
             <b>{c.name}</b>
             <span className="cycle-count">
               {c.owned} / {c.total}
@@ -99,6 +126,25 @@ export function CyclesPanel({ view, onShop }: { view: CyclesView; onShop?: () =>
           </b>
         </div>
         <p className="cycles-ring-label">{t("cycles.completeCount")}</p>
+        {(
+          [
+            ["cycle", "cycles.countCycles"],
+            ["story", "cycles.countStories"],
+            ["ours", "cycles.countOurs"],
+          ] as const
+        ).map(([kind, label]) => {
+          const groups = view.cycles.filter((c) => kindOf(c) === kind);
+          return (
+            groups.length > 0 && (
+              <div key={kind} className="ready-line">
+                <span>{t(label)}</span>
+                <b>
+                  {groups.filter((c) => c.complete).length} / {groups.length}
+                </b>
+              </div>
+            )
+          );
+        })}
         <div className="ready-line">
           <span>{t("cycles.cards")}</span>
           <b>
@@ -125,7 +171,11 @@ export function CyclesPanel({ view, onShop }: { view: CyclesView; onShop?: () =>
           </>
         )}
         <p className="hint cycles-note">
-          <span className="cycle-badge official">◆</span> {t("cycles.official")} · <span className="cycle-badge ours">U</span> {t("cycles.ours")}
+          <span className="cycle-badge official">◆</span> {t("cycles.official")}
+          <br />
+          <span className="cycle-badge story">¶</span> {t("cycles.story")}
+          <br />
+          <span className="cycle-badge ours">U</span> {t("cycles.ours")}
         </p>
       </div>
       {onShop && (

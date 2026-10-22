@@ -76,6 +76,8 @@ export interface CycleView {
   id: string;
   name: string;
   custom: boolean;
+  /** A cycle, or a story told card after card (Story Spotlights). */
+  kind: "cycle" | "story";
   owned: number;
   total: number;
   complete: boolean;
