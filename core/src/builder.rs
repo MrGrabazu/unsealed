@@ -8,7 +8,7 @@ use crate::catalog::{
     BoosterValue, Manifest, ManifestSet, PriceFile, PriceSet, SetFile, SetSelection, ARTISTS_FILE, COLLECTOR_KIND,
     DATA_FORMAT_VERSION, GUESTS_FILE,
 };
-use crate::import::{add_art_cards_from, add_art_slots, artist_index, guest_index, add_token_slots, add_tokens_from, art_set_code, compact_set, merge_foil_printings, ArtCardOdds, featured_card, token_set_code, prices_by_uuid, prices_from_scryfall_jsonl, read_all_printings, AllPrintings};
+use crate::import::{add_art_cards_from, add_art_slots, artist_index, guest_index, add_token_slots, add_tokens_from, art_set_code, compact_set, merge_foil_printings, merge_token_faces, ArtCardOdds, featured_card, token_set_code, prices_by_uuid, prices_from_scryfall_jsonl, read_all_printings, AllPrintings};
 use crate::sim::expected_value_cents;
 use crate::{simulate, ColorIndex};
 use flate2::read::GzDecoder;
@@ -195,6 +195,7 @@ fn build_set(
     if let Some(token_set) = all.data.get(&token_set_code(raw)) {
         add_tokens_from(&mut set, token_set);
     }
+    merge_token_faces(&mut set);
     add_token_slots(&mut set, extra.token_foil_one_in);
     if let Some(art_set) = all.data.get(&art_set_code(code)) {
         add_art_cards_from(&mut set, art_set);

@@ -209,6 +209,26 @@ pub fn add_tokens_from(set: &mut SetFile, token_set: &RawSet) {
     set.cards.extend(added);
 }
 
+/// Makes one card of a token printed on two faces (Amonkhet's Punchcard: "Punchcard //
+/// Punchcard"), which MTGJSON lists once per face under the same number: the face a stays,
+/// the face b goes, and `foil_aliases` gives its copies, in games saved before, to the face a.
+/// Without this, the binder kept a pocket for a face no booster could ever fill.
+pub fn merge_token_faces(set: &mut SetFile) {
+    let backs: Vec<(String, String)> = set
+        .cards
+        .iter()
+        .filter(|b| b.token && b.side.as_deref() == Some("b"))
+        .filter_map(|b| {
+            set.cards
+                .iter()
+                .find(|a| a.token && a.side.as_deref() == Some("a") && a.number == b.number && a.set_code == b.set_code)
+                .map(|a| (b.uuid.clone(), a.uuid.clone()))
+        })
+        .collect();
+    set.cards.retain(|c| !backs.iter().any(|(b, _)| *b == c.uuid));
+    set.foil_aliases.extend(backs);
+}
+
 /// Rarity given to tokens.
 pub const TOKEN_RARITY: &str = "token";
 
@@ -618,7 +638,7 @@ pub fn merge_foil_printings(set: &mut SetFile) {
             }
         }
     }
-    set.foil_aliases = aliases.into_iter().map(|(star, (base, _))| (star, base)).collect();
+    set.foil_aliases.extend(aliases.into_iter().map(|(star, (base, _))| (star, base)));
 }
 
 /// Parses a decimal price string ("0.05", "12", "1.5") into cents without floats.

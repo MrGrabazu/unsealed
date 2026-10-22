@@ -4,7 +4,7 @@ use unsealed_core::catalog::{AllSets, Manifest, ManifestSet, SetSelection, DATA_
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use unsealed_core::import::{
-    add_art_cards_from, add_art_slots, add_token_slots, artist_index, add_tokens_from, merge_foil_printings, parse_cents,
+    add_art_cards_from, add_art_slots, add_token_slots, artist_index, add_tokens_from, merge_foil_printings, merge_token_faces, parse_cents,
     prices_by_uuid, prices_from_scryfall_jsonl, read_all_printings, set_from_mtgjson, ArtCardOdds,
 };
 use unsealed_core::catalog::PriceSet;
@@ -182,6 +182,29 @@ fn tokens_kept_in_the_token_sub_set_join_the_set() {
     add_tokens_from(&mut set, &all.data["TTST"]);
     let tokens: Vec<&str> = set.cards.iter().filter(|c| c.token).map(|c| c.uuid.as_str()).collect();
     assert_eq!(tokens, ["t1", "t2", "t9"]);
+}
+
+#[test]
+fn a_token_on_two_faces_is_one_card_its_back_an_alias() {
+    // Amonkhet's Punchcard: one token, listed once per face under the same number.
+    let all = read_all_printings(
+        r#"{ "meta": { "version": "v" }, "data": { "TTST": {
+          "code": "TTST", "name": "Test Set Tokens", "releaseDate": "2026-01-01", "type": "token",
+          "cards": [],
+          "tokens": [
+            { "uuid": "p1", "setCode": "TTST", "name": "Punchcard // Punchcard", "number": "26", "side": "a",
+              "finishes": ["nonfoil"], "layout": "double_faced_token", "identifiers": { "scryfallId": "sp1" } },
+            { "uuid": "p1b", "setCode": "TTST", "name": "Punchcard // Punchcard", "number": "26", "side": "b",
+              "finishes": ["nonfoil"], "layout": "double_faced_token", "identifiers": { "scryfallId": "sp1" } } ] } } }"#
+            .as_bytes(),
+    )
+    .unwrap();
+    let mut set = set_from_mtgjson(SET_WITH_TOKENS, &["play"], &[]).unwrap();
+    add_tokens_from(&mut set, &all.data["TTST"]);
+    merge_token_faces(&mut set);
+    let punchcards: Vec<&str> = set.cards.iter().filter(|c| c.name.starts_with("Punchcard")).map(|c| c.uuid.as_str()).collect();
+    assert_eq!(punchcards, ["p1"]);
+    assert_eq!(set.foil_aliases.get("p1b").map(String::as_str), Some("p1"));
 }
 
 #[test]

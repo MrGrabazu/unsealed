@@ -25,15 +25,17 @@ pub struct SetFile {
     /// The set's name in other languages (code -> name), when it was translated.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub names: BTreeMap<String, String>,
-    /// Foil printings merged into their card (see `CardEntry::foil_scryfall_id`): their uuid
-    /// -> the card's. Games saved before the merge own them under the old uuid.
+    /// Entries merged into another card: foil printings into their card (see
+    /// `CardEntry::foil_scryfall_id`), a two-faced token's face b into its face a
+    /// (`merge_token_faces`). Their uuid -> the card's: games saved before own them under the
+    /// old uuid.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub foil_aliases: BTreeMap<String, String>,
 }
 
 /// Bump when the compact files change in a way older data cannot satisfy: the app then
 /// rebuilds its data at the next launch.
-pub const DATA_FORMAT_VERSION: u32 = 10;
+pub const DATA_FORMAT_VERSION: u32 = 11;
 
 /// Languages kept for card and set names, as (MTGJSON language name, code). Cards printed
 /// in other languages, or never translated, stay in English.
