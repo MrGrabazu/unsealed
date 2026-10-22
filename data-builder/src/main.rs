@@ -2,21 +2,25 @@
 //!
 //! Usage:
 //!   data-builder --sets all|BLB,FDN [--set-types core,expansion] [--boosters play,draft,set,collector]
-//!                [--out dist] [--cache .cache] [--sim-boosters 50000]
+//!                [--out dist] [--cache .cache] [--sim-boosters 50000] [--pack release]
 //!
 //! Without `--set-types`, `--sets all` keeps the types listed in `config/data.json`.
 //!
-//! Output: `<out>/manifest.json`, `<out>/prices.json`, `<out>/sets/<CODE>.json`.
+//! Output: `<out>/manifest.json`, `<out>/prices.json`, `<out>/sets/<CODE>.json`. With
+//! `--pack <dir>`, also the data in one file and its manifest beside it, in `<dir>`: what
+//! the daily GitHub Action publishes (see `unsealed_core::pack`).
 
 use std::error::Error;
+use std::path::PathBuf;
 use unsealed_core::builder::{build, BuildOptions};
 use unsealed_core::catalog::{AllSets, SetSelection};
+use unsealed_core::pack::{write_pack, MANIFEST, PACK_FILE};
 use unsealed_core::update::DataConfig;
 
 /// Defaults shared with the app.
 const DATA_CONFIG: &str = include_str!("../../config/data.json");
 
-fn parse_args() -> Result<BuildOptions, String> {
+fn parse_args() -> Result<(BuildOptions, Option<PathBuf>), String> {
     let defaults = DataConfig::from_json(DATA_CONFIG).map_err(|e| format!("config/data.json: {e}"))?;
     let mut opts = BuildOptions {
         sets: SetSelection::List(Vec::new()),
@@ -28,6 +32,7 @@ fn parse_args() -> Result<BuildOptions, String> {
         token_foil_one_in: defaults.token_foil_one_in,
         art_cards: defaults.art_cards,
     };
+    let mut pack = None;
     let mut args = std::env::args().skip(1);
     while let Some(flag) = args.next() {
         let value = args.next().ok_or_else(|| format!("missing value for {flag}"))?;
@@ -39,6 +44,7 @@ fn parse_args() -> Result<BuildOptions, String> {
             "--boosters" => opts.boosters = list(&value),
             "--out" => opts.out = value.into(),
             "--cache" => opts.cache = value.into(),
+            "--pack" => pack = Some(value.into()),
             "--sim-boosters" => {
                 opts.sim_boosters = value.parse().map_err(|_| "invalid --sim-boosters")?
             }
@@ -48,11 +54,11 @@ fn parse_args() -> Result<BuildOptions, String> {
     if opts.sets == SetSelection::List(Vec::new()) {
         return Err("--sets is required (e.g. --sets all, or --sets BLB,FDN)".to_string());
     }
-    Ok(opts)
+    Ok((opts, pack))
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let opts = parse_args()?;
+    let (opts, pack) = parse_args()?;
     // Print each step once, not every progress tick of a download.
     let mut last = String::new();
     let manifest = build(&opts, &mut |line, _| {
@@ -68,6 +74,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         for (code, reason) in &manifest.skipped {
             println!("  {code}: {reason}");
         }
+    }
+    if let Some(dir) = pack {
+        std::fs::create_dir_all(&dir)?;
+        let count = write_pack(&opts.out, &dir.join(PACK_FILE))?;
+        std::fs::copy(opts.out.join(MANIFEST), dir.join(MANIFEST))?;
+        let size = std::fs::metadata(dir.join(PACK_FILE))?.len();
+        println!("{count} files packed in {} ({:.1} MB)", dir.join(PACK_FILE).display(), size as f64 / 1e6);
     }
     Ok(())
 }

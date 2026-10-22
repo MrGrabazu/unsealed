@@ -1,6 +1,7 @@
 //! Background data refresh. At launch a thread checks the age of the local data and, when it is
-//! too old (or incomplete), rebuilds it from MTGJSON and Scryfall. The game stays playable on the
-//! previous data meanwhile; the new files are swapped in atomically by the builder.
+//! too old (or incomplete), installs the ready-made data published every day (`pack`), or else
+//! rebuilds it from MTGJSON and Scryfall. The game stays playable on the previous data
+//! meanwhile; the new files are swapped in atomically, the manifest last.
 
 use crate::Session;
 use serde::Serialize;
@@ -11,6 +12,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager};
 use unsealed_core::builder::{build, BuildOptions};
 use unsealed_core::catalog::Manifest;
+use unsealed_core::pack::fetch_pack;
 use unsealed_core::update::{refresh_reason, DataConfig};
 
 /// Event name the frontend listens to.
@@ -52,6 +54,16 @@ fn read_manifest(data_dir: &Path) -> Option<Manifest> {
     serde_json::from_str(&fs::read_to_string(data_dir.join("manifest.json")).ok()?).ok()
 }
 
+/// Drops what the game cached from the old files (taking its lock only now, not during the
+/// refresh).
+fn reload_session(app: &AppHandle) {
+    if let Some(session) = app.try_state::<Mutex<Session>>() {
+        if let Ok(mut session) = session.lock() {
+            session.reload_data();
+        }
+    }
+}
+
 /// Starts the refresh again after a failure (offline at the first launch…). Does nothing
 /// while one is running or when the data is up to date.
 pub fn retry(app: AppHandle, status: SharedStatus, refresh: Arc<Refresh>) {
@@ -73,6 +85,30 @@ pub fn spawn(app: AppHandle, status: SharedStatus, refresh: Arc<Refresh>) {
         };
         eprintln!("data refresh needed: {reason:?}");
         set_status(&app, &status, DataStatus::Updating { message: "Starting".to_string(), percent: 0 });
+        let mut last: Option<DataStatus> = None;
+        let mut report = |line: &str, fraction: f64| {
+            let percent = (fraction.clamp(0.0, 1.0) * 100.0).round() as u8;
+            let next = DataStatus::Updating { message: line.to_string(), percent };
+            // Downloads report every percent of each file: only forward actual changes.
+            if last.as_ref() != Some(&next) {
+                set_status(&app, &status, next.clone());
+                last = Some(next);
+            }
+        };
+
+        // The ready-made data first (a few MB, published every day); building it here, from
+        // MTGJSON and Scryfall, is the fallback: when the pack is of no use or cannot be had.
+        match fetch_pack(cfg, local.as_ref(), now_secs(), data_dir, cache_dir, &mut report) {
+            Ok(Some(manifest)) if refresh_reason(Some(&manifest), cfg, now_secs()).is_none() => {
+                reload_session(&app);
+                set_status(&app, &status, DataStatus::UpToDate);
+                return;
+            }
+            // Installed but already a day old (the daily build failed): built here as well.
+            Ok(Some(_)) => reload_session(&app),
+            Ok(None) => {}
+            Err(e) => eprintln!("ready-made data unavailable: {e}"),
+        }
 
         let opts = BuildOptions {
             sets: cfg.sets.clone(),
@@ -84,24 +120,10 @@ pub fn spawn(app: AppHandle, status: SharedStatus, refresh: Arc<Refresh>) {
             token_foil_one_in: cfg.token_foil_one_in,
             art_cards: cfg.art_cards.clone(),
         };
-        let mut last: Option<DataStatus> = None;
-        let result = build(&opts, &mut |line, fraction| {
-            let percent = (fraction.clamp(0.0, 1.0) * 100.0).round() as u8;
-            let next = DataStatus::Updating { message: line.to_string(), percent };
-            // Downloads report every percent of each file: only forward actual changes.
-            if last.as_ref() != Some(&next) {
-                set_status(&app, &status, next.clone());
-                last = Some(next);
-            }
-        });
+        let result = build(&opts, &mut report);
         match result {
             Ok(_) => {
-                // Drop what the game cached from the old files, without holding its lock during the build.
-                if let Some(session) = app.try_state::<Mutex<Session>>() {
-                    if let Ok(mut session) = session.lock() {
-                        session.reload_data();
-                    }
-                }
+                reload_session(&app);
                 set_status(&app, &status, DataStatus::UpToDate);
             }
             Err(e) => {

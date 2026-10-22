@@ -1,0 +1,53 @@
+# Builds the game data from MTGJSON and Scryfall twice a day, and publishes it, ready made,
+# on the "data" release (a pre-release: never taken for a version of the game by the in-app
+# updater, which reads the latest release). Games download it instead of building their data
+# themselves (see core/src/pack.rs): a few MB instead of hundreds, seconds instead of minutes.
+# Twice a day so that the pack is always well under the 24 hours after which a game deems its
+# data stale. Run by hand from Actions > Game data > Run workflow. Secret: RELEASE_TOKEN (the
+# workflow's own token was refused for releases, see release.yml).
+name: Game data
+
+on:
+  schedule:
+    - cron: "17 3,15 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: game-data
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+
+      # The validation of the boosters' rates is kept from one run to the next (validated.json).
+      - name: Keep the validation cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/validated.json
+          key: validated-${{ github.run_id }}
+          restore-keys: validated-
+
+      - name: Build the game data
+        run: cargo run --release -p data-builder -- --sets all --out dist --cache .cache --sim-boosters 20000 --pack release-data
+
+      - name: Publish it on the "data" release
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          if ! gh release view data > /dev/null 2>&1; then
+            gh release create data --prerelease --target "$GITHUB_SHA" --title "Game data" \
+              --notes "The game data, ready made (sets, booster contents, prices), rebuilt twice a day. Games download it by themselves: nothing to do here."
+          fi
+          # The pack first, its manifest after: a game reading the new manifest finds the new pack.
+          gh release upload data release-data/unsealed-data.pack.gz --clobber
+          gh release upload data release-data/manifest.json --clobber

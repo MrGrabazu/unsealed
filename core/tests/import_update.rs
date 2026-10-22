@@ -9,7 +9,7 @@ use unsealed_core::import::{
 };
 use unsealed_core::catalog::PriceSet;
 use unsealed_core::{open_booster, ColorIndex};
-use unsealed_core::update::{refresh_reason, DataConfig, RefreshReason};
+use unsealed_core::update::{pack_is_of_use, refresh_reason, DataConfig, RefreshReason};
 
 fn raw_set(sheet_card: &str, scryfall_id: &str) -> String {
     format!(
@@ -553,6 +553,27 @@ fn refresh_when_the_wanted_booster_kinds_or_sets_change() {
     let mut local = manifest("1000", &["BLB"]);
     (local.requested_sets, local.set_types) = (Some(all.sets.clone()), all.set_types.clone());
     assert_eq!(refresh_reason(Some(&local), &all, 1_100), None);
+}
+
+#[test]
+fn the_ready_made_data_is_taken_only_when_newer_and_made_for_this_game() {
+    let cfg = data_config();
+    let remote = manifest("2000", &["BLB", "DSK"]);
+    // Nothing installed, or older data: taken, even if the pack itself is a day old.
+    assert!(pack_is_of_use(&remote, None, &cfg, 2_100));
+    assert!(pack_is_of_use(&remote, Some(&manifest("1000", &["BLB", "DSK"])), &cfg, 2_100 + 30 * 3600));
+    // Not newer than what is installed.
+    assert!(!pack_is_of_use(&remote, Some(&manifest("2000", &["BLB", "DSK"])), &cfg, 2_100));
+    assert!(!pack_is_of_use(&remote, Some(&manifest("3000", &["BLB", "DSK"])), &cfg, 3_100));
+    // Data of an older format is replaced whatever its date.
+    let mut old = manifest("3000", &["BLB", "DSK"]);
+    old.format_version -= 1;
+    assert!(pack_is_of_use(&remote, Some(&old), &cfg, 3_100));
+    // A pack of another format, or missing a wanted set, is of no use.
+    let mut other = manifest("2000", &["BLB", "DSK"]);
+    other.format_version += 1;
+    assert!(!pack_is_of_use(&other, None, &cfg, 2_100));
+    assert!(!pack_is_of_use(&manifest("2000", &["BLB"]), None, &cfg, 2_100));
 }
 
 #[test]

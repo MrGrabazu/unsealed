@@ -1,5 +1,6 @@
 {
   "sets": "all",
+  "packUrl": "https://github.com/MrGrabazu/unsealed/releases/download/data",
   "setTypes": ["core", "expansion", "masters", "draft_innovation", "funny", "starter"],
   "boosters": ["play", "draft", "set", "default", "collector"],
   "maxAgeHours": 24,

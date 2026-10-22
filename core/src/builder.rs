@@ -79,7 +79,7 @@ pub(crate) fn http_post_json(url: &str, body: &str) -> Result<ureq::Response, Bu
 
 /// Downloads a file, reporting the fraction received (at most once per percent) when the
 /// server announces its size.
-fn download(url: &str, dest: &Path, on_fraction: &mut dyn FnMut(f64)) -> Result<(), BuildError> {
+pub(crate) fn download(url: &str, dest: &Path, on_fraction: &mut dyn FnMut(f64)) -> Result<(), BuildError> {
     let response = http_get(url)?;
     let total: Option<u64> = response.header("Content-Length").and_then(|v| v.parse().ok()).filter(|&t| t > 0);
     let mut reader = response.into_reader();

@@ -31,6 +31,10 @@ pub struct DataConfig {
     /// How often boosters hold an art card.
     #[serde(default)]
     pub art_cards: ArtCardOdds,
+    /// Where the ready-made data is published (`pack`): the address its `manifest.json` and
+    /// its pack are found under. None: the game always builds its data itself.
+    #[serde(default)]
+    pub pack_url: Option<String>,
 }
 
 pub fn default_token_foil_one_in() -> u64 {
@@ -72,6 +76,21 @@ pub enum RefreshReason {
     FormatChanged,
     /// The data is older than the configured maximum age.
     Stale,
+}
+
+/// Whether a published data pack, described by its manifest, is worth installing: of this
+/// version's format, built for the same sets, set types and booster kinds, and newer than the
+/// local data (or there is none, or it is of another format).
+pub fn pack_is_of_use(remote: &Manifest, local: Option<&Manifest>, cfg: &DataConfig, now: i64) -> bool {
+    let compatible = matches!(refresh_reason(Some(remote), cfg, now), None | Some(RefreshReason::Stale));
+    let newer = match local {
+        Some(local) if local.format_version == DATA_FORMAT_VERSION => {
+            let at = |m: &Manifest| m.generated_at.parse::<i64>().unwrap_or(0);
+            at(remote) > at(local)
+        }
+        _ => true,
+    };
+    compatible && newer
 }
 
 /// Whether the data must be rebuilt now. `now` is a Unix time in seconds.
