@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CollectionCard } from "./api";
 import { CardImage } from "./CardImage";
 import { useI18n } from "./i18n";
@@ -73,6 +73,22 @@ export function Binder({ setCode, sections, onOpen, active, onSection }: Props) 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
+
+  // The facing spreads' images, loaded while this one is looked at: turning a page shows
+  // them at once (and fills the cache on disk). Kept referenced, or a load could be dropped.
+  const preloaded = useRef<HTMLImageElement[]>([]);
+  useEffect(() => {
+    const neighbours = [spread - 1, spread + 1].flatMap((s) => [pages[s * 2], pages[s * 2 + 1]]);
+    preloaded.current = neighbours
+      .flatMap((page) => page?.cards ?? [])
+      .filter((card) => card.quantity + card.foilQuantity > 0)
+      .map((card) => {
+        const image = new Image();
+        image.decoding = "async";
+        image.src = card.imageUrl;
+        return image;
+      });
+  }, [spread, pages]);
 
   // The section shown: the left page's, or the right one's where a new section starts on
   // the right (as a jump to that section's tab shows it).
@@ -200,8 +216,10 @@ function Pocket({ card, onOpen }: { card: CollectionCard; onOpen: (uuid: string)
       onKeyDown={(e) => e.key === "Enter" && onOpen(card.uuid)}
     >
       <div className="thumb">
+        {/* Not lazy: a binder shows one spread at a time (18 cards), and the next ones are
+            preloaded; waiting for the observer only delayed each page. */}
         {total > 0 ? (
-          <CardImage front={card.imageUrl} back={card.backImageUrl} alt={card.name} lazy />
+          <CardImage front={card.imageUrl} back={card.backImageUrl} alt={card.name} />
         ) : (
           <Placeholder card={card} />
         )}

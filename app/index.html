@@ -15,6 +15,11 @@
       .splash svg { width: min(560px, 80vw); height: auto; filter: drop-shadow(0 6px 14px #000a); }
       .splash .spinner { margin-top: 18px; width: 28px; height: 28px; border-radius: 50%; border: 3px solid #3d2b1b; border-top-color: #a61f28; animation: splash-spin 0.9s linear infinite; }
       @keyframes splash-spin { to { transform: rotate(360deg); } }
+      /* The way out if the game never starts (full screen: no title bar), after a few seconds. */
+      .splash-quit { margin-top: 28px; padding: 8px 22px; border: 1px solid #6b4a2a; border-radius: 6px; background: #2a1b10; color: #efe3c8;
+        font: 15px Georgia, serif; cursor: pointer; opacity: 0; pointer-events: none; animation: splash-show 0.6s 6s forwards; }
+      .splash-quit:hover { border-color: #d9a441; }
+      @keyframes splash-show { to { opacity: 1; pointer-events: auto; } }
     </style>
   </head>
   <body>
@@ -23,8 +28,25 @@
       <div class="splash">
         <!-- splash-logo -->
         <div class="spinner"></div>
+        <button class="splash-quit" id="splash-quit" type="button">Quit</button>
       </div>
     </div>
+    <script>
+      // Before the app's scripts: the button in the player's language, closing the window
+      // through Tauri's own call (getCurrentWindow().close() of the app does the same).
+      (function () {
+        var button = document.getElementById("splash-quit");
+        var labels = { fr: "Quitter", de: "Beenden", es: "Salir", it: "Esci" };
+        var lang;
+        try { lang = localStorage.getItem("unsealed.language"); } catch (e) {}
+        lang = lang || (navigator.language || "en").slice(0, 2).toLowerCase();
+        if (labels[lang]) button.textContent = labels[lang];
+        button.addEventListener("click", function () {
+          var tauri = window.__TAURI_INTERNALS__;
+          if (tauri) tauri.invoke("plugin:window|close", { label: "main" }).catch(function () {});
+        });
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -8,11 +8,41 @@
 use crate::builder::{http_get, http_post_json, BuildError};
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::io::Read;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 const API: &str = "https://api.scryfall.com";
 const MIN_INTERVAL: Duration = Duration::from_millis(100);
+
+/// Scryfall's image CDN (the API's rate limit does not apply to it).
+pub const IMAGES: &str = "https://cards.scryfall.io";
+/// An image is far smaller than this: anything bigger is not one.
+const MAX_IMAGE_BYTES: u64 = 8 << 20;
+
+/// Whether `path` is the path of a card image on the CDN ("normal/front/a/b/<id>.jpg"): all
+/// the game's image cache fetches, never anything else.
+pub fn is_card_image_path(path: &str) -> bool {
+    let parts: Vec<&str> = path.split('/').collect();
+    let [version, face, a, b, file] = parts[..] else { return false };
+    let hex = |s: &str| s.len() == 1 && s.chars().all(|c| c.is_ascii_hexdigit());
+    let id = file.strip_suffix(".jpg").or_else(|| file.strip_suffix(".png"));
+    ["small", "normal", "large", "png", "art_crop", "border_crop"].contains(&version)
+        && ["front", "back"].contains(&face)
+        && hex(a)
+        && hex(b)
+        && id.is_some_and(|id| id.len() == 36 && id.starts_with(&format!("{a}{b}")) && id.chars().all(|c| c.is_ascii_hexdigit() || c == '-'))
+}
+
+/// A card image from the CDN, by its path (see `is_card_image_path`).
+pub fn card_image(path: &str) -> Result<Vec<u8>, BuildError> {
+    if !is_card_image_path(path) {
+        return Err(format!("not a card image: {path}").into());
+    }
+    let mut bytes = Vec::new();
+    http_get(&format!("{IMAGES}/{path}"))?.into_reader().take(MAX_IMAGE_BYTES).read_to_end(&mut bytes)?;
+    Ok(bytes)
+}
 /// Printings shown for a card (Scryfall's first page holds 175).
 const MAX_PRINTS: usize = 175;
 

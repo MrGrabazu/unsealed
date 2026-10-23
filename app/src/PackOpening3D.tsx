@@ -6,6 +6,7 @@ import { useI18n } from "./i18n";
 import { CardImage } from "./CardImage";
 import { Money, useMoney } from "./money";
 import { FoilSheen } from "./foils";
+import { smallImage } from "./images";
 import { RevealedCards } from "./RevealedCards";
 import { PackScene } from "./scene/PackScene";
 
@@ -139,7 +140,7 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
               {[...seen].reverse().map((card, i) => (
                 <button key={seen.length - i} className={`seen-card ${card.rarity}`} onClick={() => onDetails(card)} title={card.name}>
                   <span className="thumb">
-                    <CardImage front={card.imageUrl} back={card.backImageUrl} alt={card.name} />
+                    <CardImage front={smallImage(card.imageUrl)} back={smallImage(card.backImageUrl)} alt={card.name} />
                     {card.foil && <FoilSheen rarity={card.rarity} kind={card.foilKind} badge={false} />}
                     {card.isNew && <span className="badge-new">{t("open.new")}</span>}
                   </span>

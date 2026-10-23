@@ -1,4 +1,8 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke as tauriInvoke, type InvokeArgs } from "@tauri-apps/api/core";
+import { withCachedImages } from "./images";
+
+/** A command of the game; the card images of its answer come through the cache on disk. */
+const invoke = <T>(command: string, args?: InvokeArgs) => tauriInvoke<T>(command, args).then(withCachedImages);
 
 // Mirrors the structs serialized by the Rust side (src-tauri/src/game.rs).
 // All amounts are integer cents of the market currency; the interface shows them in Seals.

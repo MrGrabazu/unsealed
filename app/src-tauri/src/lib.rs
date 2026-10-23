@@ -2,6 +2,7 @@
 //! The frontend only displays; every draw, price and payment is computed in Rust.
 
 mod game;
+mod images;
 mod saves;
 mod store;
 mod updater;
@@ -598,7 +599,19 @@ pub fn run() {
         // app restarts once one is installed.
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        // The card images, kept on disk (see `images`).
+        .register_asynchronous_uri_scheme_protocol(images::SCHEME, |ctx, request, responder| {
+            match resolve_cache_dir(ctx.app_handle()) {
+                Ok(dir) => images::handle(dir.join("images"), request, responder),
+                Err(e) => responder.respond(
+                    tauri::http::Response::builder().status(500).body(e.to_string().into_bytes()).expect("a valid response"),
+                ),
+            }
+        })
         .setup(|app| {
+            if let Ok(dir) = resolve_cache_dir(app.handle()) {
+                std::thread::spawn(move || images::prune(&dir.join("images")));
+            }
             // The window opens hidden, then shows in the display the player chose: never full
             // screen for a moment before going back to a window.
             if let Some(window) = app.get_webview_window("main") {

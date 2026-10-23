@@ -6,6 +6,7 @@ import { CardImage } from "./CardImage";
 import { useI18n } from "./i18n";
 import { Money } from "./money";
 import { FoilSheen } from "./foils";
+import { smallImage } from "./images";
 
 /** One line of a sale: copies of a card in one finish. */
 export interface SoldLine {
@@ -66,7 +67,7 @@ export function SaleModal({ soldCount, totalCents, lines, onClose }: Props) {
             {lines.map((line) => (
               <li key={`${line.card.uuid}:${line.foil}`}>
                 <div className="sale-thumb thumb">
-                  <CardImage front={line.card.imageUrl} back={null} alt={line.card.name} lazy />
+                  <CardImage front={smallImage(line.card.imageUrl)} back={null} alt={line.card.name} lazy />
                   {line.foil && <FoilSheen rarity={line.card.rarity} kind={line.card.foilKind} badge={false} />}
                 </div>
                 <span className="sale-name">
