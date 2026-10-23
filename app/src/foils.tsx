@@ -68,9 +68,9 @@ function ensureArt() {
   const style = document.createElement("style");
   style.dataset.foils = "";
   style.textContent = `:root {
-  --foil-stars-1: ${svgUrl(stars(11, 70, 2))};
-  --foil-stars-2: ${svgUrl(stars(23, 70, 2))};
-  --foil-stars-3: ${svgUrl(stars(37, 40, 3))};
+  --foil-stars-1: ${svgUrl(stars(STAR_FIELDS[0]))};
+  --foil-stars-2: ${svgUrl(stars(STAR_FIELDS[1]))};
+  --foil-stars-3: ${svgUrl(stars(STAR_FIELDS[2]))};
   --foil-shards: ${svgUrl(shards())};
   --foil-relief: ${svgUrl(RELIEF)};
   --foil-oil: ${svgUrl(OIL)};
@@ -85,24 +85,49 @@ function seeded(seed: number) {
   return () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 }
 
-/** A field of stars at random, of all sizes, a few with the four-pointed glint of a real
- * galaxy foil; drawn on the card's whole size, so that no pattern repeats. */
-function stars(seed: number, count: number, glints: number): string {
+/** A galaxy foil's field of stars, on a 630 × 880 card: dots at random, of all sizes, and a
+ * few with the four-pointed glint of a real galaxy foil. */
+export interface StarField {
+  stars: { x: number; y: number; r: number; tint: string; opacity: number }[];
+  glints: { x: number; y: number; s: number }[];
+}
+
+/** The three fields of a galaxy foil, each twinkling at its own pace (`STAR_TWINKLES`): the
+ * same in the lists (an SVG, foils.css) and in the 3D opening (a texture, cardMaterial.ts). */
+export const STAR_FIELDS: StarField[] = [starField(11, 70, 2), starField(23, 70, 2), starField(37, 40, 3)];
+/** Each field's twinkle: its period and its delay, in seconds (foils.css `.foil-stars`). */
+export const STAR_TWINKLES: [number, number][] = [
+  [2.6, 0],
+  [3.4, -1.7],
+  [4.2, -0.8],
+];
+
+function starField(seed: number, count: number, glints: number): StarField {
   const rnd = seeded(seed);
-  const parts: string[] = [];
   const tints = ["#ffffff", "#dfe8ff", "#ffe9f8", "#cfd8ff"];
+  const field: StarField = { stars: [], glints: [] };
   for (let i = 0; i < count; i++) {
-    const [x, y] = [rnd() * 630, rnd() * 880];
+    const [x, y] = [Math.round(rnd() * 630), Math.round(rnd() * 880)];
     const r = rnd() < 0.85 ? 0.9 + rnd() * 1.4 : 2.4 + rnd() * 2;
     const tint = tints[Math.floor(rnd() * 4)];
-    parts.push(`<circle cx='${x.toFixed(0)}' cy='${y.toFixed(0)}' r='${r.toFixed(1)}' fill='${tint}' opacity='${(0.6 + rnd() * 0.4).toFixed(2)}'/>`);
+    field.stars.push({ x, y, r: Math.round(r * 10) / 10, tint, opacity: Math.round((0.6 + rnd() * 0.4) * 100) / 100 });
   }
   for (let i = 0; i < glints; i++) {
     const [x, y, s] = [rnd() * 630, rnd() * 880, 9 + rnd() * 12].map((v) => Math.round(v));
-    parts.push(
-      `<path d='M${x} ${y - s}Q${x} ${y} ${x + s} ${y}Q${x} ${y} ${x} ${y + s}Q${x} ${y} ${x - s} ${y}Q${x} ${y} ${x} ${y - s}Z' fill='white'/>` +
-        `<circle cx='${x}' cy='${y}' r='${(s / 3).toFixed(1)}' fill='white' opacity='0.5'/>`,
-    );
+    field.glints.push({ x, y, s });
+  }
+  return field;
+}
+
+/** A glint's four-pointed outline, as an SVG path (also drawn on a canvas, `Path2D`). */
+export const glintPath = ({ x, y, s }: { x: number; y: number; s: number }) =>
+  `M${x} ${y - s}Q${x} ${y} ${x + s} ${y}Q${x} ${y} ${x} ${y + s}Q${x} ${y} ${x - s} ${y}Q${x} ${y} ${x} ${y - s}Z`;
+
+/** A field of stars as an SVG drawn on the card's whole size, so that no pattern repeats. */
+function stars({ stars, glints }: StarField): string {
+  const parts = stars.map((s) => `<circle cx='${s.x}' cy='${s.y}' r='${s.r}' fill='${s.tint}' opacity='${s.opacity}'/>`);
+  for (const g of glints) {
+    parts.push(`<path d='${glintPath(g)}' fill='white'/><circle cx='${g.x}' cy='${g.y}' r='${(g.s / 3).toFixed(1)}' fill='white' opacity='0.5'/>`);
   }
   return `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 630 880' preserveAspectRatio='none'><defs><filter id='g'><feGaussianBlur stdDeviation='0.6'/></filter></defs><g filter='url(#g)'>${parts.join("")}</g></svg>`;
 }

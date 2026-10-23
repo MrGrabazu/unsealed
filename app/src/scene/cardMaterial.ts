@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { foilEffect } from "../foils";
+import { foilEffect, glintPath, STAR_FIELDS, STAR_TWINKLES } from "../foils";
 
 // The cards of the 3D opening: rigid pieces of cardboard with a thickness, rounded corners,
 // a face, a back and an edge. The face of a foil gets an iridescent sheen that shifts with
@@ -50,6 +50,7 @@ void main() {
 const FRAGMENT = /* glsl */ `
 uniform sampler2D uFront;
 uniform sampler2D uBack;
+uniform sampler2D uStars;
 uniform float uHasFront;
 uniform float uFoil;
 uniform float uKind;
@@ -158,14 +159,19 @@ void main() {
           }
           c.rgb = mix(c.rgb, softLight(c.rgb, layer), strength);
           if (kind == 2) {
-            // Galaxy: a nebula's tint and a field of stars, each twinkling at its own pace.
-            c.rgb = mix(c.rgb, softLight(c.rgb, vec3(0.45, 0.4, 0.75)), 0.35);
-            vec2 cell = floor(p * 26.0);
-            float h = hash(cell);
-            vec2 at = (cell + 0.2 + 0.6 * vec2(h, hash(cell + 3.1))) / 26.0;
-            float size = h > 0.97 ? 0.012 : 0.006;
-            float twinkle = 0.5 + 0.5 * sin(uTime * (1.5 + 2.0 * h) + h * 40.0);
-            c.rgb += vec3(0.95, 0.95, 1.0) * step(0.78, h) * (1.0 - smoothstep(0.0, size, length(p - at))) * twinkle;
+            // Galaxy, as foils.css draws it: a nebula (two soft-light glows, violet at the top
+            // left, blue at the bottom right), then the same three fields of stars (uStars, one
+            // per channel, from STAR_FIELDS), each twinkling at its own pace, in "screen".
+            vec2 q = vec2(vUv.x, 1.0 - vUv.y);
+            float violet = 0.6 * max(0.0, 1.0 - length((q - vec2(0.3, 0.25)) / vec2(0.99, 1.06)) / 0.55);
+            float blue = 0.53 * max(0.0, 1.0 - length((q - vec2(0.75, 0.7)) / vec2(1.06, 0.99)) / 0.6);
+            c.rgb = mix(c.rgb, softLight(c.rgb, vec3(0.42, 0.29, 1.0)), violet);
+            c.rgb = mix(c.rgb, softLight(c.rgb, vec3(0.16, 0.54, 1.0)), blue);
+            vec3 field = texture2D(uStars, vUv).rgb;
+            vec3 phase = (vec3(uTime) - vec3(${STAR_TWINKLES.map(([, d]) => d.toFixed(2)).join(", ")})) / vec3(${STAR_TWINKLES.map(([t]) => t.toFixed(2)).join(", ")});
+            vec3 twinkle = 0.4 + 0.6 * (0.5 - 0.5 * cos(6.2832 * phase));
+            float star = min(1.0, dot(field, twinkle));
+            c.rgb = 1.0 - (1.0 - c.rgb) * (1.0 - star * vec3(0.95, 0.96, 1.0));
           } else if (kind == 12) {
             // Textured: a relief catching the light.
             c.rgb += vec3(0.22) * (noise(p * 18.0) - 0.5) * (0.4 + band);
@@ -194,6 +200,7 @@ export interface CardUniforms {
   [name: string]: THREE.IUniform;
   uFront: THREE.IUniform<THREE.Texture | null>;
   uBack: THREE.IUniform<THREE.Texture | null>;
+  uStars: THREE.IUniform<THREE.Texture | null>;
   uHasFront: THREE.IUniform<number>;
   uFoil: THREE.IUniform<number>;
   uKind: THREE.IUniform<number>;
@@ -207,14 +214,54 @@ const KINDS: Record<string, number> = {
   textured: 12, neon: 13,
 };
 
+/** The galaxy foil's three fields of stars (STAR_FIELDS of foils.tsx, as in the lists), each
+ * in a channel of its own (red, green, blue) for the shader to twinkle them apart. Drawn once,
+ * shared by every card (never disposed: a few MB at most). */
+let stars: THREE.CanvasTexture | null = null;
+function starsTexture(): THREE.CanvasTexture {
+  if (stars) return stars;
+  const canvas = document.createElement("canvas");
+  canvas.width = 630;
+  canvas.height = 880;
+  const g = canvas.getContext("2d")!;
+  g.fillStyle = "#000";
+  g.fillRect(0, 0, 630, 880);
+  g.globalCompositeOperation = "lighter";
+  g.filter = "blur(0.6px)";
+  STAR_FIELDS.forEach((field, i) => {
+    const channel = (a: number) => (i === 0 ? `rgba(255,0,0,${a})` : i === 1 ? `rgba(0,255,0,${a})` : `rgba(0,0,255,${a})`);
+    for (const s of field.stars) {
+      g.fillStyle = channel(s.opacity);
+      g.beginPath();
+      g.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      g.fill();
+    }
+    for (const glint of field.glints) {
+      g.fillStyle = channel(1);
+      g.fill(new Path2D(glintPath(glint)));
+      g.fillStyle = channel(0.5);
+      g.beginPath();
+      g.arc(glint.x, glint.y, glint.s / 3, 0, Math.PI * 2);
+      g.fill();
+    }
+  });
+  stars = new THREE.CanvasTexture(canvas);
+  stars.generateMipmaps = false;
+  stars.minFilter = THREE.LinearFilter;
+  return stars;
+}
+
 /** Materials of one card: [face and back, edge] (the geometry's groups 0 and 1). */
 export function createCardMaterials(back: THREE.Texture, foil: boolean, foilKind?: string | null) {
+  const kind = KINDS[foilEffect(foilKind)] ?? 0;
   const uniforms: CardUniforms = {
     uFront: { value: null },
     uBack: { value: back },
+    // Only a galaxy foil reads it (the shader still wants a texture there: the back).
+    uStars: { value: foil && kind === KINDS.galaxy ? starsTexture() : back },
     uHasFront: { value: 0 },
     uFoil: { value: foil ? 1 : 0 },
-    uKind: { value: KINDS[foilEffect(foilKind)] ?? 0 },
+    uKind: { value: kind },
     uTime: { value: 0 },
     uLight: { value: new THREE.Vector2() },
   };
