@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getArtifacts, getPinnedSets, setPinnedSets, type ArtifactView, type SetSummary, type ShopItem, type WalletView } from "./api";
 import { ArtifactGlyph, artifactMetal } from "./ArtifactGlyph";
 import { BackToTop } from "./BackToTop";
+import { NearImage } from "./CardImage";
 import { kindLabel, kindRank } from "./boosterKinds";
 import { useI18n } from "./i18n";
 import { Money, useAmountsInText, useMoney, useMoneyText } from "./money";
@@ -152,7 +153,7 @@ export function Boosterium({ shop, sets, wallet, onBuy, onClaimCharity, busy, fo
         }}
       >
         {set.art ? (
-          <img className="slot-art" src={set.art.imageUrl} alt="" draggable={false} />
+          <NearImage className="slot-art" src={set.art.imageUrl} alt="" />
         ) : (
           <span className="slot-symbol">
             <SetIcon url={set.iconUrl} name={set.name} />

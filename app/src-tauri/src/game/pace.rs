@@ -195,3 +195,39 @@ fn pace_of_a_casual_player() {
 fn pace_of_a_grinder() {
     play(&GRINDER);
 }
+
+/// The chance of "at least one foil card" on every booster on sale, and which are left
+/// unpriced (certain, or impossible). `cargo test --release -p unsealed-app foil_bet -- --ignored --nocapture`.
+#[test]
+#[ignore = "needs the data built in dist/"]
+fn foil_bet_on_every_booster() {
+    use unsealed_core::betting::{Bet, CardFilter, Clause, Compare, Finish};
+    let dist = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../dist");
+    let mut g = Game::with_parts(
+        dist,
+        Store::open_in_memory().unwrap(),
+        EconomyConfig::from_json(include_str!("../../../../config/economy.json")).unwrap(),
+        Engine::from_json(include_str!("../../../../config/achievements.json")).unwrap(),
+        ChaCha8Rng::seed_from_u64(11),
+        Box::new(|| Clock { now: 1_792_000_000, day: "2026-10-23".into() }),
+    )
+    .unwrap();
+    let bet = Bet {
+        clauses: vec![Clause::Cards { compare: Compare::AtLeast, count: 1, filter: CardFilter { finish: Finish::Foil, ..Default::default() } }],
+    };
+    let mut by_case: BTreeMap<&str, Vec<String>> = BTreeMap::new();
+    for item in g.shop().unwrap() {
+        let chance = g.bet_chance(&item.set_code, &item.kind, &bet).unwrap();
+        let case = match chance.probability {
+            Some(_) => "priced",
+            None => "unpriced",
+        };
+        by_case.entry(case).or_default().push(format!("{} {} {:?}", item.set_code, item.kind, chance.probability.map(|p| format!("{:.4}%", p * 100.0))));
+    }
+    for (case, items) in &by_case {
+        println!("\n{case} ({}):", items.len());
+        for i in items {
+            println!("  {i}");
+        }
+    }
+}

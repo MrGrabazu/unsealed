@@ -1561,7 +1561,7 @@ fn reveal_rank(kind: &str, card: &OpenedCard) -> u8 {
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicU32, Ordering};
-    use betting::SkipReason;
+    use betting::{SkipReason, Unpriced};
     use unsealed_core::betting::{Bet, CardFilter, Clause, Compare};
     use std::sync::Arc;
 
@@ -2579,7 +2579,7 @@ mod tests {
         let m1 = cards(Compare::AtLeast, 1, CardFilter { card: Some("m1".into()), ..CardFilter::default() });
         let no_mythic = cards(Compare::AtMost, 0, CardFilter { rarities: vec!["mythic".into()], ..CardFilter::default() });
         // Whether a kind of card comes: exact.
-        assert_eq!(g.bet_chance("TST", "play", &m1).unwrap(), BetChance { probability: Some(0.25), exact: true });
+        assert_eq!(g.bet_chance("TST", "play", &m1).unwrap(), BetChance { probability: Some(0.25), exact: true, unpriced: None });
         assert_eq!(g.bet_chance("TST", "play", &no_mythic).unwrap().probability, Some(0.75));
         // Anything else: simulated. The booster is worth 1,200 with the mythic, 200 without.
         let rich = Bet { clauses: vec![Clause::Value { compare: Compare::AtLeast, cents: 1_000 }] };
@@ -2587,7 +2587,9 @@ mod tests {
         assert!(!simulated.exact && (simulated.probability.unwrap() - 0.25).abs() < 0.01, "{simulated:?}");
         // Always two commons, never three: certain either way, nothing to bet.
         let two = cards(Compare::Exactly, 2, CardFilter { rarities: vec!["common".into()], ..CardFilter::default() });
-        assert_eq!(g.bet_chance("TST", "play", &two).unwrap().probability, None);
+        assert_eq!(g.bet_chance("TST", "play", &two).unwrap().unpriced, Some(Unpriced::Always));
+        let three = cards(Compare::AtLeast, 3, CardFilter { rarities: vec!["common".into()], ..CardFilter::default() });
+        assert_eq!(g.bet_chance("TST", "play", &three).unwrap().unpriced, Some(Unpriced::Never));
 
         // A sure thing, or a stake under the minimum, is left out (no stake taken): the booster
         // still opens. A kept bet can well be one of those on another booster.

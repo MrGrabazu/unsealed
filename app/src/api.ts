@@ -218,6 +218,9 @@ export interface BetChance {
   probability: number | null;
   /** Worked out from the sheets (else over simulated boosters). */
   exact: boolean;
+  /** Why there are no odds: won by every booster of this kind, by none, or too rare (or too
+   * sure) for the simulated boosters. */
+  unpriced: "always" | "never" | "simulation" | null;
 }
 
 export interface SettledBet {

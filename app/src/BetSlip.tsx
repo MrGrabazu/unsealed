@@ -41,6 +41,17 @@ interface Props {
 
 const newCardsClause = (): Clause => ({ type: "cards", compare: "atLeast", count: 1, filter: {} });
 
+/** Why a bet has no odds, in a word (the slip's lines) or in a sentence (the builder). */
+function unpricedText(chance: BetChance, t: (key: MessageKey) => string, long = false): string {
+  const why = chance.unpriced ?? "simulation";
+  const keys = {
+    always: ["bet.unpricedAlways", "bet.unpricedAlwaysLong"],
+    never: ["bet.unpricedNever", "bet.unpricedNeverLong"],
+    simulation: ["bet.unpriced", "bet.unpricedLong"],
+  } as const;
+  return t(keys[why][long ? 1 : 0]);
+}
+
 /** Bets on the booster about to be opened. Each is built from conditions that must all hold:
  * on its cards (how many, of which rarity, type, colour, finish, treatment, price, or a given
  * card) or on its value, at odds from the real chances. As many bets as wanted; any can be
@@ -157,7 +168,7 @@ export function BetSlip({ setCode, kind, bets, onBets, kept, onKept, onCardName,
                   {locked && isKept(request.bet) && <span className="bet-pin"> 📌</span>}
                 </span>
                 <span className="bet-odds">
-                  {chance === undefined ? "…" : odds == null ? t("bet.unpriced") : formatOdds(odds, formatNumber)}
+                  {chance === undefined ? "…" : odds == null ? unpricedText(chance, t) : formatOdds(odds, formatNumber)}
                 </span>
                 <span className="bet-card-sub">
                   {locked ? (
@@ -245,7 +256,7 @@ export function BetSlip({ setCode, kind, bets, onBets, kept, onKept, onCardName,
                     </label>
                     <span className="bet-line-name">{describe(request.bet)}</span>
                     <span className="hint">
-                      {chance === undefined ? "…" : odds == null ? t("bet.unpriced") : formatOdds(odds, formatNumber)}
+                      {chance === undefined ? "…" : odds == null ? unpricedText(chance, t) : formatOdds(odds, formatNumber)}
                     </span>
                     <StakeInput value={request.stakeCents} onChange={(c) => setStake(request, c)} />
                     <span className="hint">{odds != null && <>→ <Money cents={Math.floor(request.stakeCents * odds)} /></>}</span>
@@ -337,7 +348,7 @@ function BetBuilder({
     const timer = setTimeout(() => {
       getBetChance(setCode, kind, bet)
         .then((c) => live && setChance(c))
-        .catch(() => live && setChance({ probability: null, exact: false }))
+        .catch(() => live && setChance({ probability: null, exact: false, unpriced: null }))
         .finally(() => live && setBusy(false));
     }, 250);
     return () => {
@@ -379,7 +390,9 @@ function BetBuilder({
             ? t("bet.computing")
             : chance?.probability
               ? `${formatChance(chance.probability, t, formatNumber)} · ${chance.exact ? t("bet.exact") : t("bet.simulated")}`
-              : t("bet.unpricedLong")}
+              : chance
+                ? unpricedText(chance, t, true)
+                : t("bet.unpricedLong")}
         </span>
         {odds != null && <strong>{formatOdds(odds, formatNumber)}</strong>}
         <StakeInput value={stake} onChange={setStake} />

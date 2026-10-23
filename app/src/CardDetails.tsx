@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { getCardDetails, type CardDetailsView } from "./api";
 import { Backdrop } from "./Backdrop";
 import { BackToTop } from "./BackToTop";
-import { CardImage } from "./CardImage";
+import { CardImage, NearImage } from "./CardImage";
 import { largeImage } from "./images";
 import { CARD_LANGUAGES, useI18n, type I18n } from "./i18n";
 import { Loading } from "./Loading";
@@ -163,7 +163,7 @@ export function CardDetails({ setCode, uuid, onClose }: Props) {
                 <div className="printing-grid">
                   {details.printings.map((p) => (
                     <div key={`${p.setCode}-${p.number}`} className={`printing ${p.current ? "current" : ""}`}>
-                      {p.imageUrl && <img src={p.imageUrl} alt={p.setName} loading="lazy" draggable={false} />}
+                      {p.imageUrl && <NearImage src={p.imageUrl} alt={p.setName} />}
                       <div className="printing-info">
                         <strong>{p.setName}</strong>
                         <span className="hint">

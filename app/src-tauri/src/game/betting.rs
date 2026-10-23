@@ -98,15 +98,32 @@ pub struct BetContext {
     pub min_stake_cents: u32,
 }
 
-/// How likely a bet is; `probability` is `None` when it cannot be priced (certain either way,
-/// or too rare or too sure for the simulation to price it).
+/// How likely a bet is; `probability` is `None` when it cannot be priced, and `unpriced` says
+/// why.
 #[derive(Debug, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct BetChance {
     pub probability: Option<f64>,
     /// Worked out from the sheets (else counted over simulated boosters).
     pub exact: bool,
+    pub unpriced: Option<Unpriced>,
 }
+
+/// Why a bet has no odds.
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum Unpriced {
+    /// Won by every booster of this kind (a Play Booster always holds a foil).
+    Always,
+    /// Won by none (a foil in a set printed before foils).
+    Never,
+    /// Too rare, or too sure, for the simulated boosters to tell its chance.
+    Simulation,
+}
+
+/// Below this distance from 0 or 1, an exact chance is certain: the sums over the sheets leave
+/// rounding errors (99.9999999 %), which were priced ×1.00.
+const CERTAIN: f64 = 1e-9;
 
 /// The cards of a booster's set as the bets see them, and boosters drawn ahead.
 pub(super) struct BetTable {
@@ -146,11 +163,16 @@ impl Game {
         let cfg = &self.sets[set_code].file.boosters[kind];
         let empty = SimulatedPacks::default();
         let found = chance(bet, cfg, &table.cards, &table.index, table.packs.as_ref().unwrap_or(&empty));
-        let probability = match found {
-            Chance::Exact(p) => Some(p).filter(|p| *p > 0.0 && *p < 1.0),
-            Chance::Simulated { hits, total } => (hits >= min && total - hits >= min).then(|| found.probability()),
+        let (probability, unpriced) = match found {
+            Chance::Exact(p) if p <= CERTAIN => (None, Some(Unpriced::Never)),
+            Chance::Exact(p) if p >= 1.0 - CERTAIN => (None, Some(Unpriced::Always)),
+            Chance::Exact(p) => (Some(p), None),
+            Chance::Simulated { hits: 0, .. } => (None, Some(Unpriced::Never)),
+            Chance::Simulated { hits, total } if hits == total => (None, Some(Unpriced::Always)),
+            Chance::Simulated { hits, total } if hits >= min && total - hits >= min => (Some(found.probability()), None),
+            Chance::Simulated { .. } => (None, Some(Unpriced::Simulation)),
         };
-        Ok(BetChance { probability, exact })
+        Ok(BetChance { probability, exact, unpriced })
     }
 
     pub fn kept_bets(&self) -> Result<Vec<KeptBet>, String> {
