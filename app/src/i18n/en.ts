@@ -49,6 +49,19 @@ export const en = {
   "data.prepareFailedTitle": "The game couldn't be prepared",
   "data.prepareFailed": "Its data (sets, cards, prices) couldn't be downloaded. Check your connection, then try again.",
   "data.retry": "Try again",
+  // The steps of the data refresh, sent by the game in English.
+  "data.step.starting": "Starting",
+  "data.step.lookingForPack": "Looking for the ready-made game data",
+  "data.step.downloadingPack": "Downloading the game data",
+  "data.step.installingPack": "Installing the game data",
+  "data.step.downloadingSets": "Downloading every set from MTGJSON (large file)",
+  "data.step.readingSets": "Reading the sets",
+  "data.step.preparingSet": "Preparing {set} ({index}/{count})",
+  "data.step.downloadingPrices": "Downloading Scryfall prices (large file)",
+  "data.step.readingPrices": "Reading prices",
+  "data.step.saving": "Saving the game data",
+  // The official Fan Content Policy notice in the interface's language, shown under it.
+  "legal.noticeTranslated": "",
 
   // ---- home screen
   "home.continue": "Continue",

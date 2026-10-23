@@ -44,6 +44,18 @@ export const it: Messages = {
   "data.prepareFailedTitle": "Impossibile preparare il gioco",
   "data.prepareFailed": "Non è stato possibile scaricarne i dati (espansioni, carte, prezzi). Controlla la connessione e riprova.",
   "data.retry": "Riprova",
+  "data.step.starting": "Avvio",
+  "data.step.lookingForPack": "Ricerca dei dati di gioco già pronti",
+  "data.step.downloadingPack": "Download dei dati di gioco",
+  "data.step.installingPack": "Installazione dei dati di gioco",
+  "data.step.downloadingSets": "Download di tutti i set da MTGJSON (file grande)",
+  "data.step.readingSets": "Lettura dei set",
+  "data.step.preparingSet": "Preparazione di {set} ({index}/{count})",
+  "data.step.downloadingPrices": "Download dei prezzi di Scryfall (file grande)",
+  "data.step.readingPrices": "Lettura dei prezzi",
+  "data.step.saving": "Salvataggio dei dati di gioco",
+  "legal.noticeTranslated":
+    "Unsealed è contenuto non ufficiale creato da fan, consentito dalla Fan Content Policy. Non approvato né sostenuto da Wizards. Parte dei materiali utilizzati è di proprietà di Wizards of the Coast. ©Wizards of the Coast LLC.",
 
   // ---- home screen
   "home.continue": "Continua",

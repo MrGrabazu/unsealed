@@ -26,14 +26,47 @@ export function useDataStatus(onRefreshed?: () => void): DataStatus {
   return status;
 }
 
+type T = ReturnType<typeof useI18n>["t"];
+
+/** The steps the game sends, in English (core/src/builder.rs, pack.rs, updater.rs). */
+const STEPS = {
+  Starting: "data.step.starting",
+  "Looking for the ready-made game data": "data.step.lookingForPack",
+  "Downloading the game data": "data.step.downloadingPack",
+  "Installing the game data": "data.step.installingPack",
+  "Downloading every set from MTGJSON (large file)": "data.step.downloadingSets",
+  "Reading the sets": "data.step.readingSets",
+  "Downloading Scryfall prices (large file)": "data.step.downloadingPrices",
+  "Reading prices": "data.step.readingPrices",
+  "Saving the game data": "data.step.saving",
+} as const;
+
+/** A step of the data refresh in the interface's language; an unknown one stays as sent. */
+function stepText(step: string, t: T): string {
+  const key = STEPS[step as keyof typeof STEPS];
+  if (key) return t(key);
+  const preparing = /^Preparing (.+) \((\d+)\/(\d+)\)$/.exec(step);
+  if (preparing) return t("data.step.preparingSet", { set: preparing[1], index: preparing[2], count: preparing[3] });
+  return step;
+}
+
+/** A failure, "<step>: <error>": the step translated, the error itself as the system gave it. */
+function failureText(message: string, t: T): string {
+  const at = message.indexOf(": ");
+  if (at < 0) return message;
+  const step = message.slice(0, at);
+  const translated = stepText(step, t);
+  return translated === step ? message : `${translated} — ${message.slice(at + 2)}`;
+}
+
 /** Progress of the background data refresh while the game is playable on the data it has,
- * or its failure (never blocking). The step itself comes from the data builder, in English. */
+ * or its failure (never blocking). */
 export function DataStatusBar({ status }: { status: DataStatus }) {
   const { t } = useI18n();
   if (status.state === "updating") {
     return (
       <div className="data-status" role="status">
-        <span className="data-status-text">{t("data.updating", { percent: status.percent, step: status.message })}</span>
+        <span className="data-status-text">{t("data.updating", { percent: status.percent, step: stepText(status.message, t) })}</span>
         <div className="bar">
           <i style={{ width: `${status.percent}%` }} />
         </div>
@@ -41,7 +74,7 @@ export function DataStatusBar({ status }: { status: DataStatus }) {
     );
   }
   if (status.state === "failed") {
-    return <p className="hint data-status failed">{t("data.failed", { reason: status.message })}</p>;
+    return <p className="hint data-status failed">{t("data.failed", { reason: failureText(status.message, t) })}</p>;
   }
   return null;
 }
@@ -58,9 +91,7 @@ export function DataPreparing({ status }: { status: DataStatus }) {
       {failed ? (
         <>
           <p>{t("data.prepareFailed")}</p>
-          <p className="hint" lang="en">
-            {status.message}
-          </p>
+          <p className="hint">{failureText(status.message, t)}</p>
           <button className="big" onClick={() => void retryDataUpdate()}>
             {t("data.retry")}
           </button>
@@ -73,10 +104,7 @@ export function DataPreparing({ status }: { status: DataStatus }) {
             </div>
             <b>{percent} %</b>
           </div>
-          {/* The builder's steps are in English ("Downloading Scryfall prices"…). */}
-          <p className="prepare-step" lang="en">
-            {status.state === "updating" ? status.message : t("data.prepareChecking")}
-          </p>
+          <p className="prepare-step">{status.state === "updating" ? stepText(status.message, t) : t("data.prepareChecking")}</p>
           <p className="hint">{t("data.prepareHint")}</p>
         </>
       )}

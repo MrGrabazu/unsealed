@@ -3,7 +3,7 @@ import type { DataStatus } from "./api";
 import { DataPreparing } from "./DataStatus";
 import { useI18n } from "./i18n";
 import { Logo } from "./Logo";
-import { FAN_CONTENT_NOTICE } from "./legal";
+import { FanNotice } from "./Footer";
 
 /** The first launch: the game's data (sets, cards, prices) is being built and nothing can be
  * played yet. Shown instead of the home screen, which appears once it is ready. */
@@ -21,8 +21,8 @@ export function Preparing({ status }: { status: DataStatus }) {
         <div className="cartouche">{t("data.prepareCartouche")}</div>
         <DataPreparing status={status} />
       </section>
-      <p className="legal preparing-legal" lang="en">
-        {FAN_CONTENT_NOTICE}
+      <p className="legal preparing-legal">
+        <FanNotice />
       </p>
     </div>
   );

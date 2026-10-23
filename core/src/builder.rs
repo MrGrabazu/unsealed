@@ -17,7 +17,7 @@ use rand_chacha::ChaCha8Rng;
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashSet};
 use std::fs::{self, File};
-use std::io::{BufReader, Read, Write};
+use std::io::{self, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
@@ -77,31 +77,74 @@ pub(crate) fn http_post_json(url: &str, body: &str) -> Result<ureq::Response, Bu
         .send_string(body)?)
 }
 
+/// How many times a download cut off by the network is taken up again.
+const DOWNLOAD_ATTEMPTS: u32 = 5;
+
 /// Downloads a file, reporting the fraction received (at most once per percent) when the
-/// server announces its size.
+/// server announces its size. A connection lost on the way (common on a large file: Wi-Fi,
+/// sleep, an antivirus, Windows' "invalid handle" from its network stack) is taken up again
+/// where it stopped when the server allows it (a Range request), else from the start.
 pub(crate) fn download(url: &str, dest: &Path, on_fraction: &mut dyn FnMut(f64)) -> Result<(), BuildError> {
-    let response = http_get(url)?;
-    let total: Option<u64> = response.header("Content-Length").and_then(|v| v.parse().ok()).filter(|&t| t > 0);
-    let mut reader = response.into_reader();
     let tmp = dest.with_extension("part");
     let mut file = File::create(&tmp)?;
+    let (mut received, mut total, mut last_percent) = (0u64, None::<u64>, None);
     let mut buffer = vec![0u8; 64 * 1024];
-    let (mut received, mut last_percent) = (0u64, None);
+    let mut attempt = 1;
     loop {
-        let n = reader.read(&mut buffer)?;
-        if n == 0 {
-            break;
-        }
-        file.write_all(&buffer[..n])?;
-        received += n as u64;
-        if let Some(total) = total {
-            let percent = received * 100 / total;
-            if last_percent != Some(percent) {
-                last_percent = Some(percent);
-                on_fraction((received as f64 / total as f64).min(1.0));
+        let request = ureq::get(url).set("User-Agent", USER_AGENT).set("Accept", ACCEPT);
+        let request = if received > 0 { request.set("Range", &format!("bytes={received}-")) } else { request };
+        let response = match request.call() {
+            Ok(response) => response,
+            // Only a network failure is worth another try, not an answer such as a 404.
+            Err(ureq::Error::Transport(_)) if attempt < DOWNLOAD_ATTEMPTS => {
+                attempt += 1;
+                std::thread::sleep(Duration::from_secs(2 * attempt as u64));
+                continue;
             }
+            Err(e) => return Err(e.into()),
+        };
+        let length: Option<u64> = response.header("Content-Length").and_then(|v| v.parse().ok());
+        if response.status() == 206 {
+            total = total.or(length.map(|l| l + received));
+        } else {
+            // The whole file (first request, or a server ignoring Range): from the start.
+            if received > 0 {
+                file = File::create(&tmp)?;
+                received = 0;
+            }
+            total = length.filter(|&t| t > 0);
+        }
+        let mut reader = response.into_reader();
+        let cut = loop {
+            let n = match reader.read(&mut buffer) {
+                Ok(0) => break None,
+                Ok(n) => n,
+                Err(e) => break Some(e),
+            };
+            file.write_all(&buffer[..n])?;
+            received += n as u64;
+            if let Some(total) = total {
+                let percent = received * 100 / total;
+                if last_percent != Some(percent) {
+                    last_percent = Some(percent);
+                    on_fraction((received as f64 / total as f64).min(1.0));
+                }
+            }
+        };
+        // Cut short without an error is a cut too.
+        let cut = cut.or_else(|| {
+            total.filter(|&t| received < t).map(|t| io::Error::new(io::ErrorKind::UnexpectedEof, format!("{received} of {t} bytes received")))
+        });
+        match cut {
+            None => break,
+            Some(_) if attempt < DOWNLOAD_ATTEMPTS => {
+                attempt += 1;
+                std::thread::sleep(Duration::from_secs(2 * attempt as u64));
+            }
+            Some(e) => return Err(e.into()),
         }
     }
+    file.flush()?;
     drop(file);
     fs::rename(&tmp, dest)?;
     Ok(())
@@ -291,6 +334,18 @@ struct BulkEntry {
 /// Runs the whole build, reporting its progress. The manifest is written last, so an
 /// interrupted build never advertises missing files.
 pub fn build(opts: &BuildOptions, progress: Progress<'_>) -> Result<Manifest, BuildError> {
+    // An error says at which step it happened: "invalid handle (os error 6)" alone tells nothing.
+    let mut step = String::new();
+    let result = build_steps(opts, &mut |line, fraction| {
+        if step != line {
+            step = line.to_string();
+        }
+        progress(line, fraction)
+    });
+    result.map_err(|e| if step.is_empty() { e } else { format!("{step}: {e}").into() })
+}
+
+fn build_steps(opts: &BuildOptions, progress: Progress<'_>) -> Result<Manifest, BuildError> {
     let sets_dir = opts.out.join("sets");
     fs::create_dir_all(&opts.cache)?;
     fs::create_dir_all(&sets_dir)?;

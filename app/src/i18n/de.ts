@@ -44,6 +44,18 @@ export const de: Messages = {
   "data.prepareFailedTitle": "Das Spiel konnte nicht vorbereitet werden",
   "data.prepareFailed": "Seine Daten (Sets, Karten, Preise) konnten nicht heruntergeladen werden. Prüfe deine Verbindung und versuche es erneut.",
   "data.retry": "Erneut versuchen",
+  "data.step.starting": "Start",
+  "data.step.lookingForPack": "Suche nach den fertigen Spieldaten",
+  "data.step.downloadingPack": "Spieldaten werden heruntergeladen",
+  "data.step.installingPack": "Spieldaten werden installiert",
+  "data.step.downloadingSets": "Alle Sets werden von MTGJSON heruntergeladen (große Datei)",
+  "data.step.readingSets": "Sets werden gelesen",
+  "data.step.preparingSet": "{set} wird vorbereitet ({index}/{count})",
+  "data.step.downloadingPrices": "Scryfall-Preise werden heruntergeladen (große Datei)",
+  "data.step.readingPrices": "Preise werden gelesen",
+  "data.step.saving": "Spieldaten werden gespeichert",
+  "legal.noticeTranslated":
+    "Unsealed ist inoffizieller Fan-Content, erlaubt im Rahmen der Fan Content Policy. Nicht von Wizards genehmigt oder unterstützt. Teile der verwendeten Materialien sind Eigentum von Wizards of the Coast. ©Wizards of the Coast LLC.",
 
   // ---- home screen
   "home.continue": "Weiterspielen",
