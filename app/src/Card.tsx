@@ -3,7 +3,7 @@ import type { OpenedCard } from "./api";
 import { CardImage } from "./CardImage";
 import { useI18n } from "./i18n";
 import { Money } from "./money";
-import { sheenClass } from "./RevealedCards";
+import { FoilSheen } from "./foils";
 
 interface Props {
   card: OpenedCard;
@@ -30,7 +30,7 @@ export function Card({ card, faceUp, clickable, onReveal }: Props) {
         <div className="face front">
           {/* Only a revealed card can be turned over: before that, a click reveals it. */}
           <CardImage front={card.imageUrl} back={faceUp ? card.backImageUrl : null} alt={card.name} />
-          {card.foil && <div className={sheenClass(card.rarity)} />}
+          {card.foil && <FoilSheen rarity={card.rarity} kind={card.foilKind} />}
           {card.isNew && <span className="badge-new">{t("open.new")}</span>}
         </div>
       </motion.div>

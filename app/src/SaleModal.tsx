@@ -5,7 +5,7 @@ import { BackToTop } from "./BackToTop";
 import { CardImage } from "./CardImage";
 import { useI18n } from "./i18n";
 import { Money } from "./money";
-import { sheenClass } from "./RevealedCards";
+import { FoilSheen } from "./foils";
 
 /** One line of a sale: copies of a card in one finish. */
 export interface SoldLine {
@@ -67,7 +67,7 @@ export function SaleModal({ soldCount, totalCents, lines, onClose }: Props) {
               <li key={`${line.card.uuid}:${line.foil}`}>
                 <div className="sale-thumb thumb">
                   <CardImage front={line.card.imageUrl} back={null} alt={line.card.name} lazy />
-                  {line.foil && <div className={sheenClass(line.card.rarity)} />}
+                  {line.foil && <FoilSheen rarity={line.card.rarity} kind={line.card.foilKind} badge={false} />}
                 </div>
                 <span className="sale-name">
                   {line.card.name}

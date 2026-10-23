@@ -34,7 +34,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use unsealed_core::achievements::{Engine, Event};
-use unsealed_core::catalog::{CardEntry, Manifest, PriceFile, SetFile, COLLECTOR_KIND, FOREIGN_LANGUAGES};
+use unsealed_core::catalog::{set_file_name, CardEntry, Manifest, PriceFile, SetFile, COLLECTOR_KIND, FOREIGN_LANGUAGES};
 use unsealed_core::import::ART_RARITY;
 use unsealed_core::economy::{charity_available, EconomyConfig};
 use unsealed_core::limited::LimitedConfig;
@@ -82,6 +82,9 @@ pub struct OpenedCard {
     pub set_code: String,
     pub scryfall_id: String,
     pub foil: bool,
+    /// A special foil (see `CardEntry::foil_kind`), when the card is drawn foil.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub foil_kind: Option<String>,
     pub sheet: String,
     pub image_url: String,
     /// Back face, for double-faced cards.
@@ -108,6 +111,9 @@ pub struct CollectionCard {
     pub back_image_url: Option<String>,
     pub quantity: u32,
     pub foil_quantity: u32,
+    /// Its foil's kind, when special (see `CardEntry::foil_kind`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub foil_kind: Option<String>,
     pub price_cents: Option<u32>,
     pub foil_price_cents: Option<u32>,
     /// Both prices are estimated (see `OpenedCard::price_estimated`).
@@ -732,6 +738,7 @@ impl Game {
                     set_code: card.set_code.clone(),
                     scryfall_id: card.scryfall_id.clone(),
                     foil: d.foil,
+                    foil_kind: card.foil_kind.clone().filter(|_| d.foil),
                     sheet: d.sheet,
                     price_cents: price,
                     price_estimated,
@@ -926,6 +933,7 @@ impl Game {
             back_image_url: shown.back_image_url,
             quantity: have.normal,
             foil_quantity: have.foil,
+            foil_kind: c.foil_kind.clone(),
             price_cents: self.market_price(&c.uuid, false),
             foil_price_cents: self.market_price(&c.uuid, true),
             price_estimated: self.price_estimated(&c.uuid),
@@ -1149,6 +1157,7 @@ impl Game {
             image_url: shown.image_url,
             back_image_url: shown.back_image_url,
             foil,
+            foil_kind: card.foil_kind.clone().filter(|_| foil),
             sheet: String::new(),
             price_cents,
             // A pull keeps the price it had when pulled, estimated or not.
@@ -1216,7 +1225,7 @@ impl Game {
         if self.sets.contains_key(code) {
             return Ok(());
         }
-        let file: SetFile = read_json(&self.data_dir.join("sets").join(format!("{code}.json")))?;
+        let file: SetFile = read_json(&self.data_dir.join("sets").join(set_file_name(code)))?;
         // Foil printings merged into their card since the game was saved: their copies become
         // foil copies of the card.
         for (from, into) in &file.foil_aliases {
@@ -1873,6 +1882,7 @@ mod tests {
             set_code: String::new(),
             scryfall_id: String::new(),
             foil,
+            foil_kind: None,
             sheet: sheet.into(),
             image_url: String::new(),
             back_image_url: None,

@@ -5,7 +5,8 @@ import { SellBoosterButton, useBoosterSale } from "./BoosterSale";
 import { useI18n } from "./i18n";
 import { CardImage } from "./CardImage";
 import { Money, useMoney } from "./money";
-import { RevealedCards, sheenClass } from "./RevealedCards";
+import { FoilSheen } from "./foils";
+import { RevealedCards } from "./RevealedCards";
 import { PackScene } from "./scene/PackScene";
 
 interface Props {
@@ -139,7 +140,7 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
                 <button key={seen.length - i} className={`seen-card ${card.rarity}`} onClick={() => onDetails(card)} title={card.name}>
                   <span className="thumb">
                     <CardImage front={card.imageUrl} back={card.backImageUrl} alt={card.name} />
-                    {card.foil && <span className={sheenClass(card.rarity)} />}
+                    {card.foil && <FoilSheen rarity={card.rarity} kind={card.foilKind} badge={false} />}
                     {card.isNew && <span className="badge-new">{t("open.new")}</span>}
                   </span>
                   <span className="seen-price">{card.priceCents == null ? "—" : <Money cents={card.priceCents} estimated={card.priceEstimated} />}</span>

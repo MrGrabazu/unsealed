@@ -24,6 +24,9 @@ pub struct CardDetailsView {
     pub artist: Option<String>,
     pub can_be_foil: bool,
     pub can_be_nonfoil: bool,
+    /// Its foil's kind, when special (see `CardEntry::foil_kind`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub foil_kind: Option<String>,
     pub price_cents: Option<u32>,
     pub foil_price_cents: Option<u32>,
     /// The card has no market price of its own: its prices are estimated.
@@ -107,6 +110,7 @@ impl Game {
             artist: card.artist.clone(),
             can_be_foil: card.finishes.iter().any(|f| f == "foil" || f == "etched"),
             can_be_nonfoil: card.finishes.iter().any(|f| f == "nonfoil"),
+            foil_kind: card.foil_kind.clone(),
             price_cents: self.market_price(uuid, false),
             foil_price_cents: self.market_price(uuid, true),
             price_estimated: self.price_estimated(uuid),

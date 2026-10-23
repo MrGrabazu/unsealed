@@ -94,8 +94,9 @@ code { background: var(--panel); padding: 2px 6px; border-radius: 4px; }
    the vertical, in "soft-light": tinted, never washed out); where the light catches it, a
    broad band sweeping slowly across, the rainbow comes alive under a soft white glare.
    The 3D opening draws the same in its card shader (scene/cardMaterial.ts): keep them alike. */
-@property --foil-shift { syntax: "<percentage>"; inherits: false; initial-value: 0%; }
-@property --foil-light { syntax: "<percentage>"; inherits: false; initial-value: -60%; }
+/* Inherited: the special foils' layers (foils.css, in ::before and ::after) follow them. */
+@property --foil-shift { syntax: "<percentage>"; inherits: true; initial-value: 0%; }
+@property --foil-light { syntax: "<percentage>"; inherits: true; initial-value: -60%; }
 .foil-sheen {
   position: absolute;
   inset: 0;
@@ -127,7 +128,7 @@ code { background: var(--panel); padding: 2px 6px; border-radius: 4px; }
 /* The light crosses the card and back, as a hand would tilt it. */
 @keyframes foil-light { 0%, 100% { --foil-light: -20%; } 50% { --foil-light: 120%; } }
 /* A light halo around a foil, slowly going through the rainbow, so that it stands out in a list. */
-@property --foil-hue { syntax: "<number>"; inherits: false; initial-value: 0; }
+@property --foil-hue { syntax: "<number>"; inherits: true; initial-value: 0; }
 .thumb:has(> .foil-sheen), .card .front:has(> .foil-sheen) {
   box-shadow: 0 0 8px 1px hsl(calc(var(--foil-hue) * 1deg) 100% 65% / 0.7),
     0 0 20px 4px hsl(calc((var(--foil-hue) + 60) * 1deg) 100% 60% / 0.3);

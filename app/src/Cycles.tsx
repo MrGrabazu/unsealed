@@ -3,7 +3,7 @@ import type { CycleView, CyclesView } from "./api";
 import { Placeholder } from "./Binder";
 import { CardImage } from "./CardImage";
 import { useI18n } from "./i18n";
-import { sheenClass } from "./RevealedCards";
+import { FoilSheen } from "./foils";
 
 type Filter = "all" | "progress" | "complete" | "todo";
 const FILTERS: Filter[] = ["all", "progress", "complete", "todo"];
@@ -95,7 +95,7 @@ export function CyclesList({ view, onOpen }: { view: CyclesView; onOpen: (uuid: 
               >
                 <div className="thumb">
                   {s.owned ? <CardImage front={s.card.imageUrl} back={s.card.backImageUrl} alt={s.card.name} lazy /> : <Placeholder card={s.card} />}
-                  {s.foil && <div className={sheenClass(s.card.rarity)} />}
+                  {s.foil && <FoilSheen rarity={s.card.rarity} kind={s.card.foilKind} badge={false} />}
                   {s.prestige && s.printings > 1 && <span className="cycle-best" title={t("cycles.best")}>✦</span>}
                 </div>
               </div>

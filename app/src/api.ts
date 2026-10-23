@@ -24,6 +24,8 @@ export interface OpenedCard {
   setCode: string;
   scryfallId: string;
   foil: boolean;
+  /** A special foil ("galaxyfoil", "etched"…, see foils.tsx), when drawn foil. */
+  foilKind?: string;
   sheet: string;
   imageUrl: string;
   /** Back face, for double-faced cards. */
@@ -48,6 +50,8 @@ export interface CollectionCard {
   backImageUrl: string | null;
   quantity: number;
   foilQuantity: number;
+  /** Its foil's kind, when special (see foils.tsx). */
+  foilKind?: string;
   priceCents: number | null;
   foilPriceCents: number | null;
   priceEstimated: boolean;
@@ -466,6 +470,8 @@ export interface CardDetailsView {
   artist: string | null;
   canBeFoil: boolean;
   canBeNonfoil: boolean;
+  /** Its foil's kind, when special (see foils.tsx). */
+  foilKind?: string;
   priceCents: number | null;
   foilPriceCents: number | null;
   priceEstimated: boolean;

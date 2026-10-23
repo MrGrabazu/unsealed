@@ -33,9 +33,39 @@ pub struct SetFile {
     pub foil_aliases: BTreeMap<String, String>,
 }
 
+/// Names Windows keeps for its devices, whatever the extension (before Windows 11): writing
+/// "CON.json" (Conflux) writes to the console, and a game with none fails with "invalid
+/// handle (os error 6)".
+const RESERVED_NAMES: [&str; 22] = [
+    "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3",
+    "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+];
+
+/// Whether Windows reserves this file name (without its extension) for a device.
+pub fn is_reserved(name: &str) -> bool {
+    RESERVED_NAMES.iter().any(|r| r.eq_ignore_ascii_case(name))
+}
+
+/// The name of a set's file in `sets/`: its code, with "_" after a name Windows reserves
+/// ("CON_.json" for Conflux).
+pub fn set_file_name(code: &str) -> String {
+    if is_reserved(code) { format!("{code}_.json") } else { format!("{code}.json") }
+}
+
+/// The set code of a file of `sets/` (see `set_file_name`); None for a file not named so (an
+/// old "CON.json", left by a build made where Windows allowed it).
+pub fn set_code_of_file(name: &str) -> Option<&str> {
+    let stem = name.strip_suffix(".json")?;
+    match stem.strip_suffix('_') {
+        Some(code) if is_reserved(code) => Some(code),
+        _ if is_reserved(stem) => None,
+        _ => Some(stem),
+    }
+}
+
 /// Bump when the compact files change in a way older data cannot satisfy: the app then
 /// rebuilds its data at the next launch.
-pub const DATA_FORMAT_VERSION: u32 = 11;
+pub const DATA_FORMAT_VERSION: u32 = 12;
 
 /// Languages kept for card and set names, as (MTGJSON language name, code). Cards printed
 /// in other languages, or never translated, stay in English.
@@ -202,6 +232,26 @@ pub struct CardEntry {
     /// MTGJSON `colorIdentity` (a land's colors, for the bets).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub color_identity: Vec<String>,
+    /// The kind of its foil, when it is not the plain one: one of `FOIL_KINDS` (a galaxy
+    /// foil, a surge foil…, MTGJSON `promoTypes`), or "etched" (an etched foil, its finish).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub foil_kind: Option<String>,
+}
+
+/// The special foils told apart in the game, as MTGJSON and Scryfall name them in their
+/// promo types: each has its badge, and most their own look (`foils.ts` of the app).
+pub const FOIL_KINDS: [&str; 21] = [
+    "galaxyfoil", "surgefoil", "doublerainbow", "textured", "fracturefoil", "halofoil", "oilslick", "gilded", "silverfoil",
+    "manafoil", "neonink", "ripplefoil", "stepandcompleat", "raisedfoil", "firstplacefoil", "invisibleink", "facetfoil",
+    "chocobotrackfoil", "cosmicfoil", "rainbowfoil", "singularityfoil",
+];
+
+/// The kind of foil of a printing (see `CardEntry::foil_kind`): its first promo type that is
+/// a special foil, else "etched" for a printing etched but never plain foil.
+pub fn foil_kind(promo_types: &[String], finishes: &[String]) -> Option<String> {
+    let promo = promo_types.iter().find(|p| FOIL_KINDS.contains(&p.as_str()));
+    let etched = finishes.iter().any(|f| f == "etched") && !finishes.iter().any(|f| f == "foil");
+    promo.cloned().or_else(|| etched.then(|| "etched".to_string()))
 }
 
 /// Prices in cents, as given by Scryfall.

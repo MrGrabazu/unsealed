@@ -8,7 +8,7 @@
 //! pack is of use before downloading it, and is written last when a pack is installed.
 
 use crate::builder::{download, http_get, BuildError, Progress};
-use crate::catalog::Manifest;
+use crate::catalog::{is_reserved, Manifest};
 use crate::update::{pack_is_of_use, DataConfig};
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
@@ -72,7 +72,10 @@ pub fn read_pack(reader: impl Read) -> io::Result<Vec<(String, Vec<u8>)>> {
         let mut name = vec![0u8; u32::from_le_bytes(len) as usize];
         input.read_exact(&mut name)?;
         let name = String::from_utf8(name).map_err(|_| bad("a file name"))?;
-        let safe = !name.is_empty() && !name.starts_with('/') && name.split('/').all(|p| !p.is_empty() && p != "." && p != "..");
+        // Nor a name Windows reserves for a device ("sets/CON.json"): see `set_file_name`.
+        let safe = !name.is_empty()
+            && !name.starts_with('/')
+            && name.split('/').all(|p| !p.is_empty() && p != "." && p != ".." && !is_reserved(p.split('.').next().unwrap_or(p)));
         if !safe || name.contains('\\') || name.contains(':') {
             return Err(bad(&format!("unsafe path {name}")));
         }

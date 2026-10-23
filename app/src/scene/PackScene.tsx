@@ -359,7 +359,7 @@ function Cards({
   const back = useMemo(() => cardBackTexture(), []);
   const glow = useMemo(() => glowTexture(), []);
   const geometry = useMemo(() => createCardGeometry(), []);
-  const materials = useMemo(() => cards.map((c) => createCardMaterials(back, c.foil)), [cards, back]);
+  const materials = useMemo(() => cards.map((c) => createCardMaterials(back, c.foil, c.foilKind)), [cards, back]);
   const sparkles = useMemo(() => createSparkles(), []);
   const stack = useRef<THREE.Group>(null);
   const meshes = useRef<(THREE.Mesh | null)[]>([]);

@@ -75,7 +75,7 @@ import { useI18n } from "./i18n";
 import { Library } from "./Library";
 import { Loading } from "./Loading";
 import { duplicatesOf, SaleModal, type SoldLine } from "./SaleModal";
-import { sheenClass } from "./RevealedCards";
+import { FoilSheen, foilLabel } from "./foils";
 import { SellPicker } from "./SellPicker";
 import { SetIcon } from "./SetIcon";
 import { Money, useMoney, useMoneyText } from "./money";
@@ -344,9 +344,10 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
           onKeyDown={(e) => e.key === "Enter" && setDetailsOf(c.uuid)}
         >
           <CardImage front={c.imageUrl} back={c.backImageUrl} alt={c.name} lazy />
-          {c.foilQuantity > 0 && <div className={sheenClass(c.rarity)} />}
+          {c.foilQuantity > 0 && <FoilSheen rarity={c.rarity} kind={c.foilKind} />}
           {total > 1 && <span className="badge-qty">×{total}</span>}
-          {c.foilQuantity > 0 && (
+          {/* A special foil has its own badge (its name, from FoilSheen). */}
+          {c.foilQuantity > 0 && (c.rarity === "art" || !foilLabel(c.foilKind)) && (
             <span className={`badge-foil ${c.rarity === "art" ? "signed" : ""}`}>
               {t(c.rarity === "art" ? "collection.signedBadge" : "collection.foilBadge")}
             </span>

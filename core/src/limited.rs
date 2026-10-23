@@ -103,6 +103,7 @@ mod tests {
             special_frame: false,
             types: vec![],
             color_identity: vec![],
+            foil_kind: None,
         }
     }
 

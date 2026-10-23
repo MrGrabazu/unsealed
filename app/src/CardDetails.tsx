@@ -3,6 +3,7 @@ import { getCardDetails, type CardDetailsView } from "./api";
 import { Backdrop } from "./Backdrop";
 import { BackToTop } from "./BackToTop";
 import { CardImage, NearImage } from "./CardImage";
+import { foilLabel } from "./foils";
 import { largeImage } from "./images";
 import { CARD_LANGUAGES, useI18n, type I18n } from "./i18n";
 import { Loading } from "./Loading";
@@ -138,7 +139,8 @@ export function CardDetails({ setCode, uuid, onClose }: Props) {
                 )}
                 {details.canBeFoil && (
                   <>
-                    <dt>{t("details.marketFoil")}</dt>
+                    {/* A special foil is named (galaxy, etched…): it is the only foil of this printing. */}
+                    <dt>{foilLabel(details.foilKind) ?? t("details.marketFoil")}</dt>
                     <dd>
                       {price(details.foilPriceCents)}
                       {details.foilSellValueCents > 0 && (

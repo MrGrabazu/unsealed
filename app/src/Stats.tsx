@@ -5,7 +5,7 @@ import { CardImage } from "./CardImage";
 import { useI18n } from "./i18n";
 import { Loading } from "./Loading";
 import { Money, useMoney, useMoneyText } from "./money";
-import { sheenClass } from "./RevealedCards";
+import { FoilSheen } from "./foils";
 
 /** A big number in its own medallion. */
 function Tile({ label, children, sub, hint }: { label: string; children: ReactNode; sub?: ReactNode; hint?: string }) {
@@ -171,7 +171,7 @@ export function Stats({ refreshKey }: { refreshKey: string }) {
                 <div key={`${p.card.uuid}-${p.openedAt}-${i}`} title={`${cardName(t, p.card)} · ${formatDate(p.openedAt)}`}>
                   <div className={`thumb pull-thumb ${p.card.rarity}`}>
                     <CardImage front={p.card.imageUrl} back={p.card.backImageUrl} alt={p.card.name} lazy />
-                    {p.card.foil && <div className={sheenClass(p.card.rarity)} />}
+                    {p.card.foil && <FoilSheen rarity={p.card.rarity} kind={p.card.foilKind} />}
                   </div>
                   <span className="pull-value">{p.card.priceCents == null ? "—" : <Money cents={p.card.priceCents} />}</span>
                 </div>

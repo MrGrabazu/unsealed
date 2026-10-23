@@ -2,8 +2,8 @@
 
 use crate::booster::{BoosterConfig, BoosterPack, BoosterSheet, ConfigError};
 use crate::catalog::{
-    ArtistCard, ArtistIndex, CardEntry, FeaturedCard, ForeignCard, GuestCard, GuestIndex, PriceSet, SetFile, COLLECTOR_KIND,
-    FOREIGN_LANGUAGES,
+    foil_kind, ArtistCard, ArtistIndex, CardEntry, FeaturedCard, ForeignCard, GuestCard, GuestIndex, PriceSet, SetFile,
+    COLLECTOR_KIND, FOREIGN_LANGUAGES,
 };
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -158,6 +158,7 @@ fn to_entry(c: &RawCard) -> Result<CardEntry, ConfigError> {
         .collect();
     let c = c.clone();
     Ok(CardEntry {
+        foil_kind: foil_kind(&c.promo_types, &c.finishes),
         foreign,
         uuid: c.uuid,
         set_code: c.set_code,
@@ -705,6 +706,9 @@ impl ScryfallCard {
 struct ScryfallPrices {
     usd: Option<String>,
     usd_foil: Option<String>,
+    /// An etched foil's price (its finish "etched": no `usd_foil`). Scryfall gives no euro one.
+    #[serde(default)]
+    usd_etched: Option<String>,
     eur: Option<String>,
     eur_foil: Option<String>,
 }
@@ -732,7 +736,8 @@ pub fn prices_from_scryfall_jsonl<R: BufRead>(
         let cents = |v: &Option<String>| v.as_deref().and_then(parse_cents);
         let prices = PriceSet {
             usd: cents(&p.usd),
-            usd_foil: cents(&p.usd_foil),
+            // The game has one foil finish: an etched printing's is its etched one.
+            usd_foil: cents(&p.usd_foil).or_else(|| cents(&p.usd_etched)),
             eur: cents(&p.eur),
             eur_foil: cents(&p.eur_foil),
             estimated: false,

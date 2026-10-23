@@ -5,8 +5,8 @@
 
 use crate::booster::BoosterConfig;
 use crate::catalog::{
-    BoosterValue, Manifest, ManifestSet, PriceFile, PriceSet, SetFile, SetSelection, ARTISTS_FILE, COLLECTOR_KIND,
-    DATA_FORMAT_VERSION, GUESTS_FILE,
+    set_code_of_file, set_file_name, BoosterValue, Manifest, ManifestSet, PriceFile, PriceSet, SetFile, SetSelection,
+    ARTISTS_FILE, COLLECTOR_KIND, DATA_FORMAT_VERSION, GUESTS_FILE,
 };
 use crate::import::{add_art_cards_from, add_art_slots, artist_index, guest_index, add_token_slots, add_tokens_from, art_set_code, compact_set, merge_foil_printings, merge_token_faces, ArtCardOdds, featured_card, token_set_code, prices_by_uuid, prices_from_scryfall_jsonl, read_all_printings, AllPrintings};
 use crate::sim::expected_value_cents;
@@ -379,7 +379,7 @@ fn build_steps(opts: &BuildOptions, progress: Progress<'_>) -> Result<Manifest, 
         }
         wanted.extend(set.cards.iter().flat_map(|c| [Some(c.scryfall_id.clone()), c.foil_scryfall_id.clone()]).flatten());
         all_cards.extend(set.cards.iter().cloned());
-        write_json(&sets_dir.join(format!("{code}.json")), &set)?;
+        write_json(&sets_dir.join(set_file_name(code)), &set)?;
         manifest_sets.insert(
             code.clone(),
             ManifestSet {
@@ -491,7 +491,7 @@ fn build_steps(opts: &BuildOptions, progress: Progress<'_>) -> Result<Manifest, 
     // Sets no longer offered.
     for entry in fs::read_dir(&sets_dir)?.flatten() {
         let name = entry.file_name().to_string_lossy().into_owned();
-        if name.strip_suffix(".json").is_some_and(|code| !manifest.sets.contains_key(code)) {
+        if name.ends_with(".json") && set_code_of_file(&name).is_none_or(|code| !manifest.sets.contains_key(code)) {
             let _ = fs::remove_file(entry.path());
         }
     }

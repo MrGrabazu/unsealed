@@ -1,0 +1,155 @@
+/* The special foils (foils.tsx): each kind's look over the usual foil (.foil-sheen of
+   styles.css), as validated on the mockup .cache/da/v9.html. Layers over the card only: the
+   image itself is never changed. The drawn parts (stars, shards, relief, oil) are custom
+   properties set by foils.tsx. The 3D opening has its own version (scene/cardMaterial.ts). */
+
+@property --foil-angle { syntax: "<angle>"; inherits: true; initial-value: 0deg; }
+@property --foil-wave { syntax: "<length>"; inherits: true; initial-value: 0px; }
+@property --foil-ripple { syntax: "<length>"; inherits: true; initial-value: 0px; }
+@keyframes foil-spin { to { --foil-angle: 360deg; } }
+@keyframes foil-rise { to { --foil-wave: -28px; } }
+@keyframes foil-ripple { to { --foil-ripple: 24px; } }
+@keyframes foil-twinkle { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+@keyframes foil-pulse { 0%, 100% { opacity: 0.15; } 50% { opacity: 0.5; } }
+
+.foil-sheen::before { content: ""; position: absolute; inset: 0; pointer-events: none; }
+/* The kinds whose look covers the card on its own, not through the band of light. */
+.foil-sheen:is(.fx-etched, .fx-rainbow, .fx-oil, .fx-gilded, .fx-silver) { -webkit-mask-image: none; mask-image: none; }
+
+/* Etched: no rainbow, a matte metal shine and a fine engraving, alive only in the light. */
+.foil-sheen.fx-etched { mix-blend-mode: soft-light; opacity: 0.9;
+  background: linear-gradient(108deg, #000 calc(var(--foil-light) - 40%), #fff6dc calc(var(--foil-light) - 6%), #fff var(--foil-light),
+    #c8b48a calc(var(--foil-light) + 8%), #000 calc(var(--foil-light) + 40%)); }
+.foil-sheen.fx-etched::before { mix-blend-mode: overlay; opacity: 0.55;
+  background: repeating-linear-gradient(45deg, #ffffff55 0 0.6px, transparent 0.6px 2.4px), repeating-linear-gradient(-45deg, #ffffff30 0 0.6px, transparent 0.6px 3.2px);
+  -webkit-mask-image: linear-gradient(108deg, transparent calc(var(--foil-light) - 30%), #000 var(--foil-light), transparent calc(var(--foil-light) + 30%));
+  mask-image: linear-gradient(108deg, transparent calc(var(--foil-light) - 30%), #000 var(--foil-light), transparent calc(var(--foil-light) + 30%)); }
+.foil-sheen.fx-etched::after { background: linear-gradient(108deg, transparent calc(var(--foil-light) - 10%), #fff2d03a var(--foil-light), transparent calc(var(--foil-light) + 10%)); }
+
+/* Galaxy: the foil, with a nebula's tint, under a field of stars (.foil-stars, outside the
+   foil's mask: bright all over), each layer twinkling at its own pace. */
+.foil-sheen.fx-galaxy { opacity: 0.9; }
+.foil-sheen.fx-galaxy::before { mix-blend-mode: soft-light;
+  background: radial-gradient(ellipse at 30% 25%, #6a4aff99, transparent 55%), radial-gradient(ellipse at 75% 70%, #2a8aff88, transparent 60%); }
+.foil-stars, .foil-stars::before, .foil-stars::after { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: screen; background-size: 100% 100%; }
+.foil-stars::before, .foil-stars::after { content: ""; }
+.foil-stars { background-image: var(--foil-stars-1); animation: foil-twinkle 2.6s ease-in-out infinite; }
+.foil-stars::before { background-image: var(--foil-stars-2); animation: foil-twinkle 3.4s ease-in-out -1.7s infinite; }
+.foil-stars::after { background-image: var(--foil-stars-3); animation: foil-twinkle 4.2s ease-in-out -0.8s infinite; }
+
+/* Surge: the rainbow as strong as the usual foil's, and fine waves rising up the card,
+   thin but bright (a white core, a faint glow). */
+.foil-sheen.fx-surge { opacity: 0.85;
+  background: repeating-linear-gradient(100deg, #ff5a5a calc(var(--foil-shift) + 0%), #ffd84a calc(var(--foil-shift) + 10%), #6aff7a calc(var(--foil-shift) + 20%),
+    #4ae8ff calc(var(--foil-shift) + 30%), #5a72ff calc(var(--foil-shift) + 40%), #ff5ae0 calc(var(--foil-shift) + 50%), #ff5a5a calc(var(--foil-shift) + 60%));
+  -webkit-mask-image: linear-gradient(100deg, #0009 calc(var(--foil-light) - 25%), #000 var(--foil-light), #0009 calc(var(--foil-light) + 25%));
+  mask-image: linear-gradient(100deg, #0009 calc(var(--foil-light) - 25%), #000 var(--foil-light), #0009 calc(var(--foil-light) + 25%));
+  animation: foil-drift 4s linear infinite, foil-light 4s ease-in-out infinite, foil-rise 1.6s linear infinite; }
+.foil-sheen.fx-surge::before { mix-blend-mode: screen;
+  background: repeating-radial-gradient(ellipse 140% 60% at 50% calc(130% + var(--foil-wave)), #fff0 0 10.2px, #ffffff30 10.6px, #ffffffee 11.2px, #ffffff30 11.8px, #fff0 12.2px 14px); }
+
+/* Double rainbow: two rainbows crossing, more saturated. */
+.foil-sheen.fx-rainbow { opacity: 0.8;
+  background: repeating-linear-gradient(120deg, #ff5a5a calc(var(--foil-shift) + 0%), #ffd84a calc(var(--foil-shift) + 10%), #6aff7a calc(var(--foil-shift) + 20%),
+    #4ae8ff calc(var(--foil-shift) + 30%), #5a72ff calc(var(--foil-shift) + 40%), #ff5ae0 calc(var(--foil-shift) + 50%), #ff5a5a calc(var(--foil-shift) + 60%)); }
+.foil-sheen.fx-rainbow::before { mix-blend-mode: overlay; opacity: 0.7;
+  background: repeating-linear-gradient(60deg, #ff5a5a calc(60% - var(--foil-shift)), #ffd84a calc(70% - var(--foil-shift)), #6aff7a calc(80% - var(--foil-shift)),
+    #4ae8ff calc(90% - var(--foil-shift)), #5a72ff calc(100% - var(--foil-shift)), #ff5ae0 calc(110% - var(--foil-shift)), #ff5a5a calc(120% - var(--foil-shift))); }
+.foil-sheen.fx-rainbow::after { background: linear-gradient(108deg, transparent calc(var(--foil-light) - 16%), #ffffff50 var(--foil-light), transparent calc(var(--foil-light) + 16%)); }
+
+/* Textured: a relief on the surface, catching the light as it goes by. */
+.foil-sheen.fx-textured::before { mix-blend-mode: overlay; opacity: 0.6; background: var(--foil-relief) 0 0 / 160px 160px;
+  -webkit-mask-image: linear-gradient(108deg, #0006 calc(var(--foil-light) - 30%), #000 var(--foil-light), #0006 calc(var(--foil-light) + 30%));
+  mask-image: linear-gradient(108deg, #0006 calc(var(--foil-light) - 30%), #000 var(--foil-light), #0006 calc(var(--foil-light) + 30%)); }
+
+/* Fracture: the foil broken into shards, whose fine edges catch the light. */
+.foil-sheen.fx-fracture { opacity: 0.95; }
+.foil-sheen.fx-fracture::before { mix-blend-mode: overlay; opacity: 0.8;
+  background: repeating-linear-gradient(32deg, #ff5a5a calc(var(--foil-shift) * -1), #ffd84a calc(10% - var(--foil-shift)), #6aff7a calc(20% - var(--foil-shift)),
+    #4ae8ff calc(30% - var(--foil-shift)), #5a72ff calc(40% - var(--foil-shift)), #ff5ae0 calc(50% - var(--foil-shift)), #ff5a5a calc(60% - var(--foil-shift)));
+  -webkit-mask: var(--foil-shards) 0 0 / 100% 100%; mask: var(--foil-shards) 0 0 / 100% 100%; }
+.foil-sheen.fx-fracture::after { background: var(--foil-shards) 0 0 / 100% 100%;
+  -webkit-mask-image: linear-gradient(108deg, #000d calc(var(--foil-light) - 25%), #000 var(--foil-light), #000d calc(var(--foil-light) + 25%));
+  mask-image: linear-gradient(108deg, #000d calc(var(--foil-light) - 25%), #000 var(--foil-light), #000d calc(var(--foil-light) + 25%)); }
+
+/* Halo: iridescent rings turning slowly around the middle. */
+.foil-sheen.fx-halo { opacity: 0.8;
+  background: repeating-conic-gradient(from var(--foil-angle) at 50% 45%, #ff5a5a 0deg, #ffd84a 30deg, #6aff7a 60deg, #4ae8ff 90deg, #5a72ff 120deg, #ff5ae0 150deg, #ff5a5a 180deg);
+  -webkit-mask-image: repeating-radial-gradient(circle at 50% 45%, #000 0 10px, #0005 16px, #000 22px);
+  mask-image: repeating-radial-gradient(circle at 50% 45%, #000 0 10px, #0005 16px, #000 22px);
+  animation: foil-light 5.5s ease-in-out infinite, foil-spin 14s linear infinite; }
+.foil-sheen.fx-halo::after { background: radial-gradient(circle at 50% 45%, #ffffff40, transparent 55%); }
+
+/* Oil slick: oil on water, dark and shifting. */
+.foil-sheen.fx-oil { opacity: 0.8; background: var(--foil-oil) 0 0 / 300px 300px; }
+.foil-sheen.fx-oil::after { background: linear-gradient(108deg, transparent calc(var(--foil-light) - 14%), #ffffff35 var(--foil-light), transparent calc(var(--foil-light) + 14%)); }
+
+/* Gilded: a warm gold over the whole card, its shine in the light, a bright glint. */
+.foil-sheen.fx-gilded { mix-blend-mode: soft-light; opacity: 0.85; background: linear-gradient(160deg, #ffd877, #b87a1e 50%, #ffe08a); }
+.foil-sheen.fx-gilded::before { mix-blend-mode: overlay; opacity: 0.95;
+  background: linear-gradient(108deg, #6a420e calc(var(--foil-light) - 45%), #ffd877 calc(var(--foil-light) - 14%), #fff6d0 var(--foil-light),
+    #e0a83a calc(var(--foil-light) + 16%), #6a420e calc(var(--foil-light) + 45%)); }
+.foil-sheen.fx-gilded::after { background: linear-gradient(108deg, transparent calc(var(--foil-light) - 12%), #ffe9a880 var(--foil-light), transparent calc(var(--foil-light) + 12%)); }
+
+/* Silver: a cold metal shine, no rainbow. */
+.foil-sheen.fx-silver { opacity: 0.7;
+  background: linear-gradient(108deg, #3a3e46 calc(var(--foil-light) - 50%), #c8d0dc calc(var(--foil-light) - 12%), #ffffff var(--foil-light),
+    #9aa4b4 calc(var(--foil-light) + 14%), #3a3e46 calc(var(--foil-light) + 50%)); }
+.foil-sheen.fx-silver::after { background: linear-gradient(108deg, transparent calc(var(--foil-light) - 10%), #ffffff55 var(--foil-light), transparent calc(var(--foil-light) + 10%)); }
+
+/* Mana: the rainbow made of the five colours of mana, swirling. */
+.foil-sheen.fx-mana { background: conic-gradient(from var(--foil-angle) at 50% 50%, #fff3c4, #4a90e2, #5a3a6a, #e24a3a, #3aa04a, #fff3c4);
+  animation: foil-light 5.5s ease-in-out infinite, foil-spin 14s linear infinite; }
+.foil-sheen.fx-mana::after { background: linear-gradient(108deg, transparent calc(var(--foil-light) - 16%), #ffffff45 var(--foil-light), transparent calc(var(--foil-light) + 16%)); }
+
+/* Neon ink: the foil, with neon glows pulsing. */
+.foil-sheen.fx-neon { animation: foil-drift 9s linear infinite, foil-light 5.5s ease-in-out infinite, foil-halo 6s linear infinite; }
+.foil-sheen.fx-neon::before { mix-blend-mode: color-dodge;
+  background: radial-gradient(circle at 25% 30%, hsl(calc(var(--foil-hue) * 1deg) 100% 55%), transparent 35%),
+    radial-gradient(circle at 75% 65%, hsl(calc((var(--foil-hue) + 140) * 1deg) 100% 55%), transparent 38%);
+  animation: foil-pulse 2.2s ease-in-out infinite; }
+
+/* Ripple: rings widening from the middle, like a stone in water. */
+.foil-sheen.fx-ripple { opacity: 0.8;
+  -webkit-mask-image: repeating-radial-gradient(circle at 50% 50%, #0004 var(--foil-ripple), #000 calc(var(--foil-ripple) + 6px), #0004 calc(var(--foil-ripple) + 12px), #0004 calc(var(--foil-ripple) + 24px));
+  mask-image: repeating-radial-gradient(circle at 50% 50%, #0004 var(--foil-ripple), #000 calc(var(--foil-ripple) + 6px), #0004 calc(var(--foil-ripple) + 12px), #0004 calc(var(--foil-ripple) + 24px));
+  animation: foil-drift 9s linear infinite, foil-light 5.5s ease-in-out infinite, foil-ripple 1.8s linear infinite; }
+
+/* The halo around the card, in its foil's colours (the usual one goes through the rainbow). */
+:is(.thumb, .card .front):has(> .foil-sheen.fx-etched) { box-shadow: 0 0 9px 1px #e8d6a888; animation: none; }
+:is(.thumb, .card .front):has(> .foil-sheen.fx-galaxy) { box-shadow: 0 0 12px 2px #8fa0ffbb, 0 0 28px 6px #b06aff66; animation: none; }
+:is(.thumb, .card .front):has(> .foil-sheen.fx-surge) { box-shadow: 0 0 10px 2px hsl(calc(var(--foil-hue) * 1deg) 100% 65% / 0.8), 0 0 26px 6px hsl(calc((var(--foil-hue) + 90) * 1deg) 100% 60% / 0.4); }
+:is(.thumb, .card .front):has(> .foil-sheen.fx-rainbow) { box-shadow: 0 0 9px 2px hsl(calc(var(--foil-hue) * 1deg) 100% 65% / 0.8), 0 0 22px 5px hsl(calc((var(--foil-hue) + 180) * 1deg) 100% 60% / 0.35); }
+:is(.thumb, .card .front):has(> .foil-sheen.fx-fracture) { box-shadow: 0 0 10px 2px hsl(calc(var(--foil-hue) * 1deg) 100% 65% / 0.75), 0 0 24px 5px hsl(calc((var(--foil-hue) + 120) * 1deg) 100% 60% / 0.35); }
+:is(.thumb, .card .front):has(> .foil-sheen.fx-halo) { box-shadow: 0 0 10px 2px hsl(calc(var(--foil-hue) * 1deg) 100% 70% / 0.7); }
+:is(.thumb, .card .front):has(> .foil-sheen.fx-oil) { box-shadow: 0 0 10px 1px #6a5aff77, 0 0 20px 4px #20ffd033; animation: none; }
+:is(.thumb, .card .front):has(> .foil-sheen.fx-gilded) { box-shadow: 0 0 12px 3px #f5c45acc, 0 0 28px 6px #e0a03a55; animation: none; }
+:is(.thumb, .card .front):has(> .foil-sheen.fx-silver) { box-shadow: 0 0 10px 2px #d8e2f099; animation: none; }
+:is(.thumb, .card .front):has(> .foil-sheen.fx-mana) { box-shadow: 0 0 10px 2px #fff3c477, 0 0 22px 5px #4a90e244; animation: none; }
+:is(.thumb, .card .front):has(> .foil-sheen.fx-neon) { box-shadow: 0 0 12px 2px hsl(calc(var(--foil-hue) * 1deg) 100% 60% / 0.9), 0 0 28px 6px hsl(calc((var(--foil-hue) + 140) * 1deg) 100% 55% / 0.45); }
+
+/* The badges: a special foil's name where "Foil" is (bottom right), in its colours. */
+.badge-foil { z-index: 2; white-space: nowrap; }
+/* A foil's name is longer than "Foil": sized after the card (about 9 px on a card of the
+   collection's grid, 11 px at most on a big one), and left out on a card too small to read
+   it (a group's slots, the cards seen beside an opening). */
+:is(.thumb, .card .front):has(> .badge-foil[class*=" b-"]) { container-type: inline-size; }
+.badge-foil[class*=" b-"] { font-size: clamp(8px, 5.4cqw, 11px); padding: 0.1em 0.55em; bottom: 4.5cqw; right: 4.5cqw; }
+@container (max-width: 120px) { .badge-foil[class*=" b-"] { display: none; } }
+.badge-foil.b-etched { background: linear-gradient(90deg, #f0e2bc, #b8a47a); }
+.badge-foil.b-galaxy { background: linear-gradient(90deg, #2a2a6a, #6a4ab0); color: #fff; box-shadow: inset 0 0 0 1px #b9c8ff88; }
+.badge-foil.b-surge { background: linear-gradient(90deg, #ff5a5a, #ffd84a, #6aff7a, #4ae8ff, #ff5ae0); }
+.badge-foil.b-rainbow { background: linear-gradient(90deg, #ff5ae0, #4ae8ff, #ffd84a, #ff5a5a); }
+.badge-foil.b-textured { background: linear-gradient(90deg, #d8d0c0, #8a8070); }
+.badge-foil.b-fracture { background: linear-gradient(115deg, #7bd0ff 0 45%, #ff7bd0 45% 70%, #ffd84a 70%); }
+.badge-foil.b-halo { background: radial-gradient(circle, #fff, #7bd0ff 60%, #ff7bd0); }
+.badge-foil.b-oil { background: linear-gradient(90deg, #1a1a2a, #3a2a5a, #1a4a4a); color: #cfe; }
+.badge-foil.b-gilded { background: linear-gradient(180deg, #fff0b0, #d8a03a 55%, #8a5a18); color: #2a1606; }
+.badge-foil.b-silver { background: linear-gradient(180deg, #ffffff, #b8c0cc 55%, #6a7280); }
+.badge-foil.b-mana { background: linear-gradient(90deg, #fff3c4, #4a90e2, #8a6a9a, #e24a3a, #3aa04a); }
+.badge-foil.b-neon { background: #111; color: #6aff9a; box-shadow: 0 0 6px #6aff9a, inset 0 0 0 1px #6aff9a; }
+.badge-foil.b-ripple { background: linear-gradient(90deg, #7bd0ff, #c8f0ff); }
+
+@media (prefers-reduced-motion: reduce) {
+  .foil-stars, .foil-stars::before, .foil-stars::after, .foil-sheen::before { animation: none; }
+}

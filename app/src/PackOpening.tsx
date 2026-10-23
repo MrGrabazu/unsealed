@@ -8,7 +8,7 @@ import { CardImage } from "./CardImage";
 import { useI18n } from "./i18n";
 import { Money, useMoney } from "./money";
 import { Pack } from "./Pack";
-import { sheenClass } from "./RevealedCards";
+import { FoilSheen } from "./foils";
 import { revealSound, sounds } from "./sound";
 
 interface Props {
@@ -66,7 +66,7 @@ function FlipCard({ card, faceUp }: { card: OpenedCard; faceUp: boolean }) {
       <div className="face back" style={backUrl ? { backgroundImage: `url(${backUrl})` } : undefined} />
       <div className="face front">
         <CardImage front={card.imageUrl} back={faceUp ? card.backImageUrl : null} alt={card.name} />
-        {card.foil && <div className={sheenClass(card.rarity)} />}
+        {card.foil && <FoilSheen rarity={card.rarity} kind={card.foilKind} />}
         {card.isNew && <span className="badge-new">{t("open.new")}</span>}
       </div>
     </motion.div>

@@ -6,6 +6,7 @@ import { startMusicOnFirstGesture } from "./music";
 import "./styles.css";
 import "./theme.css";
 import "./comptoir.css";
+import "./foils.css";
 
 // The ambience starts with the first click or key press (browsers allow no sound before).
 startMusicOnFirstGesture();

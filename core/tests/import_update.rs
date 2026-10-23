@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 use std::io::Cursor;
-use unsealed_core::catalog::{AllSets, Manifest, ManifestSet, SetSelection, DATA_FORMAT_VERSION};
+use unsealed_core::catalog::{foil_kind, set_code_of_file, set_file_name, AllSets, Manifest, ManifestSet, SetSelection, DATA_FORMAT_VERSION};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use unsealed_core::import::{
@@ -474,6 +474,42 @@ fn a_printing_without_price_is_estimated_from_the_other_printings() {
     assert_eq!((prices["rev"].usd, prices["rev"].estimated), (Some(100), true));
     // Nothing to estimate from: no price.
     assert!(!prices.contains_key("alone"));
+}
+
+#[test]
+fn a_set_named_like_a_windows_device_gets_another_file_name() {
+    // Conflux: "CON.json" is the console on Windows 10, whatever the extension.
+    assert_eq!(set_file_name("CON"), "CON_.json");
+    assert_eq!(set_file_name("BLB"), "BLB.json");
+    assert_eq!(set_code_of_file("CON_.json"), Some("CON"));
+    assert_eq!(set_code_of_file("BLB.json"), Some("BLB"));
+    // An old file from where Windows allowed it: no set's, so the build removes it.
+    assert_eq!(set_code_of_file("CON.json"), None);
+    assert_eq!(set_code_of_file("notes.txt"), None);
+}
+
+#[test]
+fn an_etched_printing_is_priced_by_its_etched_price() {
+    let jsonl = concat!(
+        r#"{"id":"etched","oracle_id":"lotus","prices":{"usd":null,"usd_foil":null,"usd_etched":"80.00"}}"#, "\n",
+        r#"{"id":"both","oracle_id":"lotus","prices":{"usd":"1.00","usd_foil":"3.00","usd_etched":"9.00"}}"#, "\n",
+    );
+    let wanted: HashSet<String> = ["etched", "both"].map(String::from).into();
+    let prices = prices_from_scryfall_jsonl(Cursor::new(jsonl), &wanted).unwrap();
+    // Its own price, not an estimate from its other printings.
+    assert_eq!((prices["etched"].usd_foil, prices["etched"].estimated), (Some(8000), false));
+    // A printing with a foil price keeps it.
+    assert_eq!(prices["both"].usd_foil, Some(300));
+}
+
+#[test]
+fn a_special_foil_is_told_by_its_promo_types_or_its_etched_finish() {
+    let strings = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+    assert_eq!(foil_kind(&strings(&["boosterfun", "galaxyfoil"]), &strings(&["foil"])).as_deref(), Some("galaxyfoil"));
+    assert_eq!(foil_kind(&[], &strings(&["etched"])).as_deref(), Some("etched"));
+    // An etched finish beside a plain foil one: the foil drawn is the plain one.
+    assert_eq!(foil_kind(&[], &strings(&["foil", "etched"])), None);
+    assert_eq!(foil_kind(&strings(&["boosterfun"]), &strings(&["nonfoil", "foil"])), None);
 }
 
 fn manifest(generated_at: &str, sets: &[&str]) -> Manifest {

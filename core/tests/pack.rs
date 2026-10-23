@@ -63,7 +63,7 @@ fn a_damaged_or_hostile_pack_is_refused() {
     // No manifest.
     assert!(read_pack(Cursor::new(gzip(&[("prices.json", b"{}")]))).is_err());
     // Paths leaving the data directory.
-    for bad in ["../evil.json", "/evil.json", "sets/../../evil.json", "C:\\evil.json", "sets//x.json"] {
+    for bad in ["../evil.json", "/evil.json", "sets/../../evil.json", "C:\\evil.json", "sets//x.json", "sets/CON.json", "sets/nul.json"] {
         assert!(read_pack(Cursor::new(gzip(&[(bad, b"{}"), manifest]))).is_err(), "{bad}");
     }
     // Cut short: the gzip stream (or a record) ends early.

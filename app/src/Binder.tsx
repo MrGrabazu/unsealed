@@ -3,7 +3,7 @@ import type { CollectionCard } from "./api";
 import { CardImage } from "./CardImage";
 import { useI18n } from "./i18n";
 import { Money } from "./money";
-import { sheenClass } from "./RevealedCards";
+import { FoilSheen } from "./foils";
 import { sounds } from "./sound";
 
 /** Cards per binder page: 3 rows of 3, like a real binder page. */
@@ -205,7 +205,7 @@ function Pocket({ card, onOpen }: { card: CollectionCard; onOpen: (uuid: string)
         ) : (
           <Placeholder card={card} />
         )}
-        {card.foilQuantity > 0 && <div className={sheenClass(card.rarity)} />}
+        {card.foilQuantity > 0 && <FoilSheen rarity={card.rarity} kind={card.foilKind} />}
         {total > 1 && <span className="badge-qty">×{total}</span>}
         <div className="pocket-hover">
           <span className="name">
