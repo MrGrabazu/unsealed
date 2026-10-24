@@ -217,6 +217,7 @@ impl Game {
             .with("topCardValueCents", cards.iter().map(|c| i64::from(c.price_cents.unwrap_or(0))).max().unwrap_or(0))];
         booster.extend(self.set_progress_event(set_code));
         booster.extend(self.cycle_events(set_code));
+        booster.extend(self.scene_events(set_code));
         booster.extend(self.year_progress_event(set_code));
         booster.extend(self.balance_event());
         OpeningEvents { per_card, booster }

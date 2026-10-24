@@ -1,0 +1,69 @@
+{
+  "about": "Scenes: one artwork spread over several borderless cards of a set, which form it laid edge to edge. Neither MTGJSON nor Scryfall tells them apart: names and grids come from the MTG Wiki, the cards and their places were checked on the images (node .cache/scene-sheet.js). `cells` lists the collector numbers row by row (\"328:back\": the back face of a double-faced card), `columns` cards a row.",
+  "sets": {
+    "LTR": [
+      { "id": "bilbos-birthday-party", "columns": 3, "cells": ["399", "400", "401", "402", "403", "404"],
+        "name": { "en": "Bilbo's Birthday Party", "fr": "L'anniversaire de Bilbo", "de": "Bilbos Geburtstagsfeier", "es": "La fiesta de cumpleaños de Bilbo", "it": "La festa di compleanno di Bilbo" } },
+      { "id": "bridge-of-khazad-dum", "columns": 3, "cells": ["405", "406", "407", "408", "409", "410"],
+        "name": { "en": "The Bridge of Khazad-dûm", "fr": "Le pont de Khazad-dûm", "de": "Die Brücke von Khazad-dûm", "es": "El puente de Khazad-dûm", "it": "Il ponte di Khazad-dûm" } },
+      { "id": "isengard-destroyed", "columns": 3, "cells": ["411", "412", "413", "414", "415", "416", "417", "418", "419"],
+        "name": { "en": "Isengard Destroyed", "fr": "La chute d'Isengard", "de": "Isengards Zerstörung", "es": "Isengard destruida", "it": "Isengard distrutta" } },
+      { "id": "battle-of-the-pelennor-fields", "columns": 6,
+        "cells": ["420", "421", "422", "423", "424", "425", "426", "427", "428", "429", "430", "431", "432", "433", "434", "435", "436", "437"],
+        "name": { "en": "Battle of the Pelennor Fields", "fr": "La bataille des champs du Pelennor", "de": "Die Schlacht auf den Pelennor-Feldern", "es": "La batalla de los Campos del Pelennor", "it": "La battaglia dei Campi del Pelennor" } },
+      { "id": "scouring-of-the-shire", "columns": 2, "cells": ["438", "439", "440", "441"],
+        "name": { "en": "The Scouring of the Shire", "fr": "Le nettoyage de la Comté", "de": "Die Befreiung des Auenlandes", "es": "El saneamiento de la Comarca", "it": "Il repulisti della Contea" } },
+      { "id": "grey-havens", "columns": 3, "cells": ["442", "443", "444", "445", "446", "447"],
+        "name": { "en": "The Grey Havens", "fr": "Les Havres Gris", "de": "Die Grauen Anfurten", "es": "Los Puertos Grises", "it": "I Porti Grigi" } },
+      { "id": "mount-doom", "columns": 2, "cells": ["448", "449", "450", "451"],
+        "name": { "en": "Mount Doom", "fr": "La Montagne du Destin", "de": "Der Schicksalsberg", "es": "El Monte del Destino", "it": "Il Monte Fato" } }
+    ],
+    "HOB": [
+      { "id": "fight-with-the-great-goblin", "columns": 3, "cells": ["199", "200", "201", "202", "203", "204"],
+        "name": { "en": "Fight with the Great Goblin", "fr": "Combat contre le Grand Gobelin", "de": "Kampf gegen den Großork", "es": "Combate con el Gran Trasgo", "it": "Lotta col Grande Goblin" } },
+      { "id": "five-armies-clash", "columns": 3, "cells": ["205", "206", "207", "208", "209", "210", "211", "212", "213"],
+        "name": { "en": "The Five Armies Clash!", "fr": "Le choc des Cinq Armées !", "de": "Die fünf Heere prallen aufeinander!", "es": "¡Chocan los Cinco Ejércitos!", "it": "Lo scontro dei Cinque Eserciti!" } }
+    ],
+    "ACR": [
+      { "id": "rome-vista", "columns": 3, "cells": ["111", "112", "113", "114", "115", "116"],
+        "name": { "en": "Rome Vista", "fr": "Panorama de Rome", "de": "Blick über Rom", "es": "Vista de Roma", "it": "Panorama di Roma" } }
+    ],
+    "MSH": [
+      { "id": "cap-versus-hydra", "columns": 3, "cells": ["314", "315", "316", "317", "318", "319"],
+        "name": { "en": "Cap Versus HYDRA", "fr": "Cap contre HYDRA", "de": "Cap gegen HYDRA", "es": "Cap contra HYDRA", "it": "Cap contro HYDRA" } },
+      { "id": "fantastic-family", "columns": 2, "cells": ["320", "321", "322", "323"],
+        "name": { "en": "Fantastic Family", "fr": "Famille fantastique", "de": "Fantastische Familie", "es": "Familia fantástica", "it": "Famiglia fantastica" } },
+      { "id": "daredevil-street-fight", "columns": 2, "cells": ["324", "325", "326", "327"],
+        "name": { "en": "Daredevil Street Fight", "fr": "Daredevil, bagarre de rue", "de": "Daredevils Straßenkampf", "es": "Daredevil, pelea callejera", "it": "Daredevil, rissa di strada" } },
+      { "id": "hulks-smash", "columns": 3, "cells": ["328:back", "329", "330", "331:back", "332", "333"],
+        "name": { "en": "HULKS SMASH", "fr": "HULKS CASSER", "de": "HULKS ZERSCHMETTERN", "es": "HULKS APLASTAR", "it": "HULKS SPACCARE" } },
+      { "id": "clash-for-the-cosmic-cube", "columns": 6,
+        "cells": ["334", "335", "336", "337", "338", "339", "340", "341", "342", "343", "344", "345:back", "346:back", "347", "348", "349", "350:back", "351"],
+        "name": { "en": "Clash for the Cosmic Cube", "fr": "La bataille du Cube cosmique", "de": "Kampf um den Kosmischen Würfel", "es": "Choque por el Cubo Cósmico", "it": "Scontro per il Cubo Cosmico" } },
+      { "id": "avengers-balcony-bbq", "columns": 5, "cells": ["328", "345", "346", "350", "331"],
+        "name": { "en": "Avengers Balcony BBQ", "fr": "Barbecue sur le balcon des Avengers", "de": "Avengers-Grillparty auf dem Balkon", "es": "Barbacoa en el balcón de los Vengadores", "it": "Grigliata sul balcone degli Avengers" } }
+    ],
+    "SPM": [
+      { "id": "spider-man-showcase", "columns": 3, "cells": ["199", "200:back", "201", "202:back", "203", "204", "205", "206", "207"],
+        "name": { "en": "Spider-Man Showcase Scene", "fr": "La grande scène Spider-Man", "de": "Spider-Man-Szene", "es": "Escena de Spider-Man", "it": "La scena di Spider-Man" } },
+      { "id": "miles-and-gwen", "columns": 2, "cells": ["200", "202"],
+        "name": { "en": "Miles and Gwen", "fr": "Miles et Gwen", "de": "Miles und Gwen", "es": "Miles y Gwen", "it": "Miles e Gwen" } }
+    ],
+    "TLA": [
+      { "id": "siege-of-the-north", "columns": 2, "cells": ["297", "298:back", "299", "300"],
+        "name": { "en": "Siege of the North", "fr": "Le siège du Nord", "de": "Die Belagerung des Nordens", "es": "El asedio del Norte", "it": "L'assedio del Nord" } },
+      { "id": "crossroads-of-destiny", "columns": 3, "cells": ["301", "302", "303", "304", "305", "306"],
+        "name": { "en": "The Crossroads of Destiny", "fr": "La croisée des destins", "de": "Am Scheideweg des Schicksals", "es": "La encrucijada del destino", "it": "Il crocevia del destino" } },
+      { "id": "sozins-comet", "columns": 3, "cells": ["307", "308", "309", "310", "311", "312", "313", "314", "315"],
+        "name": { "en": "Sozin's Comet", "fr": "La comète de Sozin", "de": "Sozins Komet", "es": "El cometa de Sozin", "it": "La cometa di Sozin" } }
+    ],
+    "TMT": [
+      { "id": "turtle-tots-pizza-party", "columns": 2, "cells": ["196", "197", "198", "199"],
+        "name": { "en": "Turtle Tots Pizza Party", "fr": "La pizza des bébés tortues", "de": "Pizzaparty der Schildkrötenkinder", "es": "Fiesta de pizza de las tortuguitas", "it": "Pizza party delle tartarughine" } },
+      { "id": "mutant-melee", "columns": 3, "cells": ["200", "201", "202", "203", "204", "205", "206", "207", "208"],
+        "name": { "en": "Mutant Melee", "fr": "Mêlée mutante", "de": "Mutantengetümmel", "es": "Refriega mutante", "it": "Mischia mutante" } },
+      { "id": "shredder-rooftop-battle", "columns": 3, "cells": ["209", "210", "211", "212", "213", "214"],
+        "name": { "en": "Shredder Rooftop Battle", "fr": "Combat contre Shredder sur les toits", "de": "Dachkampf gegen Shredder", "es": "Batalla con Shredder en la azotea", "it": "Battaglia con Shredder sui tetti" } }
+    ]
+  }
+}

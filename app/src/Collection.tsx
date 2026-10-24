@@ -4,6 +4,7 @@ import {
   getArtistCollection,
   getCollection,
   getCycles,
+  getScenes,
   getOwnedCards,
   listArtists,
   listGuestSeries,
@@ -15,6 +16,7 @@ import {
   type CollectionCard,
   type CollectionView,
   type CyclesView,
+  type ScenesView,
   type SetSummary,
 } from "./api";
 
@@ -72,6 +74,7 @@ import { Binder, type BinderSection } from "./Binder";
 import { CardDetails } from "./CardDetails";
 import { CardImage } from "./CardImage";
 import { CyclesList, CyclesPanel } from "./Cycles";
+import { ScenesGallery, ScenesPanel } from "./Scenes";
 import { useI18n } from "./i18n";
 import { Library } from "./Library";
 import { Loading } from "./Loading";
@@ -115,9 +118,13 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
   const { t, tx, plural, lang } = useI18n();
   const [setCode, setSetCode] = useState("");
   const [view, setView] = useState<CollectionView | null>(null);
-  // The set's cycles, and whether they are shown in place of its binder or grid.
+  // The set's cycles and scenes, and which of them is shown in place of its binder or grid.
   const [cycles, setCycles] = useState<CyclesView | null>(null);
-  const [showCycles, setShowCycles] = useState(false);
+  const [scenes, setScenes] = useState<ScenesView | null>(null);
+  const [extra, setExtra] = useState<"cycles" | "scenes" | null>(null);
+  // The painting looked at in the gallery of scenes.
+  const [sceneAt, setSceneAt] = useState(0);
+  useEffect(() => setSceneAt(0), [setCode]);
   const [filter, setFilter] = useState<Filter>("all");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -179,10 +186,12 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
       } else if (setCode) {
         setView(await getCollection(setCode));
         setCycles(await getCycles(setCode, lang).catch(() => null));
+        setScenes(await getScenes(setCode, lang).catch(() => null));
         // Translated images: shown once known as good scans (checked once per card).
         if ((await checkSetImages(setCode).catch(() => 0)) > 0) {
           setView(await getCollection(setCode));
           setCycles(await getCycles(setCode, lang).catch(() => null));
+          setScenes(await getScenes(setCode, lang).catch(() => null));
         }
       }
       setError(null);
@@ -320,7 +329,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
   }, [artists, artistSearch]);
 
   function changeLayout(next: CollectionLayout) {
-    setShowCycles(false);
+    setExtra(null);
     setLayout(next);
     setCollectionLayout(next);
   }
@@ -402,7 +411,11 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
   const oneSet = source === "sets" && !allSets && !!view;
   // Its cycles instead, when it has some and they are asked for.
   const hasCycles = oneSet && !!cycles && cycles.setCode === view?.setCode && cycles.total > 0;
-  const cyclesShown = hasCycles && showCycles;
+  const cyclesShown = hasCycles && extra === "cycles";
+  // Its scenes, likewise.
+  const hasScenes = oneSet && !!scenes && scenes.setCode === view?.setCode && scenes.total > 0;
+  const scenesShown = hasScenes && extra === "scenes";
+  const extraShown = cyclesShown || scenesShown;
 
   const bar = (
     <>
@@ -467,7 +480,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
             <option value="quantity">{t("collection.sortQuantity")}</option>
           </select>
         )}
-        {layout === "grid" && !allSets && !library && !cyclesShown && (
+        {layout === "grid" && !allSets && !library && !extraShown && (
           <select value={filter} onChange={(e) => setFilter(e.target.value as Filter)}>
             <option value="all">{t("collection.allCards")}</option>
             <option value="owned">{t("collection.owned")}</option>
@@ -478,15 +491,20 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
         <div className="collection-bar-right">
           {!allSets && !library && (
             <div className="segmented" role="group" aria-label={t("collection.layout")}>
-              <button className={layout === "binder" && !cyclesShown ? "active" : ""} onClick={() => changeLayout("binder")}>
+              <button className={layout === "binder" && !extraShown ? "active" : ""} onClick={() => changeLayout("binder")}>
                 {t("collection.layoutBinder")}
               </button>
-              <button className={layout === "grid" && !cyclesShown ? "active" : ""} onClick={() => changeLayout("grid")}>
+              <button className={layout === "grid" && !extraShown ? "active" : ""} onClick={() => changeLayout("grid")}>
                 {t("collection.layoutGrid")}
               </button>
               {hasCycles && (
-                <button className={cyclesShown ? "active" : ""} onClick={() => setShowCycles(true)}>
+                <button className={cyclesShown ? "active" : ""} onClick={() => setExtra("cycles")}>
                   {t("collection.layoutCycles")}
+                </button>
+              )}
+              {hasScenes && (
+                <button className={scenesShown ? "active" : ""} onClick={() => setExtra("scenes")}>
+                  {t("collection.layoutScenes")}
                 </button>
               )}
             </div>
@@ -534,7 +552,8 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
         </>
       )}
       {cyclesShown && cycles && <CyclesList view={cycles} onOpen={setDetailsOf} />}
-      {source === "sets" && !allSets && view && !cyclesShown && (
+      {scenesShown && scenes && <ScenesGallery view={scenes} at={sceneAt} onAt={setSceneAt} onOpen={setDetailsOf} active={!detailsOf} />}
+      {source === "sets" && !allSets && view && !extraShown && (
         <>
           {layout === "binder" ? (
             <Binder
@@ -708,6 +727,8 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
       </section>
       {cyclesShown && cycles ? (
         <CyclesPanel view={cycles} onShop={view && !ofSeries ? () => onShop(view.setCode) : undefined} />
+      ) : scenesShown && scenes ? (
+        <ScenesPanel view={scenes} onShop={view && !ofSeries ? () => onShop(view.setCode) : undefined} onShow={setSceneAt} />
       ) : (
       <aside className="frame set-side">
         <div className="cartouche">{t("collection.completion")}</div>

@@ -103,6 +103,40 @@ export interface CyclesView {
   cycles: CycleView[];
 }
 
+/** A card of a scene, at its place. */
+export interface SceneCell {
+  card: CollectionCard;
+  owned: boolean;
+  /** A foil copy is owned. */
+  foil: boolean;
+  /** The scene is on the card's back face. */
+  back: boolean;
+}
+
+/** One artwork spread over several cards of a set, which form it laid edge to edge. */
+export interface SceneView {
+  id: string;
+  name: string;
+  columns: number;
+  rows: number;
+  owned: number;
+  total: number;
+  complete: boolean;
+  /** Every card owned in foil. */
+  allFoil: boolean;
+  /** Row by row. */
+  cells: SceneCell[];
+}
+
+export interface ScenesView {
+  setCode: string;
+  completed: number;
+  total: number;
+  cardsOwned: number;
+  cardsTotal: number;
+  scenes: SceneView[];
+}
+
 /** In a set's completion panel: a guest series its boosters give, with its own binder. */
 export interface GuestLink {
   code: string;
@@ -656,6 +690,9 @@ export const getOwnedCards = () => invoke<ArtistCard[]>("get_owned_cards");
 export const getLibrary = () => invoke<LibraryBinder[]>("get_library");
 /** A set's cycles, as far as the player is, their names in `lang`. */
 export const getCycles = (setCode: string, lang: string) => invoke<CyclesView>("get_cycles", { setCode, lang });
+
+/** A set's scenes, as far as the player is, their names in `lang`. */
+export const getScenes = (setCode: string, lang: string) => invoke<ScenesView>("get_scenes", { setCode, lang });
 export const listArtists = () => invoke<ArtistSummary[]>("list_artists");
 /** The guest series with a binder of their own (no boosters, no art). */
 export const listGuestSeries = () => invoke<SetSummary[]>("list_guest_series");

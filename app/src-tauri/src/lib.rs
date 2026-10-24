@@ -22,6 +22,7 @@ use tauri::{Manager, State};
 use unsealed_core::achievements::Engine;
 use unsealed_core::artifacts::{ArtifactTranslations, ArtifactsConfig};
 use unsealed_core::cycles::Cycles;
+use unsealed_core::scenes::Scenes;
 use unsealed_core::economy::EconomyConfig;
 use unsealed_core::limited::LimitedConfig;
 use unsealed_core::scryfall;
@@ -68,6 +69,7 @@ const CYCLE_TRANSLATIONS: &[(&str, &str)] = &[
     ("es", include_str!("../../../config/cycles.es.json")),
     ("it", include_str!("../../../config/cycles.it.json")),
 ];
+const DEFAULT_SCENES: &str = include_str!("../../../config/scenes.json");
 
 /// What is running: the saves, and the game being played, if any (none on the home screen
 /// at launch).
@@ -79,6 +81,8 @@ pub(crate) struct Session {
     card_lang: String,
     /// The sets' cycles, read once and shared by the games.
     cycles: Arc<Cycles>,
+    /// The sets' scenes, read once and shared by the games.
+    scenes: Arc<Scenes>,
 }
 
 impl Session {
@@ -99,6 +103,7 @@ impl Session {
         game.set_artifacts(load_artifacts(&self.data_dir).map_err(|e| e.to_string())?);
         game.set_artifact_texts(load_artifact_texts(&self.data_dir).map_err(|e| e.to_string())?);
         game.set_cycles(self.cycles.clone());
+        game.set_scenes(self.scenes.clone());
         game.set_card_language(&self.card_lang);
         self.current = Some((info.clone(), game));
         Ok(info)
@@ -435,6 +440,12 @@ fn get_cycles(state: State<'_, SessionState>, set_code: String, lang: String) ->
     with_game(&state, |g| g.cycles(&set_code, &lang))
 }
 
+/// A set's scenes, as far as the player is, their names in `lang`.
+#[tauri::command]
+fn get_scenes(state: State<'_, SessionState>, set_code: String, lang: String) -> Result<game::ScenesView, String> {
+    with_game(&state, |g| g.scenes(&set_code, &lang))
+}
+
 /// The cabinet of curiosities: every artifact, owned, on sale or still hidden.
 #[tauri::command]
 fn get_artifacts(state: State<'_, SessionState>, lang: String) -> Result<Vec<game::ArtifactView>, String> {
@@ -585,6 +596,12 @@ fn load_cycles(data_dir: &Path) -> Result<Cycles, Box<dyn Error>> {
     Ok(Cycles::from_json(&wiki, &custom, &texts)?)
 }
 
+/// The scenes. A file of the same name in the data directory replaces the shipped one.
+fn load_scenes(data_dir: &Path) -> Result<Scenes, Box<dyn Error>> {
+    let json = fs::read_to_string(data_dir.join("scenes.json")).unwrap_or_else(|_| DEFAULT_SCENES.to_string());
+    Ok(Scenes::from_json(&json)?)
+}
+
 fn load_data_config(data_dir: &Path) -> Result<DataConfig, Box<dyn Error>> {
     let json = fs::read_to_string(data_dir.join("data.json")).unwrap_or_else(|_| DEFAULT_DATA.to_string());
     Ok(DataConfig::from_json(&json)?)
@@ -645,6 +662,7 @@ pub fn run() {
                 current: None,
                 card_lang: "en".to_string(),
                 cycles: Arc::new(load_cycles(&data_dir)?),
+                scenes: Arc::new(load_scenes(&data_dir)?),
             }));
 
             app.manage(Arc::new(scryfall::Client::default()));
@@ -701,6 +719,7 @@ pub fn run() {
             take_unlocks,
             take_box_toppers,
             get_cycles,
+            get_scenes,
             get_artifacts,
             buy_artifact,
             take_given_artifacts,

@@ -14,6 +14,7 @@ pub mod economy;
 pub mod import;
 pub mod limited;
 pub mod pack;
+pub mod scenes;
 pub mod scryfall;
 pub mod sim;
 pub mod update;

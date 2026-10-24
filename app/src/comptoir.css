@@ -526,6 +526,116 @@ button.curios-slot { display: block; width: 100%; height: 96px; margin-bottom: 1
 .cycle-slot.best .thumb { box-shadow: 0 0 0 1px #f5d68a, 0 0 10px #f5b84a88, 0 3px 6px #000b; }
 .cycle-best { position: absolute; right: 4px; top: 4px; z-index: 2; width: 18px; height: 18px; display: grid; place-items: center; border-radius: 50%; font-size: 11px;
   color: #1a0d03; background: radial-gradient(circle at 35% 30%, #fff6d8, #d9a441 65%); box-shadow: 0 1px 3px #000a; }
+/* ---- The gallery of scenes (Scenes.tsx, maquette .cache/scenes/museum.html): a museum wall,
+   one painting at a time in its own frame, under a lamp, a brass label below. ---- */
+.museum { position: relative; height: clamp(460px, calc(100vh - 210px), 1000px); overflow: hidden; border-radius: 4px;
+  background:
+    radial-gradient(ellipse 40% 60% at 50% 36%, #ffe9b426, transparent 70%),
+    repeating-linear-gradient(45deg, #ffffff05 0 2px, transparent 2px 22px),
+    repeating-linear-gradient(-45deg, #00000018 0 2px, transparent 2px 22px),
+    linear-gradient(#1f2a22, #17201a 70%, #0f150f);
+  box-shadow: inset 0 0 0 1px #00000088, inset 0 0 40px #000a; }
+/* The wainscot, under a dado rail. */
+.museum::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 7%; pointer-events: none;
+  background: repeating-linear-gradient(90deg, #00000030 0 1px, transparent 1px 180px), linear-gradient(#2a1a0e, #1a0f07);
+  box-shadow: 0 -3px 0 #6b4a22, 0 -5px 0 #2a1a0e, 0 -7px 0 #8a6a3a, 0 -10px 14px #0008; }
+.museum-defs { position: absolute; }
+.museum-track { position: absolute; inset: 0 0 7% 0; display: flex; transition: transform 1s cubic-bezier(.65, 0, .35, 1); }
+.museum-spot { flex: 0 0 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; position: relative; }
+/* The lamp's light falling on the painting. */
+.museum-spot::before { content: ""; position: absolute; top: 0; left: 50%; width: 62%; height: 100%; transform: translateX(-50%); pointer-events: none;
+  background: conic-gradient(from 180deg at 50% 0%, transparent 150deg, #fff3cf12 164deg, #fff3cf1c 180deg, #fff3cf12 196deg, transparent 210deg); }
+.museum-lamp { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 140px; height: 14px; border-radius: 0 0 70px 70px;
+  background: linear-gradient(#b08a4a, #4a3418); box-shadow: 0 8px 22px #ffe7a877; }
+@media (prefers-reduced-motion: reduce) { .museum-track { transition: none; } }
+
+/* The label: a small brass plate. */
+.museum-label { position: relative; min-width: 200px; max-width: 420px; padding: 5px 16px 6px; display: flex; flex-direction: column; align-items: center; text-align: center;
+  border-radius: 2px; color: #2a1606; background: linear-gradient(#f7e2a4, #d6a84a 55%, #b0802e);
+  box-shadow: 0 4px 8px #0009, inset 0 1px 0 #fff6d8, inset 0 -1px 0 #7a4c1488; }
+.museum-label b { font: 700 13.5px var(--font-title); letter-spacing: .06em; }
+.museum-label span { font: 700 9.5px var(--font-title); letter-spacing: .14em; text-transform: uppercase; color: #4a2c0c; }
+.museum-label span.done { color: #6b1a10; }
+
+/* The wall signs: an engraved brass plate with a pointing hand, hung on two pins. */
+.museum-sign { position: absolute; top: 44%; transform: translateY(-50%); z-index: 3; width: 104px; padding: 10px 8px 8px; cursor: pointer; border: none;
+  border-radius: 3px; background: linear-gradient(#f7e2a4, #d6a84a 55%, #9a6c22); color: #3a2108;
+  box-shadow: 0 8px 16px #000b, inset 0 1px 0 #fff6d8, inset 0 0 0 2px #7a4c1466, inset 0 0 0 4px #f7e2a466, inset 0 0 0 5px #7a4c1444;
+  font: 700 9px var(--font-title); letter-spacing: .16em; text-transform: uppercase; transition: transform .2s, filter .2s; }
+.museum-sign::before, .museum-sign::after { content: ""; position: absolute; top: 5px; width: 5px; height: 5px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff, #7a4c14); }
+.museum-sign::before { left: 6px; }
+.museum-sign::after { right: 6px; }
+.museum-sign svg { display: block; width: 52px; height: 32px; margin: 0 auto 3px; fill: #3a2108; }
+.museum-sign svg .cuff { stroke: #3a2108; stroke-width: 3; fill: none; }
+.museum-sign:hover:not(:disabled) { filter: brightness(1.1); transform: translateY(-50%) scale(1.04); }
+.museum-sign:disabled { opacity: .18; cursor: default; }
+.museum-sign.left { left: 2.5%; }
+.museum-sign.right { right: 2.5%; }
+.museum-where { position: absolute; bottom: calc(7% + 10px); left: 50%; transform: translateX(-50%); font: 11px var(--font-title); letter-spacing: .24em; color: #cdb98a88; text-transform: uppercase; white-space: nowrap; }
+
+/* ---- The frames: --m is the moulding's width; each style sets its metal (--orn) and bands. ---- */
+.museum-frame { position: relative; padding: var(--m); }
+.museum-frame[role="button"] { cursor: zoom-in; }
+.museum-frame[role="button"]:hover { filter: brightness(1.06); }
+.museum-frame > .band { position: absolute; pointer-events: none; }
+.museum-frame .orn { position: absolute; width: calc(var(--m) * 2.1); height: calc(var(--m) * 2.1); fill: var(--orn); pointer-events: none; filter: drop-shadow(0 2px 2px #0009); }
+.museum-frame .orn .hi, .museum-frame .crest .hi { fill: var(--orn-hi); }
+.museum-frame .orn.tl { left: calc(var(--m) * -.35); top: calc(var(--m) * -.35); }
+.museum-frame .orn.tr { right: calc(var(--m) * -.35); top: calc(var(--m) * -.35); transform: scaleX(-1); }
+.museum-frame .orn.bl { left: calc(var(--m) * -.35); bottom: calc(var(--m) * -.35); transform: scaleY(-1); }
+.museum-frame .orn.br { right: calc(var(--m) * -.35); bottom: calc(var(--m) * -.35); transform: scale(-1, -1); }
+.museum-frame .crest { position: absolute; left: 50%; top: calc(var(--m) * -.75); width: calc(var(--m) * 3.6); transform: translateX(-50%); fill: var(--orn);
+  filter: drop-shadow(0 2px 2px #0009); pointer-events: none; }
+.museum-frame .crest .line { fill: none; stroke: #6b4210; stroke-width: 1.6; }
+.museum-mat { position: relative; padding: var(--mat); background: linear-gradient(#1c1510, #130e0a); box-shadow: inset 0 4px 12px #000d, inset 0 0 0 1px #000a; }
+/* Baroque gilt: a deep gold moulding, a row of beads, a shell at the top and leaves at the corners. */
+.f-baroque { --orn: url(#museum-gold); --orn-hi: #fff1c4; border-radius: 4px;
+  background: linear-gradient(135deg, #fff3c4 0%, #d9a441 16%, #6b4210 30%, #f2cf7c 46%, #8a5a1c 62%, #e9bf62 80%, #5a3608 100%);
+  box-shadow: 0 34px 56px #000d, 0 12px 20px #000a, inset 0 0 0 2px #fff6d888, inset 0 0 0 6px #6b4210aa, inset 0 0 0 9px #e9bf62, inset 0 0 0 11px #5a3608; }
+.f-baroque > .band, .f-silver > .band { inset: calc(var(--m) * .55); padding: 5px;
+  -webkit-mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
+.f-baroque > .band { border-radius: 2px; background: radial-gradient(circle, #fff1c4 0 28%, #b07a28 40%, #5a3608 62%, transparent 64%) 0 0 / 9px 9px; }
+/* Dutch ebony ripple: black wood waved in fine lines, a gold slip inside, small gilt corners. */
+.f-ripple { --orn: url(#museum-gold); --orn-hi: #fff1c4; border-radius: 2px;
+  background: repeating-linear-gradient(90deg, #ffffff10 0 1px, transparent 1px 4px), repeating-linear-gradient(0deg, #ffffff0c 0 1px, transparent 1px 5px),
+    linear-gradient(135deg, #2b2420, #0b0806 40%, #231b16 60%, #050403);
+  box-shadow: 0 34px 56px #000d, 0 12px 20px #000a, inset 0 0 0 1px #5a4a3a, inset 0 0 0 4px #0b0806; }
+.f-ripple > .band { inset: calc(var(--m) - 7px); border: 4px solid; border-image: linear-gradient(135deg, #fff1c4, #b07a28, #f5d68a, #6b4210) 1;
+  box-shadow: 0 0 0 1px #000, inset 0 0 0 1px #000; }
+.f-ripple .orn { width: calc(var(--m) * 1.4); height: calc(var(--m) * 1.4); }
+/* Silver gilt: cold metal, beads, leaves at the corners. */
+.f-silver { --orn: url(#museum-silver); --orn-hi: #ffffff; border-radius: 4px;
+  background: linear-gradient(135deg, #ffffff 0%, #b9c0c8 16%, #4e555c 30%, #e6eaee 46%, #69717a 62%, #cfd5db 80%, #3b4147 100%);
+  box-shadow: 0 34px 56px #000d, 0 12px 20px #000a, inset 0 0 0 2px #ffffffaa, inset 0 0 0 6px #4e555caa, inset 0 0 0 9px #cfd5db, inset 0 0 0 11px #2e3338; }
+.f-silver > .band { background: radial-gradient(circle, #fff 0 26%, #8d959d 40%, #2e3338 62%, transparent 64%) 0 0 / 9px 9px; }
+/* Carved walnut: warm wood grain, a carved inner step, a gold liner, wooden leaves. */
+.f-walnut { --orn: url(#museum-wood); --orn-hi: #c99a62; border-radius: 3px;
+  background: repeating-linear-gradient(8deg, #ffffff08 0 2px, transparent 2px 7px), repeating-linear-gradient(-4deg, #0000001a 0 1px, transparent 1px 11px),
+    linear-gradient(135deg, #8a5a32, #4a2a14 30%, #7a4a26 55%, #3a200e);
+  box-shadow: 0 34px 56px #000d, 0 12px 20px #000a, inset 0 0 0 2px #c99a6255, inset 0 0 0 calc(var(--m) * .45) #00000022; }
+.f-walnut > .band { inset: calc(var(--m) - 6px); border: 3px solid #d9a441; box-shadow: 0 0 0 1px #3a200e, inset 0 0 0 1px #6b4210; }
+/* Reeded gilt (Whistler): flat gold in fine reeds, no ornament but a double fillet. */
+.f-reeded { border-radius: 2px;
+  background: repeating-linear-gradient(90deg, #ffffff22 0 1px, transparent 1px 5px), repeating-linear-gradient(0deg, #ffffff1a 0 1px, transparent 1px 5px),
+    linear-gradient(135deg, #f5d68a, #b07a28 40%, #e9bf62 60%, #8a5a1c);
+  box-shadow: 0 34px 56px #000d, 0 12px 20px #000a, inset 0 0 0 1px #fff1c4, inset 0 0 0 4px #8a5a1c; }
+.f-reeded > .band { inset: calc(var(--m) * .3); border: 1px solid #6b4210; box-shadow: 0 0 0 2px #fff1c455, inset 0 0 0 2px #fff1c455; }
+
+/* The cards: edge to edge, no gap, each keeping its own rounded corners (the mat shows between
+   them); a missing one an empty card-shaped place with its scrap of paper. */
+.museum-fresco { display: grid; grid-template-columns: repeat(var(--columns), var(--cw)); }
+.scene-cell { width: var(--cw); cursor: inherit; }
+.scene-cell .thumb { border-radius: 4.8% / 3.4%; background: transparent; }
+.scene-cell .thumb::after { display: none; }
+.scene-cell.missing .thumb { background: #00000059; box-shadow: inset 0 0 0 1px #f5d68a1f; }
+
+/* The painting seen large, over everything; a click on a card opens its details. */
+.museum-large { position: relative; cursor: zoom-out; }
+.museum-large .scene-cell { cursor: pointer; }
+.museum-large .scene-cell:not(.missing):hover .thumb { filter: brightness(1.08); }
+.museum-close { position: fixed; top: 16px; right: 22px; font: 28px var(--font-title); color: var(--gold-hi); background: none; border: none; cursor: pointer; }
+.ready-line.linkish { width: 100%; background: none; border: none; color: inherit; font: inherit; text-align: left; cursor: pointer; padding: 0; }
+.ready-line.linkish:hover span { color: var(--gold-hi); }
 .cycles-ring-label { margin: -4px 0 10px; text-align: center; font: 700 11px var(--font-title); letter-spacing: .18em; text-transform: uppercase; color: var(--muted); }
 .cycles-note { margin-top: 14px; font-size: 12.5px; line-height: 1.5; }
 .cycles-note .cycle-badge { width: 16px; height: 16px; font-size: 8px; }

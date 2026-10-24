@@ -10,6 +10,7 @@ mod guests;
 mod history;
 mod income;
 mod library;
+mod scenes;
 mod toppers;
 #[cfg(test)]
 mod pace;
@@ -20,6 +21,7 @@ pub use artists::{ArtistCardView, ArtistSummary, ArtistView};
 pub use betting::{BetChance, BetContext, BetRequest, KeptBet, OpenedBooster};
 pub use toppers::ToppersGiven;
 pub use cycles::CyclesView;
+pub use scenes::ScenesView;
 pub use library::LibraryBinder;
 
 pub use achievements::{AchievementTexts, AchievementView, AchievementsView};
@@ -382,6 +384,8 @@ pub struct Game {
     completed_sets_cache: Option<(i64, usize)>,
     /// The sets' cycles (see `cycles`), shared by the games of a session.
     cycles: Option<std::sync::Arc<unsealed_core::cycles::Cycles>>,
+    /// The sets' scenes (see `scenes`), shared by the games of a session.
+    scenes: Option<std::sync::Arc<unsealed_core::scenes::Scenes>>,
     /// Release date of each set offered, read when first needed (booster discounts).
     release_dates: Option<HashMap<String, String>>,
     /// The box toppers (see `toppers`): the sets' boxes, read when first needed, and those
@@ -451,6 +455,7 @@ impl Game {
             artifacts: artifacts::Artifacts::default(),
             completed_sets_cache: None,
             cycles: None,
+            scenes: None,
             release_dates: None,
             box_toppers: toppers::BoxToppers::default(),
             image_quality,
@@ -1825,6 +1830,42 @@ mod tests {
         assert_eq!(upgrade.slots[0].printings, 2);
         let unlocked: Vec<String> = g.take_unlocks("en").into_iter().map(|a| a.id).collect();
         assert_eq!(unlocked, ["first", "prestige"]);
+    }
+
+    #[test]
+    fn scenes_come_together_card_after_card_and_tell_the_achievements() {
+        let engine = Engine::from_json(
+            r#"{ "metrics": { "scenes": { "event": "SceneCompleted", "op": "distinct", "field": "scene" } },
+                 "achievements": [
+                   { "id": "scene", "name": "Scene", "description": "d", "rarity": "common", "emblem": "cards", "palette": "forest",
+                     "condition": { "type": "metric", "metric": "scenes", "atLeast": 1 } } ] }"#,
+        )
+        .unwrap();
+        let (mut g, _) = game_with_engine("scenes", PRICES, engine);
+        g.set_scenes(Arc::new(
+            unsealed_core::scenes::Scenes::from_json(
+                r#"{ "sets": { "TST": [
+                  { "id": "pair", "name": { "en": "Pair", "fr": "Paire" }, "columns": 2, "cells": ["2", "10:back"] },
+                  { "id": "rare", "name": { "en": "Rare" }, "columns": 1, "cells": ["10", "3"] },
+                  { "id": "unbuilt", "name": { "en": "Unbuilt" }, "columns": 2, "cells": ["2", "999"] } ] } }"#,
+            )
+            .unwrap(),
+        ));
+        let before = g.scenes("TST", "fr").unwrap();
+        // The scene whose card is not in the set's file is left out.
+        assert_eq!((before.completed, before.total, before.cards_owned, before.cards_total), (0, 2, 0, 4));
+        let pair = &before.scenes[0];
+        assert_eq!((pair.name.as_str(), pair.columns, pair.rows), ("Paire", 2, 1));
+        assert!(pair.cells[1].back && !pair.cells[0].back);
+
+        g.buy_boosters("TST", "play", 1).unwrap();
+        g.open_booster("TST", "play").unwrap(); // the mythic and two commons
+        g.reveal_cards(usize::MAX);
+        let after = g.scenes("TST", "en").unwrap();
+        assert_eq!((after.completed, after.cards_owned), (1, 3));
+        assert!(after.scenes[0].complete && !after.scenes[1].complete);
+        let unlocked: Vec<String> = g.take_unlocks("en").into_iter().map(|a| a.id).collect();
+        assert_eq!(unlocked, ["scene"]);
     }
 
     /// Artifacts for the tests: one on sale, one hidden in every play booster, one that
