@@ -99,6 +99,18 @@
 .preparing { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px; padding: 30px 20px; }
 .preparing .frame.preparing-frame { width: min(680px, 100%); padding: 34px 28px 26px; }
 .preparing-quit { margin-top: 14px; min-width: 160px; }
+
+/* Box toppers: the gauge of a booster's box, the topper in the reserve, its toast. */
+.box-gauge { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 10px; margin: 12px 4px 0; }
+.box-gauge-label { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; color: var(--gold-hi); font-family: var(--font-title); font-size: 13px; }
+.box-gauge-label svg { width: 16px; height: 16px; fill: currentColor; flex: none; }
+.box-gauge .bar { height: 6px; }
+.box-gauge small { color: var(--muted); }
+.ready-topper { margin: 4px 0; text-align: center; color: #cdbb9b; }
+.topper-toast-pack { display: grid; place-items: center; aspect-ratio: 63 / 88; border-radius: 6px;
+  background: linear-gradient(160deg, #241f19, #070605 60%, #15120e); box-shadow: inset 0 0 0 2px #f5d68a, 0 0 14px #f5b84a66; color: #f5d68a; }
+.topper-toast-pack svg { width: 34px; height: 34px; fill: currentColor; }
+.topper-no-bets { margin: 12px 4px; }
 .preparing-legal { max-width: 720px; font-size: 12px; color: var(--muted); text-align: center; }
 /* The notice's translation, on its own line under the official English text. */
 .notice-translated { display: block; margin-top: 4px; }
@@ -303,6 +315,21 @@ button.product.sel { background: linear-gradient(90deg, #3a2416, #2a1a10); box-s
 .wrapper.finish-collector .wrapper-window { box-shadow: 0 0 0 2px #f5d68a, 0 0 0 3px #3a2208, 0 0 14px #f5b84a66; }
 .wrapper.finish-collector .wrapper-kind { background: linear-gradient(90deg, #ff7eb3, #ffd36e, #7effc6, #7ec8ff, #c58bff); color: #1a0d03; box-shadow: 0 2px 6px #000a; }
 .wrapper.finish-collector .wrapper-seal { background: radial-gradient(circle at 36% 30%, #fff4c8, #d9a441 55%, #6d4512); color: #3a2108; }
+/* Prism (a box topper): the collector's opposite, a pearly white lacquer all iridescent, its
+   rainbow turning slowly; a holographic rule, the ribbon in black and gold, a pearl seal. */
+@property --prism-angle { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+@keyframes prism-turn { to { --prism-angle: 360deg; } }
+.wrapper.finish-prism { --c1: #f2eee8; --c2: #c9c3ba; animation: prism-turn 8s linear infinite;
+  background: conic-gradient(from var(--prism-angle) at 30% 20%, #ffb3d1aa, #ffe9a8aa, #b3ffdcaa, #b3dcffaa, #d9b3ffaa, #ffb3d1aa), linear-gradient(180deg, var(--c1), var(--c2));
+  box-shadow: 0 10px 14px #000b, 0 0 22px #c58bff55, inset 0 0 0 1px #ffffffaa; }
+.wrapper.finish-prism .wrapper-holo { display: block; position: absolute; inset: 4px; border-radius: 2px; border: 2px solid transparent; pointer-events: none;
+  background: linear-gradient(135deg, #ff7eb3, #ffd36e, #7effc6, #7ec8ff, #c58bff, #ff7eb3) border-box;
+  -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+.wrapper.finish-prism .wrapper-name { color: #2a2018; text-shadow: 0 1px 0 #fff8; }
+.wrapper.finish-prism .wrapper-window { box-shadow: 0 0 0 2px #1a1410, 0 0 0 3px #ffffffaa, 0 0 12px #c58bff88; }
+.wrapper.finish-prism .wrapper-kind { background: #14100c; color: #f5d68a; box-shadow: 0 2px 6px #000a, inset 0 0 0 1px #f5d68a66; }
+.wrapper.finish-prism .wrapper-seal { background: radial-gradient(circle at 36% 30%, #ffffff, #d8d2ca 55%, #8a847c); color: #2a2018; }
+@media (prefers-reduced-motion: reduce) { .wrapper.finish-prism { animation: none; } }
 .wrapper.large { width: 150px; height: 256px; }
 /* The same finishes on the classic opening's booster (Pack.tsx). */
 .pack.finish-matte .pack-body { background: linear-gradient(160deg, hsl(var(--pack-hue) 26% 30%), hsl(var(--pack-hue) 28% 17%)); }
@@ -320,6 +347,16 @@ button.product.sel { background: linear-gradient(90deg, #3a2416, #2a1a10); box-s
 .pack.finish-collector .pack-kind { background: linear-gradient(90deg, #ff7eb3, #ffd36e, #7effc6, #7ec8ff, #c58bff); color: #1a0d03; }
 .pack.finish-collector .pack-brand, .pack.finish-collector .pack-header { color: #f5d68a; }
 .pack.finish-collector { filter: drop-shadow(0 0 22px #f5b84a55) drop-shadow(0 18px 30px #000c); }
+.pack.finish-prism .pack-body { animation: prism-turn 8s linear infinite;
+  background: conic-gradient(from var(--prism-angle) at 30% 20%, #ffb3d1aa, #ffe9a8aa, #b3ffdcaa, #b3dcffaa, #d9b3ffaa, #ffb3d1aa), linear-gradient(160deg, #f2eee8, #c9c3ba 60%, #e6e0d8); }
+.pack.finish-prism .pack-body::after { content: ""; position: absolute; inset: 6px; border-radius: 3px; border: 3px solid transparent; pointer-events: none;
+  background: linear-gradient(135deg, #ff7eb3, #ffd36e, #7effc6, #7ec8ff, #c58bff, #ff7eb3) border-box;
+  -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+.pack.finish-prism .pack-strip { background: repeating-linear-gradient(90deg, #f2eee8 0 3px, #c9c3ba 3px 6px); }
+.pack.finish-prism .pack-window { border-color: #1a1410; box-shadow: 0 0 16px #c58bff88; }
+.pack.finish-prism .pack-kind { background: #14100c; color: #f5d68a; }
+.pack.finish-prism .pack-brand, .pack.finish-prism .pack-header { color: #2a2018; text-shadow: none; }
+.pack.finish-prism { filter: drop-shadow(0 0 22px #c58bff55) drop-shadow(0 18px 30px #000c); }
 .wrapper.large .wrapper-name { font-size: 13px; top: 12px; }
 .wrapper.large .wrapper-window { left: 14px; right: 14px; top: 50px; height: 128px; }
 .wrapper.large .wrapper-kind { top: 190px; font-size: 10.5px; padding: 4px 2px; }

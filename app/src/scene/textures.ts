@@ -130,6 +130,8 @@ function silver(g: CanvasRenderingContext2D, y0: number, y1: number) {
 /** The trims' metal for a finish: bronze on matte paper, silver on a set booster, else gold. */
 function trim(g: CanvasRenderingContext2D, finish: WrapperFinish, y0: number, y1: number): CanvasGradient | string {
   if (finish === "matte") return "#b9a37a";
+  // On the prism's pearl, ink: gold would not show.
+  if (finish === "prism") return "#1a1410";
   return finish === "silver" ? silver(g, y0, y1) : gold(g, y0, y1);
 }
 
@@ -161,7 +163,7 @@ function drawFrame(g: CanvasRenderingContext2D, x: number, y: number, w: number,
     g.moveTo(14, 30);
     g.quadraticCurveTo(14, 14, 30, 14);
     g.stroke();
-    g.fillStyle = finish === "silver" ? "#f2f4f8" : finish === "matte" ? "#d8c8a6" : "#f5d68a";
+    g.fillStyle = finish === "silver" ? "#f2f4f8" : finish === "matte" ? "#d8c8a6" : finish === "prism" ? "#1a1410" : "#f5d68a";
     g.beginPath();
     g.arc(20, 20, 4.5, 0, Math.PI * 2);
     g.fill();
@@ -185,19 +187,31 @@ export async function packTexture(look: PackLook): Promise<THREE.CanvasTexture> 
   await Promise.all([document.fonts.load(`700 34px Cinzel`), document.fonts.load(`900 84px Cinzel`)]).catch(() => {});
 
   // The material: matte paper (draft), foil in the set's colour (play), a brighter foil (set),
-  // black lacquer (collector).
+  // black lacquer (collector), iridescent pearl (prism: a box topper).
   const bg = g.createLinearGradient(0, 0, w, h);
   const stops: [number, string][] =
     finish === "matte"
       ? [[0, `hsl(${hue} 26% 32%)`], [0.5, `hsl(${hue} 28% 20%)`], [1, `hsl(${hue} 24% 26%)`]]
       : finish === "collector"
         ? [[0, "#2a241d"], [0.5, "#0a0806"], [1, "#1c1813"]]
-        : finish === "silver"
-          ? [[0, `hsl(${hue} 70% 54%)`], [0.5, `hsl(${(hue + 25) % 360} 75% 28%)`], [1, `hsl(${hue} 65% 46%)`]]
-          : [[0, `hsl(${hue} 70% 46%)`], [0.5, `hsl(${(hue + 25) % 360} 75% 24%)`], [1, `hsl(${hue} 65% 38%)`]];
+        : finish === "prism"
+          ? [[0, "#f2eee8"], [0.55, "#cfc9c0"], [1, "#ece6de"]]
+          : finish === "silver"
+            ? [[0, `hsl(${hue} 70% 54%)`], [0.5, `hsl(${(hue + 25) % 360} 75% 28%)`], [1, `hsl(${hue} 65% 46%)`]]
+            : [[0, `hsl(${hue} 70% 46%)`], [0.5, `hsl(${(hue + 25) % 360} 75% 24%)`], [1, `hsl(${hue} 65% 38%)`]];
   for (const [at, color] of stops) bg.addColorStop(at, color);
   g.fillStyle = bg;
   g.fillRect(0, 0, w, h);
+  if (finish === "prism") {
+    // The pearl's iridescence: a pastel rainbow turning from the top left (still here; the
+    // wrapper in the reserve has it turn).
+    const iris = g.createConicGradient(0.6, w * 0.3, h * 0.2);
+    ["#ffb3d1", "#ffe9a8", "#b3ffdc", "#b3dcff", "#d9b3ff", "#ffb3d1"].forEach((c, i, all) => iris.addColorStop(i / (all.length - 1), c));
+    g.globalAlpha = 0.62;
+    g.fillStyle = iris;
+    g.fillRect(0, 0, w, h);
+    g.globalAlpha = 1;
+  }
   if (finish !== "matte") {
     // A sheen across the wrapper (brighter on a set booster).
     const sheen = g.createLinearGradient(0, h * 0.2, w, h * 0.5);
@@ -207,7 +221,7 @@ export async function packTexture(look: PackLook): Promise<THREE.CanvasTexture> 
     g.fillStyle = sheen;
     g.fillRect(0, 0, w, h);
     // Fine diagonal ridges, like a foil wrapper.
-    g.strokeStyle = finish === "collector" ? "#ffffff0d" : `hsl(${hue} 70% 80% / 0.08)`;
+    g.strokeStyle = finish === "collector" ? "#ffffff0d" : finish === "prism" ? "#ffffff30" : `hsl(${hue} 70% 80% / 0.08)`;
     g.lineWidth = 2;
     for (let x = -h; x < w; x += 9) {
       g.beginPath();
@@ -222,7 +236,7 @@ export async function packTexture(look: PackLook): Promise<THREE.CanvasTexture> 
     g.fillStyle = x % 16 === 0 ? crimp[0] : crimp[1];
     g.fillRect(x, h - 46, 8, 46);
   }
-  if (finish === "collector") {
+  if (finish === "collector" || finish === "prism") {
     // A holographic rule just inside the edges.
     g.strokeStyle = holo(g, w, h);
     g.lineWidth = 5;
@@ -236,23 +250,26 @@ export async function packTexture(look: PackLook): Promise<THREE.CanvasTexture> 
   drawFrame(g, 14, 14, w - 28, h - 74, finish);
 
   g.textAlign = "center";
-  g.shadowColor = "#000";
-  g.shadowBlur = 6;
-  g.shadowOffsetY = 2;
+  // On the prism's pearl, the name in ink with a light shadow; gold in the shadow elsewhere.
+  const prism = finish === "prism";
+  g.shadowColor = prism ? "#ffffffaa" : "#000";
+  g.shadowBlur = prism ? 2 : 6;
+  g.shadowOffsetY = prism ? 1 : 2;
+  const nameInk = (y0: number, y1: number) => (prism ? "#2a2018" : gold(g, y0, y1));
   // The set's name: one line, or two smaller ones when it is long.
   const nameWidth = w - 120;
   g.font = `700 30px ${TITLE_FONT}`;
   if (g.measureText(look.setName).width <= nameWidth) {
-    g.fillStyle = gold(g, 48, 80);
+    g.fillStyle = nameInk(48, 80);
     g.fillText(look.setName, w / 2, 76, nameWidth);
   } else {
     g.font = `700 22px ${TITLE_FONT}`;
     const words = look.setName.split(" ");
     let first = words.shift() ?? "";
     while (words.length > 0 && g.measureText(`${first} ${words[0]}`).width <= nameWidth) first += ` ${words.shift()}`;
-    g.fillStyle = gold(g, 44, 66);
+    g.fillStyle = nameInk(44, 66);
     g.fillText(first, w / 2, 62, nameWidth);
-    g.fillStyle = gold(g, 70, 92);
+    g.fillStyle = nameInk(70, 92);
     g.fillText(words.join(" "), w / 2, 88, nameWidth);
   }
   g.shadowOffsetY = 0;
@@ -278,8 +295,8 @@ export async function packTexture(look: PackLook): Promise<THREE.CanvasTexture> 
   g.strokeRect(win.x, win.y, win.w, win.h);
   g.strokeStyle = trim(g, finish, win.y, win.y + win.h);
   g.lineWidth = 5;
-  if (finish === "collector") {
-    g.shadowColor = "#f5b84a";
+  if (finish === "collector" || finish === "prism") {
+    g.shadowColor = finish === "prism" ? "#c58bff" : "#f5b84a";
     g.shadowBlur = 18;
   }
   g.strokeRect(win.x - 1, win.y - 1, win.w + 2, win.h + 2);
@@ -307,20 +324,21 @@ export async function packTexture(look: PackLook): Promise<THREE.CanvasTexture> 
     leather.addColorStop(0, "#4a2f1b");
     leather.addColorStop(1, "#24160c");
   }
-  g.fillStyle = finish === "collector" ? holo(g, w, 0) : leather;
+  g.fillStyle = finish === "collector" ? holo(g, w, 0) : finish === "prism" ? "#14100c" : leather;
   g.shadowColor = "#000";
   g.shadowBlur = 10;
   g.fill();
   g.shadowBlur = 0;
-  g.strokeStyle = trim(g, finish, ribbon.y, ribbon.y + ribbon.h);
+  // The prism's black ribbon: a gold rule and gold letters.
+  g.strokeStyle = prism ? gold(g, ribbon.y, ribbon.y + ribbon.h) : trim(g, finish, ribbon.y, ribbon.y + ribbon.h);
   g.lineWidth = 2.5;
   g.stroke();
   g.font = `700 24px ${TITLE_FONT}`;
   g.fillStyle = finish === "collector" ? "#1a0d03" : finish === "silver" ? "#ffffff" : finish === "matte" ? "#d8c8a6" : gold(g, ribbon.y + 12, ribbon.y + 40);
   g.fillText(look.kindLabel.toUpperCase(), w / 2, ribbon.y + 34, ribbon.half * 2 - 20);
 
-  // The seal (gold on a collector booster), and the game's name.
-  drawSeal(g, w / 2, 712, 66, finish === "collector");
+  // The seal (gold on a collector booster or a box topper), and the game's name.
+  drawSeal(g, w / 2, 712, 66, finish === "collector" || prism);
   g.font = `700 19px ${TITLE_FONT}`;
   g.fillStyle = trim(g, finish, 752, 770);
   g.fillText("U N S E A L E D", w / 2, 768);
@@ -331,6 +349,7 @@ export async function packTexture(look: PackLook): Promise<THREE.CanvasTexture> 
  * collector booster. */
 function edgeColours(hue: number, finish: WrapperFinish): [string, string] {
   if (finish === "collector") return ["#e2b45a", "#b07d2c"];
+  if (finish === "prism") return ["#f2eee8", "#c9c3ba"];
   if (finish === "matte") return [`hsl(${hue} 22% 46%)`, `hsl(${hue} 25% 28%)`];
   return [`hsl(${hue} 35% 64%)`, `hsl(${hue} 40% 40%)`];
 }

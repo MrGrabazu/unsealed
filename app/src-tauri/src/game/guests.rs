@@ -120,6 +120,8 @@ impl Game {
             guests_owned: 0,
             elsewhere: Vec::new(),
             elsewhere_owned: 0,
+            toppers: Vec::new(),
+            toppers_owned: 0,
             guest_links: Vec::new(),
         })
     }

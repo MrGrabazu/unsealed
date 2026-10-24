@@ -10,6 +10,7 @@ mod guests;
 mod history;
 mod income;
 mod library;
+mod toppers;
 #[cfg(test)]
 mod pace;
 
@@ -17,6 +18,7 @@ pub use income::IncomeView;
 pub use artifacts::{ArtifactPerks, ArtifactView};
 pub use artists::{ArtistCardView, ArtistSummary, ArtistView};
 pub use betting::{BetChance, BetContext, BetRequest, KeptBet, OpenedBooster};
+pub use toppers::ToppersGiven;
 pub use cycles::CyclesView;
 pub use library::LibraryBinder;
 
@@ -155,6 +157,9 @@ pub struct CollectionView {
     /// Gods boosters…); outside completion.
     pub elsewhere: Vec<CollectionCard>,
     pub elsewhere_owned: usize,
+    /// The cards its box toppers give (see `toppers`); outside completion.
+    pub toppers: Vec<CollectionCard>,
+    pub toppers_owned: usize,
     /// The guest series its boosters give, each with a binder (see `guests`).
     pub guest_links: Vec<guests::GuestLink>,
 }
@@ -188,6 +193,11 @@ pub struct SealedStack {
     pub sell_value_cents: u32,
     /// Recent prices of one booster, oldest first.
     pub history: Vec<u32>,
+    /// A box topper's pack (given with a box, never sold: no price).
+    pub topper: bool,
+    /// For a booster whose box holds a box topper: how far its next box is.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub box_progress: Option<toppers::BoxProgress>,
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
@@ -221,6 +231,9 @@ pub struct ShopItem {
     pub sell_back_cents: u32,
     /// Recent prices, oldest first (one per price update seen by this install).
     pub history: Vec<u32>,
+    /// When the booster's box holds a box topper: how far its next box is.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub box_progress: Option<toppers::BoxProgress>,
 }
 
 /// One past opening.
@@ -338,6 +351,8 @@ struct LoadedSet {
     /// them (`keeps_guests`).
     guests: Vec<usize>,
     keeps_guests: bool,
+    /// The cards its box toppers give (`SetFile::topper_boosters`): outside completion.
+    toppers: Vec<usize>,
 }
 
 pub struct Game {
@@ -369,6 +384,9 @@ pub struct Game {
     cycles: Option<std::sync::Arc<unsealed_core::cycles::Cycles>>,
     /// Release date of each set offered, read when first needed (booster discounts).
     release_dates: Option<HashMap<String, String>>,
+    /// The box toppers (see `toppers`): the sets' boxes, read when first needed, and those
+    /// given and not shown yet.
+    box_toppers: toppers::BoxToppers,
     /// Whether each translated printing checked has a good scan (see `localized`).
     image_quality: HashMap<String, bool>,
     prices: Option<PriceFile>,
@@ -434,6 +452,7 @@ impl Game {
             completed_sets_cache: None,
             cycles: None,
             release_dates: None,
+            box_toppers: toppers::BoxToppers::default(),
             image_quality,
             prices: None,
             prices_stamp: None,
@@ -451,6 +470,7 @@ impl Game {
         self.guests = None;
         self.completed_sets_cache = None;
         self.release_dates = None;
+        self.box_toppers.boxes = None;
         self.prices = None;
         self.prices_stamp = None;
         self.bet_tables.clear();
@@ -478,6 +498,7 @@ impl Game {
 
     pub fn shop(&mut self) -> Result<Vec<ShopItem>, String> {
         self.ensure_prices();
+        let opened = self.opened_counts();
         let mut items = Vec::new();
         for set in self.list_sets()? {
             for kind in &set.boosters {
@@ -488,6 +509,7 @@ impl Game {
                     set_code: set.code.clone(),
                     set_name: set.name.clone(),
                     history: self.price_history(&set.code, kind),
+                    box_progress: self.box_progress(&set.code, kind, &opened),
                     kind: kind.clone(),
                 });
             }
@@ -517,26 +539,27 @@ impl Game {
             .list_sets()
             .map(|sets| sets.into_iter().map(|s| (s.code, s.name)).collect())
             .unwrap_or_default();
-        let sealed = self
-            .store
-            .sealed_stacks()
-            .map_err(err)?
-            .into_iter()
-            .map(|row| {
-                let price_cents = self.booster_price(&row.set_code, &row.kind);
-                let history = self.price_history(&row.set_code, &row.kind);
-                SealedStack {
-                    set_name: names.get(&row.set_code).cloned().unwrap_or_else(|| row.set_code.clone()),
-                    set_code: row.set_code,
-                    kind: row.kind,
-                    quantity: row.quantity,
-                    cost_cents: row.cost_cents,
-                    price_cents,
-                    sell_value_cents: self.economy.booster_sell_value_cents(price_cents),
-                    history,
-                }
-            })
-            .collect();
+        let opened = self.opened_counts();
+        let rows = self.store.sealed_stacks().map_err(err)?;
+        let mut sealed = Vec::with_capacity(rows.len());
+        for row in rows {
+            // A box topper's pack: no price, never sold.
+            let topper = self.is_topper_kind(&row.set_code, &row.kind);
+            let price_cents = if topper { 0 } else { self.booster_price(&row.set_code, &row.kind) };
+            let history = if topper { Vec::new() } else { self.price_history(&row.set_code, &row.kind) };
+            sealed.push(SealedStack {
+                set_name: names.get(&row.set_code).cloned().unwrap_or_else(|| row.set_code.clone()),
+                box_progress: self.box_progress(&row.set_code, &row.kind, &opened),
+                set_code: row.set_code,
+                kind: row.kind,
+                quantity: row.quantity,
+                cost_cents: row.cost_cents,
+                price_cents,
+                sell_value_cents: if topper { 0 } else { self.economy.booster_sell_value_cents(price_cents) },
+                history,
+                topper,
+            });
+        }
         Ok(WalletView {
             balance_cents: balance,
             currency: CurrencyView { seals_per_cent: self.economy.currency.seals_per_cent },
@@ -576,6 +599,11 @@ impl Game {
         self.flush_reveal();
         if !(1..=MAX_PURCHASE).contains(&quantity) {
             return Err(format!("quantity must be between 1 and {MAX_PURCHASE}"));
+        }
+        // A box topper is opened, never sold (its cards can be).
+        self.ensure_loaded(set_code)?;
+        if self.sets[set_code].file.is_topper(kind) {
+            return Err("a box topper cannot be sold".to_string());
         }
         self.ensure_prices();
         let unit = self.economy.booster_sell_value_cents(self.booster_price(set_code, kind));
@@ -709,11 +737,8 @@ impl Game {
             .collect();
         let Self { sets, prices, rng, economy, card_lang, print_runs, limited, image_quality, .. } = self;
         let set = &sets[set_code];
-        let cfg = set
-            .file
-            .boosters
-            .get(kind)
-            .ok_or_else(|| format!("set {set_code} has no `{kind}` booster"))?;
+        // One of its boosters, or of its box toppers.
+        let cfg = set.file.booster_config(kind).ok_or_else(|| format!("set {set_code} has no `{kind}` booster"))?;
         let drawn = open_booster_excluding(cfg, &set.colors, rng, &exhausted).map_err(err)?;
 
         let mut cards: Vec<OpenedCard> = drawn
@@ -776,6 +801,8 @@ impl Game {
         for (card, is_new) in cards.iter_mut().zip(&outcome.is_new) {
             card.is_new = *is_new;
         }
+        // The box this booster completes, if any, gives its box topper.
+        self.give_box_toppers(set_code, kind)?;
 
         let mut events = self.opening_events(set_code, kind, &cards, outcome.cost_cents, animated);
         events.booster.extend(settled.iter().map(betting::bet_event));
@@ -859,6 +886,7 @@ impl Game {
         let tokens = view(&set.tokens);
         let arts = view(&set.arts);
         let guests = if set.keeps_guests { view(&set.guests) } else { Vec::new() };
+        let toppers = view(&set.toppers);
         let owned_count = owned_in(&cards);
         let total_count = cards.len();
         let completion_percent =
@@ -874,12 +902,14 @@ impl Game {
             arts_owned: owned_in(&arts),
             guests_owned: owned_in(&guests),
             elsewhere_owned: owned_in(&elsewhere),
+            toppers_owned: owned_in(&toppers),
             cards,
             extras,
             tokens,
             arts,
             guests,
             elsewhere,
+            toppers,
             guest_links,
         })
     }
@@ -989,6 +1019,7 @@ impl Game {
             .iter()
             .chain(&set.arts)
             .chain(&set.guests)
+            .chain(&set.toppers)
             .map(|&i| set.file.cards[i].set_code.as_str())
             .filter(|c| *c != set_code)
             .collect();
@@ -1003,7 +1034,7 @@ impl Game {
     /// guest series'): exactly the cards its collection shows, every section included.
     pub fn sell_duplicates(&mut self, set_code: &str) -> Result<SaleResult, String> {
         let view = self.collection(set_code)?;
-        let sections = [view.cards, view.extras, view.tokens, view.arts, view.guests, view.elsewhere];
+        let sections = [view.cards, view.extras, view.tokens, view.arts, view.guests, view.elsewhere, view.toppers];
         let mut seen = HashSet::new();
         let mut requests = Vec::new();
         for card in sections.into_iter().flatten().filter(|c| seen.insert(c.uuid.clone())) {
@@ -1238,12 +1269,16 @@ impl Game {
         let arts = cards_where(&file, |c| c.art);
         let guests = guest_cards(&file);
         let keeps_guests = file.keeps_its_guests();
+        let toppers = topper_cards(&file);
         for card in &file.cards {
             if let Some(run) = self.limited.print_run_of(card) {
                 self.print_runs.insert(card.uuid.clone(), run);
             }
         }
-        self.sets.insert(code.to_string(), LoadedSet { file, colors, index, obtainable, extras, tokens, arts, guests, keeps_guests });
+        self.sets.insert(
+            code.to_string(),
+            LoadedSet { file, colors, index, obtainable, extras, tokens, arts, guests, keeps_guests, toppers },
+        );
         Ok(())
     }
 
@@ -1330,6 +1365,24 @@ fn obtainable_cards(file: &SetFile) -> (Vec<usize>, Vec<usize>) {
         indices
     };
     (pick(&|u| main.contains(u)), pick(&|u| collector.contains(u) && !main.contains(u)))
+}
+
+/// The cards the set's box toppers give, by set then collector number (another set's too:
+/// Zendikar Rising's Expeditions, Dominaria United's commander cards).
+fn topper_cards(file: &SetFile) -> Vec<usize> {
+    let in_toppers: HashSet<&str> = file
+        .topper_boosters
+        .values()
+        .flat_map(|cfg| cfg.sheets.values())
+        .flat_map(|sheet| sheet.cards.keys().map(String::as_str))
+        .collect();
+    let mut indices: Vec<usize> =
+        file.cards.iter().enumerate().filter(|(_, c)| in_toppers.contains(c.uuid.as_str())).map(|(i, _)| i).collect();
+    indices.sort_by(|&a, &b| {
+        let (a, b) = (&file.cards[a], &file.cards[b]);
+        (a.set_code.as_str(), number_key(&a.number)).cmp(&(b.set_code.as_str(), number_key(&b.number)))
+    });
+    indices
 }
 
 /// The cards of other sets the set's boosters give (`SetFile::guest_cards`: Special Guests,
@@ -1674,6 +1727,51 @@ mod tests {
         let mut g = game(name);
         g.buy_boosters("TST", "play", 1).unwrap();
         g
+    }
+
+    #[test]
+    fn every_box_of_boosters_opened_gives_its_box_topper_once() {
+        let mut g = game("box-toppers");
+        // A box of two Play Boosters, with one box topper pack: the card no booster gives.
+        let topper = r#""boxToppers": { "play": { "boosters": 2, "packs": { "box-topper": 1 } } },
+          "topperBoosters": { "box-topper": { "boosters": [ { "contents": { "topper": 1 }, "weight": 1 } ], "boostersTotalWeight": 1,
+            "sheets": { "topper": { "cards": { "x1": 1 }, "foil": true, "totalWeight": 1 } } } },"#;
+        fs::write(g.data_dir.join("sets/TST.json"), SET.replacen("\"cards\": [", &format!("{topper} \"cards\": ["), 1)).unwrap();
+        fs::write(
+            g.data_dir.join("manifest.json"),
+            MANIFEST.replace(r#""boosters": ["play"]"#, r#""boosters": ["play"], "boxToppers": { "play": { "boosters": 2, "packs": { "box-topper": 1 } } }"#),
+        )
+        .unwrap();
+        g.reload_data();
+        let completion = g.collection("TST").unwrap().total_count;
+
+        g.buy_boosters("TST", "play", 3).unwrap();
+        g.open_booster("TST", "play").unwrap();
+        assert_eq!(g.take_box_toppers().unwrap(), []);
+        let progress = g.shop().unwrap().into_iter().find(|i| i.kind == "play").unwrap().box_progress;
+        assert_eq!(progress, Some(toppers::BoxProgress { opened: 1, size: 2, packs: 1 }));
+
+        // The second booster completes the box: its topper, as a sealed booster of its own.
+        g.open_booster("TST", "play").unwrap();
+        let given = g.take_box_toppers().unwrap();
+        assert_eq!(given.len(), 1);
+        assert_eq!((given[0].kind.as_str(), given[0].quantity), ("box-topper", 1));
+        assert_eq!(g.take_box_toppers().unwrap(), [], "shown once");
+        let wallet = g.wallet().unwrap();
+        let stack = wallet.sealed.iter().find(|s| s.kind == "box-topper").unwrap();
+        assert!(stack.topper && stack.price_cents == 0 && stack.sell_value_cents == 0);
+        // Never sold, never bought.
+        assert!(g.sell_boosters("TST", "box-topper", 1).is_err());
+        assert!(g.buy_boosters("TST", "box-topper", 1).is_err());
+
+        // Opened like the others: its card, in a section of the binder, outside completion.
+        let cards = g.open_booster("TST", "box-topper").unwrap();
+        assert_eq!(cards.iter().map(|c| (c.uuid.as_str(), c.foil)).collect::<Vec<_>>(), [("x1", true)]);
+        let view = g.collection("TST").unwrap();
+        assert_eq!((view.toppers.len(), view.toppers_owned, view.total_count), (1, 1, completion));
+        // A topper opened does not count toward the box; the third booster starts the next one.
+        g.open_booster("TST", "play").unwrap();
+        assert_eq!(g.take_box_toppers().unwrap(), []);
     }
 
     /// Cycles of the test set: the mythic and the common (complete after a booster); the
@@ -2135,6 +2233,7 @@ mod tests {
                 price_cents: 400,
                 sell_back_cents: 320,
                 history: vec![400],
+                box_progress: None,
             }]
         );
     }
@@ -2165,6 +2264,8 @@ mod tests {
                 price_cents: 400,
                 sell_value_cents: 320,
                 history: vec![400],
+                topper: false,
+                box_progress: None,
             }]
         );
 

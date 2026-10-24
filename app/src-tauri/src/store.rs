@@ -120,6 +120,14 @@ const MIGRATIONS: &[&str] = &[
         acquired_at INTEGER NOT NULL,
         source TEXT NOT NULL
     );",
+    // 13: the booster boxes whose box topper was given, by set and booster kind: a box is a
+    // number of boosters of a kind opened (the openings), its topper given once
+    "CREATE TABLE box_toppers (
+        set_code TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        boxes INTEGER NOT NULL,
+        PRIMARY KEY (set_code, kind)
+    ) WITHOUT ROWID;",
 ];
 
 /// Key of `save_meta`: the last day a lost bet's stake was given back (an artifact's effect).
@@ -470,6 +478,53 @@ impl Store {
         }
         tx.commit()?;
         Ok(())
+    }
+
+    // ---- box toppers ----------------------------------------------------------
+
+    /// How many boosters of each set and kind were opened, box toppers' own included.
+    pub fn opened_by_kind(&self) -> StoreResult<Vec<(String, String, u32)>> {
+        let mut stmt = self.conn.prepare("SELECT set_code, booster_kind, COUNT(*) FROM openings GROUP BY set_code, booster_kind")?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    /// How many boosters of a set and kind were opened.
+    pub fn opened_of(&self, set_code: &str, kind: &str) -> StoreResult<u32> {
+        Ok(self.conn.query_row(
+            "SELECT COUNT(*) FROM openings WHERE set_code = ?1 AND booster_kind = ?2",
+            params![set_code, kind],
+            |r| r.get(0),
+        )?)
+    }
+
+    /// Gives the box toppers of the boxes completed (`boxes`, of a set and booster kind) not
+    /// given yet: `packs` (topper booster, how many) for each, as sealed boosters that cost
+    /// nothing. Returns how many boxes were given now (0 if none).
+    pub fn give_box_toppers(&mut self, set_code: &str, kind: &str, boxes: u32, packs: &[(&str, u32)]) -> StoreResult<u32> {
+        let tx = self.conn.transaction()?;
+        let given: u32 = tx
+            .query_row("SELECT boxes FROM box_toppers WHERE set_code = ?1 AND kind = ?2", params![set_code, kind], |r| r.get(0))
+            .optional()?
+            .unwrap_or(0);
+        if boxes <= given {
+            return Ok(0);
+        }
+        let new = boxes - given;
+        for (topper, count) in packs {
+            tx.execute(
+                "INSERT INTO sealed (set_code, kind, quantity, cost_cents) VALUES (?1, ?2, ?3, 0)
+                 ON CONFLICT (set_code, kind) DO UPDATE SET quantity = quantity + excluded.quantity",
+                params![set_code, topper, count * new],
+            )?;
+        }
+        tx.execute(
+            "INSERT INTO box_toppers (set_code, kind, boxes) VALUES (?1, ?2, ?3)
+             ON CONFLICT (set_code, kind) DO UPDATE SET boxes = excluded.boxes",
+            params![set_code, kind, boxes],
+        )?;
+        tx.commit()?;
+        Ok(new)
     }
 
     // ---- sealed boosters ----------------------------------------------------

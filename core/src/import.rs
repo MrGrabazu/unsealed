@@ -2,7 +2,7 @@
 
 use crate::booster::{BoosterConfig, BoosterPack, BoosterSheet, ConfigError};
 use crate::catalog::{
-    foil_kind, ArtistCard, ArtistIndex, CardEntry, FeaturedCard, ForeignCard, GuestCard, GuestIndex, PriceSet, SetFile,
+    foil_kind, ArtistCard, ArtistIndex, BoxTopper, CardEntry, FeaturedCard, ForeignCard, GuestCard, GuestIndex, PriceSet, SetFile,
     COLLECTOR_KIND, FOREIGN_LANGUAGES,
 };
 use serde::Deserialize;
@@ -51,6 +51,118 @@ pub struct RawSet {
     pub token_set_code: Option<String>,
     #[serde(default)]
     pub booster: BTreeMap<String, BoosterConfig>,
+    /// The set's sealed products (boxes, packs, bundles…), for its booster boxes' box toppers.
+    #[serde(default)]
+    sealed_product: Vec<RawSealed>,
+}
+
+/// A sealed product of MTGJSON (`sealedProduct`), as far as box toppers go.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RawSealed {
+    #[serde(default)]
+    uuid: String,
+    #[serde(default)]
+    category: Option<String>,
+    #[serde(default)]
+    subtype: Option<String>,
+    #[serde(default)]
+    contents: RawContents,
+}
+
+#[derive(Deserialize, Default)]
+struct RawContents {
+    /// Other sealed products inside (a box's boosters, its box topper pack).
+    #[serde(default)]
+    sealed: Vec<RawSealedItem>,
+    /// Boosters drawn from a booster config: a box topper pack's.
+    #[serde(default)]
+    pack: Vec<RawPack>,
+}
+
+#[derive(Deserialize)]
+struct RawSealedItem {
+    #[serde(default = "one")]
+    count: u32,
+    #[serde(default)]
+    set: String,
+    #[serde(default)]
+    uuid: String,
+}
+
+fn one() -> u32 {
+    1
+}
+
+#[derive(Deserialize)]
+struct RawPack {
+    code: String,
+    set: String,
+}
+
+/// The key of a box topper's booster in `SetFile::topper_boosters`: its config's name, followed
+/// by its set when it is another's ("box-topper-zne", Zendikar Rising's Expeditions).
+fn topper_key(code: &str, pack: &RawPack) -> String {
+    if pack.set.eq_ignore_ascii_case(code) { pack.code.clone() } else { format!("{}-{}", pack.code, pack.set.to_lowercase()) }
+}
+
+/// The box toppers of a set's booster boxes, for the booster kinds kept (`kinds`): what each
+/// kind's box holds besides its boosters (`BoxTopper`), and the toppers' booster configs, by
+/// key. A box topper pack is a sealed product of the box (of this set or another: Zendikar
+/// Rising's Expeditions are ZNE's) whose contents is a "box-topper" booster config. `all`: every
+/// MTGJSON set, by code. Kinds whose box holds none are left out.
+pub fn box_toppers(
+    raw: &RawSet,
+    all: &BTreeMap<String, RawSet>,
+    kinds: &[&str],
+) -> (BTreeMap<String, BoxTopper>, BTreeMap<String, BoosterConfig>) {
+    let product = |set: &str, uuid: &str| all.get(&set.to_uppercase())?.sealed_product.iter().find(|p| p.uuid == uuid);
+    let (mut toppers, mut configs) = (BTreeMap::new(), BTreeMap::new());
+    for kind in kinds {
+        let boxes = raw.sealed_product.iter().filter(|p| p.category.as_deref() == Some("booster_box") && p.subtype.as_deref() == Some(*kind));
+        for b in boxes {
+            let (mut boosters, mut packs) = (0, BTreeMap::new());
+            for item in &b.contents.sealed {
+                let pack = product(&item.set, &item.uuid).and_then(|p| p.contents.pack.first());
+                let config = pack.and_then(|p| Some((p, all.get(&p.set.to_uppercase())?.booster.get(&p.code)?)));
+                match config {
+                    Some((pack, config)) if pack.code.starts_with("box-topper") => {
+                        let key = topper_key(&raw.code, pack);
+                        *packs.entry(key.clone()).or_insert(0) += item.count;
+                        configs.insert(key, config.clone());
+                    }
+                    _ => boosters += item.count,
+                }
+            }
+            // The first box of the kind with a topper (a few sets list two boxes of a kind).
+            if !packs.is_empty() && boosters > 0 {
+                toppers.insert(kind.to_string(), BoxTopper { boosters, packs });
+                break;
+            }
+        }
+    }
+    (toppers, configs)
+}
+
+/// The cards the box toppers' sheets draw that the set's file lacks (another set's: ZNE's
+/// Expeditions for Zendikar Rising), from `all`; also tokens, should a sheet hold one.
+pub fn topper_cards(set: &SetFile, all: &BTreeMap<String, RawSet>) -> Vec<CardEntry> {
+    let known: HashSet<&str> = set.cards.iter().map(|c| c.uuid.as_str()).collect();
+    let wanted: HashSet<&str> = set
+        .topper_boosters
+        .values()
+        .flat_map(|cfg| cfg.sheets.values())
+        .flat_map(|sheet| sheet.cards.keys().map(String::as_str))
+        .filter(|uuid| !known.contains(uuid))
+        .collect();
+    if wanted.is_empty() {
+        return Vec::new();
+    }
+    all.values()
+        .flat_map(|s| s.cards.iter().chain(&s.tokens))
+        .filter(|c| wanted.contains(c.uuid.as_str()))
+        .filter_map(|c| to_entry(c).ok())
+        .collect()
 }
 
 impl RawSet {
@@ -596,6 +708,8 @@ pub fn compact_set(raw: &RawSet, version: &str, kinds: &[&str], extra_sets: &[&R
         boosters,
         names: raw.names(),
         foil_aliases: BTreeMap::new(),
+        box_toppers: BTreeMap::new(),
+        topper_boosters: BTreeMap::new(),
     })
 }
 
@@ -688,6 +802,8 @@ struct ScryfallCard {
     prices: ScryfallPrices,
     #[serde(default)]
     promo_types: Vec<String>,
+    #[serde(default)]
+    layout: String,
 }
 
 #[derive(Deserialize)]
@@ -699,6 +815,12 @@ struct ScryfallFace {
 impl ScryfallCard {
     fn oracle_id(&self) -> Option<&str> {
         self.oracle_id.as_deref().or_else(|| self.card_faces.iter().find_map(|f| f.oracle_id.as_deref()))
+    }
+
+    /// A token or an emblem: every Treasure token shares one oracle id, yet a common one and a
+    /// collector's one have nothing in common, so their printings estimate nothing.
+    fn is_token(&self) -> bool {
+        self.layout.contains("token") || self.layout == "emblem"
     }
 }
 
@@ -716,7 +838,7 @@ struct ScryfallPrices {
 /// Reads a Scryfall bulk file (one JSON card per line) and returns the prices of the wanted
 /// card ids only. A wanted printing without any price (a serialized card, a rare promo...)
 /// gets an estimate instead: the best prices of the other printings of the same card,
-/// marked `estimated`.
+/// marked `estimated`. Tokens are never estimated (the game gives them its fallback price).
 pub fn prices_from_scryfall_jsonl<R: BufRead>(
     reader: R,
     wanted: &HashSet<String>,
@@ -742,7 +864,7 @@ pub fn prices_from_scryfall_jsonl<R: BufRead>(
             eur_foil: cents(&p.eur_foil),
             estimated: false,
         };
-        if let Some(oracle) = card.oracle_id() {
+        if let Some(oracle) = card.oracle_id().filter(|_| !card.is_token()) {
             // Serialized printings already carry their scarcity in their price: the base of
             // an estimate is the ordinary printings (the game multiplies it for scarce cards).
             if !prices.is_empty() && !card.promo_types.iter().any(|p| p == "serialized") {

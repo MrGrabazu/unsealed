@@ -8,7 +8,7 @@ use crate::catalog::{
     set_code_of_file, set_file_name, BoosterValue, Manifest, ManifestSet, PriceFile, PriceSet, SetFile, SetSelection,
     ARTISTS_FILE, COLLECTOR_KIND, DATA_FORMAT_VERSION, GUESTS_FILE,
 };
-use crate::import::{add_art_cards_from, add_art_slots, artist_index, guest_index, add_token_slots, add_tokens_from, art_set_code, compact_set, merge_foil_printings, merge_token_faces, ArtCardOdds, featured_card, token_set_code, prices_by_uuid, prices_from_scryfall_jsonl, read_all_printings, AllPrintings};
+use crate::import::{add_art_cards_from, add_art_slots, artist_index, box_toppers, guest_index, topper_cards, add_token_slots, add_tokens_from, art_set_code, compact_set, merge_foil_printings, merge_token_faces, ArtCardOdds, featured_card, token_set_code, prices_by_uuid, prices_from_scryfall_jsonl, read_all_printings, AllPrintings};
 use crate::sim::expected_value_cents;
 use crate::{simulate, ColorIndex};
 use flate2::read::GzDecoder;
@@ -244,9 +244,16 @@ fn build_set(
         add_art_cards_from(&mut set, art_set);
         add_art_slots(&mut set, &extra.art_cards);
     }
+    // The box toppers of its booster boxes (kept kinds only), and the cards they draw.
+    let kept: Vec<&str> = set.boosters.keys().map(String::as_str).collect();
+    let (toppers, configs) = box_toppers(raw, &all.data, &kept);
+    (set.box_toppers, set.topper_boosters) = (toppers, configs.into_iter().filter(|(_, cfg)| cfg.validate().is_ok()).collect());
+    let added = topper_cards(&set, &all.data);
+    set.cards.extend(added);
+
     let colors = ColorIndex::from_cards(&set.cards);
     let mut failed = Vec::new();
-    for (kind, cfg) in &set.boosters {
+    for (kind, cfg) in set.boosters.iter().chain(&set.topper_boosters) {
         let key = format!("{code}/{kind}");
         let print = fingerprint(cfg, sim_boosters)?;
         if validated.get(&key) == Some(&print) {
@@ -263,7 +270,14 @@ fn build_set(
     }
     for kind in failed {
         set.boosters.remove(&kind);
+        set.topper_boosters.remove(&kind);
     }
+    // A box topper goes with its kind's boosters, and needs its packs' configs.
+    set.box_toppers.retain(|kind, _| set.boosters.contains_key(kind));
+    for topper in set.box_toppers.values_mut() {
+        topper.packs.retain(|key, _| set.topper_boosters.contains_key(key));
+    }
+    set.box_toppers.retain(|_, topper| !topper.packs.is_empty());
     if set.boosters.is_empty() {
         return Err("every booster failed the simulation".into());
     }
@@ -390,6 +404,7 @@ fn build_steps(opts: &BuildOptions, progress: Progress<'_>) -> Result<Manifest, 
                 boosters: set.boosters.keys().cloned().collect(),
                 featured: None, // chosen once prices are known
                 icon_svg_uri: None,
+                box_toppers: set.box_toppers.clone(),
             },
         );
         built_sets.push(set);

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import type { SealedStack, SetSummary } from "./api";
+import type { BoxProgress, SealedStack, SetSummary } from "./api";
 import { BackToTop } from "./BackToTop";
 import { kindLabel, wrapperFinish } from "./boosterKinds";
 import { useI18n } from "./i18n";
+import { Icon } from "./icons";
 import { Money, useMoney } from "./money";
 import { hueOf } from "./Pack";
 import { PriceTrend } from "./PriceTrend";
@@ -40,6 +41,27 @@ export function Wrapper({ stack, set, large = false }: { stack: SealedStack; set
       <span className="wrapper-kind">{kindLabel(t, stack.kind)}</span>
       <span className="wrapper-seal">U</span>
     </span>
+  );
+}
+
+/** How far a booster's box is, when it holds a box topper: a gilded gauge, "Box topper in 14
+ * boosters". Every box's worth of boosters opened gives it (toppers.rs of the game). */
+export function BoxGauge({ progress }: { progress: BoxProgress }) {
+  const { t, plural } = useI18n();
+  const left = progress.size - progress.opened;
+  return (
+    <div className="box-gauge" title={t("topper.gaugeHint", { size: progress.size })}>
+      <span className="box-gauge-label">
+        <Icon name="pack" />
+        {plural("topper.gauge", left, { packs: progress.packs })}
+      </span>
+      <span className="bar">
+        <i style={{ width: `${(progress.opened / progress.size) * 100}%` }} />
+      </span>
+      <small>
+        {progress.opened} / {progress.size}
+      </small>
+    </div>
   );
 }
 
@@ -129,19 +151,27 @@ export function SealedBoosters({ sealed, sets, busy, onOpen, onOpenQuick, onOpen
             </div>
           )}
           <div className="gild-divider" />
-          <div className="ready-line">
-            <span>{tx("open.paid", { amount: money(current.costCents) })}</span>
-            <span>
-              {tx("open.worth", { amount: money(current.quantity * current.sellValueCents) })}{" "}
-              <span className={pnl >= 0 ? "gain" : "loss"}>
-                {pnl >= 0 ? "+" : "−"}
-                <Money cents={Math.abs(pnl)} />
-              </span>
-            </span>
-          </div>
-          <div className="ready-line">
-            <PriceTrend history={current.history} />
-          </div>
+          {current.topper ? (
+            // Given with a box of boosters: no price, never sold (its cards can be).
+            <p className="ready-topper">{t("topper.reserveLine")}</p>
+          ) : (
+            <>
+              <div className="ready-line">
+                <span>{tx("open.paid", { amount: money(current.costCents) })}</span>
+                <span>
+                  {tx("open.worth", { amount: money(current.quantity * current.sellValueCents) })}{" "}
+                  <span className={pnl >= 0 ? "gain" : "loss"}>
+                    {pnl >= 0 ? "+" : "−"}
+                    <Money cents={Math.abs(pnl)} />
+                  </span>
+                </span>
+              </div>
+              <div className="ready-line">
+                <PriceTrend history={current.history} />
+              </div>
+            </>
+          )}
+          {current.boxProgress && <BoxGauge progress={current.boxProgress} />}
         </div>
         <div className="buy-bar">
           <button className="big wax" disabled={busy} onClick={() => onOpen(current)}>
@@ -156,9 +186,11 @@ export function SealedBoosters({ sealed, sets, busy, onOpen, onOpenQuick, onOpen
                 {t("open.openMany", { count: n })}
               </button>
             ))}
-            <button disabled={busy} onClick={() => onSell(current)}>
-              {tx("open.sellOne", { amount: money(current.sellValueCents) })}
-            </button>
+            {!current.topper && (
+              <button disabled={busy} onClick={() => onSell(current)}>
+                {tx("open.sellOne", { amount: money(current.sellValueCents) })}
+              </button>
+            )}
           </div>
         </div>
       </section>

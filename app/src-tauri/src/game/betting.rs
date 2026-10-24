@@ -195,6 +195,11 @@ impl Game {
         kind: &str,
         bets: &[BetRequest],
     ) -> Result<(Vec<(BetRequest, f64)>, Vec<SkippedBet>), String> {
+        // No bets on a box topper (a pack of one or two cards, given, not bought): the bets kept
+        // for the other boosters are not even mentioned.
+        if self.sets.get(set_code).is_some_and(|s| s.file.is_topper(kind)) {
+            return Ok((Vec::new(), Vec::new()));
+        }
         let min_stake = self.economy.betting.min_stake_cents;
         let mut available = if bets.is_empty() { 0 } else { self.store.balance().map_err(err)? };
         let (mut placed, mut skipped) = (Vec::new(), Vec::new());

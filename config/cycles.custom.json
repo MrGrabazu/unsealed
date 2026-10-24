@@ -17,6 +17,13 @@
           ["339", "730"]
         ]
       }
+    ],
+    "UMA": [
+      {
+        "id": "umbras",
+        "name": { "en": "The Umbras", "fr": "Les Umbras", "de": "Die Umbras", "es": "Las Umbras", "it": "Le Umbra" },
+        "slots": [["21"], ["24"], ["53"], ["158"], ["182"], ["184"]]
+      }
     ]
   },
   "hidden": []

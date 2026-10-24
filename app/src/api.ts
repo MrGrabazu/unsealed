@@ -134,7 +134,28 @@ export interface CollectionView {
   /** The set's own cards that only other sets' boosters give: outside completion. */
   elsewhere: CollectionCard[];
   elsewhereOwned: number;
+  /** The cards its box toppers give: outside completion. */
+  toppers: CollectionCard[];
+  toppersOwned: number;
   guestLinks: GuestLink[];
+}
+
+/** How far the box of a booster is, when it holds a box topper: boosters opened toward it. */
+export interface BoxProgress {
+  opened: number;
+  /** Boosters in the box. */
+  size: number;
+  /** Box topper packs the box gives. */
+  packs: number;
+}
+
+/** Box toppers just given (a box of boosters completed), to show the player. */
+export interface ToppersGiven {
+  setCode: string;
+  setName: string;
+  /** The topper's booster kind ("box-topper"…). */
+  kind: string;
+  quantity: number;
 }
 
 /** What the collection earns by itself. */
@@ -331,6 +352,10 @@ export interface SealedStack {
   sellValueCents: number;
   /** Recent prices of one booster, oldest first. */
   history: number[];
+  /** A box topper's pack: given with a box, no price, never sold. */
+  topper: boolean;
+  /** When its box holds a box topper: how far the next box is. */
+  boxProgress?: BoxProgress;
 }
 
 export interface BoosterSaleResult {
@@ -361,6 +386,8 @@ export interface ShopItem {
   sellBackCents: number;
   /** Recent prices, oldest first. */
   history: number[];
+  /** When its box holds a box topper: how far the next box is. */
+  boxProgress?: BoxProgress;
 }
 
 export interface SaleRequest {
@@ -587,6 +614,7 @@ export const retryDataUpdate = () => invoke<void>("retry_data_update");
 /** `lang`: the interface language, for the achievements' names and descriptions. */
 export const getAchievements = (lang: string) => invoke<AchievementsView>("get_achievements", { lang });
 export const takeUnlocks = (lang: string) => invoke<AchievementView[]>("take_unlocks", { lang });
+export const takeBoxToppers = () => invoke<ToppersGiven[]>("take_box_toppers");
 export const getArtifacts = (lang: string) => invoke<ArtifactView[]>("get_artifacts", { lang });
 export const buyArtifact = (id: string, lang: string) => invoke<ArtifactView>("buy_artifact", { id, lang });
 /** Artifacts given since the last call (by achievements), to celebrate. */

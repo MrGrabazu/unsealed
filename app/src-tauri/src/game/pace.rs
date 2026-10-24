@@ -196,6 +196,32 @@ fn pace_of_a_grinder() {
     play(&GRINDER);
 }
 
+/// A bet on a black basic land on Ultimate Masters' draft booster (it has no basic land).
+/// `cargo test --release -p unsealed-app basic_land_bet -- --ignored --nocapture`.
+#[test]
+#[ignore = "needs the data built in dist/"]
+fn basic_land_bet_on_a_set_without_basic_lands() {
+    use unsealed_core::betting::{Bet, CardFilter, CardType, Clause, ColorChoice, Compare};
+    let dist = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../dist");
+    let mut g = Game::with_parts(
+        dist,
+        Store::open_in_memory().unwrap(),
+        EconomyConfig::from_json(include_str!("../../../../config/economy.json")).unwrap(),
+        Engine::from_json(include_str!("../../../../config/achievements.json")).unwrap(),
+        ChaCha8Rng::seed_from_u64(11),
+        Box::new(|| Clock { now: 1_792_000_000, day: "2026-10-24".into() }),
+    )
+    .unwrap();
+    let filter = CardFilter { types: vec![CardType::BasicLand], colors: vec![ColorChoice::Black], ..Default::default() };
+    for (compare, count) in [(Compare::AtLeast, 1), (Compare::Exactly, 1), (Compare::AtMost, 0)] {
+        let bet = Bet { clauses: vec![Clause::Cards { compare, count, filter: filter.clone() }] };
+        println!("{compare:?} {count}: {:?}", g.bet_chance("UMA", "draft", &bet));
+    }
+    let land = CardFilter { types: vec![CardType::Land], colors: vec![ColorChoice::Black], ..Default::default() };
+    let bet = Bet { clauses: vec![Clause::Cards { compare: Compare::AtLeast, count: 1, filter: land }] };
+    println!("a black land: {:?}", g.bet_chance("UMA", "draft", &bet));
+}
+
 /// The chance of "at least one foil card" on every booster on sale, and which are left
 /// unpriced (certain, or impossible). `cargo test --release -p unsealed-app foil_bet -- --ignored --nocapture`.
 #[test]

@@ -63,6 +63,7 @@ const sectionsOf = (view: CollectionView) => [
   ...view.arts,
   ...view.guests,
   ...view.elsewhere,
+  ...view.toppers,
 ];
 
 /** For a search: lower case, without accents ("Magali Villeneuve" ~ "magali villeneuve"). */
@@ -258,6 +259,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
   const shownArts = view?.arts.filter(matches);
   const shownGuests = view?.guests.filter(matches);
   const shownElsewhere = view?.elsewhere.filter(matches);
+  const shownToppers = view?.toppers.filter(matches);
 
   const library = source === "library";
   const byArtist = source === "artists";
@@ -281,6 +283,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
               { title: t("collection.arts"), cards: view.arts },
               { title: t("collection.guests"), cards: view.guests },
               { title: t("collection.elsewhere"), cards: view.elsewhere },
+              { title: t("collection.toppers"), cards: view.toppers },
             ].filter((s) => s.cards.length > 0)
           : [],
     [byArtist, artistView, view, t],
@@ -588,6 +591,15 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
                     {t("collection.elsewhereProgress", { owned: view.elsewhereOwned, total: view.elsewhere.length })}
                   </p>
                   <div className="collection-grid">{shownElsewhere?.map(cardTile)}</div>
+                </>
+              )}
+              {view.toppers.length > 0 && (
+                <>
+                  <h3>{t("collection.toppers")}</h3>
+                  <p className="progress-label">
+                    {t("collection.toppersProgress", { owned: view.toppersOwned, total: view.toppers.length })}
+                  </p>
+                  <div className="collection-grid">{shownToppers?.map(cardTile)}</div>
                 </>
               )}
             </>

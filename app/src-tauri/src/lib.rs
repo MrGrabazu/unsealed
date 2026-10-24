@@ -422,6 +422,13 @@ fn take_unlocks(state: State<'_, SessionState>, lang: String) -> Result<Vec<Achi
     with_game(&state, |g| Ok(g.take_unlocks(&lang)))
 }
 
+/// The box toppers given since the last call (the first call also gives those of the boxes
+/// opened before), to show the player.
+#[tauri::command]
+fn take_box_toppers(state: State<'_, SessionState>) -> Result<Vec<game::ToppersGiven>, String> {
+    with_game(&state, |g| g.take_box_toppers())
+}
+
 /// A set's cycles, as far as the player is, their names in `lang`.
 #[tauri::command]
 fn get_cycles(state: State<'_, SessionState>, set_code: String, lang: String) -> Result<game::CyclesView, String> {
@@ -692,6 +699,7 @@ pub fn run() {
             claim_charity,
             get_achievements,
             take_unlocks,
+            take_box_toppers,
             get_cycles,
             get_artifacts,
             buy_artifact,

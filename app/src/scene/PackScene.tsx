@@ -242,7 +242,7 @@ function Pack({ look, onTorn, leaving, tearRequest }: { look: PackLook; onTorn: 
           key={body ? "printed" : "plain"}
           ref={bodyMaterial}
           map={body}
-          color={body ? "#ffffff" : look.finish === "collector" ? "#14110d" : `hsl(${look.hue}, 65%, 40%)`}
+          color={body ? "#ffffff" : look.finish === "collector" ? "#14110d" : look.finish === "prism" ? "#e6e0d8" : `hsl(${look.hue}, 65%, 40%)`}
           // A little of the print glows by itself: without an environment to reflect, a
           // metallic wrapper turns grey.
           emissiveMap={body}

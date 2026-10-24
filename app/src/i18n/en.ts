@@ -25,6 +25,18 @@ export const en = {
   "kind.collector": "Collector booster",
   "kind.default": "Booster",
   "kind.other": "{kind} booster",
+  "kind.topper": "Box topper",
+  "kind.topperFoil": "Foil box topper",
+  // Box toppers: given with every box's worth of boosters opened (toppers.rs).
+  "topper.given": "Box topper!",
+  "topper.givenLine_one": "{set} · {kind}: a box of boosters completed",
+  "topper.givenLine_other": "{set} · {count} × {kind}: boxes of boosters completed",
+  "topper.givenHint": "In the reserve, ready to open",
+  "topper.reserveLine": "Given with a box of boosters: it cannot be sold, its cards can.",
+  "topper.gauge_one": "Box topper in {count} booster",
+  "topper.gauge_other": "Box topper in {count} boosters",
+  "topper.gaugeHint": "Every {size} boosters of this kind opened (a box's worth) give its box topper",
+  "topper.noBets": "No bets on a box topper: a pack of one or two cards, given with a box.",
 
   // ---- rarities (counts in summaries)
   "rarity.common_one": "{count} common",
@@ -310,6 +322,8 @@ export const en = {
   "collection.guestSeries": "Guest series",
   "collection.elsewhere": "From other boosters",
   "collection.elsewhereProgress": "{owned} / {total} · cards of this set found only in other sets' boosters, not counted in completion",
+  "collection.toppers": "Box toppers",
+  "collection.toppersProgress": "{owned} / {total} · the cards of its box toppers, not counted in completion",
   "collection.fromBoosters": "In {sets} boosters",
   "collection.givenBy": "In the boosters of",
   "collection.cardCount_one": "{count} card",

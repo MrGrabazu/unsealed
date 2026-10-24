@@ -17,7 +17,9 @@ import {
   setKeptBets as saveKeptBets,
   takeGivenArtifacts,
   takeUnlocks,
+  takeBoxToppers,
   type AchievementView,
+  type ToppersGiven,
   type ArtifactView,
   type IncomeView,
   type SkippedBet,
@@ -48,7 +50,7 @@ import { canUseWebGL, getOpening3d } from "./settings";
 const PackOpening3D = lazy(() => import("./PackOpening3D").then((m) => ({ default: m.PackOpening3D })));
 import { Boosterium, CURIOS } from "./Boosterium";
 import { Collection } from "./Collection";
-import { kindLabel, rewardText } from "./boosterKinds";
+import { isTopperKind, kindLabel, rewardText } from "./boosterKinds";
 import { DataPreparing, DataStatusBar, useDataStatus } from "./DataStatus";
 import { Ambience } from "./Ambience";
 import { BackToTop } from "./BackToTop";
@@ -309,10 +311,26 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     }
   }, []);
 
+  // Box toppers given (a box of boosters completed): a toast of their own, held like the
+  // achievements' during a batch.
+  const [topperToasts, setTopperToasts] = useState<(ToppersGiven & { id: number })[]>([]);
+  const heldToppers = useRef<ToppersGiven[]>([]);
+  const topperId = useRef(0);
+  const showToppers = useCallback((given: ToppersGiven[]) => {
+    if (given.length === 0) return;
+    sounds.coins();
+    const withIds = given.map((g) => ({ ...g, id: ++topperId.current }));
+    setTopperToasts((current) => [...current, ...withIds]);
+    for (const g of withIds) {
+      setTimeout(() => setTopperToasts((current) => current.filter((other) => other.id !== g.id)), TOAST_MS);
+    }
+  }, []);
+
   const releaseToasts = useCallback(() => {
     holdingToasts.current = false;
     showToasts(heldToasts.current.splice(0));
-  }, [showToasts]);
+    showToppers(heldToppers.current.splice(0));
+  }, [showToasts, showToppers]);
 
   /** Refreshes the wallet and shows the achievements unlocked by the last action. */
   const refreshWallet = useCallback(async () => {
@@ -321,6 +339,10 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
       const unlocked = await takeUnlocks(lang);
       if (holdingToasts.current) heldToasts.current.push(...unlocked);
       else showToasts(unlocked);
+      // The box toppers given (the first time, those of the boxes opened before, too).
+      const toppers = await takeBoxToppers();
+      if (holdingToasts.current) heldToppers.current.push(...toppers);
+      else showToppers(toppers);
       // Artifacts these achievements gave: their own moment.
       const given = await takeGivenArtifacts(lang);
       if (given.length > 0) {
@@ -330,7 +352,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     } catch (e) {
       setError(String(e));
     }
-  }, [lang, showToasts]);
+  }, [lang, showToasts, showToppers]);
 
   // The Seals per cent, for the income's pace (read from a ref: it must not restart the timer).
   const sealsPerCent = useRef(currency.sealsPerCent);
@@ -825,19 +847,24 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
                 <aside className="frame bet-side">
                   <div className="cartouche">🎲 {t("bet.title")}</div>
                   <div className="scroll">
-                    <BetSlip
-                      key={`${pack.setCode}/${pack.kind}`}
-                      setCode={pack.setCode}
-                      kind={pack.kind}
-                      bets={slip}
-                      onBets={setSlip}
-                      kept={kept}
-                      onKept={changeKept}
-                      onCardName={(uuid, name) => betCardNames.current.set(uuid, name)}
-                      balanceCents={wallet.balanceCents}
-                      panel
-                      locked={!!cards}
-                    />
+                    {/* No bets on a box topper (a pack of one or two cards, given with a box). */}
+                    {isTopperKind(pack.kind) ? (
+                      <p className="hint topper-no-bets">{t("topper.noBets")}</p>
+                    ) : (
+                      <BetSlip
+                        key={`${pack.setCode}/${pack.kind}`}
+                        setCode={pack.setCode}
+                        kind={pack.kind}
+                        bets={slip}
+                        onBets={setSlip}
+                        kept={kept}
+                        onKept={changeKept}
+                        onCardName={(uuid, name) => betCardNames.current.set(uuid, name)}
+                        balanceCents={wallet.balanceCents}
+                        panel
+                        locked={!!cards}
+                      />
+                    )}
                   </div>
                   <div className="buy-bar">
                     {!cards && (
@@ -986,6 +1013,22 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
                     {t("achievement.reward", { reward: rewardText(i18n, money, a.reward) })}
                   </span>
                 )}
+              </div>
+            </button>
+          ))}
+          {topperToasts.map((g) => (
+            <button
+              key={`topper-${g.id}`}
+              className="toast topper-toast"
+              onClick={() => setTopperToasts((current) => current.filter((other) => other.id !== g.id))}
+            >
+              <div className="toast-card topper-toast-pack">
+                <Icon name="pack" />
+              </div>
+              <div className="toast-text">
+                <strong>{t("topper.given")}</strong>
+                <span>{i18n.plural("topper.givenLine", g.quantity, { set: g.setName, kind: kindLabel(t, g.kind) })}</span>
+                <span className="hint">{t("topper.givenHint")}</span>
               </div>
             </button>
           ))}

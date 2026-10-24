@@ -12,9 +12,16 @@ export const kindRank = (kind: string) => {
 /** How a booster's wrapper looks, by kind, so the kinds of a set tell apart at a glance and
  * rise with their price: matte paper (draft), foil (play, and the oldest sets' single kind),
  * brighter foil with silver (set), black lacquer with gold and a holographic rule (collector). */
-export type WrapperFinish = "matte" | "foil" | "silver" | "collector";
+export type WrapperFinish = "matte" | "foil" | "silver" | "collector" | "prism";
+
+/** A box topper's pack ("box-topper", "box-topper-foil", "box-topper-zne"…): given with a box
+ * of boosters, never sold (see toppers.rs of the game). */
+export const isTopperKind = (kind: string) => kind.startsWith("box-topper");
 
 export function wrapperFinish(kind: string): WrapperFinish {
+  // A box topper (a pouch of a booster's size, with a card or two): the prism, the collector's
+  // opposite, a pearly lacquer all iridescent (mockup .cache/da/v10.html, proposal D).
+  if (isTopperKind(kind)) return "prism";
   switch (kind) {
     case "draft":
       return "matte";
@@ -29,6 +36,7 @@ export function wrapperFinish(kind: string): WrapperFinish {
 
 /** "Draft booster", or just "Booster" for the oldest sets, which had a single kind ("default"). */
 export function kindLabel(t: I18n["t"], kind: string): string {
+  if (isTopperKind(kind)) return t(kind.startsWith("box-topper-foil") ? "kind.topperFoil" : "kind.topper");
   switch (kind) {
     case "play":
       return t("kind.play");

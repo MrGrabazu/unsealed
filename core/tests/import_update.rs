@@ -477,6 +477,19 @@ fn a_printing_without_price_is_estimated_from_the_other_printings() {
 }
 
 #[test]
+fn a_token_without_a_price_is_not_estimated_from_its_other_printings() {
+    // Every Treasure token shares one oracle id, a collector's one among them.
+    let jsonl = concat!(
+        r#"{"id":"rare","oracle_id":"treasure","layout":"token","prices":{"usd":"49.00","usd_foil":"214.99"}}"#, "\n",
+        r#"{"id":"common","oracle_id":"treasure","layout":"token","prices":{"usd":null,"usd_foil":null}}"#, "\n",
+    );
+    let wanted: HashSet<String> = ["common"].map(String::from).into();
+    let prices = prices_from_scryfall_jsonl(Cursor::new(jsonl), &wanted).unwrap();
+    // No price: the game gives it the fallback price of tokens.
+    assert!(!prices.contains_key("common"));
+}
+
+#[test]
 fn a_set_named_like_a_windows_device_gets_another_file_name() {
     // Conflux: "CON.json" is the console on Windows 10, whatever the extension.
     assert_eq!(set_file_name("CON"), "CON_.json");
@@ -529,6 +542,7 @@ fn manifest(generated_at: &str, sets: &[&str]) -> Manifest {
                         boosters: vec!["play".into()],
                         featured: None,
                         icon_svg_uri: None,
+                        box_toppers: BTreeMap::new(),
                     },
                 )
             })

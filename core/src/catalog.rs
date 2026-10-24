@@ -31,6 +31,15 @@ pub struct SetFile {
     /// old uuid.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub foil_aliases: BTreeMap<String, String>,
+    /// Booster kind (of `boosters`) -> the box topper its booster box holds, if any.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub box_toppers: BTreeMap<String, BoxTopper>,
+    /// The box toppers' boosters (MTGJSON "box-topper" configs, a pack of one or a few cards),
+    /// by key ("box-topper", "box-topper-foil", "box-topper-zne" for another set's): opened
+    /// like the others, never sold. Their cards are a section of the set's binder, outside
+    /// its completion.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub topper_boosters: BTreeMap<String, BoosterConfig>,
 }
 
 /// Names Windows keeps for its devices, whatever the extension (before Windows 11): writing
@@ -65,7 +74,7 @@ pub fn set_code_of_file(name: &str) -> Option<&str> {
 
 /// Bump when the compact files change in a way older data cannot satisfy: the app then
 /// rebuilds its data at the next launch.
-pub const DATA_FORMAT_VERSION: u32 = 12;
+pub const DATA_FORMAT_VERSION: u32 = 13;
 
 /// Languages kept for card and set names, as (MTGJSON language name, code). Cards printed
 /// in other languages, or never translated, stay in English.
@@ -178,6 +187,29 @@ impl SetFile {
     pub fn is_main_booster(&self, kind: &str) -> bool {
         kind != COLLECTOR_KIND || self.boosters.keys().all(|k| k == COLLECTOR_KIND)
     }
+
+    /// The config of one of the set's boosters, or of its box toppers' (`topper_boosters`).
+    pub fn booster_config(&self, kind: &str) -> Option<&BoosterConfig> {
+        self.boosters.get(kind).or_else(|| self.topper_boosters.get(kind))
+    }
+
+    /// Whether `kind` is a box topper's booster (never sold, earned with the boxes).
+    pub fn is_topper(&self, kind: &str) -> bool {
+        self.topper_boosters.contains_key(kind) && !self.boosters.contains_key(kind)
+    }
+}
+
+/// What a booster box of one kind holds besides its boosters (MTGJSON `sealedProduct`): its
+/// box topper packs. The game gives them every `boosters` boosters of that kind opened, as a
+/// box would.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BoxTopper {
+    /// Boosters in the box (36 Play Boosters, 12 Collector Boosters…).
+    pub boosters: u32,
+    /// Its topper packs: their booster (a key of `SetFile::topper_boosters`) -> how many (two
+    /// Expeditions in a Zendikar Rising Collector box, one elsewhere).
+    pub packs: BTreeMap<String, u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -382,6 +414,9 @@ pub struct ManifestSet {
     /// Scryfall's SVG of the set's expansion symbol (black, to be shown unaltered).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon_svg_uri: Option<String>,
+    /// `SetFile::box_toppers`, here too: the game counts the boxes without reading every set.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub box_toppers: BTreeMap<String, BoxTopper>,
 }
 
 /// A card shown as the face of its set. Its art must be shown with its artist's name.
