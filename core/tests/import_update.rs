@@ -357,6 +357,34 @@ fn keeps_the_wanted_kinds_the_set_has() {
     let set = set_from_mtgjson(&json, &["collector", "play"], &[]).unwrap();
     assert_eq!(set.boosters.keys().collect::<Vec<_>>(), ["play"]);
     assert!(source_set_codes(&json, &["collector", "play"]).unwrap().is_empty());
+    // An entry ending with "*" keeps every kind it starts.
+    assert_eq!(set_from_mtgjson(&json, &["pl*"], &[]).unwrap().boosters.keys().collect::<Vec<_>>(), ["play"]);
+    assert!(set_from_mtgjson(&json, &["theme-*"], &[]).is_err());
+}
+
+#[test]
+fn booster_kinds_are_wanted_by_name_or_prefix_and_main_ones_define_completion() {
+    use unsealed_core::catalog::{is_collector_kind, kind_wanted};
+    let wanted = ["play", "theme-*", "collector-special"];
+    assert!(kind_wanted("play", &wanted) && kind_wanted("theme-b", &wanted) && kind_wanted("theme-boros", &wanted));
+    assert!(!kind_wanted("theme", &wanted) && !kind_wanted("collector", &wanted) && !kind_wanted("player", &wanted));
+    assert!(is_collector_kind("collector") && is_collector_kind("collector-special"));
+    assert!(!is_collector_kind("collectors") && !is_collector_kind("play"));
+
+    let mut set = set_from_mtgjson(&raw_set("u1", r#""scryfallId": "s1""#), &["play"], &[]).unwrap();
+    let config = set.boosters["play"].clone();
+    // Beside a usual booster, other kinds are not main ones.
+    for kind in ["collector", "collector-special", "jumpstart", "theme-b"] {
+        set.boosters.insert(kind.into(), config.clone());
+    }
+    assert!(set.is_main_booster("play"));
+    assert!(["collector", "collector-special", "jumpstart", "theme-b"].iter().all(|k| !set.is_main_booster(k)));
+    // Without one (Jumpstart), every kind but the collector ones.
+    set.boosters.remove("play");
+    assert!(set.is_main_booster("jumpstart") && set.is_main_booster("theme-b") && !set.is_main_booster("collector"));
+    // Collector boosters alone (Doctor Who, Fallout) are the main ones.
+    set.boosters.retain(|k, _| is_collector_kind(k));
+    assert!(set.is_main_booster("collector") && set.is_main_booster("collector-special"));
 }
 
 #[test]
@@ -547,7 +575,7 @@ fn manifest(generated_at: &str, sets: &[&str]) -> Manifest {
                 )
             })
             .collect::<BTreeMap<_, _>>(),
-        booster_kinds: ["play", "draft", "set", "default", "collector"].map(String::from).to_vec(),
+        booster_kinds: data_config().boosters,
         // What `data_config` asks for.
         requested_sets: Some(SetSelection::List(vec!["BLB".into(), "DSK".into()])),
         set_types: Vec::new(),
@@ -563,8 +591,11 @@ fn data_config() -> DataConfig {
 #[test]
 fn data_config_applies_defaults() {
     let cfg = data_config();
-    assert_eq!(cfg.boosters, ["play", "draft", "set", "default", "collector"]);
+    assert_eq!(&cfg.boosters[..5], ["play", "draft", "set", "default", "six"]);
     assert_eq!((cfg.max_age_hours, cfg.sim_boosters), (24, 20_000));
+    // The defaults are what the shipped config asks for.
+    let shipped = DataConfig::from_json(include_str!("../../config/data.json")).unwrap();
+    assert_eq!((&cfg.boosters, &cfg.set_types), (&shipped.boosters, &shipped.set_types));
 }
 
 #[test]

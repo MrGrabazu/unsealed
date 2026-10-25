@@ -3,7 +3,7 @@
 use crate::booster::{BoosterConfig, BoosterPack, BoosterSheet, ConfigError};
 use crate::catalog::{
     foil_kind, ArtistCard, ArtistIndex, BoxTopper, CardEntry, FeaturedCard, ForeignCard, GuestCard, GuestIndex, PriceSet, SetFile,
-    COLLECTOR_KIND, FOREIGN_LANGUAGES,
+    is_collector_kind, kind_wanted, COLLECTOR_KIND, FOREIGN_LANGUAGES,
 };
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -176,7 +176,7 @@ impl RawSet {
 
     /// Whether the set has at least one of the wanted booster kinds.
     pub fn has_any_booster(&self, kinds: &[&str]) -> bool {
-        kinds.iter().any(|k| self.booster.contains_key(*k))
+        self.booster.keys().any(|k| kind_wanted(k, kinds))
     }
 
     /// Codes of the other sets whose cards the kept booster configs draw from
@@ -379,7 +379,7 @@ pub fn add_token_slots(set: &mut SetFile, foil_one_in: u64) {
         let slots: Vec<(&str, u64)> = match (&plain, &foil) {
             // (MTGJSON describes neither tokens nor art cards in boosters.)
             (None, None) => return,
-            (_, Some(_)) if kind == COLLECTOR_KIND => vec![(TOKEN_FOIL_SHEET, 1)],
+            (_, Some(_)) if is_collector_kind(kind) => vec![(TOKEN_FOIL_SHEET, 1)],
             (Some(_), None) => vec![(TOKEN_SHEET, 1)],
             (None, Some(_)) => vec![(TOKEN_FOIL_SHEET, 1)],
             (Some(_), Some(_)) => vec![(TOKEN_SHEET, foil_one_in - 1), (TOKEN_FOIL_SHEET, 1)],
@@ -641,9 +641,17 @@ fn number_order(number: &str) -> (u32, &str) {
 
 /// The wanted booster kinds this set actually has, in the wanted order. Sets differ
 /// (older sets have draft boosters, not play boosters; not every set has a collector
-/// booster), so a kind the set lacks is skipped. Fails only when none is available.
-fn kept_kinds<'a>(booster: &BTreeMap<String, BoosterConfig>, kinds: &[&'a str]) -> Result<Vec<&'a str>, ConfigError> {
-    let kept: Vec<&str> = kinds.iter().copied().filter(|k| booster.contains_key(*k)).collect();
+/// booster), so a kind the set lacks is skipped. An entry ending with "*" keeps every kind it
+/// starts (`kind_wanted`). Fails only when none is available.
+fn kept_kinds<'a>(booster: &'a BTreeMap<String, BoosterConfig>, kinds: &[&str]) -> Result<Vec<&'a str>, ConfigError> {
+    let mut kept: Vec<&str> = Vec::new();
+    for wanted in kinds {
+        for kind in booster.keys().filter(|k| kind_wanted(k, &[wanted])) {
+            if !kept.contains(&kind.as_str()) {
+                kept.push(kind);
+            }
+        }
+    }
     if kept.is_empty() {
         return Err(ConfigError::UnknownBooster(kinds.join(", ")));
     }

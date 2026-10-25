@@ -6,7 +6,7 @@
 use crate::booster::BoosterConfig;
 use crate::catalog::{
     set_code_of_file, set_file_name, BoosterValue, Manifest, ManifestSet, PriceFile, PriceSet, SetFile, SetSelection,
-    ARTISTS_FILE, COLLECTOR_KIND, DATA_FORMAT_VERSION, GUESTS_FILE,
+    is_collector_kind, kind_wanted, ARTISTS_FILE, COLLECTOR_KIND, DATA_FORMAT_VERSION, GUESTS_FILE,
 };
 use crate::import::{add_art_cards_from, add_art_slots, artist_index, box_toppers, guest_index, topper_cards, add_token_slots, add_tokens_from, art_set_code, compact_set, merge_foil_printings, merge_token_faces, ArtCardOdds, featured_card, token_set_code, prices_by_uuid, prices_from_scryfall_jsonl, read_all_printings, AllPrintings};
 use crate::sim::expected_value_cents;
@@ -200,8 +200,11 @@ fn select_sets(all: &AllPrintings, opts: &BuildOptions, kinds: &[&str]) -> (Vec<
                     continue;
                 }
                 // Only its collector boosters kept: its main booster is most likely of a kind
-                // not listed yet. The set is offered, but says so.
-                if kinds.iter().all(|k| *k == COLLECTOR_KIND || !s.booster.contains_key(*k)) {
+                // not listed yet. The set is offered, but says so. Not for a set sold in collector
+                // boosters only (Doctor Who, Fallout).
+                if s.booster.keys().filter(|k| kind_wanted(k, kinds)).all(|k| is_collector_kind(k))
+                    && s.booster.keys().any(|k| !k.starts_with(COLLECTOR_KIND))
+                {
                     skipped.insert(
                         format!("{}/main", s.code),
                         format!("only collector boosters kept: a new kind of main booster? (MTGJSON has: {})", offered()),

@@ -43,11 +43,19 @@ pub fn default_token_foil_one_in() -> u64 {
 
 fn default_boosters() -> Vec<String> {
     // "default" is the booster of the oldest sets (before draft boosters existed).
-    ["play", "draft", "set", "default", "collector"].map(String::from).to_vec()
+    // "theme-*": every theme booster ("theme-b", "theme-boros"…).
+    [
+        "play", "draft", "set", "default", "six", "value", "theme-*", "jumpstart", "jumpstart-v2", "mirran", "phyrexian", "premium",
+        "collector", "collector-special",
+    ]
+    .map(String::from)
+    .to_vec()
 }
 
 fn default_set_types() -> Vec<String> {
-    ["core", "expansion", "masters", "draft_innovation", "funny", "starter"].map(String::from).to_vec()
+    ["core", "expansion", "masters", "draft_innovation", "funny", "starter", "commander", "memorabilia", "box", "eternal"]
+        .map(String::from)
+        .to_vec()
 }
 
 fn default_max_age_hours() -> i64 {

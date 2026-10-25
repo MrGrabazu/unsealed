@@ -38,7 +38,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use unsealed_core::achievements::{Engine, Event};
-use unsealed_core::catalog::{set_file_name, CardEntry, Manifest, PriceFile, SetFile, COLLECTOR_KIND, FOREIGN_LANGUAGES};
+use unsealed_core::catalog::{is_collector_kind, set_file_name, CardEntry, Manifest, PriceFile, SetFile, FOREIGN_LANGUAGES};
 use unsealed_core::import::ART_RARITY;
 use unsealed_core::economy::{charity_available, EconomyConfig};
 use unsealed_core::limited::LimitedConfig;
@@ -1580,7 +1580,7 @@ fn reveal_rank(kind: &str, card: &OpenedCard) -> u8 {
         _ => rare,
     };
     match kind {
-        COLLECTOR_KIND => by_rarity(0, 1, 2),
+        _ if is_collector_kind(kind) => by_rarity(0, 1, 2),
         "set" => {
             let rare = !matches!(card.rarity.as_str(), "common" | "uncommon");
             if land {

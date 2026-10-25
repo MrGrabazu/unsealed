@@ -145,6 +145,25 @@ pub struct GuestCard {
 /// Booster kind whose exclusive cards are extras, outside a set's completion target.
 pub const COLLECTOR_KIND: &str = "collector";
 
+/// The kinds of a set's usual boosters: when a set has one, its other kinds (collector,
+/// jumpstart, theme, faction…) do not define what completing it means.
+pub const MAIN_KINDS: [&str; 4] = ["play", "draft", "set", "default"];
+
+/// Whether a booster kind is a collector booster: "collector", or one of its editions
+/// ("collector-special", LTR's Special Edition).
+pub fn is_collector_kind(kind: &str) -> bool {
+    kind == COLLECTOR_KIND || kind.strip_prefix(COLLECTOR_KIND).is_some_and(|rest| rest.starts_with('-'))
+}
+
+/// Whether a booster kind is one `data.json` asks for: listed as is, or matching an entry
+/// ending with "*" ("theme-*": every theme booster, "theme-b", "theme-boros"…).
+pub fn kind_wanted(kind: &str, wanted: &[&str]) -> bool {
+    wanted.iter().any(|w| match w.strip_suffix('*') {
+        Some(prefix) => kind.starts_with(prefix),
+        None => kind == *w,
+    })
+}
+
 /// See `SetFile::keeps_its_guests`.
 const KEEPS_GUESTS_RATIO: usize = 3;
 
@@ -183,9 +202,14 @@ impl SetFile {
     }
 
     /// Whether a booster kind is one of the set's main boosters (those that define what
-    /// completing the set means). A set offering nothing but collector boosters counts them.
+    /// completing the set means): its usual ones (`MAIN_KINDS`) if it has any; else every
+    /// kind but its collector boosters (Jumpstart); else its collector boosters (Doctor Who).
     pub fn is_main_booster(&self, kind: &str) -> bool {
-        kind != COLLECTOR_KIND || self.boosters.keys().all(|k| k == COLLECTOR_KIND)
+        if self.boosters.keys().any(|k| MAIN_KINDS.contains(&k.as_str())) {
+            MAIN_KINDS.contains(&kind)
+        } else {
+            !is_collector_kind(kind) || self.boosters.keys().all(|k| is_collector_kind(k))
+        }
     }
 
     /// The config of one of the set's boosters, or of its box toppers' (`topper_boosters`).

@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
 use unsealed_core::artifacts::ArtifactsConfig;
+use unsealed_core::catalog::COLLECTOR_KIND;
 
 /// Days played (`UNSEALED_PACE_DAYS` changes it).
 fn days() -> i64 {

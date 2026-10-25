@@ -1,8 +1,8 @@
 {
   "sets": "all",
   "packUrl": "https://github.com/MrGrabazu/unsealed/releases/download/data",
-  "setTypes": ["core", "expansion", "masters", "draft_innovation", "funny", "starter"],
-  "boosters": ["play", "draft", "set", "default", "collector"],
+  "setTypes": ["core", "expansion", "masters", "draft_innovation", "funny", "starter", "commander", "memorabilia", "box", "eternal"],
+  "boosters": ["play", "draft", "set", "default", "six", "value", "theme-*", "jumpstart", "jumpstart-v2", "mirran", "phyrexian", "premium", "collector", "collector-special"],
   "maxAgeHours": 24,
   "simBoosters": 20000,
   "tokenFoilOneIn": 15,
