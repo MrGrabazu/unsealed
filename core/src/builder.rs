@@ -21,8 +21,8 @@ use std::io::{self, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
-const USER_AGENT: &str = "Unsealed/0.1 (unofficial fan project)";
-const ACCEPT: &str = "application/json;q=0.9,*/*;q=0.8";
+pub(crate) const USER_AGENT: &str = "Unsealed/0.1 (unofficial fan project)";
+pub(crate) const ACCEPT: &str = "application/json;q=0.9,*/*;q=0.8";
 /// Every MTGJSON set in one file (about 180 MB compressed).
 const ALL_PRINTINGS_URL: &str = "https://mtgjson.com/api/v5/AllPrintings.json.gz";
 const ALL_PRINTINGS_FILE: &str = "AllPrintings.json.gz";

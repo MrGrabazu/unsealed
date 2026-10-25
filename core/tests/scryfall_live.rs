@@ -22,6 +22,64 @@ fn fetches_a_double_faced_card_and_its_printings() {
     assert_eq!(client.card(&card.id).unwrap().name, card.name);
 }
 
+/// Times the download of a booster's worth of large card images (from the set file of
+/// `dist/sets/FRA.json`): one after another, then all at once, as the 3D opening asks.
+#[test]
+#[ignore = "needs a connection to cards.scryfall.io and the data built in dist/"]
+fn times_card_image_downloads() {
+    use std::time::Instant;
+    let file = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../dist/sets/FRA.json")).unwrap();
+    let set: unsealed_core::catalog::SetFile = serde_json::from_str(&file).unwrap();
+    let paths: Vec<String> = set
+        .cards
+        .iter()
+        .map(|c| format!("large/front/{}/{}/{}.jpg", &c.scryfall_id[..1], &c.scryfall_id[1..2], c.scryfall_id))
+        .collect();
+    let time = |label: &str, batch: &[String], parallel: bool| {
+        let start = Instant::now();
+        if parallel {
+            std::thread::scope(|s| {
+                for p in batch {
+                    s.spawn(move || unsealed_core::scryfall::card_image(p).unwrap());
+                }
+            });
+        } else {
+            for p in batch {
+                let one = Instant::now();
+                let bytes = unsealed_core::scryfall::card_image(p).unwrap();
+                println!("  {} KB in {:?}", bytes.len() / 1024, one.elapsed());
+            }
+        }
+        println!("{label}: {} images in {:?}", batch.len(), start.elapsed());
+    };
+    time("one after another", &paths[0..5], false);
+    time("all at once", &paths[5..20], true);
+}
+
+/// Each step of an image download with ureq, to tell where the time goes.
+#[test]
+#[ignore = "needs a connection to cards.scryfall.io and the data built in dist/"]
+fn traces_card_image_downloads() {
+    use std::io::Read;
+    use std::time::{Duration, Instant};
+    let file = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../dist/sets/FRA.json")).unwrap();
+    let set: unsealed_core::catalog::SetFile = serde_json::from_str(&file).unwrap();
+    let agent = ureq::AgentBuilder::new().timeout_connect(Duration::from_secs(3)).timeout_read(Duration::from_secs(10)).build();
+    for c in &set.cards[40..48] {
+        let url = format!("https://cards.scryfall.io/large/front/{}/{}/{}.jpg", &c.scryfall_id[..1], &c.scryfall_id[1..2], c.scryfall_id);
+        let start = Instant::now();
+        match agent.get(&url).set("User-Agent", "Unsealed/0.1 (unofficial fan project)").call() {
+            Ok(response) => {
+                let headers = start.elapsed();
+                let mut bytes = Vec::new();
+                let read = response.into_reader().read_to_end(&mut bytes);
+                println!("headers after {headers:?}, {} KB after {:?} ({read:?})", bytes.len() / 1024, start.elapsed());
+            }
+            Err(e) => println!("failed after {:?}: {e}", start.elapsed()),
+        }
+    }
+}
+
 #[test]
 #[ignore = "needs a connection to api.scryfall.com"]
 fn tells_the_quality_of_translated_images() {

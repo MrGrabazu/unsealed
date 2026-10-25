@@ -216,6 +216,8 @@ export const en = {
   "open.sellBooster": "Sell the whole booster {amount}",
   "open.sellBoosterConfirm": "Confirm the sale for {amount}?",
   "open.soldCards": "Sold for {amount}",
+  "open.sellDuplicates": "Sell the set's duplicates {amount}",
+  "open.soldDuplicates": "Duplicates sold for {amount}",
   "open.cardSold": "Sold",
   "bet.title": "Bet on this booster",
   "bet.count_one": "{count} bet",

@@ -5,11 +5,11 @@
 //! Scryfall asks for at most 10 requests per second and the `User-Agent` / `Accept` headers
 //! (sent by `builder::http_get`): requests are spaced by `MIN_INTERVAL`.
 
-use crate::builder::{http_get, http_post_json, BuildError};
+use crate::builder::{http_get, http_post_json, BuildError, ACCEPT, USER_AGENT};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::io::Read;
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 const API: &str = "https://api.scryfall.com";
@@ -34,14 +34,53 @@ pub fn is_card_image_path(path: &str) -> bool {
         && id.is_some_and(|id| id.len() == 36 && id.starts_with(&format!("{a}{b}")) && id.chars().all(|c| c.is_ascii_hexdigit() || c == '-'))
 }
 
-/// A card image from the CDN, by its path (see `is_card_image_path`).
+/// A connection to the CDN that does not answer by then is given up and tried again: a lost
+/// connection request is otherwise sent again by the system only after 3, 6 then 12 s (an
+/// image took 20 s or more to come).
+const IMAGE_CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
+/// An image whose bytes stop coming for this long is asked for again.
+const IMAGE_READ_TIMEOUT: Duration = Duration::from_secs(10);
+const IMAGE_ATTEMPTS: u32 = 3;
+/// Connections kept open to the CDN: a booster's images are asked for all at once.
+const IMAGE_CONNECTIONS: usize = 16;
+
+/// The card images' agent: its connections to the CDN are kept and reused, so an image does
+/// not pay a connection of its own (a few round trips, a fifth of a second each from Europe).
+fn image_agent() -> &'static ureq::Agent {
+    static AGENT: OnceLock<ureq::Agent> = OnceLock::new();
+    AGENT.get_or_init(|| {
+        ureq::AgentBuilder::new()
+            .timeout_connect(IMAGE_CONNECT_TIMEOUT)
+            .timeout_read(IMAGE_READ_TIMEOUT)
+            .max_idle_connections(IMAGE_CONNECTIONS)
+            .max_idle_connections_per_host(IMAGE_CONNECTIONS)
+            .build()
+    })
+}
+
+/// A card image from the CDN, by its path (see `is_card_image_path`). A network failure
+/// (a connection that does not come, bytes that stop) is tried again, up to `IMAGE_ATTEMPTS`.
 pub fn card_image(path: &str) -> Result<Vec<u8>, BuildError> {
     if !is_card_image_path(path) {
         return Err(format!("not a card image: {path}").into());
     }
-    let mut bytes = Vec::new();
-    http_get(&format!("{IMAGES}/{path}"))?.into_reader().take(MAX_IMAGE_BYTES).read_to_end(&mut bytes)?;
-    Ok(bytes)
+    let url = format!("{IMAGES}/{path}");
+    let mut attempt = 1;
+    loop {
+        let fetched: Result<Vec<u8>, BuildError> = match image_agent().get(&url).set("User-Agent", USER_AGENT).set("Accept", ACCEPT).call() {
+            Ok(response) => {
+                let mut bytes = Vec::new();
+                response.into_reader().take(MAX_IMAGE_BYTES).read_to_end(&mut bytes).map(|_| bytes).map_err(Into::into)
+            }
+            // The CDN answered: asking again would change nothing.
+            Err(e @ ureq::Error::Status(..)) => return Err(e.into()),
+            Err(e) => Err(e.into()),
+        };
+        match fetched {
+            Err(_) if attempt < IMAGE_ATTEMPTS => attempt += 1,
+            _ => return fetched,
+        }
+    }
 }
 /// Printings shown for a card (Scryfall's first page holds 175).
 const MAX_PRINTS: usize = 175;

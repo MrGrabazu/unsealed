@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { sellCards, type OpenedCard, type SaleRequest } from "./api";
+import { getDuplicatesValue, sellCards, sellDuplicates, type OpenedCard, type SaleRequest } from "./api";
 import { useI18n } from "./i18n";
 import { useMoney } from "./money";
 import { sounds } from "./sound";
@@ -16,6 +16,9 @@ export interface BoosterSale {
   soldCents: number;
   busy: boolean;
   error: string | null;
+  /** Copies sold elsewhere (the set's duplicates): as many of the booster's are marked sold,
+   * so that selling what is left never asks for more copies than are owned. */
+  markSold: (sold: SaleRequest[]) => void;
 }
 
 /** The sale of the booster `cards` (reset with each new booster); `onSold` refreshes the wallet. */
@@ -72,7 +75,86 @@ export function useBoosterSale(cards: OpenedCard[] | null, onSold: () => void): 
     soldCents,
     busy,
     error,
+    markSold: (requests) => {
+      if (!cards) return;
+      const left = new Map(requests.map((r) => [`${r.uuid}:${r.foil}`, r.quantity]));
+      setSold((s) => {
+        const next = [...s];
+        cards.forEach((c, i) => {
+          const key = `${c.uuid}:${c.foil}`;
+          const n = left.get(key) ?? 0;
+          if (next[i] || n === 0) return;
+          next[i] = true;
+          left.set(key, n - 1);
+        });
+        return next;
+      });
+    },
   };
+}
+
+/** Sells the duplicates of the opened boosters' set (one copy of each card kept, as in its
+ * binder), after a second click to confirm. `opened`: what was opened (a new opening resets
+ * the button); `sale`: the sale of the booster's own cards, if there is one. */
+export function SellDuplicatesButton(props: { setCode: string; opened: unknown; sale?: BoosterSale; onSold: () => void }) {
+  const { setCode, opened, sale, onSold } = props;
+  const { tx } = useI18n();
+  const money = useMoney();
+  const [value, setValue] = useState<number | null>(null);
+  const [soldCents, setSoldCents] = useState<number | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => setSoldCents(null), [opened]);
+
+  // Read again after each sale of the booster's own cards.
+  useEffect(() => {
+    let live = true;
+    getDuplicatesValue(setCode)
+      .then((v) => live && setValue(v.totalCents))
+      .catch(() => live && setValue(null));
+    return () => {
+      live = false;
+    };
+  }, [setCode, opened, sale?.sold, soldCents]);
+
+  if (soldCents != null && !value) return <span className="hint">{tx("open.soldDuplicates", { amount: money(soldCents) })}</span>;
+  if (!value) return null;
+
+  async function sell() {
+    setBusy(true);
+    try {
+      const result = await sellDuplicates(setCode);
+      sounds.coins();
+      sale?.markSold(result.sold);
+      setSoldCents((n) => (n ?? 0) + result.totalCents);
+      setError(null);
+      onSold();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <button
+        className={confirming ? "sell confirm" : "sell"}
+        disabled={busy || sale?.busy}
+        onClick={() => {
+          if (!confirming) return setConfirming(true);
+          setConfirming(false);
+          void sell();
+        }}
+        onMouseLeave={() => setConfirming(false)}
+      >
+        {tx(confirming ? "open.sellBoosterConfirm" : "open.sellDuplicates", { amount: money(value) })}
+      </button>
+      {error && <span className="error">{error}</span>}
+    </>
+  );
 }
 
 /** Sells every card of the booster still there, after a second click to confirm. */

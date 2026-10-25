@@ -3,7 +3,7 @@ import type { OpenedCard, SealedStack, SetSummary, SettledBet, SkippedBet } from
 import { BackToTop } from "./BackToTop";
 import { BetResults } from "./BetResults";
 import { kindLabel } from "./boosterKinds";
-import { SellBoosterButton, useBoosterSale } from "./BoosterSale";
+import { SellBoosterButton, SellDuplicatesButton, useBoosterSale } from "./BoosterSale";
 import { useI18n } from "./i18n";
 import { Money, useMoney } from "./money";
 import { RevealedCards } from "./RevealedCards";
@@ -109,6 +109,7 @@ export function OpeningResult(props: Props) {
         <div className="buy-bar">
           <div className="result-sell">
             <SellBoosterButton sale={sale} />
+            <SellDuplicatesButton setCode={setCode} opened={cards} sale={sale} onSold={onSold} />
           </div>
           {remaining ? (
             <>

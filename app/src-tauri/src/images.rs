@@ -6,8 +6,10 @@
 //!
 //! The cache is kept under `MAX_BYTES`: past it, the oldest images go (at launch).
 
+use std::collections::{HashSet, VecDeque};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Condvar, Mutex, OnceLock};
 use tauri::http::{header, Request, Response, StatusCode};
 use tauri::UriSchemeResponder;
 use unsealed_core::scryfall::{card_image, is_card_image_path};
@@ -44,25 +46,96 @@ fn image(dir: &Path, path: &str) -> Response<Vec<u8>> {
         return respond(StatusCode::NOT_FOUND, "text/plain", b"not a card image".to_vec());
     }
     let content_type = if path.ends_with(".png") { "image/png" } else { "image/jpeg" };
-    let file = path.split('/').fold(dir.to_path_buf(), |p, part| p.join(part));
+    let file = file_of(dir, path);
     if let Ok(bytes) = fs::read(&file) {
         return respond(StatusCode::OK, content_type, bytes);
     }
-    match card_image(path) {
-        Ok(bytes) => {
-            // Written beside, then renamed: a half-written image is never read.
-            if let Some(parent) = file.parent() {
-                let _ = fs::create_dir_all(parent);
-            }
-            let tmp = file.with_extension(format!("{}.part", std::process::id()));
-            if fs::write(&tmp, &bytes).is_ok() && fs::rename(&tmp, &file).is_err() {
-                let _ = fs::remove_file(&tmp);
-            }
-            respond(StatusCode::OK, content_type, bytes)
-        }
+    match fetch_and_keep(&file, path) {
+        Ok(bytes) => respond(StatusCode::OK, content_type, bytes),
         // Offline, say: the card shows without its image, as before.
-        Err(e) => respond(StatusCode::BAD_GATEWAY, "text/plain", e.to_string().into_bytes()),
+        Err(e) => respond(StatusCode::BAD_GATEWAY, "text/plain", e),
     }
+}
+
+/// Where an image is kept: its CDN path under the cache.
+fn file_of(dir: &Path, path: &str) -> PathBuf {
+    path.split('/').fold(dir.to_path_buf(), |p, part| p.join(part))
+}
+
+/// Downloads an image from the CDN and keeps it in `file`.
+fn fetch_and_keep(file: &Path, path: &str) -> Result<Vec<u8>, Vec<u8>> {
+    let bytes = card_image(path).map_err(|e| e.to_string().into_bytes())?;
+    // Written beside, then renamed: a half-written image is never read.
+    if let Some(parent) = file.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let tmp = file.with_extension(format!("{}.{:?}.part", std::process::id(), std::thread::current().id()).replace(['(', ')'], ""));
+    if fs::write(&tmp, &bytes).is_ok() && fs::rename(&tmp, file).is_err() {
+        let _ = fs::remove_file(&tmp);
+    }
+    Ok(bytes)
+}
+
+/// Threads downloading images ahead of time: few, so that the images an opening asks for
+/// right now (`handle`) are not kept waiting behind them.
+const PREFETCH_THREADS: usize = 3;
+
+/// The images to download ahead of time, oldest asked first, and every path asked this
+/// session (asked again, a path is skipped).
+#[derive(Default)]
+struct Queue {
+    paths: VecDeque<(PathBuf, String)>,
+    asked: HashSet<String>,
+}
+
+struct Prefetcher {
+    queue: Mutex<Queue>,
+    ready: Condvar,
+}
+
+fn prefetcher() -> &'static Prefetcher {
+    static PREFETCHER: OnceLock<Prefetcher> = OnceLock::new();
+    PREFETCHER.get_or_init(|| {
+        for _ in 0..PREFETCH_THREADS {
+            std::thread::spawn(prefetch_worker);
+        }
+        Prefetcher { queue: Mutex::new(Queue::default()), ready: Condvar::new() }
+    })
+}
+
+fn prefetch_worker() {
+    let p = prefetcher();
+    loop {
+        let (file, path) = {
+            let mut queue = p.queue.lock().unwrap_or_else(|e| e.into_inner());
+            loop {
+                match queue.paths.pop_front() {
+                    Some(next) => break next,
+                    None => queue = p.ready.wait(queue).unwrap_or_else(|e| e.into_inner()),
+                }
+            }
+        };
+        if !file.exists() && fetch_and_keep(&file, &path).is_err() {
+            // Offline, say: it may be asked again later.
+            p.queue.lock().unwrap_or_else(|e| e.into_inner()).asked.remove(&path);
+        }
+    }
+}
+
+/// Downloads card images ahead of time, in the background (`paths` from the CDN, see
+/// `Game::booster_image_paths`): those of the sealed boosters in stock, so that opening one
+/// does not wait for its cards (Scryfall's CDN is far from Europe). Images already kept, or
+/// already asked this session, are skipped.
+pub fn prefetch(dir: &Path, paths: Vec<String>) {
+    let p = prefetcher();
+    let mut queue = p.queue.lock().unwrap_or_else(|e| e.into_inner());
+    for path in paths.into_iter().filter(|path| is_card_image_path(path)) {
+        let file = file_of(dir, &path);
+        if !file.exists() && queue.asked.insert(path.clone()) {
+            queue.paths.push_back((file, path));
+        }
+    }
+    p.ready.notify_all();
 }
 
 /// Keeps the cache under `MAX_BYTES`, removing the images kept longest ago. Run at launch, on

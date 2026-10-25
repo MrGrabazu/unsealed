@@ -307,7 +307,7 @@ pub struct StatsView {
     pub boosters: Vec<BoosterStatsView>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SaleRequest {
     pub uuid: String,
     pub foil: bool,
@@ -319,6 +319,15 @@ pub struct SaleRequest {
 pub struct SaleResult {
     pub sold_count: u32,
     pub total_cents: i64,
+}
+
+/// The duplicates of a binder sold, with what went, card by card and finish.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct DuplicatesSale {
+    pub sold_count: u32,
+    pub total_cents: i64,
+    pub sold: Vec<SaleRequest>,
 }
 
 /// Current time and local calendar day ("YYYY-MM-DD", used for the daily charity).
@@ -939,6 +948,35 @@ impl Game {
         Ok(ids)
     }
 
+    /// The sets and kinds of the sealed boosters in stock.
+    pub fn sealed_kinds(&self) -> Result<Vec<(String, String)>, String> {
+        Ok(self.store.sealed_stacks().map_err(err)?.into_iter().map(|row| (row.set_code, row.kind)).collect())
+    }
+
+    /// The CDN paths of the images an opening of this booster may show ("large/front/a/b/<id>.jpg"):
+    /// every card its sheets can give, in the card language as `localized` shows it, large (the
+    /// 3D opening) then normal (the opening's result, the classic opening). To download before
+    /// the booster is opened (`images::prefetch`).
+    pub fn booster_image_paths(&mut self, set_code: &str, kind: &str) -> Result<Vec<String>, String> {
+        self.ensure_loaded(set_code)?;
+        let set = &self.sets[set_code];
+        let cfg = set.file.booster_config(kind).ok_or_else(|| format!("set {set_code} has no `{kind}` booster"))?;
+        let mut ids: Vec<String> = cfg
+            .sheets
+            .values()
+            .flat_map(|sheet| sheet.cards.keys())
+            .filter_map(|uuid| set.index.get(uuid))
+            .map(|&i| localized(&set.file.cards[i], &self.card_lang, &self.image_quality).image_id)
+            .collect();
+        ids.sort();
+        ids.dedup();
+        Ok(["large", "normal"]
+            .iter()
+            .flat_map(|version| ids.iter().map(move |id| scryfall_image_face(id, version, "front")))
+            .filter_map(|url| url.strip_prefix(CDN).map(String::from))
+            .collect())
+    }
+
     /// Records Scryfall's `image_status` of translated printings (a good scan: "highres_scan"),
     /// and keeps them for the next games. Ids Scryfall did not answer for count as without a
     /// good image. Returns how many have one.
@@ -993,11 +1031,7 @@ impl Game {
             if r.quantity == 0 {
                 return Err("cannot sell zero cards".to_string());
             }
-            let base = self.sale_value(&r.uuid, r.foil);
-            let unit_cents = match self.market_price(&r.uuid, r.foil) {
-                Some(market) if duplicates => self.bonuses().duplicate_value(base, market),
-                _ => base,
-            };
+            let unit_cents = self.unit_sale_value(&r.uuid, r.foil, duplicates);
             if unit_cents == 0 {
                 return Err(format!("card {} has no market value and cannot be sold", r.uuid));
             }
@@ -1035,9 +1069,44 @@ impl Game {
         Ok(owned)
     }
 
+    /// What one card sells for; `duplicates`: with the artifacts' bonus on duplicates.
+    fn unit_sale_value(&self, uuid: &str, foil: bool, duplicates: bool) -> u32 {
+        let base = self.sale_value(uuid, foil);
+        match self.market_price(uuid, foil) {
+            Some(market) if duplicates => self.bonuses().duplicate_value(base, market),
+            _ => base,
+        }
+    }
+
     /// Sells every copy beyond the first of each card and finish in a set's binder (or a
     /// guest series'): exactly the cards its collection shows, every section included.
+    #[cfg(test)]
     pub fn sell_duplicates(&mut self, set_code: &str) -> Result<SaleResult, String> {
+        self.sell_listed_duplicates(set_code).map(|s| SaleResult { sold_count: s.sold_count, total_cents: s.total_cents })
+    }
+
+    /// Sells a binder's duplicates (as `sell_duplicates`), saying which cards went.
+    pub fn sell_listed_duplicates(&mut self, set_code: &str) -> Result<DuplicatesSale, String> {
+        let requests = self.duplicate_requests(set_code)?;
+        if requests.is_empty() {
+            return Ok(DuplicatesSale { sold_count: 0, total_cents: 0, sold: requests });
+        }
+        let result = self.sell_cards_at(&requests, true)?;
+        Ok(DuplicatesSale { sold_count: result.sold_count, total_cents: result.total_cents, sold: requests })
+    }
+
+    /// What selling a binder's duplicates would bring in, without selling them.
+    pub fn duplicates_value(&mut self, set_code: &str) -> Result<SaleResult, String> {
+        let requests = self.duplicate_requests(set_code)?;
+        self.ensure_prices();
+        let sold_count = requests.iter().map(|r| r.quantity).sum();
+        let total_cents =
+            requests.iter().map(|r| i64::from(r.quantity) * i64::from(self.unit_sale_value(&r.uuid, r.foil, true))).sum();
+        Ok(SaleResult { sold_count, total_cents })
+    }
+
+    /// The copies `sell_duplicates` sells.
+    fn duplicate_requests(&mut self, set_code: &str) -> Result<Vec<SaleRequest>, String> {
         let view = self.collection(set_code)?;
         let sections = [view.cards, view.extras, view.tokens, view.arts, view.guests, view.elsewhere, view.toppers];
         let mut seen = HashSet::new();
@@ -1053,10 +1122,7 @@ impl Game {
                 }
             }
         }
-        if requests.is_empty() {
-            return Ok(SaleResult { sold_count: 0, total_cents: 0 });
-        }
-        self.sell_cards_at(&requests, true)
+        Ok(requests)
     }
 
     // ---- statistics ------------------------------------------------------------------
@@ -1499,6 +1565,9 @@ struct Shown {
     back_image_url: Option<String>,
     /// The printing shown (the translated one when it exists).
     scryfall_id: String,
+    /// The printing whose images are shown (the English one when the translated one has no
+    /// good scan).
+    image_id: String,
     /// The language actually shown: the requested one, or "en" when not printed in it.
     lang: String,
 }
@@ -1511,17 +1580,18 @@ fn localized(card: &CardEntry, lang: &str, image_quality: &HashMap<String, bool>
     let foreign = card.foreign.get(lang);
     let scryfall_id = foreign.and_then(|f| f.scryfall_id.clone()).unwrap_or_else(|| card.scryfall_id.clone());
     let image_id = if scryfall_id == card.scryfall_id || image_quality.get(&scryfall_id) == Some(&true) {
-        &scryfall_id
+        scryfall_id.clone()
     } else {
-        &card.scryfall_id
+        card.scryfall_id.clone()
     };
     Shown {
         name: foreign.map_or(&card.name, |f| &f.name).clone(),
-        image_url: image_url(image_id),
+        image_url: image_url(&image_id),
         back_image_url: DOUBLE_FACED
             .contains(&card.layout.as_str())
-            .then(|| scryfall_image_face(image_id, "normal", "back")),
+            .then(|| scryfall_image_face(&image_id, "normal", "back")),
         scryfall_id,
+        image_id,
         lang: if foreign.is_some() { lang.to_string() } else { "en".to_string() },
     }
 }
@@ -1543,9 +1613,12 @@ fn scryfall_image(scryfall_id: &str, version: &str) -> String {
     scryfall_image_face(scryfall_id, version, "front")
 }
 
+/// Scryfall's image CDN.
+const CDN: &str = "https://cards.scryfall.io/";
+
 fn scryfall_image_face(scryfall_id: &str, version: &str, face: &str) -> String {
     match scryfall_id.get(0..2) {
-        Some(p) => format!("https://cards.scryfall.io/{version}/{face}/{}/{}/{scryfall_id}.jpg", &p[0..1], &p[1..2]),
+        Some(p) => format!("{CDN}{version}/{face}/{}/{}/{scryfall_id}.jpg", &p[0..1], &p[1..2]),
         None => String::new(),
     }
 }
@@ -2596,6 +2669,19 @@ mod tests {
     }
 
     #[test]
+    fn the_images_of_a_booster_in_stock_are_listed_to_download_ahead() {
+        let mut g = game_with_booster("prefetch");
+        assert_eq!(g.sealed_kinds().unwrap(), [("TST".to_string(), "play".to_string())]);
+        let paths = g.booster_image_paths("TST", "play").unwrap();
+        // Every card the booster can give, large (the 3D opening) then normal, once each.
+        assert!(paths.contains(&"large/front/a/b/abcdef.jpg".to_string()));
+        assert!(paths.contains(&"normal/front/a/b/abcdef.jpg".to_string()));
+        let large = paths.iter().take_while(|p| p.starts_with("large/")).count();
+        assert_eq!(large * 2, paths.len());
+        assert!(g.booster_image_paths("TST", "collector").is_err());
+    }
+
+    #[test]
     fn opens_many_boosters_and_stops_when_the_stock_runs_out() {
         let mut g = game("batch");
         g.buy_boosters("TST", "play", 3).unwrap();
@@ -2707,6 +2793,20 @@ mod tests {
         assert_eq!(result, SaleResult { sold_count: 1, total_cents: 80 });
         assert_eq!(g.collection("TST").unwrap().owned_count, 2);
         assert_eq!(g.sell_duplicates("TST").unwrap(), SaleResult { sold_count: 0, total_cents: 0 });
+    }
+
+    #[test]
+    fn the_duplicates_sold_after_an_opening_are_valued_first_and_listed() {
+        let mut g = game_with_booster("dupes-listed");
+        g.open_booster("TST", "play").unwrap();
+        let before = balance(&mut g);
+        assert_eq!(g.duplicates_value("TST").unwrap(), SaleResult { sold_count: 1, total_cents: 80 });
+        assert_eq!(balance(&mut g), before); // nothing sold yet
+        let sale = g.sell_listed_duplicates("TST").unwrap();
+        assert_eq!((sale.sold_count, sale.total_cents), (1, 80));
+        assert_eq!(sale.sold, [SaleRequest { uuid: "c1".into(), foil: false, quantity: 1 }]);
+        assert_eq!(balance(&mut g), before + 80);
+        assert_eq!(g.duplicates_value("TST").unwrap(), SaleResult { sold_count: 0, total_cents: 0 });
     }
 
     /// `SET` where one booster in four has the mythic (the others two commons only).

@@ -208,6 +208,8 @@ export const fr: Messages = {
   "open.sellBooster": "Vendre tout le booster {amount}",
   "open.sellBoosterConfirm": "Confirmer la vente pour {amount} ?",
   "open.soldCards": "Vendu pour {amount}",
+  "open.sellDuplicates": "Revendre les doublons du set {amount}",
+  "open.soldDuplicates": "Doublons vendus pour {amount}",
   "open.cardSold": "Vendue",
   "bet.title": "Parier sur ce booster",
   "bet.count_one": "{count} pari",

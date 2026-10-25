@@ -3,6 +3,7 @@ import {
   buyArtifact,
   buyBoosters,
   checkSetImages,
+  prefetchSealedImages,
   claimCharity,
   createSavePoint,
   collectIncome,
@@ -35,6 +36,7 @@ import {
 import { AchievementCard } from "./AchievementCard";
 import { Achievements } from "./Achievements";
 import { BatchOpening } from "./BatchOpening";
+import { SellDuplicatesButton } from "./BoosterSale";
 import { BetResults } from "./BetResults";
 import { activeBets, keptFor, namedCard } from "./bets";
 import { BetSlip } from "./BetSlip";
@@ -272,6 +274,16 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
       .then(setKept)
       .catch(() => {});
   }, []);
+
+  // The card images of the boosters in stock download in the background, so that opening one
+  // does not wait for them: at the start, and whenever a new set or kind comes in.
+  const stockKinds = wallet?.sealed
+    .map((s) => `${s.setCode}/${s.kind}`)
+    .sort()
+    .join(",");
+  useEffect(() => {
+    if (stockKinds) void prefetchSealedImages().catch(() => {});
+  }, [stockKinds]);
 
   function changeKept(next: KeptBet[]) {
     setKept(next);
@@ -907,6 +919,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
                       {t("open.quick")}
                     </button>
                   )}
+                  {batch && allSeen && last && <SellDuplicatesButton setCode={last.setCode} opened={batch} onSold={refreshWallet} />}
                 </div>
                 {batch && allSeen && <BetResults bets={betResults} skipped={betSkipped} cardName={betCardName} />}
                 {/* A quick opening shows its result as soon as it is drawn. */}

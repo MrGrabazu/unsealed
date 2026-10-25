@@ -359,17 +359,47 @@ async fn check_set_images(
     scryfall: State<'_, Arc<scryfall::Client>>,
     set_code: String,
 ) -> Result<usize, String> {
-    let ids = with_game(&state, |g| g.unchecked_images(&set_code))?;
+    check_images(&state, scryfall.inner(), &set_code).await
+}
+
+async fn check_images(state: &State<'_, SessionState>, scryfall: &Arc<scryfall::Client>, set_code: &str) -> Result<usize, String> {
+    let ids = with_game(state, |g| g.unchecked_images(set_code))?;
     if ids.is_empty() {
         return Ok(0);
     }
-    let client = scryfall.inner().clone();
+    let client = scryfall.clone();
     let asked = ids.clone();
     let statuses = tauri::async_runtime::spawn_blocking(move || client.image_statuses(&asked))
         .await
         .map_err(|e| e.to_string())?
         .map_err(|e| e.to_string())?;
-    with_game(&state, |g| Ok(g.record_image_quality(&ids, &statuses)))
+    with_game(state, |g| Ok(g.record_image_quality(&ids, &statuses)))
+}
+
+/// Downloads, in the background, the card images of the sealed boosters in stock (see
+/// `images::prefetch`), once the quality of their translated images is known (the card
+/// language's images are the ones an opening shows). Returns how many images were asked for.
+#[tauri::command]
+async fn prefetch_sealed_images(
+    app: tauri::AppHandle,
+    state: State<'_, SessionState>,
+    scryfall: State<'_, Arc<scryfall::Client>>,
+) -> Result<usize, String> {
+    let stacks = with_game(&state, |g| g.sealed_kinds())?;
+    let mut sets: Vec<&String> = stacks.iter().map(|(set, _)| set).collect();
+    sets.dedup();
+    for set in sets {
+        // Offline, say: the English images are fetched (or not) all the same.
+        let _ = check_images(&state, scryfall.inner(), set).await;
+    }
+    let mut paths = Vec::new();
+    for (set, kind) in &stacks {
+        paths.extend(with_game(&state, |g| g.booster_image_paths(set, kind))?);
+    }
+    let count = paths.len();
+    let dir = resolve_cache_dir(&app).map_err(|e| e.to_string())?.join("images");
+    images::prefetch(&dir, paths);
+    Ok(count)
 }
 
 /// Every card owned, across the sets (the collection's "all sets" list).
@@ -406,8 +436,13 @@ fn sell_cards(state: State<'_, SessionState>, requests: Vec<SaleRequest>) -> Res
 }
 
 #[tauri::command]
-fn sell_duplicates(state: State<'_, SessionState>, set_code: String) -> Result<SaleResult, String> {
-    with_game(&state, |g| g.sell_duplicates(&set_code))
+fn sell_duplicates(state: State<'_, SessionState>, set_code: String) -> Result<game::DuplicatesSale, String> {
+    with_game(&state, |g| g.sell_listed_duplicates(&set_code))
+}
+
+#[tauri::command]
+fn get_duplicates_value(state: State<'_, SessionState>, set_code: String) -> Result<SaleResult, String> {
+    with_game(&state, |g| g.duplicates_value(&set_code))
 }
 
 #[tauri::command]
@@ -703,6 +738,7 @@ pub fn run() {
             list_guest_series,
             get_artist_collection,
             check_set_images,
+            prefetch_sealed_images,
             get_owned_cards,
             get_library,
             collect_income,
@@ -714,6 +750,7 @@ pub fn run() {
             set_kept_bets,
             sell_cards,
             sell_duplicates,
+            get_duplicates_value,
             claim_charity,
             get_achievements,
             take_unlocks,

@@ -685,6 +685,9 @@ export const getCollection = (setCode: string) =>
 /** Asks which translated images of a set are good scans (the others show in English);
  * returns how many good ones were found (0 when nothing was left to check). */
 export const checkSetImages = (setCode: string) => invoke<number>("check_set_images", { setCode });
+/** Downloads, in the background, the card images of the sealed boosters in stock (how many
+ * images were asked for). */
+export const prefetchSealedImages = () => invoke<number>("prefetch_sealed_images");
 /** Every card owned, across the sets, with the set it comes from. */
 export const getOwnedCards = () => invoke<ArtistCard[]>("get_owned_cards");
 export const getLibrary = () => invoke<LibraryBinder[]>("get_library");
@@ -703,6 +706,10 @@ export const undoTransaction = (id: number) => invoke<number>("undo_transaction"
 export const getCardDetails =(setCode: string, uuid: string) =>
   invoke<CardDetailsView>("get_card_details", { setCode, uuid });
 export const sellCards =(requests: SaleRequest[]) => invoke<SaleResult>("sell_cards", { requests });
-export const sellDuplicates = (setCode: string) => invoke<SaleResult>("sell_duplicates", { setCode });
+/** Sells a binder's duplicates (one copy of each card kept), saying which copies went. */
+export const sellDuplicates = (setCode: string) =>
+  invoke<SaleResult & { sold: SaleRequest[] }>("sell_duplicates", { setCode });
+/** What selling a binder's duplicates would bring in, without selling them. */
+export const getDuplicatesValue = (setCode: string) => invoke<SaleResult>("get_duplicates_value", { setCode });
 export const claimCharity = () => invoke<void>("claim_charity");
 export const getStats = () => invoke<StatsView>("get_stats");
