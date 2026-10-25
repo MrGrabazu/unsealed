@@ -1,6 +1,6 @@
 [package]
 name = "unsealed-core"
-version = "0.8.5"
+version = "0.9.0"
 edition = "2021"
 description = "Unsealed: booster config parsing, seeded weighted draw and simulation"
 license = "GPL-3.0-or-later"
