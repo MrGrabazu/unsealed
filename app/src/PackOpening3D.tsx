@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import type { OpenedCard, SetSummary } from "./api";
-import { kindLabel, wrapperFinish } from "./boosterKinds";
 import { SellBoosterButton, useBoosterSale } from "./BoosterSale";
 import { useI18n } from "./i18n";
 import { CardImage } from "./CardImage";
@@ -8,6 +7,7 @@ import { Money, useMoney } from "./money";
 import { FoilSheen } from "./foils";
 import { smallImage } from "./images";
 import { RevealedCards } from "./RevealedCards";
+import { packLookOf } from "./scene/packArt";
 import { PackScene } from "./scene/PackScene";
 
 interface Props {
@@ -26,13 +26,6 @@ interface Props {
   tearRequest?: number;
 }
 
-/** A colour per set, the same as the classic wrapper's. */
-function hueOf(code: string): number {
-  let h = 0;
-  for (const c of code) h = (h * 31 + c.charCodeAt(0)) % 360;
-  return h;
-}
-
 /** Opening one booster in the 3D scene: tear the pack, then slide the cards off the pile one
  * by one. Once the last card has left, the scene gives way to the list of the cards, and a
  * click on one shows its details. */
@@ -47,18 +40,7 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
   // Bumped when tearing failed: the scene starts over, the pack sealed again.
   const [attempt, setAttempt] = useState(0);
 
-  const look = useMemo(
-    () => ({
-      hue: hueOf(setCode),
-      setName: set?.name ?? setCode,
-      setCode,
-      kindLabel: kindLabel(t, kind),
-      finish: wrapperFinish(kind),
-      artUrl: set?.art?.imageUrl ?? null,
-      iconUrl: set?.iconUrl ?? null,
-    }),
-    [setCode, set, kind, t],
-  );
+  const look = useMemo(() => packLookOf(setCode, set, kind, t), [setCode, set, kind, t]);
 
   useEffect(() => {
     setTop(0);

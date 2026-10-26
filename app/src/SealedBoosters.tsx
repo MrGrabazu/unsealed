@@ -7,7 +7,9 @@ import { Icon } from "./icons";
 import { Money, useMoney } from "./money";
 import { hueOf } from "./Pack";
 import { PriceTrend } from "./PriceTrend";
+import { packLookOf, preparePack } from "./scene/packArt";
 import { SetIcon } from "./SetIcon";
+import { getOpening3d } from "./settings";
 
 /** Batch sizes offered next to "Open one". */
 const BATCH_SIZES = [10, 100];
@@ -85,6 +87,12 @@ export function SealedBoosters({ sealed, sets, busy, onOpen, onOpenQuick, onOpen
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
+
+  // The 3D wrapper's print of the one chosen, drawn ahead: the scene shows it at once.
+  const currentSet = current ? sets.find((s) => s.code === current.setCode) : undefined;
+  useEffect(() => {
+    if (current && getOpening3d()) preparePack(packLookOf(current.setCode, currentSet, current.kind, t));
+  }, [current?.setCode, current?.kind, currentSet, t]);
 
   if (!current) {
     return (

@@ -6,7 +6,7 @@ import { isBigCard } from "../BatchOpening";
 import { largeImage } from "../images";
 import { revealSound, sounds } from "../sound";
 import { CARD_H, CARD_W, createCardGeometry, createCardMaterials } from "./cardMaterial";
-import { cardBackTexture, glowTexture, loadCardTexture, packTexture, stripTexture, type PackLook } from "./textures";
+import { cardBackTexture, drawnPackTexture, glowTexture, loadCardTexture, packTexture, stripTexture, type PackLook } from "./textures";
 
 // The 3D opening. The pack tilts with the pointer, shakes when held and moved, and its top
 // strip tears off as the pointer slides along it, peeling back from where the tear started.
@@ -68,7 +68,10 @@ function Pack({ look, onTorn, leaving, tearRequest }: { look: PackLook; onTorn: 
   const group = useRef<THREE.Group>(null);
   const stripMesh = useRef<THREE.Mesh>(null);
   const bodyMaterial = useRef<THREE.MeshStandardMaterial>(null);
-  const [body, setBody] = useState<THREE.Texture | null>(null);
+  // The print: at once when the reserve drew it ahead, else as soon as it is drawn.
+  const drawnBody = useMemo(() => drawnPackTexture(look), [look]);
+  const [loaded, setLoaded] = useState<THREE.Texture | null>(null);
+  const body = drawnBody ?? loaded;
   const strip = useMemo(() => stripTexture(look.hue, look.finish), [look.hue, look.finish]);
 
   const bodyGeometry = useMemo(() => {
@@ -96,19 +99,21 @@ function Pack({ look, onTorn, leaving, tearRequest }: { look: PackLook; onTorn: 
     return base;
   }, [stripGeometry]);
 
+  useEffect(() => () => drawnBody?.dispose(), [drawnBody]);
   useEffect(() => {
+    if (drawnBody) return;
     let texture: THREE.Texture | null = null;
     let live = true;
     void packTexture(look).then((t) => {
       texture = t;
-      if (live) setBody(t);
+      if (live) setLoaded(t);
       else t.dispose();
     });
     return () => {
       live = false;
       texture?.dispose();
     };
-  }, [look]);
+  }, [look, drawnBody]);
   useEffect(() => () => [strip, bodyGeometry, stripGeometry].forEach((r) => r.dispose()), [strip, bodyGeometry, stripGeometry]);
 
   // Shake: the pack follows the held pointer on a spring.

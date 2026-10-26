@@ -37,6 +37,7 @@ import { AchievementCard } from "./AchievementCard";
 import { Achievements } from "./Achievements";
 import { BatchOpening } from "./BatchOpening";
 import { SellDuplicatesButton } from "./BoosterSale";
+import { packLookOf, preparePack } from "./scene/packArt";
 import { BetResults } from "./BetResults";
 import { activeBets, keptFor, namedCard } from "./bets";
 import { BetSlip } from "./BetSlip";
@@ -524,6 +525,8 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
 
   /** Shows the sealed pack. Nothing is opened (or used up) until the player tears it. */
   function open(setCode: string, kind: string) {
+    // The 3D wrapper's print, drawn while the scene loads (already, if chosen in the reserve).
+    if (opening3d) preparePack(packLookOf(setCode, sets.find((s) => s.code === setCode), kind, t));
     setBatch(null);
     setCards(null);
     resetBets();
