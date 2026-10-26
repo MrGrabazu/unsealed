@@ -180,6 +180,8 @@ export const en = {
   "open.openOne": "Open one",
   "open.quick": "⚡ Quick open",
   "open.quickHint": "No animation: the cards are dealt at once.",
+  "open.animated": "✨ Animated opening",
+  "open.animatedHint": "Back to tearing the booster and turning its cards over one by one.",
   "game.soundOn": "Sound on (click to mute)",
   "game.soundOff": "Sound off (click to turn on)",
   "open.openMany": "Open ×{count}",

@@ -172,6 +172,8 @@ export const de: Messages = {
   "open.openOne": "Einen öffnen",
   "open.quick": "⚡ Schnell öffnen",
   "open.quickHint": "Ohne Animation: Die Karten werden auf einmal ausgeteilt.",
+  "open.animated": "✨ Animiert öffnen",
+  "open.animatedHint": "Zurück zum Aufreißen des Boosters und zum Aufdecken der Karten nacheinander.",
   "game.soundOn": "Ton an (klicken zum Stummschalten)",
   "game.soundOff": "Ton aus (klicken zum Einschalten)",
   "open.openMany": "×{count} öffnen",

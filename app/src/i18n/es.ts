@@ -172,6 +172,8 @@ export const es: Messages = {
   "open.openOne": "Abrir uno",
   "open.quick": "⚡ Apertura rápida",
   "open.quickHint": "Sin animación: las cartas se reparten de golpe.",
+  "open.animated": "✨ Apertura animada",
+  "open.animatedHint": "Volver a rasgar el sobre y a girar sus cartas una a una.",
   "game.soundOn": "Sonido activado (clic para silenciar)",
   "game.soundOff": "Sonido desactivado (clic para activarlo)",
   "open.openMany": "Abrir ×{count}",

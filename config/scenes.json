@@ -1,6 +1,10 @@
 {
   "about": "Scenes: one artwork spread over several borderless cards of a set, which form it laid edge to edge. Neither MTGJSON nor Scryfall tells them apart: names and grids come from the MTG Wiki, the cards and their places were checked on the images (node .cache/scene-sheet.js). `cells` lists the collector numbers row by row (\"328:back\": the back face of a double-faced card), `columns` cards a row.",
   "sets": {
+    "UGL": [
+      { "id": "big-furry-monster", "columns": 2, "cells": ["28", "29"],
+        "name": { "en": "B.F.M. (Big Furry Monster)", "fr": "B.F.M. (Big Furry Monster)", "de": "B.F.M. (Big Furry Monster)", "es": "B.F.M. (Big Furry Monster)", "it": "B.F.M. (Big Furry Monster)" } }
+    ],
     "LTR": [
       { "id": "bilbos-birthday-party", "columns": 3, "cells": ["399", "400", "401", "402", "403", "404"],
         "name": { "en": "Bilbo's Birthday Party", "fr": "L'anniversaire de Bilbo", "de": "Bilbos Geburtstagsfeier", "es": "La fiesta de cumpleaños de Bilbo", "it": "La festa di compleanno di Bilbo" } },

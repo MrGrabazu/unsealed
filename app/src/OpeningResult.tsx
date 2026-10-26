@@ -115,8 +115,13 @@ export function OpeningResult(props: Props) {
               <button className="big" disabled={busy} onClick={quick ? props.onQuickNext : props.onNext}>
                 {t("open.next", { count: remaining.quantity })}
               </button>
-              {!quick && (
-                <button disabled={busy} onClick={props.onQuickNext}>
+              {/* The other way of opening the next one: after a quick opening, the scene again. */}
+              {quick ? (
+                <button disabled={busy} onClick={props.onNext} title={t("open.animatedHint")}>
+                  {t("open.animated")}
+                </button>
+              ) : (
+                <button disabled={busy} onClick={props.onQuickNext} title={t("open.quickHint")}>
                   {t("open.quick")}
                 </button>
               )}
