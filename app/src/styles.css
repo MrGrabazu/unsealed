@@ -315,8 +315,11 @@ button.sell.confirm { background: #7a1d1d; border-color: #c24040; color: #fff; }
 
 .ach-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 22px 18px; }
 .ach-item { display: flex; flex-direction: column; gap: 6px; }
-.ach-card { width: 100%; height: auto; display: block; filter: drop-shadow(0 6px 14px #0008); }
-.ach-card.locked { filter: grayscale(0.85) brightness(0.55) drop-shadow(0 6px 14px #0008); }
+/* An achievement card: its art an image, its text a light SVG over it (AchievementCard.tsx);
+   a locked card is dimmed in its own colours (`dim`), not by a filter. */
+.ach-card { position: relative; isolation: isolate; display: block; width: 100%; aspect-ratio: 630 / 880; }
+.ach-card > img, .ach-card > .ach-text { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.ach-card:not(.lite) { filter: drop-shadow(0 6px 14px #0008); }
 .ach-caption { display: flex; flex-direction: column; gap: 2px; font-size: 12px; text-align: center; min-height: 18px; }
 .ach-item { cursor: pointer; border-radius: 12px; transition: transform 0.15s; }
 .ach-item:hover, .ach-item:focus-visible { transform: translateY(-3px); }

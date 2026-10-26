@@ -1,4 +1,5 @@
 import { useId, type ReactNode } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import type { AchievementView } from "./api";
 import { useI18n } from "./i18n";
 import { useAmountsInText } from "./money";
@@ -270,15 +271,164 @@ function Corner({ x, y, sx, sy, color }: { x: number; y: number; sx: number; sy:
   );
 }
 
+/** A locked card's colour: mostly grey, and darker (CSS `grayscale(0.85) brightness(0.55)`).
+ * Worked out on each colour instead of filtering the drawn card: a filter on a hundred SVG
+ * cards made the cabinet lag, and these steps being linear, the result is the same. */
+function dim(hex: string): string {
+  const full = hex.length === 4 ? hex.replace(/[0-9a-f]/gi, (d) => d + d) : hex;
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(full.slice(i, i + 2), 16));
+  const s = 0.15;
+  const mix = [
+    (0.2126 + 0.7874 * s) * r + (0.7152 - 0.7152 * s) * g + (0.0722 - 0.0722 * s) * b,
+    (0.2126 - 0.2126 * s) * r + (0.7152 + 0.2848 * s) * g + (0.0722 - 0.0722 * s) * b,
+    (0.2126 - 0.2126 * s) * r + (0.7152 - 0.7152 * s) * g + (0.0722 + 0.9278 * s) * b,
+  ];
+  return "#" + mix.map((v) => Math.round(Math.min(255, v * 0.55)).toString(16).padStart(2, "0")).join("");
+}
+
+const same = (hex: string) => hex;
+
+/** The colours of a card: as they are once unlocked, dimmed before. */
+const toneOf = (item: AchievementView) => (item.unlocked ? same : dim);
+
+/** The card's art, everything but its text (an image cannot use the page's fonts): the rim
+ * in the rarity's metal, the leather, the corners, the plate and pips, the medallion between
+ * its wings, the ornament under the name at `ornamentY`, and the ribbon. Drawn as an image of
+ * its own, its ids clash with no other card's. */
+function CardArt({ item, ornamentY }: { item: AchievementView; ornamentY: number }) {
+  const c = toneOf(item);
+  const base = PALETTES[item.palette] ?? PALETTES.onyx;
+  const palette: Palette = { bg1: c(base.bg1), bg2: c(base.bg2), accent: c(base.accent), glow: c(base.glow) };
+  const metal = c(FRAMES[item.rarity][0]);
+  const metalDark = c(FRAMES[item.rarity][1]);
+  const ink = c("#1a100a");
+  const emblem = EMBLEMS[item.emblem] ?? EMBLEMS.star;
+  const uid = "art";
+
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 630 880" width="630" height="880">
+      <defs>
+        <linearGradient id={`${uid}m`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor={metal} />
+          <stop offset="0.5" stopColor={metalDark} />
+          <stop offset="1" stopColor={metal} />
+        </linearGradient>
+        <linearGradient id={`${uid}l`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={c("#3a2618")} />
+          <stop offset="1" stopColor={ink} />
+        </linearGradient>
+        {/* The grain of the leather. */}
+        <pattern id={`${uid}grain`} width="14" height="14" patternUnits="userSpaceOnUse">
+          <circle cx="3" cy="4" r="1.1" fill={c("#ffffff")} opacity="0.05" />
+          <circle cx="10" cy="10" r="1.3" fill="#000000" opacity="0.22" />
+          <circle cx="11" cy="3" r="0.8" fill={c("#ffffff")} opacity="0.04" />
+        </pattern>
+        <linearGradient id={`${uid}b`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={palette.bg2} />
+          <stop offset="1" stopColor={palette.bg1} />
+        </linearGradient>
+        <radialGradient id={`${uid}g`} cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor={palette.glow} stopOpacity="0.8" />
+          <stop offset="1" stopColor={palette.glow} stopOpacity="0" />
+        </radialGradient>
+        <clipPath id={`${uid}c`}>
+          <circle cx={CX} cy={CY} r={R} />
+        </clipPath>
+      </defs>
+
+      {/* The body: the rim in the rarity's metal, the leather inside, its grain. */}
+      <rect x={BODY.x} y={BODY.y} width={BODY.w} height={BODY.h} rx={BODY.r} fill={`url(#${uid}m)`} />
+      <rect x={BODY.x + 3} y={BODY.y + 3} width={BODY.w - 6} height={BODY.h - 6} rx={BODY.r - 3} fill="none" stroke="#000" strokeOpacity="0.45" strokeWidth="2" />
+      <path d={INNER} fill={`url(#${uid}l)`} />
+      <path d={INNER} fill={`url(#${uid}grain)`} />
+      {/* A double gilded rule, and the stitching between them. */}
+      <path d={INNER} fill="none" stroke={metal} strokeWidth="3" opacity="0.9" />
+      <rect x="58" y="58" width="514" height="732" rx="6" fill="none" stroke={metal} strokeWidth="1.5" opacity="0.45" />
+      <rect x="50" y="50" width="530" height="748" rx="5" fill="none" stroke={metal} strokeWidth="1.2" strokeDasharray="7 6" opacity="0.35" />
+      <Corner x={64} y={64} sx={1} sy={1} color={metal} />
+      <Corner x={566} y={64} sx={-1} sy={1} color={metal} />
+      <Corner x={64} y={784} sx={1} sy={-1} color={metal} />
+      <Corner x={566} y={784} sx={-1} sy={-1} color={metal} />
+
+      {/* The number on a small plate, and the rarity's pips. */}
+      <rect x="146" y="76" width="128" height="40" rx="6" fill={ink} stroke={metal} strokeWidth="1.5" opacity="0.95" />
+      {Array.from({ length: PIPS[item.rarity] }, (_, i) => (
+        <rect key={i} x={470 - i * 30} y="88" width="16" height="16" fill={metal} stroke={ink} strokeWidth="1.5" transform={`rotate(45 ${478 - i * 30} 96)`} />
+      ))}
+
+      {/* The medallion between two gilded wings. */}
+      <circle cx={CX} cy={CY} r={R + 34} fill={`url(#${uid}g)`} opacity={item.unlocked ? 1 : 0.4} />
+      {[-1, 1].map((side) => (
+        <g key={side} transform={`translate(${CX} ${CY}) scale(${side} 1)`} fill="none" stroke={metal} strokeLinecap="round">
+          <path d={`M${R + 14} -24 C${R + 70} -40 ${R + 92} -10 ${R + 104} 22`} strokeWidth="5" />
+          <path d={`M${R + 10} 6 C${R + 54} 0 ${R + 74} 22 ${R + 82} 46`} strokeWidth="4" opacity="0.8" />
+          <path d={`M${R + 4} 36 C${R + 38} 36 ${R + 54} 54 ${R + 58} 70`} strokeWidth="3" opacity="0.6" />
+          <circle cx={R + 104} cy="22" r="6" fill={metal} stroke="none" />
+        </g>
+      ))}
+      <circle cx={CX} cy={CY} r={R + 10} fill={ink} stroke={`url(#${uid}m)`} strokeWidth="14" />
+      <circle cx={CX} cy={CY} r={R} fill={`url(#${uid}b)`} />
+      <g clipPath={`url(#${uid}c)`}>
+        <Pattern id={item.id} color={palette.accent} />
+        <circle cx={CX} cy={CY} r={R * 0.75} fill={`url(#${uid}g)`} />
+      </g>
+      <circle cx={CX} cy={CY} r={R - 12} fill="none" stroke={metal} strokeWidth="2" opacity="0.55" />
+      {/* Studs around the rim of the medallion. */}
+      {Array.from({ length: 12 }, (_, i) => {
+        const a = (i * 30 * Math.PI) / 180;
+        return <circle key={i} cx={CX + (R + 10) * Math.cos(a)} cy={CY + (R + 10) * Math.sin(a)} r="3.5" fill={ink} opacity="0.6" />;
+      })}
+      <g
+        transform={`translate(${CX - 92} ${CY - 92}) scale(1.84)`}
+        fill={palette.accent}
+        stroke={palette.bg1}
+        strokeWidth="2.5"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        style={{ filter: `drop-shadow(0 0 6px ${palette.glow})` }}
+      >
+        {emblem(palette)}
+      </g>
+
+      {/* The ornament between the name and the goal. */}
+      <g transform={`translate(${CX} ${ornamentY})`} stroke={metal} fill={metal}>
+        <line x1="-120" y1="0" x2="-14" y2="0" strokeWidth="1.5" opacity="0.7" />
+        <line x1="14" y1="0" x2="120" y2="0" strokeWidth="1.5" opacity="0.7" />
+        <rect x="-7" y="-7" width="14" height="14" transform="rotate(45)" stroke="none" />
+      </g>
+
+      {/* The rarity's ribbon over the lower edge. */}
+      <path d="M150 812 H480 L504 836 L480 860 H150 L126 836 Z" fill="#000" opacity="0.4" transform="translate(0 4)" />
+      <path d="M150 812 H480 L504 836 L480 860 H150 L126 836 Z" fill={`url(#${uid}m)`} />
+      <path d="M160 818 H470 L488 836 L470 854 H160 L142 836 Z" fill="none" stroke={ink} strokeWidth="1.5" opacity="0.5" />
+    </svg>
+  );
+}
+
+/** The art of each look already drawn, as an image URL: decoded once by the browser, where
+ * a hundred live SVG cards of a few hundred shapes each made the cabinet lag. */
+const arts = new Map<string, string>();
+
+function artUrl(item: AchievementView, ornamentY: number): string {
+  const key = [item.id, item.palette, item.emblem, item.rarity, item.unlocked, ornamentY].join("|");
+  let url = arts.get(key);
+  if (!url) {
+    url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(renderToStaticMarkup(<CardArt item={item} ornamentY={ornamentY} />))}`;
+    arts.set(key, url);
+  }
+  return url;
+}
+
 /** An achievement card, as on the game's tooled leather: a rim in the rarity's metal, the
  * theme's filigree corners, a medallion (the achievement's own colours, pattern and emblem)
  * between two gilded wings, its name, its goal or progress, and the rarity on a ribbon over
- * the lower edge. */
-export function AchievementCard({ item }: { item: AchievementView }) {
+ * the lower edge. Its art is an image (`CardArt`), its text a light SVG layer over it, and
+ * the holographic sheen of an unlocked mythic a layer slid by CSS (`.ach-holo`). `lite`: a
+ * card of the cabinet, without the shadow filter of a card shown alone. */
+export function AchievementCard({ item, lite = false }: { item: AchievementView; lite?: boolean }) {
   const uid = useId().replace(/:/g, "");
-  const palette = PALETTES[item.palette] ?? PALETTES.onyx;
-  const [metal, metalDark] = FRAMES[item.rarity];
-  const emblem = EMBLEMS[item.emblem] ?? EMBLEMS.star;
+  const c = toneOf(item);
+  const metal = c(FRAMES[item.rarity][0]);
   const { t, formatNumber } = useI18n();
   const amountsInText = useAmountsInText();
   const hidden = item.secret && !item.unlocked;
@@ -298,160 +448,57 @@ export function AchievementCard({ item }: { item: AchievementView }) {
   const textY = nameY + nameLines.length * nameSize + 34;
 
   return (
-    <svg
-      viewBox="0 0 630 880"
-      className={`ach-card ${item.unlocked ? "unlocked" : "locked"} ${item.rarity}`}
+    <div
+      className={`ach-card ${item.unlocked ? "unlocked" : "locked"} ${item.rarity}${lite ? " lite" : ""}`}
       role="img"
       aria-label={t(item.unlocked ? "achievements.cardLabelUnlocked" : "achievements.cardLabelLocked", { name })}
     >
-      <defs>
-        <linearGradient id={`${uid}m`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor={metal} />
-          <stop offset="0.5" stopColor={metalDark} />
-          <stop offset="1" stopColor={metal} />
-        </linearGradient>
-        <linearGradient id={`${uid}l`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#3a2618" />
-          <stop offset="1" stopColor="#1a100a" />
-        </linearGradient>
-        {/* The grain of the leather. */}
-        <pattern id={`${uid}grain`} width="14" height="14" patternUnits="userSpaceOnUse">
-          <circle cx="3" cy="4" r="1.1" fill="#ffffff" opacity="0.05" />
-          <circle cx="10" cy="10" r="1.3" fill="#000000" opacity="0.22" />
-          <circle cx="11" cy="3" r="0.8" fill="#ffffff" opacity="0.04" />
-        </pattern>
-        <linearGradient id={`${uid}b`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor={palette.bg2} />
-          <stop offset="1" stopColor={palette.bg1} />
-        </linearGradient>
-        <radialGradient id={`${uid}g`} cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0" stopColor={palette.glow} stopOpacity="0.8" />
-          <stop offset="1" stopColor={palette.glow} stopOpacity="0" />
-        </radialGradient>
-        <linearGradient id={`${uid}h`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0.2" stopColor="#ff7bd0" stopOpacity="0" />
-          <stop offset="0.4" stopColor="#ff7bd0" stopOpacity="0.5" />
-          <stop offset="0.5" stopColor="#7bd0ff" stopOpacity="0.5" />
-          <stop offset="0.6" stopColor="#b6ff7b" stopOpacity="0.5" />
-          <stop offset="0.8" stopColor="#b6ff7b" stopOpacity="0" />
-          <animateTransform attributeName="gradientTransform" type="translate" from="-1 -1" to="1 1" dur="4s" repeatCount="indefinite" />
-        </linearGradient>
-        <clipPath id={`${uid}c`}>
-          <circle cx={CX} cy={CY} r={R} />
-        </clipPath>
-        <clipPath id={`${uid}i`}>
-          <path d={INNER} />
-        </clipPath>
-      </defs>
-
-      {/* The body: the rim in the rarity's metal, the leather inside, its grain. */}
-      <rect x={BODY.x} y={BODY.y} width={BODY.w} height={BODY.h} rx={BODY.r} fill={`url(#${uid}m)`} />
-      <rect x={BODY.x + 3} y={BODY.y + 3} width={BODY.w - 6} height={BODY.h - 6} rx={BODY.r - 3} fill="none" stroke="#000" strokeOpacity="0.45" strokeWidth="2" />
-      <path d={INNER} fill={`url(#${uid}l)`} />
-      <path d={INNER} fill={`url(#${uid}grain)`} />
-      {/* A double gilded rule, and the stitching between them. */}
-      <path d={INNER} fill="none" stroke={metal} strokeWidth="3" opacity="0.9" />
-      <rect x="58" y="58" width="514" height="732" rx="6" fill="none" stroke={metal} strokeWidth="1.5" opacity="0.45" />
-      <rect x="50" y="50" width="530" height="748" rx="5" fill="none" stroke={metal} strokeWidth="1.2" strokeDasharray="7 6" opacity="0.35" />
-      <Corner x={64} y={64} sx={1} sy={1} color={metal} />
-      <Corner x={566} y={64} sx={-1} sy={1} color={metal} />
-      <Corner x={64} y={784} sx={1} sy={-1} color={metal} />
-      <Corner x={566} y={784} sx={-1} sy={-1} color={metal} />
-
-      {/* The number on a small plate, and the rarity's pips. */}
-      <rect x="146" y="76" width="128" height="40" rx="6" fill="#1a100a" stroke={metal} strokeWidth="1.5" opacity="0.95" />
-      <text x="210" y="104" fontSize="23" fontFamily="Cinzel, serif" fontWeight="700" letterSpacing="2" textAnchor="middle" fill={metal}>
-        {t("achievements.cardNumber", { number: String(item.number).padStart(2, "0") })}
-      </text>
-      {Array.from({ length: PIPS[item.rarity] }, (_, i) => (
-        <rect key={i} x={470 - i * 30} y="88" width="16" height="16" fill={metal} stroke="#1a100a" strokeWidth="1.5" transform={`rotate(45 ${478 - i * 30} 96)`} />
-      ))}
-
-      {/* The medallion between two gilded wings. */}
-      <circle cx={CX} cy={CY} r={R + 34} fill={`url(#${uid}g)`} opacity={item.unlocked ? 1 : 0.4} />
-      {[-1, 1].map((side) => (
-        <g key={side} transform={`translate(${CX} ${CY}) scale(${side} 1)`} fill="none" stroke={metal} strokeLinecap="round">
-          <path d={`M${R + 14} -24 C${R + 70} -40 ${R + 92} -10 ${R + 104} 22`} strokeWidth="5" />
-          <path d={`M${R + 10} 6 C${R + 54} 0 ${R + 74} 22 ${R + 82} 46`} strokeWidth="4" opacity="0.8" />
-          <path d={`M${R + 4} 36 C${R + 38} 36 ${R + 54} 54 ${R + 58} 70`} strokeWidth="3" opacity="0.6" />
-          <circle cx={R + 104} cy="22" r="6" fill={metal} stroke="none" />
-        </g>
-      ))}
-      <circle cx={CX} cy={CY} r={R + 10} fill="#1a100a" stroke={`url(#${uid}m)`} strokeWidth="14" />
-      <circle cx={CX} cy={CY} r={R} fill={`url(#${uid}b)`} />
-      <g clipPath={`url(#${uid}c)`}>
-        <Pattern id={item.id} color={palette.accent} />
-        <circle cx={CX} cy={CY} r={R * 0.75} fill={`url(#${uid}g)`} />
-      </g>
-      <circle cx={CX} cy={CY} r={R - 12} fill="none" stroke={metal} strokeWidth="2" opacity="0.55" />
-      {/* Studs around the rim of the medallion. */}
-      {Array.from({ length: 12 }, (_, i) => {
-        const a = (i * 30 * Math.PI) / 180;
-        return <circle key={i} cx={CX + (R + 10) * Math.cos(a)} cy={CY + (R + 10) * Math.sin(a)} r="3.5" fill="#1a100a" opacity="0.6" />;
-      })}
-      <g
-        transform={`translate(${CX - 92} ${CY - 92}) scale(1.84)`}
-        fill={palette.accent}
-        stroke={palette.bg1}
-        strokeWidth="2.5"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-        style={{ filter: `drop-shadow(0 0 6px ${palette.glow})` }}
-      >
-        {emblem(palette)}
-      </g>
-
-      {/* The name, then an ornament, then the goal (or the progress while locked). */}
-      {nameLines.map((line, i) => (
-        <text
-          key={i}
-          x={CX}
-          y={nameY + i * nameSize * 1.05}
-          fontSize={nameSize}
-          fontFamily="Cinzel, serif"
-          fontWeight="800"
-          textAnchor="middle"
-          letterSpacing="1.5"
-          fill="#fff1c7"
-          style={{ filter: "drop-shadow(0 2px 0 #000)" }}
-        >
-          {line}
+      <img src={artUrl(item, textY - 26)} alt="" draggable={false} />
+      <svg className="ach-text" viewBox="0 0 630 880" aria-hidden="true">
+        <defs>
+          <clipPath id={`${uid}i`}>
+            <path d={INNER} />
+          </clipPath>
+        </defs>
+        <text x="210" y="104" fontSize="23" fontFamily="Cinzel, serif" fontWeight="700" letterSpacing="2" textAnchor="middle" fill={metal}>
+          {t("achievements.cardNumber", { number: String(item.number).padStart(2, "0") })}
         </text>
-      ))}
-      <g transform={`translate(${CX} ${textY - 26})`} stroke={metal} fill={metal}>
-        <line x1="-120" y1="0" x2="-14" y2="0" strokeWidth="1.5" opacity="0.7" />
-        <line x1="14" y1="0" x2="120" y2="0" strokeWidth="1.5" opacity="0.7" />
-        <rect x="-7" y="-7" width="14" height="14" transform="rotate(45)" stroke="none" />
-      </g>
-      <g clipPath={`url(#${uid}i)`}>
-        {lines.map((line, i) => (
-          <text key={i} x={CX} y={textY + 6 + i * 30} fontSize="25" fontFamily="Alegreya, serif" textAnchor="middle" fill="#e8d8b4" opacity="0.92">
-            {line}
-          </text>
-        ))}
-        {showProgress && item.progress && (
-          <>
-            <rect x="140" y="738" width="350" height="14" rx="7" fill="#120b07" stroke={metal} strokeWidth="1.5" />
-            <rect x="140" y="738" width={350 * ratio} height="14" rx="7" fill={metal} />
-            <text x={CX} y="778" fontSize="19" fontFamily="Cinzel, serif" textAnchor="middle" fill="#cdbb9b" letterSpacing="1">
-              {formatNumber(item.progress.current)} / {formatNumber(item.progress.goal)}
+        {/* The name (its hard shadow drawn under it, cheaper than a filter), then the goal (or
+            the progress while locked). */}
+        <g fontSize={nameSize} fontFamily="Cinzel, serif" fontWeight="800" textAnchor="middle" letterSpacing="1.5">
+          {nameLines.map((line, i) => (
+            <g key={i}>
+              <text x={CX} y={nameY + i * nameSize * 1.05 + 2} fill="#000">
+                {line}
+              </text>
+              <text x={CX} y={nameY + i * nameSize * 1.05} fill={c("#fff1c7")}>
+                {line}
+              </text>
+            </g>
+          ))}
+        </g>
+        <g clipPath={`url(#${uid}i)`}>
+          {lines.map((line, i) => (
+            <text key={i} x={CX} y={textY + 6 + i * 30} fontSize="25" fontFamily="Alegreya, serif" textAnchor="middle" fill={c("#e8d8b4")} opacity="0.92">
+              {line}
             </text>
-          </>
-        )}
-      </g>
-
-      {/* The rarity, on a ribbon over the lower edge. */}
-      <path d="M150 812 H480 L504 836 L480 860 H150 L126 836 Z" fill="#000" opacity="0.4" transform="translate(0 4)" />
-      <path d="M150 812 H480 L504 836 L480 860 H150 L126 836 Z" fill={`url(#${uid}m)`} />
-      <path d="M160 818 H470 L488 836 L470 854 H160 L142 836 Z" fill="none" stroke="#1a100a" strokeWidth="1.5" opacity="0.5" />
-      <text x={CX} y="845" fontSize="24" fontFamily="Cinzel, serif" fontWeight="800" letterSpacing="4" textAnchor="middle" fill="#2a1606">
-        {t(RARITY_KEYS[item.rarity]).toUpperCase()}
-      </text>
-
-      {/* Holographic sheen on the rarest cards. */}
-      {item.rarity === "mythic" && item.unlocked && (
-        <rect x={BODY.x} y={BODY.y} width={BODY.w} height={BODY.h} rx={BODY.r} fill={`url(#${uid}h)`} style={{ mixBlendMode: "color-dodge" }} />
-      )}
-    </svg>
+          ))}
+          {showProgress && item.progress && (
+            <>
+              <rect x="140" y="738" width="350" height="14" rx="7" fill={c("#120b07")} stroke={metal} strokeWidth="1.5" />
+              <rect x="140" y="738" width={350 * ratio} height="14" rx="7" fill={metal} />
+              <text x={CX} y="778" fontSize="19" fontFamily="Cinzel, serif" textAnchor="middle" fill={c("#cdbb9b")} letterSpacing="1">
+                {formatNumber(item.progress.current)} / {formatNumber(item.progress.goal)}
+              </text>
+            </>
+          )}
+        </g>
+        {/* The rarity, on its ribbon. */}
+        <text x={CX} y="845" fontSize="24" fontFamily="Cinzel, serif" fontWeight="800" letterSpacing="4" textAnchor="middle" fill={c("#2a1606")}>
+          {t(RARITY_KEYS[item.rarity]).toUpperCase()}
+        </text>
+      </svg>
+      {item.rarity === "mythic" && item.unlocked && <span className="ach-holo" />}
+    </div>
   );
 }

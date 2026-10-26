@@ -5,6 +5,7 @@ import { getAchievements, type AchievementsView, type AchievementView } from "./
 import { rewardText } from "./boosterKinds";
 import { useI18n, type I18n } from "./i18n";
 import { Loading } from "./Loading";
+import { useNearScreen } from "./nearScreen";
 import { useAmountsInText, useMoneyText } from "./money";
 
 type Filter = "all" | "unlocked" | "locked" | "secret";
@@ -74,14 +75,7 @@ export function Achievements({ refreshKey }: { refreshKey: number }) {
         <div className="scroll" ref={list}>
           <div className="ach-grid">
             {shown.map((a) => (
-              <button
-                key={a.id}
-                className={`ach-item ${current?.id === a.id ? "sel" : ""}`}
-                title={t("achievements.open")}
-                onClick={() => setChosen(a.id)}
-              >
-                <AchievementCard item={a} />
-              </button>
+              <AchievementTile key={a.id} item={a} selected={current?.id === a.id} onChoose={() => setChosen(a.id)} />
             ))}
           </div>
           <BackToTop target={list} />
@@ -89,6 +83,19 @@ export function Achievements({ refreshKey }: { refreshKey: number }) {
       </section>
       {current && <AchievementDetails item={current} />}
     </div>
+  );
+}
+
+/** A card of the cabinet, drawn only near the screen; its shadow is the tile's, not a filter. */
+function AchievementTile({ item, selected, onChoose }: { item: AchievementView; selected: boolean; onChoose: () => void }) {
+  const { t } = useI18n();
+  const ref = useRef<HTMLButtonElement>(null);
+  const near = useNearScreen(ref, true);
+  const glow = item.unlocked && (item.rarity === "rare" || item.rarity === "mythic") ? item.rarity : undefined;
+  return (
+    <button ref={ref} className={`ach-item ${selected ? "sel" : ""}`} data-glow={glow} title={t("achievements.open")} onClick={onChoose}>
+      {near ? <AchievementCard item={item} lite /> : <span className="ach-card-space" />}
+    </button>
   );
 }
 

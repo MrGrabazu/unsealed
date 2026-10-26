@@ -396,8 +396,8 @@ button.reserve-cell.sel::after { content: ""; position: absolute; top: 172px; le
 
 /* ---- achievements: the cabinet, and the one chosen beside it ----------------------------- */
 /* A mythic card unlocked glows like the fire of its rim. */
-.ach-card.mythic.unlocked { filter: drop-shadow(0 0 12px #ff7a2a88) drop-shadow(0 6px 14px #0008); }
-.ach-card.rare.unlocked { filter: drop-shadow(0 0 8px #f5b84a55) drop-shadow(0 6px 14px #0008); }
+.ach-card.mythic.unlocked:not(.lite) { filter: drop-shadow(0 0 12px #ff7a2a88) drop-shadow(0 6px 14px #0008); }
+.ach-card.rare.unlocked:not(.lite) { filter: drop-shadow(0 0 8px #f5b84a55) drop-shadow(0 6px 14px #0008); }
 .ach-split { grid-template-columns: minmax(0, 1fr) 340px; }
 .ach-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; margin-bottom: 14px; }
 .ach-progress { display: flex; align-items: center; gap: 10px; flex: 1 1 220px; max-width: 360px; font: 700 13px var(--font-title); color: var(--gold-hi); white-space: nowrap; }
@@ -405,7 +405,25 @@ button.reserve-cell.sel::after { content: ""; position: absolute; top: 172px; le
 .ach-split .ach-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 16px 14px; padding: 4px 2px 8px; }
 button.ach-item { padding: 0; border: none; background: none; box-shadow: none; letter-spacing: 0; border-radius: 12px; }
 button.ach-item:hover:not(:disabled) { box-shadow: none; }
-button.ach-item.sel { transform: translateY(-4px); filter: drop-shadow(0 0 14px #f5b84aaa); }
+button.ach-item.sel { transform: translateY(-4px); }
+/* The cabinet's cards: their shadow and glow are a box-shadow behind the card's body (the
+   rounded rectangle of the SVG, the ribbon below it), far cheaper than a filter on each. */
+button.ach-item { position: relative; isolation: isolate; }
+button.ach-item::before { content: ""; position: absolute; z-index: -1; left: 1.27%; right: 1.27%; top: 0.91%; bottom: 4.55%;
+  border-radius: 4.8% / 3.4%; box-shadow: 0 6px 14px #0008; pointer-events: none; }
+button.ach-item[data-glow="rare"]::before { box-shadow: 0 0 8px #f5b84a55, 0 6px 14px #0008; }
+button.ach-item[data-glow="mythic"]::before { box-shadow: 0 0 12px #ff7a2a88, 0 6px 14px #0008; }
+button.ach-item.sel::before { box-shadow: 0 0 14px #f5b84aaa, 0 0 6px #f5b84a88, 0 6px 14px #0008; }
+.ach-card-space { display: block; width: 100%; aspect-ratio: 630 / 880; }
+/* An unlocked mythic's holographic sheen, a layer over its card (AchievementCard.tsx) slid
+   by a transform: the compositor moves it without repainting. */
+.ach-holo { position: absolute; left: 1.27%; right: 1.27%; top: 0.91%; bottom: 4.55%; border-radius: 4.8% / 3.4%;
+  overflow: hidden; mix-blend-mode: color-dodge; pointer-events: none; }
+/* Three cards wide and high, the band in its middle third: its edges never show as it slides. */
+.ach-holo::before { content: ""; position: absolute; left: -100%; top: -100%; width: 300%; height: 300%; will-change: transform;
+  background: linear-gradient(135deg, #ff7bd000 40%, #ff7bd080 46.67%, #7bd0ff80 50%, #b6ff7b80 53.33%, #b6ff7b00 60%);
+  animation: ach-holo 4s linear infinite; }
+@keyframes ach-holo { from { transform: translate(-33.33%, -33.33%); } to { transform: translate(33.33%, 33.33%); } }
 .ach-big { width: 210px; margin: 6px auto 8px; }
 .ach-side .ach-name { margin: 4px 0 6px; padding: 0; background: none; text-align: center; font-size: 19px; color: var(--gold-hi); }
 .ach-side .ach-goal { text-align: center; font-size: 15.5px; line-height: 1.4; margin: 0 4px; }
