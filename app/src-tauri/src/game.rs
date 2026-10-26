@@ -955,8 +955,8 @@ impl Game {
 
     /// The CDN paths of the images an opening of this booster may show ("large/front/a/b/<id>.jpg"):
     /// every card its sheets can give, in the card language as `localized` shows it, large (the
-    /// 3D opening) then normal (the opening's result, the classic opening). To download before
-    /// the booster is opened (`images::prefetch`).
+    /// 3D opening), small (the cards seen beside it) then normal (the opening's result, the
+    /// classic opening). To download before the booster is opened (`images::prefetch`).
     pub fn booster_image_paths(&mut self, set_code: &str, kind: &str) -> Result<Vec<String>, String> {
         self.ensure_loaded(set_code)?;
         let set = &self.sets[set_code];
@@ -970,7 +970,7 @@ impl Game {
             .collect();
         ids.sort();
         ids.dedup();
-        Ok(["large", "normal"]
+        Ok(["large", "small", "normal"]
             .iter()
             .flat_map(|version| ids.iter().map(move |id| scryfall_image_face(id, version, "front")))
             .filter_map(|url| url.strip_prefix(CDN).map(String::from))
@@ -2673,11 +2673,13 @@ mod tests {
         let mut g = game_with_booster("prefetch");
         assert_eq!(g.sealed_kinds().unwrap(), [("TST".to_string(), "play".to_string())]);
         let paths = g.booster_image_paths("TST", "play").unwrap();
-        // Every card the booster can give, large (the 3D opening) then normal, once each.
+        // Every card the booster can give, large (the 3D opening), small (seen beside it) then
+        // normal, once each.
         assert!(paths.contains(&"large/front/a/b/abcdef.jpg".to_string()));
+        assert!(paths.contains(&"small/front/a/b/abcdef.jpg".to_string()));
         assert!(paths.contains(&"normal/front/a/b/abcdef.jpg".to_string()));
         let large = paths.iter().take_while(|p| p.starts_with("large/")).count();
-        assert_eq!(large * 2, paths.len());
+        assert_eq!(large * 3, paths.len());
         assert!(g.booster_image_paths("TST", "collector").is_err());
     }
 

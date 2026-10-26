@@ -786,6 +786,8 @@ button.bet-add { width: 100%; margin-top: 10px; padding: 9px; border: 1px dashed
 .result-side .buy-bar > button:not(.big) { width: 100%; }
 .result-sell { display: flex; flex-direction: column; gap: 6px; }
 .result-sell button { width: 100%; }
+/* The tally's sale of the set's duplicates, in the room of the two sale buttons it replaced. */
+.result-sell button.large { min-height: 78px; font-size: 16px; }
 
 /* ---- the library's card on hover: an ornate frame of its own ----------------------------- */
 .library-tooltip { padding: 16px 18px 12px; background: var(--leather), linear-gradient(180deg, #2e1f15, #1f150e);

@@ -812,6 +812,8 @@ struct ScryfallCard {
     promo_types: Vec<String>,
     #[serde(default)]
     layout: String,
+    #[serde(default)]
+    set: String,
 }
 
 #[derive(Deserialize)]
@@ -843,10 +845,56 @@ struct ScryfallPrices {
     eur_foil: Option<String>,
 }
 
+/// Pairs a set needs for a rate of its own between both currencies; below, the rate of all sets.
+const MIN_RATE_PAIRS: u32 = 20;
+/// Prices under this (in cents) say little of how both markets compare: bulk sells at a floor.
+const MIN_RATE_CENTS: u32 = 100;
+
+/// How the dollar prices (TCGplayer) of some printings compare with their euro ones
+/// (Cardmarket): not the exchange rate, both markets differing (Alpha sells for less in dollars
+/// than in euros, most recent sets for about a third more).
+#[derive(Default, Clone, Copy)]
+struct CurrencyRate {
+    usd: u64,
+    eur: u64,
+    pairs: u32,
+}
+
+impl CurrencyRate {
+    fn add(&mut self, prices: &PriceSet) {
+        for (usd, eur) in [(prices.usd, prices.eur), (prices.usd_foil, prices.eur_foil)] {
+            if let (Some(usd), Some(eur)) = (usd, eur) {
+                if usd >= MIN_RATE_CENTS && eur >= MIN_RATE_CENTS {
+                    self.usd += u64::from(usd);
+                    self.eur += u64::from(eur);
+                    self.pairs += 1;
+                }
+            }
+        }
+    }
+
+    /// Dollars per euro, weighted by price (the dear cards are those whose price matters).
+    fn usd_per_eur(&self) -> Option<f64> {
+        (self.pairs > 0).then(|| self.usd as f64 / self.eur as f64)
+    }
+}
+
+/// Gives a price priced in one currency only (Scryfall has no dollar price for most of Alpha's
+/// rares, Cardmarket has them all) the other one, converted at `usd_per_eur`.
+fn fill_other_currency(prices: &mut PriceSet, usd_per_eur: f64) {
+    let convert = |cents: Option<u32>, rate: f64| cents.map(|c| (f64::from(c) * rate).round().max(1.0) as u32);
+    prices.usd = prices.usd.or_else(|| convert(prices.eur, usd_per_eur));
+    prices.usd_foil = prices.usd_foil.or_else(|| convert(prices.eur_foil, usd_per_eur));
+    prices.eur = prices.eur.or_else(|| convert(prices.usd, 1.0 / usd_per_eur));
+    prices.eur_foil = prices.eur_foil.or_else(|| convert(prices.usd_foil, 1.0 / usd_per_eur));
+}
+
 /// Reads a Scryfall bulk file (one JSON card per line) and returns the prices of the wanted
 /// card ids only. A wanted printing without any price (a serialized card, a rare promo...)
 /// gets an estimate instead: the best prices of the other printings of the same card,
 /// marked `estimated`. Tokens are never estimated (the game gives them its fallback price).
+/// A price known in one currency only gets the other, converted at the rate between both
+/// markets seen on its set's printings priced in both (or on all of them, for a set with few).
 pub fn prices_from_scryfall_jsonl<R: BufRead>(
     reader: R,
     wanted: &HashSet<String>,
@@ -855,6 +903,9 @@ pub fn prices_from_scryfall_jsonl<R: BufRead>(
     // Best prices of each card over all its printings, and the card of each wanted printing.
     let mut best: HashMap<String, PriceSet> = HashMap::new();
     let mut oracle_of: HashMap<String, String> = HashMap::new();
+    let mut set_of: HashMap<String, String> = HashMap::new();
+    let mut rates: HashMap<String, CurrencyRate> = HashMap::new();
+    let mut all_sets = CurrencyRate::default();
     for line in reader.lines() {
         let line = line?;
         let line = line.trim();
@@ -883,12 +934,23 @@ pub fn prices_from_scryfall_jsonl<R: BufRead>(
             }
         }
         if wanted.contains(&card.id) {
+            rates.entry(card.set.clone()).or_default().add(&prices);
+            all_sets.add(&prices);
+            set_of.insert(card.id.clone(), card.set);
             out.insert(card.id, prices);
         }
     }
     for (id, prices) in out.iter_mut() {
         if let Some(best) = prices.is_empty().then(|| oracle_of.get(id).and_then(|o| best.get(o))).flatten() {
             *prices = PriceSet::estimate_from(*best);
+        }
+        let rate = set_of
+            .get(id)
+            .and_then(|set| rates.get(set))
+            .filter(|rate| rate.pairs >= MIN_RATE_PAIRS)
+            .unwrap_or(&all_sets);
+        if let Some(usd_per_eur) = rate.usd_per_eur() {
+            fill_other_currency(prices, usd_per_eur);
         }
     }
     out.retain(|_, p| !p.is_empty());

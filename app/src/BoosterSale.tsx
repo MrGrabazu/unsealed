@@ -95,9 +95,10 @@ export function useBoosterSale(cards: OpenedCard[] | null, onSold: () => void): 
 
 /** Sells the duplicates of the opened boosters' set (one copy of each card kept, as in its
  * binder), after a second click to confirm. `opened`: what was opened (a new opening resets
- * the button); `sale`: the sale of the booster's own cards, if there is one. */
-export function SellDuplicatesButton(props: { setCode: string; opened: unknown; sale?: BoosterSale; onSold: () => void }) {
-  const { setCode, opened, sale, onSold } = props;
+ * the button); `sale`: the sale of the booster's own cards, if there is one; `large`: the
+ * tally's main sale, in the room of two buttons. */
+export function SellDuplicatesButton(props: { setCode: string; opened: unknown; sale?: BoosterSale; onSold: () => void; large?: boolean }) {
+  const { setCode, opened, sale, onSold, large = false } = props;
   const { tx } = useI18n();
   const money = useMoney();
   const [value, setValue] = useState<number | null>(null);
@@ -141,7 +142,7 @@ export function SellDuplicatesButton(props: { setCode: string; opened: unknown; 
   return (
     <>
       <button
-        className={confirming ? "sell confirm" : "sell"}
+        className={`sell${confirming ? " confirm" : ""}${large ? " large" : ""}`}
         disabled={busy || sale?.busy}
         onClick={() => {
           if (!confirming) return setConfirming(true);

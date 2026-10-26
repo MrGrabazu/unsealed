@@ -518,6 +518,37 @@ fn a_token_without_a_price_is_not_estimated_from_its_other_printings() {
 }
 
 #[test]
+fn a_price_in_one_currency_only_gets_the_other_at_the_rate_seen_between_both_markets() {
+    // A set of its own (Alpha: dollar prices for its commons, not for its rares) and another.
+    let mut jsonl = String::new();
+    for i in 0..20 {
+        jsonl += &format!(r#"{{"id":"lea{i}","set":"lea","prices":{{"usd":"9.00","eur":"10.00"}}}}"#);
+        jsonl += "\n";
+        jsonl += &format!(r#"{{"id":"new{i}","set":"new","prices":{{"usd":"3.00","eur":"2.00"}}}}"#);
+        jsonl += "\n";
+    }
+    jsonl += concat!(
+        r#"{"id":"lotus","set":"lea","prices":{"usd":null,"eur":"30000.00"}}"#, "\n",
+        r#"{"id":"new","set":"new","prices":{"usd":null,"eur":"4.00","usd_foil":"12.00"}}"#, "\n",
+        // Too few printings priced in both: the rate of all sets.
+        r#"{"id":"few","set":"few","prices":{"usd":"10.00"}}"#, "\n",
+    );
+    let wanted: HashSet<String> = (0..20)
+        .flat_map(|i| [format!("lea{i}"), format!("new{i}")])
+        .chain(["lotus", "new", "few"].map(String::from))
+        .collect();
+    let prices = prices_from_scryfall_jsonl(Cursor::new(jsonl), &wanted).unwrap();
+
+    // Each set at its own rate, its prices of its own kept.
+    assert_eq!((prices["lotus"].usd, prices["lotus"].eur), (Some(2_700_000), Some(3_000_000)));
+    assert_eq!((prices["new"].usd, prices["new"].eur), (Some(600), Some(400)));
+    assert_eq!((prices["new"].usd_foil, prices["new"].eur_foil), (Some(1200), Some(800)));
+    assert!(!prices["lotus"].estimated);
+    // All sets: 240 dollars for 240 euros.
+    assert_eq!(prices["few"].eur, Some(1000));
+}
+
+#[test]
 fn a_set_named_like_a_windows_device_gets_another_file_name() {
     // Conflux: "CON.json" is the console on Windows 10, whatever the extension.
     assert_eq!(set_file_name("CON"), "CON_.json");

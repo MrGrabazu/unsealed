@@ -49,6 +49,25 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
     setTearing(false);
   }, [setCode, kind, cards]);
 
+  // The thumbnails of the cards seen beside the scene, loaded and decoded as soon as the booster
+  // is torn: asked for only as each card came, they showed a black frame first. Kept while the
+  // booster is shown, so the browser keeps them ready.
+  useEffect(() => {
+    if (!cards) return;
+    const images = cards
+      .flatMap((c) => [c.imageUrl, c.backImageUrl])
+      .filter((url): url is string => url != null)
+      .map((url) => {
+        const image = new Image();
+        image.src = smallImage(url);
+        void image.decode().catch(() => {});
+        return image;
+      });
+    return () => {
+      images.length = 0;
+    };
+  }, [cards]);
+
   const total = cards?.length ?? 0;
 
   // The card on top of the pile is seen: its achievements happen now.
