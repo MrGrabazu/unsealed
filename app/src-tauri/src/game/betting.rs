@@ -23,8 +23,9 @@ pub struct BetRequest {
     pub stake_cents: u32,
 }
 
-/// A bet kept from one opening to the next (placed again on every booster). One naming a card
-/// only applies to the boosters of its set.
+/// A bet kept from one opening to the next (placed again on every booster): with a `set_code`,
+/// on that set's boosters only (the slip's default, and always for one naming a card), else on
+/// every booster.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct KeptBet {

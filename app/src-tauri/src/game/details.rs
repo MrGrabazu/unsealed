@@ -21,6 +21,9 @@ pub struct CardDetailsView {
     pub rarity: String,
     pub image_url: String,
     pub back_image_url: Option<String>,
+    /// How its image (front) is turned to be read, when printed sideways (see `reading_turn`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reading: Option<&'static str>,
     pub artist: Option<String>,
     pub can_be_foil: bool,
     pub can_be_nonfoil: bool,
@@ -75,6 +78,20 @@ pub struct PrintingView {
     pub current: bool,
 }
 
+/// How a card printed sideways is turned to be read (Scryfall's images are always upright, as
+/// printed): "right" (a quarter turn clockwise) for split cards (Duskmourn's Rooms among
+/// them), planes and the front of battles; "left" for an aftermath card's second half; "flip"
+/// (half a turn) for a Kamigawa flip card's second half. None for any other card.
+fn reading_turn(layout: &str, types: &[String]) -> Option<&'static str> {
+    match layout {
+        "split" | "planar" => Some("right"),
+        "aftermath" => Some("left"),
+        "flip" => Some("flip"),
+        _ if types.iter().any(|t| t == "battle") => Some("right"),
+        _ => None,
+    }
+}
+
 /// What to ask Scryfall for a card.
 pub struct DetailsQuery {
     /// The English printing (for the list of printings).
@@ -107,6 +124,7 @@ impl Game {
             rarity: card.rarity.clone(),
             image_url: shown.image_url,
             back_image_url: shown.back_image_url,
+            reading: reading_turn(&card.layout, &card.types),
             artist: card.artist.clone(),
             can_be_foil: card.finishes.iter().any(|f| f == "foil" || f == "etched"),
             can_be_nonfoil: card.finishes.iter().any(|f| f == "nonfoil"),
@@ -202,5 +220,22 @@ fn face_view(face: scryfall::Face) -> FaceView {
         text: face.printed_text.or(face.oracle_text).filter(|t| !t.is_empty()),
         flavor_text: face.flavor_text,
         stats,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::reading_turn;
+
+    #[test]
+    fn cards_printed_sideways_say_how_they_are_turned_to_be_read() {
+        let types = |t: &[&str]| t.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(reading_turn("split", &types(&["enchantment"])), Some("right"));
+        assert_eq!(reading_turn("planar", &types(&["plane"])), Some("right"));
+        assert_eq!(reading_turn("transform", &types(&["battle"])), Some("right"));
+        assert_eq!(reading_turn("aftermath", &types(&["sorcery"])), Some("left"));
+        assert_eq!(reading_turn("flip", &types(&["creature"])), Some("flip"));
+        assert_eq!(reading_turn("transform", &types(&["creature"])), None);
+        assert_eq!(reading_turn("normal", &types(&["creature"])), None);
     }
 }

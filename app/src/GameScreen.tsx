@@ -534,6 +534,8 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     // were for the last one.
     setSlip(keptFor(kept, setCode));
     setPack({ setCode, kind, quick: false });
+    // The last tear asked must not tear this pack as soon as its scene mounts.
+    setTearRequest(0);
     setLast({ setCode, kind });
     setTab("open");
     // While the pack is sealed: which translated images are good scans (else English ones).
@@ -930,6 +932,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
                 {batch && (
                   <BatchOpening
                     boosters={batch}
+                    onDetails={(card) => last && setDetailsOf({ setCode: last.setCode, uuid: card.uuid })}
                     onFinished={() => {
                       releaseToasts();
                       setAllSeen(true);

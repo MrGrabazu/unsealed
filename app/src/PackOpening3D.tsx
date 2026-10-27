@@ -6,6 +6,7 @@ import { CardImage } from "./CardImage";
 import { Money, useMoney } from "./money";
 import { FoilSheen } from "./foils";
 import { smallImage } from "./images";
+import { NewBadge, RevealMention } from "./NewBadge";
 import { RevealedCards } from "./RevealedCards";
 import { packLookOf } from "./scene/packArt";
 import { PackScene } from "./scene/PackScene";
@@ -39,6 +40,8 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
   const [tearing, setTearing] = useState(false);
   // Bumped when tearing failed: the scene starts over, the pack sealed again.
   const [attempt, setAttempt] = useState(0);
+  // The card seen on top of the pile, for its mention (none while one leaves).
+  const [shown, setShown] = useState<number | null>(null);
 
   const look = useMemo(() => packLookOf(setCode, set, kind, t), [setCode, set, kind, t]);
 
@@ -47,6 +50,7 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
     setFinished(false);
     setSlideRequest(0);
     setTearing(false);
+    setShown(null);
   }, [setCode, kind, cards]);
 
   // The thumbnails of the cards seen beside the scene, loaded and decoded as soon as the booster
@@ -125,6 +129,7 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
               tearRequest={tearRequest}
               onNext={() => setTop((n) => Math.min(n + 1, total - 1))}
               onFinished={() => setFinished(true)}
+              onShown={setShown}
               onTorn={() => {
                 if (tearing) return;
                 setTearing(true);
@@ -136,6 +141,7 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
               }}
             />
           </div>
+          <RevealMention card={cards && shown != null ? cards[shown] : null} index={shown ?? -1} />
           {seen.length > 0 && (
             <div className="seen-strip" aria-label={t("open.revealed", { revealed: seen.length, total })}>
               {[...seen].reverse().map((card, i) => (
@@ -143,7 +149,7 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
                   <span className="thumb">
                     <CardImage front={smallImage(card.imageUrl)} back={smallImage(card.backImageUrl)} alt={card.name} />
                     {card.foil && <FoilSheen rarity={card.rarity} kind={card.foilKind} badge={false} />}
-                    {card.isNew && <span className="badge-new">{t("open.new")}</span>}
+                    <NewBadge card={card} />
                   </span>
                   <span className="seen-price">{card.priceCents == null ? "—" : <Money cents={card.priceCents} estimated={card.priceEstimated} />}</span>
                 </button>

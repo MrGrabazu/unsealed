@@ -9,6 +9,7 @@ import { useI18n } from "./i18n";
 import { Money, useMoney } from "./money";
 import { Pack } from "./Pack";
 import { FoilSheen } from "./foils";
+import { NewBadge, RevealMention } from "./NewBadge";
 import { revealSound, sounds } from "./sound";
 
 interface Props {
@@ -53,7 +54,6 @@ function useCardBack(): string | null {
 
 /** A card that can be face down (its back) or face up. */
 function FlipCard({ card, faceUp }: { card: OpenedCard; faceUp: boolean }) {
-  const { t } = useI18n();
   const backUrl = useCardBack();
   return (
     <motion.div
@@ -67,7 +67,7 @@ function FlipCard({ card, faceUp }: { card: OpenedCard; faceUp: boolean }) {
       <div className="face front">
         <CardImage front={card.imageUrl} back={faceUp ? card.backImageUrl : null} alt={card.name} />
         {card.foil && <FoilSheen rarity={card.rarity} kind={card.foilKind} />}
-        {card.isNew && <span className="badge-new">{t("open.new")}</span>}
+        <NewBadge card={card} />
       </div>
     </motion.div>
   );
@@ -204,6 +204,10 @@ export function PackOpening({ setCode, set, kind, cards, onTear, onReveal, busy,
                 })}
             </div>
             <p className="hint">{topFaceUp ? t("open.stackHintAside") : t("open.stackHintReveal")}</p>
+            {/* Its room kept: the mention coming and going moves nothing. */}
+            <div className="mention-slot">
+              <RevealMention card={topFaceUp ? cards[aside] : null} index={aside} />
+            </div>
           </div>
         )}
 

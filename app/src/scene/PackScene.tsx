@@ -348,6 +348,7 @@ function Cards({
   top,
   onNext,
   onFinished,
+  onShown,
   slideRequest,
 }: {
   cards: OpenedCard[];
@@ -356,6 +357,8 @@ function Cards({
   onNext: () => void;
   /** The last card has left too. */
   onFinished: () => void;
+  /** The card of this index is seen on top of the pile; null once it starts leaving. */
+  onShown?: (index: number | null) => void;
   /** Bumped to send the top card off without a drag (Space). */
   slideRequest: number;
 }) {
@@ -424,6 +427,7 @@ function Cards({
   function sendOff(direction: THREE.Vector2, duration: number) {
     const dir = direction.lengthSq() > 1e-6 ? direction.clone().normalize() : new THREE.Vector2(1, 0.35).normalize();
     leaving.current = true;
+    onShown?.(null);
     sounds.slide();
     animateTo(offset.current.clone().add(dir.multiplyScalar(8)), duration, () => {
       slide.current = { kind: "idle" };
@@ -437,6 +441,7 @@ function Cards({
         current.current += 1;
         topSince.current = clock.current;
         revealSound(cards[current.current]);
+        onShown?.(current.current);
         onNext();
       }
     });
@@ -487,6 +492,7 @@ function Cards({
     if (!firstShown.current && since >= SETTLED) {
       firstShown.current = true;
       revealSound(cards[0]);
+      onShown?.(0);
     }
 
     // The whole pile tilts together with the pointer: no card reveals another by itself. While
@@ -632,12 +638,14 @@ interface Props {
   onTorn: () => void;
   onNext: () => void;
   onFinished: () => void;
+  /** The card of this index is seen on top of the pile; null once it starts leaving. */
+  onShown?: (index: number | null) => void;
   slideRequest: number;
   /** Bumped to tear the pack open without touching it. */
   tearRequest: number;
 }
 
-export function PackScene({ look, cards, top, onTorn, onNext, onFinished, slideRequest, tearRequest }: Props) {
+export function PackScene({ look, cards, top, onTorn, onNext, onFinished, onShown, slideRequest, tearRequest }: Props) {
   // Once the cards are drawn they slide out of the wrapper, which then falls away.
   const [packGone, setPackGone] = useState(false);
   useEffect(() => {
@@ -655,7 +663,7 @@ export function PackScene({ look, cards, top, onTorn, onNext, onFinished, slideR
       <PointerLight />
       {!packGone && <Pack look={look} onTorn={onTorn} leaving={cards != null} tearRequest={tearRequest} />}
       {cards && (
-        <Cards cards={cards} top={top} onNext={onNext} onFinished={onFinished} slideRequest={slideRequest} />
+        <Cards cards={cards} top={top} onNext={onNext} onFinished={onFinished} onShown={onShown} slideRequest={slideRequest} />
       )}
     </Canvas>
   );

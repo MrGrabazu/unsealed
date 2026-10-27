@@ -43,8 +43,14 @@ export function CardDetails({ setCode, uuid, onClose }: Props) {
   const [details, setDetails] = useState<CardDetailsView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const printingList = useRef<HTMLDivElement>(null);
+  // A card printed sideways, turned to be read (its front only: a battle's back is upright).
+  const [turned, setTurned] = useState(false);
+  const [backShown, setBackShown] = useState(false);
+  const reading = backShown ? undefined : details?.reading;
 
   useEffect(() => {
+    setTurned(false);
+    setBackShown(false);
     getCardDetails(setCode, uuid)
       .then(setDetails)
       .catch((e) => setError(String(e)));
@@ -68,10 +74,30 @@ export function CardDetails({ setCode, uuid, onClose }: Props) {
         {error && <p className="error">{error}</p>}
         {!details && !error && <Loading label={t("details.loading")} />}
         {details && (
-          <div className="details-layout">
+          <div className={`details-layout ${reading && turned ? `turned-${reading}` : ""}`}>
             <div className="details-image">
               {/* Shown large: the sharper image. */}
-              <CardImage front={largeImage(details.imageUrl)} back={largeImage(details.backImageUrl)} alt={details.name} />
+              <CardImage
+                front={largeImage(details.imageUrl)}
+                back={largeImage(details.backImageUrl)}
+                alt={details.name}
+                onTurned={(back) => {
+                  setBackShown(back);
+                  setTurned(false);
+                }}
+              />
+              {reading && (
+                <button
+                  type="button"
+                  className={`rotate-button ${turned ? "active" : ""}`}
+                  title={t(turned ? "details.unrotate" : "details.rotate")}
+                  aria-label={t(turned ? "details.unrotate" : "details.rotate")}
+                  aria-pressed={turned}
+                  onClick={() => setTurned((on) => !on)}
+                >
+                  {reading === "flip" ? "↻" : reading === "left" ? "⤺" : "⤻"}
+                </button>
+              )}
             </div>
 
             {/* The text, then the printings, which scroll on their own: the sheet never

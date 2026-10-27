@@ -68,6 +68,18 @@
         "name": { "en": "Mutant Melee", "fr": "Mêlée mutante", "de": "Mutantengetümmel", "es": "Refriega mutante", "it": "Mischia mutante" } },
       { "id": "shredder-rooftop-battle", "columns": 3, "cells": ["209", "210", "211", "212", "213", "214"],
         "name": { "en": "Shredder Rooftop Battle", "fr": "Combat contre Shredder sur les toits", "de": "Dachkampf gegen Shredder", "es": "Batalla con Shredder en la azotea", "it": "Battaglia con Shredder sui tetti" } }
+    ],
+    "FRA": [
+      { "id": "plains-tower", "columns": 1, "cells": ["382", "383", "384"],
+        "name": { "en": "Plains Tower", "fr": "La tour des plaines", "de": "Der Ebenenturm", "es": "La torre de las llanuras", "it": "La torre delle pianure" } },
+      { "id": "islands-tower", "columns": 1, "cells": ["385", "386", "387"],
+        "name": { "en": "Islands Tower", "fr": "La tour des îles", "de": "Der Inselturm", "es": "La torre de las islas", "it": "La torre delle isole" } },
+      { "id": "swamps-tower", "columns": 1, "cells": ["388", "389", "390"],
+        "name": { "en": "Swamps Tower", "fr": "La tour des marais", "de": "Der Sumpfturm", "es": "La torre de los pantanos", "it": "La torre delle paludi" } },
+      { "id": "mountains-tower", "columns": 1, "cells": ["391", "392", "393"],
+        "name": { "en": "Mountains Tower", "fr": "La tour des montagnes", "de": "Der Gebirgsturm", "es": "La torre de las montañas", "it": "La torre delle montagne" } },
+      { "id": "forests-tower", "columns": 1, "cells": ["394", "395", "396"],
+        "name": { "en": "Forests Tower", "fr": "La tour des forêts", "de": "Der Waldturm", "es": "La torre de los bosques", "it": "La torre delle foreste" } }
     ]
   }
 }

@@ -1,9 +1,9 @@
 import { motion } from "framer-motion";
 import type { OpenedCard } from "./api";
 import { CardImage } from "./CardImage";
-import { useI18n } from "./i18n";
 import { Money } from "./money";
 import { FoilSheen } from "./foils";
+import { NewBadge } from "./NewBadge";
 
 interface Props {
   card: OpenedCard;
@@ -11,10 +11,11 @@ interface Props {
   /** Whether a click on this card reveals it. */
   clickable: boolean;
   onReveal: () => void;
+  /** In a long list: its image only in the page near the screen. */
+  lazy?: boolean;
 }
 
-export function Card({ card, faceUp, clickable, onReveal }: Props) {
-  const { t } = useI18n();
+export function Card({ card, faceUp, clickable, onReveal, lazy = false }: Props) {
   return (
     <div className="card-slot">
       <motion.div
@@ -29,9 +30,9 @@ export function Card({ card, faceUp, clickable, onReveal }: Props) {
         </div>
         <div className="face front">
           {/* Only a revealed card can be turned over: before that, a click reveals it. */}
-          <CardImage front={card.imageUrl} back={faceUp ? card.backImageUrl : null} alt={card.name} />
+          <CardImage front={card.imageUrl} back={faceUp ? card.backImageUrl : null} alt={card.name} lazy={lazy} />
           {card.foil && <FoilSheen rarity={card.rarity} kind={card.foilKind} />}
-          {card.isNew && <span className="badge-new">{t("open.new")}</span>}
+          <NewBadge card={card} />
         </div>
       </motion.div>
       <div className={`card-caption ${faceUp ? "visible" : ""}`}>

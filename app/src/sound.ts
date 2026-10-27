@@ -137,6 +137,16 @@ export const sounds = {
     );
   },
 
+  /** A card new to the collection (or its first foil): two light notes rising, after the
+   * card's own sound. */
+  discovery() {
+    const a = context();
+    if (!a) return;
+    [1046.5, 1568].forEach((f, i) =>
+      tone(a.ctx, a.out, { at: 0.22 + i * 0.11, frequency: f * jitter(0.01), duration: 0.5, type: "triangle", gain: 0.07 }),
+    );
+  },
+
   /** A great pull (rare, mythic): a deep bell and a rising chord. */
   fanfare(mythic: boolean) {
     const a = context();
@@ -191,11 +201,16 @@ export function bestCard(cards: OpenedCard[]): OpenedCard | undefined {
 }
 
 /** What a card revealed sounds like: a bell for a great pull, a chime for a foil (both for a
- * great foil), a soft flip otherwise. */
+ * great foil), a soft flip otherwise; then two notes for a first foil, or a new card above an
+ * uncommon (early in a game, nearly every card is new: they would ring for each). */
 export function revealSound(card: OpenedCard | undefined) {
   if (!card) return;
   const great = card.rarity === "mythic" || isBigCard(card);
   if (great) sounds.fanfare(card.rarity === "mythic");
   if (card.foil) sounds.shimmer();
   if (!great && !card.foil) sounds.flip();
+  if (card.newFoil || (card.isNew && !PLAIN_RARITIES.includes(card.rarity))) sounds.discovery();
 }
+
+/** Rarities whose new cards are only said, not rung. */
+const PLAIN_RARITIES = ["common", "uncommon", "token", "art"];

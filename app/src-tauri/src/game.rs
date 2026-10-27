@@ -101,6 +101,8 @@ pub struct OpenedCard {
     pub sell_value_cents: u32,
     /// First time the player owns this card (in any finish).
     pub is_new: bool,
+    /// A foil of a card the player only owned in non-foil until now.
+    pub new_foil: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -784,6 +786,7 @@ impl Game {
                     // As `Game::sale_value` reckons it.
                     sell_value_cents: price.map_or(0, |p| economy.sell_value_cents(p)),
                     is_new: false,
+                    new_foil: false,
                 }
             })
             .collect();
@@ -812,8 +815,9 @@ impl Game {
                 .collect();
             self.store.open_sealed_with_bets(set_code, kind, &records, &placed, now).map_err(err)?
         };
-        for (card, is_new) in cards.iter_mut().zip(&outcome.is_new) {
+        for ((card, is_new), new_foil) in cards.iter_mut().zip(&outcome.is_new).zip(&outcome.new_foil) {
             card.is_new = *is_new;
+            card.new_foil = *new_foil;
         }
         // The box this booster completes, if any, gives its box topper.
         self.give_box_toppers(set_code, kind)?;
@@ -1266,6 +1270,7 @@ impl Game {
             price_estimated: false,
             sell_value_cents: 0,
             is_new: false,
+            new_foil: false,
         })
     }
 
@@ -2102,8 +2107,9 @@ mod tests {
             price_estimated: false,
             sell_value_cents: 0,
             is_new: false,
+            new_foil: false,
         };
-        let order = |kind: &str, mut cards: Vec<OpenedCard>| {
+        let order =|kind: &str, mut cards: Vec<OpenedCard>| {
             cards.sort_by_key(|c| reveal_rank(kind, c));
             cards.into_iter().map(|c| c.uuid).collect::<Vec<_>>()
         };

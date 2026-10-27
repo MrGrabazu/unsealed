@@ -101,42 +101,50 @@ export function BetSlip({ setCode, kind, bets, onBets, kept, onKept, onCardName,
   }, [open, bets, setCode, kind]);
 
   const margin = context?.houseMarginPercent ?? 0;
-  const isKept = (bet: Bet) => kept.some((k) => betKey(k.bet) === betKey(bet) && (k.setCode == null || k.setCode === setCode));
+  // The kept bet behind a bet of the slip: kept for this set's boosters, or for all of them.
+  const appliesHere = (k: KeptBet, bet: Bet) => betKey(k.bet) === betKey(bet) && (k.setCode == null || k.setCode === setCode);
+  const isKept = (bet: Bet) => kept.some((k) => appliesHere(k, bet));
+  const scopeOf = (bet: Bet): KeepScope | null => {
+    const k = kept.find((k) => appliesHere(k, bet));
+    return k ? (k.setCode == null ? "all" : "set") : null;
+  };
 
-  function add(bet: Bet, stakeCents: number, keep: boolean, chance: BetChance) {
+  function add(bet: Bet, stakeCents: number, keep: KeepScope | null, chance: BetChance) {
     if (bets.some((b) => betKey(b.bet) === betKey(bet))) return;
     setChances((all) => ({ ...all, [betKey(bet)]: chance }));
     const card = namedCard(bet);
     if (card) onCardName(card, cardName(card));
     onBets([...bets, { bet, stakeCents }]);
-    if (keep) setKeep({ bet, stakeCents }, true);
+    if (keep) setKeep({ bet, stakeCents }, keep);
     setBuilding(false);
   }
 
-  function setKeep(request: BetRequest, on: boolean) {
-    const others = kept.filter((k) => !(betKey(k.bet) === betKey(request.bet) && (k.setCode == null || k.setCode === setCode)));
+  /** Keeps a bet for this set's boosters or for all of them (one naming a card: its set's
+   * only), or stops keeping it. */
+  function setKeep(request: BetRequest, scope: KeepScope | null) {
+    const others = kept.filter((k) => !appliesHere(k, request.bet));
     const card = namedCard(request.bet);
     const keep: KeptBet = {
       bet: request.bet,
       stakeCents: request.stakeCents,
       active: request.active !== false,
-      setCode: card ? setCode : null,
+      setCode: card || scope === "set" ? setCode : null,
       cardName: card ? cardName(card) : null,
     };
-    onKept(on ? [...others, keep] : others);
+    onKept(scope ? [...others, keep] : others);
   }
 
   /** Pauses a bet, or plays it again: kept in the slip (and in the kept bets), its stake too. */
   function setActive(request: BetRequest, active: boolean) {
     const key = betKey(request.bet);
     onBets(bets.map((b) => (betKey(b.bet) === key ? { ...b, active } : b)));
-    if (isKept(request.bet)) onKept(kept.map((k) => (betKey(k.bet) === key ? { ...k, active } : k)));
+    if (isKept(request.bet)) onKept(kept.map((k) => (appliesHere(k, request.bet) ? { ...k, active } : k)));
   }
 
   function setStake(request: BetRequest, stakeCents: number) {
     const key = betKey(request.bet);
     onBets(bets.map((b) => (betKey(b.bet) === key ? { ...b, stakeCents } : b)));
-    if (isKept(request.bet)) onKept(kept.map((k) => (betKey(k.bet) === key ? { ...k, stakeCents } : k)));
+    if (isKept(request.bet)) onKept(kept.map((k) => (appliesHere(k, request.bet) ? { ...k, stakeCents } : k)));
   }
 
   // What the active bets stake (the paused ones are not placed).
@@ -188,10 +196,12 @@ export function BetSlip({ setCode, kind, bets, onBets, kept, onKept, onCardName,
                 </span>
                 {!locked && (
                   <span className="bet-card-tools">
-                    <label className="bet-keep" title={t("bet.keepHint")}>
-                      <input type="checkbox" checked={isKept(request.bet)} onChange={(e) => setKeep(request, e.target.checked)} />
-                      📌
-                    </label>
+                    <KeepControl
+                      scope={scopeOf(request.bet)}
+                      setCode={setCode}
+                      namesCard={!!namedCard(request.bet)}
+                      onChange={(scope) => setKeep(request, scope)}
+                    />
                     <button
                       className="bet-remove"
                       onClick={() => onBets(bets.filter((b) => betKey(b.bet) !== betKey(request.bet)))}
@@ -260,10 +270,12 @@ export function BetSlip({ setCode, kind, bets, onBets, kept, onKept, onCardName,
                     </span>
                     <StakeInput value={request.stakeCents} onChange={(c) => setStake(request, c)} />
                     <span className="hint">{odds != null && <>→ <Money cents={Math.floor(request.stakeCents * odds)} /></>}</span>
-                    <label className="bet-keep" title={t("bet.keepHint")}>
-                      <input type="checkbox" checked={isKept(request.bet)} onChange={(e) => setKeep(request, e.target.checked)} />
-                      📌
-                    </label>
+                    <KeepControl
+                      scope={scopeOf(request.bet)}
+                      setCode={setCode}
+                      namesCard={!!namedCard(request.bet)}
+                      onChange={(scope) => setKeep(request, scope)}
+                    />
                     <button
                       className="bet-remove"
                       onClick={() => onBets(bets.filter((b) => betKey(b.bet) !== betKey(request.bet)))}
@@ -292,6 +304,48 @@ export function BetSlip({ setCode, kind, bets, onBets, kept, onKept, onCardName,
         </div>
       )}
     </section>
+  );
+}
+
+/** Where a kept bet applies: this set's boosters, or every booster. */
+type KeepScope = "set" | "all";
+
+/** The pin that keeps a bet for the next boosters, then where: a chip that switches between
+ * this set (by default) and all sets. A bet naming a card stays with its set. */
+function KeepControl({
+  scope,
+  setCode,
+  namesCard,
+  onChange,
+  withLabel = false,
+}: {
+  scope: KeepScope | null;
+  setCode: string;
+  namesCard: boolean;
+  onChange: (scope: KeepScope | null) => void;
+  withLabel?: boolean;
+}) {
+  const { t } = useI18n();
+  const scopeHint = namesCard
+    ? t("bet.scopeCardHint", { set: setCode })
+    : t(scope === "all" ? "bet.scopeAllHint" : "bet.scopeSetHint", { set: setCode });
+  return (
+    <span className="bet-keep-ctl">
+      <label className="bet-keep" title={t("bet.keepHint")}>
+        <input type="checkbox" checked={scope != null} onChange={(e) => onChange(e.target.checked ? "set" : null)} />
+        📌{withLabel && ` ${t("bet.keep")}`}
+      </label>
+      {scope && (
+        <button
+          className={`bet-scope ${scope}`}
+          disabled={namesCard}
+          title={scopeHint}
+          onClick={() => onChange(scope === "set" ? "all" : "set")}
+        >
+          {scope === "set" ? setCode : t("bet.scopeAll")}
+        </button>
+      )}
+    </span>
   );
 }
 
@@ -328,14 +382,14 @@ function BetBuilder({
   cards: CollectionCard[];
   cardName: (uuid: string) => string;
   describe: (bet: Bet) => string;
-  onAdd: (bet: Bet, stakeCents: number, keep: boolean, chance: BetChance) => void;
+  onAdd: (bet: Bet, stakeCents: number, keep: KeepScope | null, chance: BetChance) => void;
 }) {
   const { t, formatNumber } = useI18n();
   const [clauses, setClauses] = useState<Clause[]>([newCardsClause()]);
   // Bumped when a bet is placed: the editors start afresh (the card number field included).
   const [round, setRound] = useState(0);
   const [stake, setStake] = useState(Math.max(context.minStakeCents, 100));
-  const [keep, setKeep] = useState(false);
+  const [keep, setKeep] = useState<KeepScope | null>(null);
   const [chance, setChance] = useState<BetChance | null>(null);
   const [busy, setBusy] = useState(false);
   const bet: Bet = useMemo(() => ({ clauses }), [clauses]);
@@ -401,9 +455,7 @@ function BetBuilder({
             → <Money cents={Math.floor(stake * odds)} />
           </span>
         )}
-        <label className="bet-keep" title={t("bet.keepHint")}>
-          <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} />📌 {t("bet.keep")}
-        </label>
+        <KeepControl scope={keep} setCode={setCode} namesCard={!!namedCard(bet)} onChange={setKeep} withLabel />
         <button
           className="primary"
           disabled={!chance?.probability || stake < context.minStakeCents}
@@ -411,7 +463,7 @@ function BetBuilder({
             onAdd(bet, stake, keep, chance!);
             setClauses([newCardsClause()]);
             setRound((r) => r + 1);
-            setKeep(false);
+            setKeep(null);
           }}
         >
           {t("bet.place")}

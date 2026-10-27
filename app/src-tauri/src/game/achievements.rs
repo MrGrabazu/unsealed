@@ -198,6 +198,7 @@ impl Game {
                     .with("foil", c.foil)
                     .with("priceCents", i64::from(c.price_cents.unwrap_or(0)))
                     .with("isNew", c.is_new)
+                    .with("newFoil", c.new_foil)
             })
             .collect();
         let mut booster = vec![Event::new("BoosterOpened")
@@ -210,6 +211,7 @@ impl Game {
             .with("profitCents", net_sale - paid_cents)
             .with("cardCount", cards.len() as i64)
             .with("newCardCount", count(&|c| c.is_new))
+            .with("newFoilCount", count(&|c| c.new_foil))
             .with("rareCount", count(&|c| c.rarity == "rare"))
             .with("mythicCount", count(&|c| c.rarity == "mythic"))
             .with("foilCount", count(&|c| c.foil))

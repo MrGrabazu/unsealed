@@ -42,6 +42,8 @@ export interface OpenedCard {
   sellValueCents: number;
   /** First time the player owns this card (in any finish). */
   isNew: boolean;
+  /** A foil of a card the player only owned in non-foil until now. */
+  newFoil: boolean;
 }
 
 export interface CollectionCard {
@@ -255,7 +257,8 @@ export interface BetRequest {
   active?: boolean;
 }
 
-/** A bet kept from one opening to the next; one naming a card only on its set's boosters. */
+/** A bet kept from one opening to the next: on `setCode`'s boosters only (always for one
+ * naming a card), or on every booster when null. */
 export interface KeptBet extends BetRequest {
   setCode: string | null;
   /** The card it names, as shown ("Name (#61)"). */
@@ -521,6 +524,8 @@ export interface StatsView {
 }
 
 /** A card's details: local data, plus Scryfall's when it could be reached (`online`). */
+export type Reading = "right" | "left" | "flip";
+
 export interface CardDetailsView {
   uuid: string;
   setCode: string;
@@ -532,6 +537,10 @@ export interface CardDetailsView {
   rarity: string;
   imageUrl: string;
   backImageUrl: string | null;
+  /** How the front is turned to be read, when printed sideways: a quarter turn clockwise
+   * ("right": split cards and Rooms, planes, battles), anticlockwise ("left": aftermath), or
+   * half a turn ("flip": Kamigawa flip cards). */
+  reading?: Reading;
   artist: string | null;
   canBeFoil: boolean;
   canBeNonfoil: boolean;

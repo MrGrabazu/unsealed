@@ -5,6 +5,7 @@ import { CardImage } from "./CardImage";
 import { FoilSheen } from "./foils";
 import { useI18n } from "./i18n";
 import { Money } from "./money";
+import { NewBadge } from "./NewBadge";
 
 const hitOf = (card: OpenedCard) =>
   card.rarity === "mythic" ? "hit-mythic" : isBigCard(card) ? "hit-rare" : card.foil ? "hit-foil" : "";
@@ -40,7 +41,7 @@ export function RevealedCards({
           <div className="thumb">
             <CardImage front={card.imageUrl} back={card.backImageUrl} alt={card.name} />
             {card.foil && <FoilSheen rarity={card.rarity} kind={card.foilKind} />}
-            {card.isNew && <span className="badge-new">{t("open.new")}</span>}
+            <NewBadge card={card} />
           </div>
           <span className="card-caption visible">
             <span className="name">{card.name}</span>

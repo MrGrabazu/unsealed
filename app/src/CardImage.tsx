@@ -9,6 +9,8 @@ interface Props {
   alt: string;
   className?: string;
   lazy?: boolean;
+  /** Told the face shown after each turn over (true: the back). */
+  onTurned?: (back: boolean) => void;
 }
 
 /** The marker telling where a lazy image goes: never displayed, whatever the CSS around it. */
@@ -34,7 +36,7 @@ type Turn = "idle" | "out" | "in";
  * `lazy` (long lists): the image is only in the page while its place (the parent element,
  * which keeps the card's size) is on screen or close to it, so that its memory is given back
  * once scrolled far away. */
-export function CardImage({ front, back, alt, className, lazy = false }: Props) {
+export function CardImage({ front, back, alt, className, lazy = false, onTurned }: Props) {
   const { t } = useI18n();
   const [showBack, setShowBack] = useState(false);
   const [turn, setTurn] = useState<Turn>("idle");
@@ -54,7 +56,8 @@ export function CardImage({ front, back, alt, className, lazy = false }: Props) 
         onAnimationEnd={() => {
           // Edge-on: the other face takes its place and finishes the turn.
           if (turn === "out") {
-            setShowBack((b) => !b);
+            setShowBack(!showBack);
+            onTurned?.(!showBack);
             setTurn("in");
           } else if (turn === "in") {
             setTurn("idle");

@@ -57,6 +57,7 @@ export function OpeningResult(props: Props) {
   const resale = cards.reduce((sum, c) => sum + c.sellValueCents, 0);
   const best = cards.reduce<OpenedCard | null>((b, c) => ((c.priceCents ?? 0) > (b?.priceCents ?? -1) ? c : b), null);
   const fresh = cards.filter((c) => c.isNew).length;
+  const freshFoils = cards.filter((c) => c.newFoil).length;
   const gain = priceCents == null ? null : value - priceCents;
 
   return (
@@ -90,6 +91,12 @@ export function OpeningResult(props: Props) {
             <span>{t("open.tallyNew")}</span>
             <b>{fresh}</b>
           </div>
+          {freshFoils > 0 && (
+            <div className="ready-line">
+              <span>{t("open.tallyNewFoils")}</span>
+              <b className="new-foil-count">{freshFoils}</b>
+            </div>
+          )}
           {best && (
             <div className="ready-line">
               <span>{t("open.tallyBest")}</span>

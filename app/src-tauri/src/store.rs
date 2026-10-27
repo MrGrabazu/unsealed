@@ -243,6 +243,8 @@ pub struct GrantedReward {
 pub struct OpenOutcome {
     /// For each card, whether it is a new discovery.
     pub is_new: Vec<bool>,
+    /// For each card, whether it is a foil of a card only owned in non-foil until now.
+    pub new_foil: Vec<bool>,
     /// Cost basis of the opened booster.
     pub cost_cents: i64,
 }
@@ -755,11 +757,14 @@ impl Store {
         let opening_id = tx.last_insert_rowid();
 
         let mut is_new = Vec::with_capacity(cards.len());
+        let mut new_foil = Vec::with_capacity(cards.len());
         for (position, c) in cards.iter().enumerate() {
-            let known: Option<i64> = tx
-                .query_row("SELECT 1 FROM collection WHERE card_uuid = ?1 LIMIT 1", [c.uuid], |r| r.get(0))
-                .optional()?;
+            // The best finish ever owned (a row stays once its copies are sold): none, or
+            // whether one was foil.
+            let known: Option<bool> = tx
+                .query_row("SELECT MAX(foil) FROM collection WHERE card_uuid = ?1", [c.uuid], |r| r.get(0))?;
             is_new.push(known.is_none());
+            new_foil.push(c.foil && known == Some(false));
             tx.execute(
                 "INSERT INTO collection (card_uuid, foil, set_code, quantity, first_acquired_at)
                  VALUES (?1, ?2, ?3, 1, ?4)
@@ -796,7 +801,7 @@ impl Store {
             }
         }
         tx.commit()?;
-        Ok(OpenOutcome { is_new, cost_cents })
+        Ok(OpenOutcome { is_new, new_foil, cost_cents })
     }
 
     /// Pays the bets won and not paid yet (those of the booster whose cards were all seen, or
@@ -1295,17 +1300,23 @@ mod tests {
 
     #[test]
     fn flags_new_discoveries_including_within_the_same_booster() {
-        let mut store = store_with(2);
+        let mut store = store_with(3);
         let flags = store
             .open_sealed("TST", "play", &[card("a", false, None), card("a", false, None), card("b", false, None)], 1)
             .unwrap()
             .is_new;
         assert_eq!(flags, [true, false, true]);
 
-        // A foil copy of an owned card is not a new discovery.
-        let flags =
-            store.open_sealed("TST", "play", &[card("a", true, None), card("c", true, None)], 2).unwrap().is_new;
-        assert_eq!(flags, [false, true]);
+        // A foil copy of an owned card is not a new discovery, but a new foil (once).
+        let outcome = store
+            .open_sealed("TST", "play", &[card("a", true, None), card("c", true, None), card("a", true, None)], 2)
+            .unwrap();
+        assert_eq!(outcome.is_new, [false, true, false]);
+        assert_eq!(outcome.new_foil, [true, false, false]);
+
+        // Owned in foil already: no new foil; a non-foil copy never is one.
+        let outcome = store.open_sealed("TST", "play", &[card("a", true, None), card("b", false, None)], 3).unwrap();
+        assert_eq!(outcome.new_foil, [false, false]);
     }
 
     #[test]

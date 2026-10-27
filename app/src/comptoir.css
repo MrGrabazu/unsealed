@@ -125,6 +125,19 @@
    on the right, the text then the printings, which scroll on their own. */
 .modal.details { max-height: calc(100vh - 48px); overflow: hidden; }
 .modal.details .details-layout { grid-template-columns: min(340px, calc((100vh - 96px) * 63 / 88)) minmax(0, 1fr); align-items: start; }
+/* A card printed sideways, turned to be read: lying, at the same scale (its short side keeps
+   the column's width), the text beside it narrower; or upside down, in place. */
+.modal.details .details-layout:is(.turned-right, .turned-left) { grid-template-columns: min(475px, calc(100vh - 96px)) minmax(0, 1fr); }
+.details-layout:is(.turned-right, .turned-left) .details-image { aspect-ratio: 88 / 63; }
+.details-layout:is(.turned-right, .turned-left) .details-image > img:not(.mana) {
+  position: absolute; top: 50%; left: 50%; width: calc(100% * 63 / 88); height: calc(100% * 88 / 63); transform: translate(-50%, -50%) rotate(90deg); }
+.details-layout.turned-left .details-image > img:not(.mana) { transform: translate(-50%, -50%) rotate(-90deg); }
+.details-image > img:not(.mana) { transition: transform .35s ease; }
+.details-layout.turned-flip .details-image > img:not(.mana) { transform: rotate(180deg); }
+.rotate-button { position: absolute; right: 8px; bottom: 8px; z-index: 3; width: 30px; height: 30px; padding: 0; border-radius: 50%; background: #000b; border-color: #fff6; font-size: 16px; line-height: 1; }
+.rotate-button:hover, .rotate-button.active { background: var(--gold-hi); color: #1a1405; }
+/* A battle turned to be read is put upright before it is turned over. */
+.details-layout:is(.turned-right, .turned-left, .turned-flip) .flip-button { display: none; }
 .details-side { display: flex; flex-direction: column; gap: 16px; min-height: 0; max-height: calc(100vh - 96px); }
 .details-side .details-info { flex: 0 0 auto; max-height: calc((100vh - 96px) * .55); overflow: auto; padding-right: 6px; }
 .details-side .details-printings { flex: 1 1 auto; min-height: 180px; display: flex; flex-direction: column; }
@@ -737,7 +750,33 @@ button.seen-card:hover:not(:disabled) { box-shadow: none; transform: translateX(
 .seen-card .thumb img { width: 100%; height: 100%; display: block; object-fit: contain; }
 .seen-card.mythic .thumb { box-shadow: 0 0 0 2px #ff9a4a, 0 0 12px #ff7a2acc; }
 .seen-card.rare .thumb { box-shadow: 0 0 0 2px var(--gold-hi), 0 0 10px #f5b84a99; }
-.seen-card .badge-new { font-size: 9px; }
+/* "New" and "New foil" always on one line, sized by the card's width (as the special foils'
+   badge): about 7 px on a card seen beside the scene, 11 px at most. */
+:is(.thumb, .card .front):has(> .badge-new) { container-type: inline-size; }
+.badge-new { white-space: nowrap; font-size: clamp(6px, 7.5cqw, 11px); padding: 0.18em 0.6em; top: 4.5cqw; left: 4.5cqw;
+  max-width: calc(100% - 9cqw); overflow: hidden; box-sizing: border-box; }
+/* The first foil of a card already owned: the rainbow of the foils, not the wax of "New". */
+.badge-new.new-foil { color: #1a1020; background: linear-gradient(100deg, #ffb3e6, #b9a8ff 30%, #8fe3ff 55%, #b8ffc4 80%, #ffe79a);
+  background-size: 200% 100%; box-shadow: 0 0 0 1px #fff8, 0 0 8px #c9b8ffaa; animation: new-foil-shift 4s linear infinite; }
+@keyframes new-foil-shift { to { background-position: 200% 0; } }
+.new-foil-count { background: linear-gradient(90deg, #ffb3e6, #8fe3ff, #b8ffc4); -webkit-background-clip: text; background-clip: text; color: transparent; }
+/* Said as a card is revealed, if it is new to the collection: a ribbon over the top of the
+   scene (or under the pile), which comes, stays a moment and goes (RevealMention). */
+.reveal-mention { position: absolute; z-index: 3; top: 14px; left: 50%; transform: translateX(-50%); white-space: nowrap; pointer-events: none;
+  padding: 6px 18px; border-radius: 16px; font: 700 15px var(--font-title); letter-spacing: .06em; color: #fff3dc;
+  background: linear-gradient(180deg, #a8322a, #6e1a14); box-shadow: 0 0 0 1px #e8a25a88, 0 6px 18px #000b;
+  animation: mention-in .35s ease-out, mention-out .5s ease-in 2.1s forwards; }
+.reveal-mention .star { color: var(--gold-hi); }
+.reveal-mention em { font-style: normal; color: var(--gold-hi); }
+.reveal-mention.new-foil { color: #1a1020; background: linear-gradient(100deg, #ffc6ee, #c9bbff 35%, #a6eaff 65%, #c9ffd3);
+  box-shadow: 0 0 0 1px #fffa, 0 0 16px #c9b8ffaa, 0 6px 18px #000b; }
+.reveal-mention.new-foil .star { color: #7a3fd0; }
+@keyframes mention-in { from { opacity: 0; transform: translate(-50%, -10px) scale(.92); } }
+@keyframes mention-out { to { opacity: 0; transform: translate(-50%, -6px); } }
+/* Under the classic pile: its room kept, so that nothing moves as it comes and goes. */
+.mention-slot { position: relative; width: 100%; height: 36px; }
+.mention-slot .reveal-mention { top: 0; }
+@media (prefers-reduced-motion: reduce) { .badge-new.new-foil, .reveal-mention { animation: none; } }
 .seen-price { display: flex; justify-content: center; margin-top: 4px; font: 700 11.5px var(--font-title); color: var(--gold-hi); }
 @keyframes seen-in { from { opacity: 0; transform: translateY(-12px); } }
 .pack-pills { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; padding: 8px 0 4px; }
@@ -762,6 +801,20 @@ button.seen-card:hover:not(:disabled) { box-shadow: none; transform: translateX(
 .bet-card-tools .bet-keep { cursor: pointer; opacity: .35; filter: grayscale(1); transition: opacity .15s; }
 .bet-card-tools .bet-keep:has(input:checked) { opacity: 1; filter: none; }
 .bet-card-tools .bet-keep input { position: absolute; opacity: 0; width: 0; height: 0; }
+/* The boosters of a batch already seen, the latest first: one row of small cards each. */
+.batch-boosters { display: grid; gap: 12px; }
+.batch-booster { padding: 10px 12px; border: 1px solid var(--edge); border-radius: 8px; background: #0000002a; }
+.batch-booster-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+.batch-booster-head b { font-family: var(--font-title); color: var(--gold-hi); }
+.cards.batch-cards { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+.cards.batch-cards .card.clickable { cursor: zoom-in; }
+
+/* Where a kept bet applies: a chip beside the pin, this set's code (wax) or all sets (gold). */
+.bet-keep-ctl { display: inline-flex; align-items: center; gap: 6px; }
+.bet-scope { padding: 1px 8px; min-height: 0; font-size: 11px; line-height: 1.5; border-radius: 9px; letter-spacing: .04em; white-space: nowrap;
+  background: #5a1f19; color: #f3d9c0; border: 1px solid #8a2a20; }
+.bet-scope.all { background: #3d2b1b; color: var(--gold-hi); border-color: #8a6a32; }
+.bet-scope:disabled { opacity: .7; cursor: default; }
 /* A switch for pausing a bet. */
 .bet-switch { position: relative; width: 30px; height: 17px; cursor: pointer; }
 .bet-switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
