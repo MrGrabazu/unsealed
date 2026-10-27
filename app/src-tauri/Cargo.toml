@@ -1,6 +1,6 @@
 [package]
 name = "unsealed-app"
-version = "0.9.8"
+version = "0.9.9"
 edition = "2021"
 description = "Unsealed desktop app (Tauri shell around unsealed-core)"
 license = "GPL-3.0-or-later"
