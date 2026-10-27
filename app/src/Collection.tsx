@@ -5,6 +5,7 @@ import {
   getCollection,
   getCycles,
   getScenes,
+  getAssemblies,
   getOwnedCards,
   listArtists,
   listGuestSeries,
@@ -17,6 +18,7 @@ import {
   type CollectionView,
   type CyclesView,
   type ScenesView,
+  type AssembliesView,
   type SetSummary,
 } from "./api";
 
@@ -57,6 +59,11 @@ function sortCards(cards: ArtistCard[], sort: Sort): ArtistCard[] {
   }
 }
 
+/** A variant of a card, printed a little differently and numbered with a dagger (Arabian
+ * Nights' light and dark mana symbols, misprints…): in a section of its own, still counted in
+ * the set's completion. */
+const isVariant = (c: CollectionCard) => c.number.includes("†");
+
 /** Every card of a set's binder, its sections one after the other. */
 const sectionsOf = (view: CollectionView) => [
   ...view.cards,
@@ -75,6 +82,7 @@ import { CardDetails } from "./CardDetails";
 import { CardImage } from "./CardImage";
 import { CyclesList, CyclesPanel } from "./Cycles";
 import { ScenesGallery, ScenesPanel } from "./Scenes";
+import { AssembliesList, AssembliesPanel } from "./Assemblies";
 import { useI18n } from "./i18n";
 import { Library } from "./Library";
 import { Loading } from "./Loading";
@@ -121,7 +129,8 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
   // The set's cycles and scenes, and which of them is shown in place of its binder or grid.
   const [cycles, setCycles] = useState<CyclesView | null>(null);
   const [scenes, setScenes] = useState<ScenesView | null>(null);
-  const [extra, setExtra] = useState<"cycles" | "scenes" | null>(null);
+  const [assemblies, setAssemblies] = useState<AssembliesView | null>(null);
+  const [extra, setExtra] = useState<"cycles" | "scenes" | "assemblies" | null>(null);
   // The painting looked at in the gallery of scenes.
   const [sceneAt, setSceneAt] = useState(0);
   useEffect(() => setSceneAt(0), [setCode]);
@@ -187,11 +196,13 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
         setView(await getCollection(setCode));
         setCycles(await getCycles(setCode, lang).catch(() => null));
         setScenes(await getScenes(setCode, lang).catch(() => null));
+        setAssemblies(await getAssemblies(setCode).catch(() => null));
         // Translated images: shown once known as good scans (checked once per card).
         if ((await checkSetImages(setCode).catch(() => 0)) > 0) {
           setView(await getCollection(setCode));
           setCycles(await getCycles(setCode, lang).catch(() => null));
           setScenes(await getScenes(setCode, lang).catch(() => null));
+          setAssemblies(await getAssemblies(setCode).catch(() => null));
         }
       }
       setError(null);
@@ -262,7 +273,9 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
     const owned = c.quantity + c.foilQuantity > 0;
     return filter === "all" || (filter === "owned") === owned;
   };
-  const shown = view?.cards.filter(matches);
+  const shown = view?.cards.filter((c) => !isVariant(c) && matches(c));
+  const variants = view?.cards.filter(isVariant) ?? [];
+  const shownVariants = variants.filter(matches);
   const shownExtras = view?.extras.filter(matches);
   const shownTokens = view?.tokens.filter(matches);
   const shownArts = view?.arts.filter(matches);
@@ -286,7 +299,8 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
           : []
         : view
           ? [
-              { title: null, cards: view.cards },
+              { title: null, cards: view.cards.filter((c) => !isVariant(c)) },
+              { title: t("collection.variants"), cards: view.cards.filter(isVariant) },
               { title: t("collection.extras"), cards: view.extras },
               { title: t("collection.tokens"), cards: view.tokens },
               { title: t("collection.arts"), cards: view.arts },
@@ -415,7 +429,10 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
   // Its scenes, likewise.
   const hasScenes = oneSet && !!scenes && scenes.setCode === view?.setCode && scenes.total > 0;
   const scenesShown = hasScenes && extra === "scenes";
-  const extraShown = cyclesShown || scenesShown;
+  // Its assemblies (Unstable's augments over its hosts), likewise.
+  const hasAssemblies = oneSet && !!assemblies && assemblies.setCode === view?.setCode && assemblies.total > 0;
+  const assembliesShown = hasAssemblies && extra === "assemblies";
+  const extraShown = cyclesShown || scenesShown || assembliesShown;
 
   const bar = (
     <>
@@ -507,6 +524,11 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
                   {t("collection.layoutScenes")}
                 </button>
               )}
+              {hasAssemblies && (
+                <button className={assembliesShown ? "active" : ""} onClick={() => setExtra("assemblies")}>
+                  {t("collection.layoutAssemblies")}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -552,6 +574,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
         </>
       )}
       {cyclesShown && cycles && <CyclesList view={cycles} onOpen={setDetailsOf} />}
+      {assembliesShown && assemblies && <AssembliesList view={assemblies} onOpen={setDetailsOf} />}
       {scenesShown && scenes && <ScenesGallery view={scenes} at={sceneAt} onAt={setSceneAt} onOpen={setDetailsOf} active={!detailsOf} />}
       {source === "sets" && !allSets && view && !extraShown && (
         <>
@@ -567,6 +590,18 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
           ) : (
             <>
               <div className="collection-grid">{shown?.map(cardTile)}</div>
+              {variants.length > 0 && (
+                <>
+                  <h3>{t("collection.variants")}</h3>
+                  <p className="progress-label">
+                    {t("collection.variantsProgress", {
+                      owned: variants.filter((c) => c.quantity + c.foilQuantity > 0).length,
+                      total: variants.length,
+                    })}
+                  </p>
+                  <div className="collection-grid">{shownVariants.map(cardTile)}</div>
+                </>
+              )}
               {view.extras.length > 0 && (
                 <>
                   <h3>{t("collection.extras")}</h3>
@@ -729,6 +764,8 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
         <CyclesPanel view={cycles} onShop={view && !ofSeries ? () => onShop(view.setCode) : undefined} />
       ) : scenesShown && scenes ? (
         <ScenesPanel view={scenes} onShop={view && !ofSeries ? () => onShop(view.setCode) : undefined} onShow={setSceneAt} />
+      ) : assembliesShown && assemblies ? (
+        <AssembliesPanel view={assemblies} onShop={view && !ofSeries ? () => onShop(view.setCode) : undefined} onOpen={setDetailsOf} />
       ) : (
       <aside className="frame set-side">
         <div className="cartouche">{t("collection.completion")}</div>

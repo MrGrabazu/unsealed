@@ -25,6 +25,19 @@
         "slots": [["21"], ["24"], ["53"], ["158"], ["182"], ["184"]]
       }
     ],
+    "UST": [
+      {
+        "id": "zombie-seasons",
+        "name": {
+          "en": "The Zombie's Four Seasons",
+          "fr": "Les Quatre Saisons du Zombie",
+          "de": "Die vier Jahreszeiten des Zombies",
+          "es": "Las cuatro estaciones del Zombi",
+          "it": "Le quattro stagioni dello Zombie"
+        },
+        "slots": [["54a"], ["54b"], ["54c"], ["54d"]]
+      }
+    ],
     "WHO": [
       {
         "id": "the-doctors",

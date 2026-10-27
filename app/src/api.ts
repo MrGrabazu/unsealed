@@ -139,6 +139,24 @@ export interface ScenesView {
   scenes: SceneView[];
 }
 
+/** An augment or a host of a set (Unstable), as far as the player is. */
+export interface AssemblyPart {
+  card: CollectionCard;
+  owned: boolean;
+  /** A foil copy is owned. */
+  foil: boolean;
+}
+
+/** A set's assemblies: each augment laid over each host makes a creature, assembled once
+ * both are owned. */
+export interface AssembliesView {
+  setCode: string;
+  augments: AssemblyPart[];
+  hosts: AssemblyPart[];
+  assembled: number;
+  total: number;
+}
+
 /** In a set's completion panel: a guest series its boosters give, with its own binder. */
 export interface GuestLink {
   code: string;
@@ -705,6 +723,7 @@ export const getCycles = (setCode: string, lang: string) => invoke<CyclesView>("
 
 /** A set's scenes, as far as the player is, their names in `lang`. */
 export const getScenes = (setCode: string, lang: string) => invoke<ScenesView>("get_scenes", { setCode, lang });
+export const getAssemblies = (setCode: string) => invoke<AssembliesView>("get_assemblies", { setCode });
 export const listArtists = () => invoke<ArtistSummary[]>("list_artists");
 /** The guest series with a binder of their own (no boosters, no art). */
 export const listGuestSeries = () => invoke<SetSummary[]>("list_guest_series");

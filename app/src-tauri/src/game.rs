@@ -2,6 +2,7 @@
 
 mod achievements;
 mod artifacts;
+mod assemblies;
 mod artists;
 mod betting;
 mod cycles;
@@ -22,6 +23,7 @@ pub use betting::{BetChance, BetContext, BetRequest, KeptBet, OpenedBooster};
 pub use toppers::ToppersGiven;
 pub use cycles::CyclesView;
 pub use scenes::ScenesView;
+pub use assemblies::AssembliesView;
 pub use library::LibraryBinder;
 
 pub use achievements::{AchievementTexts, AchievementView, AchievementsView};
@@ -1944,6 +1946,43 @@ mod tests {
         assert!(after.scenes[0].complete && !after.scenes[1].complete);
         let unlocked: Vec<String> = g.take_unlocks("en").into_iter().map(|a| a.id).collect();
         assert_eq!(unlocked, ["scene"]);
+    }
+
+    #[test]
+    fn an_augment_and_a_host_owned_assemble_a_creature() {
+        let engine = Engine::from_json(
+            r#"{ "metrics": { "assembled": { "event": "AssembliesProgress", "op": "max", "field": "assembled" } },
+                 "achievements": [
+                   { "id": "assembly", "name": "Assembly", "description": "d", "rarity": "common", "emblem": "cards", "palette": "forest",
+                     "condition": { "type": "metric", "metric": "assembled", "atLeast": 1 } } ] }"#,
+        )
+        .unwrap();
+        let (mut g, _) = game_with_engine("assemblies", PRICES, engine);
+        // The common is an augment, the mythic and the card no booster gives are hosts.
+        let mut set: serde_json::Value = serde_json::from_str(SET).unwrap();
+        for card in set["cards"].as_array_mut().unwrap() {
+            let layout = match card["uuid"].as_str() {
+                Some("c1") => "augment",
+                Some("m1" | "x1") => "host",
+                _ => continue,
+            };
+            card["layout"] = layout.into();
+        }
+        fs::write(g.data_dir.join("sets/TST.json"), set.to_string()).unwrap();
+
+        let before = g.assemblies("TST").unwrap();
+        assert_eq!((before.augments.len(), before.hosts.len(), before.assembled, before.total), (1, 2, 0, 2));
+        // The hosts in collector number order, tokens left out.
+        assert_eq!(before.hosts.iter().map(|h| h.card.number.as_str()).collect::<Vec<_>>(), ["2", "3"]);
+
+        g.buy_boosters("TST", "play", 1).unwrap();
+        g.open_booster("TST", "play").unwrap(); // the mythic and two commons
+        g.reveal_cards(usize::MAX);
+        let after = g.assemblies("TST").unwrap();
+        assert_eq!(after.assembled, 1);
+        assert!(after.augments[0].owned && after.hosts[0].owned && !after.hosts[1].owned);
+        let unlocked: Vec<String> = g.take_unlocks("en").into_iter().map(|a| a.id).collect();
+        assert_eq!(unlocked, ["assembly"]);
     }
 
     /// Artifacts for the tests: one on sale, one hidden in every play booster, one that

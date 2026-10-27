@@ -481,6 +481,12 @@ fn get_scenes(state: State<'_, SessionState>, set_code: String, lang: String) ->
     with_game(&state, |g| g.scenes(&set_code, &lang))
 }
 
+/// A set's assemblies (Unstable's augments over its hosts), as far as the player is.
+#[tauri::command]
+fn get_assemblies(state: State<'_, SessionState>, set_code: String) -> Result<game::AssembliesView, String> {
+    with_game(&state, |g| g.assemblies(&set_code))
+}
+
 /// The cabinet of curiosities: every artifact, owned, on sale or still hidden.
 #[tauri::command]
 fn get_artifacts(state: State<'_, SessionState>, lang: String) -> Result<Vec<game::ArtifactView>, String> {
@@ -757,6 +763,7 @@ pub fn run() {
             take_box_toppers,
             get_cycles,
             get_scenes,
+            get_assemblies,
             get_artifacts,
             buy_artifact,
             take_given_artifacts,

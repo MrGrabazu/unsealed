@@ -23,14 +23,15 @@ fn the_income_share_shrinks_as_the_collection_grows_and_never_passes_its_limit()
     // A small collection earns about 0.1 % of its value a minute.
     let small = income.per_minute_cents(10_000);
     assert!((small - 10.0).abs() < 0.2, "{small}");
-    // A large one earns a smaller share, and nothing ever earns more than 500 a minute.
+    // A large one earns a smaller share (0.1 % would be 1 000), and nothing ever earns more
+    // than 1 000 a minute.
     let large = income.per_minute_cents(1_000_000);
-    assert!(large < 1_000.0 * 0.5 && large > 400.0, "{large}");
-    assert!(income.per_minute_cents(1_000_000_000) <= 500.0);
+    assert!(large < 1_000.0 * 0.7 && large > 600.0, "{large}");
+    assert!(income.per_minute_cents(1_000_000_000) <= 1_000.0);
     assert!(income.per_minute_cents(2_000_000) > large);
     // The artifacts' bonuses raise the limit with the rest.
     let doubled = income.boosted(2.0);
-    assert!(doubled.per_minute_cents(1_000_000_000) > 999.0);
+    assert!(doubled.per_minute_cents(1_000_000_000) > 1_999.0);
     assert!((doubled.per_minute_cents(1_000_000) - 2.0 * large).abs() < 1e-6);
 }
 
