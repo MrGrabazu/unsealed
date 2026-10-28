@@ -30,6 +30,16 @@ export const it: Messages = {
   "kind.phyrexian": "Busta di fazione phyrexiana",
   "kind.premium": "Busta premium foil",
   "kind.collectorSpecial": "Busta da collezione Edizione speciale",
+  "kind.japanese": "{kind} giapponese",
+  "jpNote.title": "Una busta venuta dal Giappone",
+  "jpNote.why":
+    "Venduta solo in Giappone. Il gioco non propone buste per lingua, ma questa contiene carte che nessun'altra busta dà, perciò è proposta a parte. Le sue carte escono in giapponese; il raccoglitore mantiene la lingua delle carte scelta.",
+  "jpNote.WAR":
+    "Ogni planeswalker del set può uscire in una versione con illustrazione alternativa di un artista giapponese (36 carte, tra cui Liliana di Yoshitaka Amano): circa una busta su due ne contiene una, a volte foil. Per riconoscerla: una stella ★ dopo il numero da collezione, un'illustrazione in stile manga e il nome dell'artista scritto in giapponese sulla carta.",
+  "jpNote.IKO":
+    "La serie Godzilla (carte n. 370-387) esce più spesso, con il nome giapponese dei mostri dei film: circa una busta draft su sette, una busta da collezione su quattro.",
+  "jpNote.STX":
+    "La sua carta del Mystical Archive è la versione giapponese con illustrazione alternativa (STA n. 64-126), disegnata da artisti giapponesi, con il nome dell'artista in giapponese: circa una busta su due.",
   "kind.theme": "Busta tematica · {theme}",
   "theme.w": "Bianco",
   "theme.u": "Blu",

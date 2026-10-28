@@ -112,6 +112,12 @@
   background: linear-gradient(160deg, #241f19, #070605 60%, #15120e); box-shadow: inset 0 0 0 2px #f5d68a, 0 0 14px #f5b84a66; color: #f5d68a; }
 .topper-toast-pack svg { width: 34px; height: 34px; fill: currentColor; }
 .topper-no-bets { margin: 12px 4px; }
+/* A Japanese booster: why it is offered and what it may give (JapaneseNote.tsx). */
+.jp-note { margin: 14px 4px 4px; padding: 10px 12px; border-radius: 6px; border-left: 3px solid var(--wax);
+  background: linear-gradient(180deg, #2a1d14cc, #1d140ecc); box-shadow: inset 0 0 0 1px #d9a4411f; font-size: 13px; line-height: 1.4; color: #e6d6b8; }
+.jp-note strong { display: block; margin-bottom: 4px; font-family: var(--font-title); font-size: 13px; color: var(--gold-hi); letter-spacing: 0.04em; }
+.jp-note p { margin: 0 0 6px; }
+.jp-note p:last-child { margin-bottom: 0; }
 /* A passing word (save point, booster sold): a wax seal with its icon, and a gold thread
    that runs out until the toast leaves (GameScreen's NOTICE_MS). */
 .notice-toast { position: relative; max-width: 380px; overflow: hidden; padding: 12px 18px 14px 12px;

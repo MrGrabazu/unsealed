@@ -364,21 +364,27 @@ fn keeps_the_wanted_kinds_the_set_has() {
 
 #[test]
 fn booster_kinds_are_wanted_by_name_or_prefix_and_main_ones_define_completion() {
-    use unsealed_core::catalog::{is_collector_kind, kind_wanted};
+    use unsealed_core::catalog::{is_collector_kind, kind_wanted, usual_kind};
     let wanted = ["play", "theme-*", "collector-special"];
     assert!(kind_wanted("play", &wanted) && kind_wanted("theme-b", &wanted) && kind_wanted("theme-boros", &wanted));
     assert!(!kind_wanted("theme", &wanted) && !kind_wanted("collector", &wanted) && !kind_wanted("player", &wanted));
-    assert!(is_collector_kind("collector") && is_collector_kind("collector-special"));
+    assert!(is_collector_kind("collector") && is_collector_kind("collector-special") && is_collector_kind("collector-jp"));
     assert!(!is_collector_kind("collectors") && !is_collector_kind("play"));
+    // Japan's boosters are made like their English kind.
+    assert_eq!(
+        ["jp", "set-jp", "collector-jp", "draft", "theme-b"].map(usual_kind),
+        ["draft", "set", "collector", "draft", "theme-b"]
+    );
 
     let mut set = set_from_mtgjson(&raw_set("u1", r#""scryfallId": "s1""#), &["play"], &[]).unwrap();
     let config = set.boosters["play"].clone();
     // Beside a usual booster, other kinds are not main ones.
-    for kind in ["collector", "collector-special", "jumpstart", "theme-b"] {
+    // (Nor are Japan's: their own cards are extras, as a collector booster's.)
+    for kind in ["collector", "collector-special", "jumpstart", "theme-b", "jp"] {
         set.boosters.insert(kind.into(), config.clone());
     }
     assert!(set.is_main_booster("play"));
-    assert!(["collector", "collector-special", "jumpstart", "theme-b"].iter().all(|k| !set.is_main_booster(k)));
+    assert!(["collector", "collector-special", "jumpstart", "theme-b", "jp"].iter().all(|k| !set.is_main_booster(k)));
     // Without one (Jumpstart), every kind but the collector ones.
     set.boosters.remove("play");
     assert!(set.is_main_booster("jumpstart") && set.is_main_booster("theme-b") && !set.is_main_booster("collector"));

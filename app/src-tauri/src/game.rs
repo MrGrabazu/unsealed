@@ -40,7 +40,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use unsealed_core::achievements::{Engine, Event};
-use unsealed_core::catalog::{is_collector_kind, set_file_name, CardEntry, Manifest, PriceFile, SetFile, FOREIGN_LANGUAGES};
+use unsealed_core::catalog::{booster_language, is_collector_kind, set_file_name, usual_kind, CardEntry, Manifest, PriceFile, SetFile, FOREIGN_LANGUAGES};
 use unsealed_core::import::ART_RARITY;
 use unsealed_core::economy::{charity_available, EconomyConfig};
 use unsealed_core::limited::LimitedConfig;
@@ -406,8 +406,8 @@ pub struct Game {
     /// The box toppers (see `toppers`): the sets' boxes, read when first needed, and those
     /// given and not shown yet.
     box_toppers: toppers::BoxToppers,
-    /// Whether each translated printing checked has a good scan (see `localized`).
-    image_quality: HashMap<String, bool>,
+    /// Scryfall's `image_status` of each translated printing checked (see `localized`).
+    image_quality: HashMap<String, String>,
     prices: Option<PriceFile>,
     /// Modification time of the prices file that `prices` was loaded from.
     prices_stamp: Option<SystemTime>,
@@ -452,6 +452,8 @@ impl Game {
         // Bets of a booster left unseen when the game was last closed.
         // (Without the artifacts' bonuses: they are not known yet.)
         store.pay_bets(clock().now, 0, None).map_err(err)?;
+        // The file of older versions only said whether a scan was good: asked again.
+        let _ = fs::remove_file(data_dir.join(OLD_IMAGE_QUALITY_FILE));
         let image_quality = read_json(&data_dir.join(IMAGE_QUALITY_FILE)).unwrap_or_default();
         Ok(Self {
             data_dir,
@@ -757,6 +759,9 @@ impl Game {
             .map(|(uuid, _)| uuid)
             .collect();
         let Self { sets, prices, rng, economy, card_lang, print_runs, limited, image_quality, .. } = self;
+        // A Japanese booster's cards are shown in Japanese, as they come out of it.
+        let japanese = booster_language(kind);
+        let card_lang = japanese.unwrap_or(card_lang.as_str());
         let set = &sets[set_code];
         // One of its boosters, or of its box toppers.
         let cfg = set.file.booster_config(kind).ok_or_else(|| format!("set {set_code} has no `{kind}` booster"))?;
@@ -773,7 +778,7 @@ impl Game {
                     if unpriced { economy.fallback_price_cents(&card.rarity, d.foil) } else { own(d.foil).or_else(|| own(!d.foil)) };
                 let price_estimated =
                     unpriced || prices.as_ref().and_then(|p| p.cards.get(&d.uuid)).is_some_and(|p| p.estimated);
-                let shown = localized(card, card_lang, image_quality);
+                let shown = localized(card, card_lang, image_quality, japanese.is_some());
                 OpenedCard {
                     image_url: shown.image_url,
                     back_image_url: shown.back_image_url,
@@ -937,19 +942,20 @@ impl Game {
         })
     }
 
-    /// The translated printings of a set (in the card language) whose image quality is not
-    /// known yet: to ask Scryfall (`record_image_quality`). None in English.
+    /// The translated printings of a set (in the card language, and in the language of its
+    /// boosters printed in another: Japan's) whose image quality is not known yet: to ask
+    /// Scryfall (`record_image_quality`). None in English, for a set without such boosters.
     pub fn unchecked_images(&mut self, set_code: &str) -> Result<Vec<String>, String> {
-        if self.card_lang == "en" {
-            return Ok(Vec::new());
-        }
         self.ensure_loaded(set_code)?;
-        let lang = self.card_lang.clone();
-        let mut ids: Vec<String> = self.sets[set_code]
-            .file
+        let file = &self.sets[set_code].file;
+        let mut langs: Vec<&str> = file.boosters.keys().filter_map(|k| booster_language(k)).collect();
+        if self.card_lang != "en" {
+            langs.push(&self.card_lang);
+        }
+        let mut ids: Vec<String> = file
             .cards
             .iter()
-            .filter_map(|c| c.foreign.get(&lang)?.scryfall_id.clone())
+            .flat_map(|c| langs.iter().filter_map(|lang| c.foreign.get(*lang)?.scryfall_id.clone()))
             .filter(|id| !self.image_quality.contains_key(id))
             .collect();
         ids.sort();
@@ -975,7 +981,10 @@ impl Game {
             .values()
             .flat_map(|sheet| sheet.cards.keys())
             .filter_map(|uuid| set.index.get(uuid))
-            .map(|&i| localized(&set.file.cards[i], &self.card_lang, &self.image_quality).image_id)
+            .map(|&i| {
+                let japanese = booster_language(kind);
+                localized(&set.file.cards[i], japanese.unwrap_or(&self.card_lang), &self.image_quality, japanese.is_some()).image_id
+            })
             .collect();
         ids.sort();
         ids.dedup();
@@ -986,15 +995,15 @@ impl Game {
             .collect())
     }
 
-    /// Records Scryfall's `image_status` of translated printings (a good scan: "highres_scan"),
-    /// and keeps them for the next games. Ids Scryfall did not answer for count as without a
-    /// good image. Returns how many have one.
+    /// Records Scryfall's `image_status` of translated printings (a good scan: "highres_scan";
+    /// a small one: "lowres"), and keeps them for the next games. Ids Scryfall did not answer
+    /// for count as without an image. Returns how many have a good one.
     pub fn record_image_quality(&mut self, asked: &[String], statuses: &HashMap<String, String>) -> usize {
         let mut good = 0;
         for id in asked {
-            let ok = statuses.get(id).is_some_and(|s| s == "highres_scan");
-            good += usize::from(ok);
-            self.image_quality.insert(id.clone(), ok);
+            let status = statuses.get(id).cloned().unwrap_or_default();
+            good += usize::from(status == GOOD_SCAN);
+            self.image_quality.insert(id.clone(), status);
         }
         if let Ok(json) = serde_json::to_string(&self.image_quality) {
             // A convenience: if it cannot be saved, the check happens again next time.
@@ -1005,7 +1014,7 @@ impl Game {
 
     /// A card as the collection shows it: in the card language, with its copies and prices.
     fn collection_card(&self, c: &CardEntry, have: Owned) -> CollectionCard {
-        let shown = localized(c, &self.card_lang, &self.image_quality);
+        let shown = localized(c, &self.card_lang, &self.image_quality, false);
         CollectionCard {
             uuid: c.uuid.clone(),
             name: shown.name,
@@ -1257,7 +1266,7 @@ impl Game {
         self.ensure_loaded(booster_set).ok()?;
         let set = &self.sets[booster_set];
         let card = &set.file.cards[*set.index.get(uuid)?];
-        let shown = localized(card, &self.card_lang, &self.image_quality);
+        let shown = localized(card, &self.card_lang, &self.image_quality, false);
         Some(OpenedCard {
             uuid: card.uuid.clone(),
             name: shown.name,
@@ -1585,11 +1594,14 @@ struct Shown {
 /// A card's name and images in `lang`, or in English when it was not printed in that language.
 /// A translated name without a translated printing on Scryfall keeps the English images, and
 /// so does a translated printing whose image is not known as a good scan (`image_quality`:
-/// many have only a small scan, or none at all): the name stays translated.
-fn localized(card: &CardEntry, lang: &str, image_quality: &HashMap<String, bool>) -> Shown {
+/// many have only a small scan, or none at all): the name stays translated. A small scan
+/// will do when `small_scans` (the cards of a Japanese booster, shown as they come out of it:
+/// Scryfall has only small scans of most Japanese printings).
+fn localized(card: &CardEntry, lang: &str, image_quality: &HashMap<String, String>, small_scans: bool) -> Shown {
     let foreign = card.foreign.get(lang);
     let scryfall_id = foreign.and_then(|f| f.scryfall_id.clone()).unwrap_or_else(|| card.scryfall_id.clone());
-    let image_id = if scryfall_id == card.scryfall_id || image_quality.get(&scryfall_id) == Some(&true) {
+    let status = image_quality.get(&scryfall_id).map(String::as_str);
+    let image_id = if scryfall_id == card.scryfall_id || status == Some(GOOD_SCAN) || (small_scans && status == Some(SMALL_SCAN)) {
         scryfall_id.clone()
     } else {
         card.scryfall_id.clone()
@@ -1606,8 +1618,13 @@ fn localized(card: &CardEntry, lang: &str, image_quality: &HashMap<String, bool>
     }
 }
 
-/// Where the quality of translated images is remembered (see `localized`).
-const IMAGE_QUALITY_FILE: &str = "image-quality.json";
+/// Where the quality of translated images is remembered (see `localized`): Scryfall's
+/// `image_status` by printing. Older versions kept a mere yes or no in another file.
+const IMAGE_QUALITY_FILE: &str = "image-status.json";
+const OLD_IMAGE_QUALITY_FILE: &str = "image-quality.json";
+/// Scryfall's `image_status` of a good scan, and of a small one.
+const GOOD_SCAN: &str = "highres_scan";
+const SMALL_SCAN: &str = "lowres";
 
 /// Scryfall CDN image of a card (normal size). Double-faced back sides are not handled yet.
 fn image_url(scryfall_id: &str) -> String {
@@ -1653,8 +1670,10 @@ fn reveal_rank(kind: &str, card: &OpenedCard) -> u8 {
         return 99;
     }
     if card.rarity == ART_RARITY {
-        return if kind == "set" { 0 } else { 98 };
+        return if usual_kind(kind) == "set" { 0 } else { 98 };
     }
+    // A Japanese booster comes in the order of its English kind.
+    let kind = usual_kind(kind);
     let sheet = card.sheet.to_lowercase();
     let land = (sheet.contains("land") || sheet.contains("basic")) && !sheet.contains("orbasic");
     let by_rarity = |common: u8, uncommon: u8, rare: u8| match card.rarity.as_str() {
@@ -2110,17 +2129,22 @@ mod tests {
         .unwrap();
         let mut quality = HashMap::new();
         // Not checked yet, then a small scan: the English image, the French name.
-        for known in [None, Some(false)] {
-            if let Some(ok) = known {
-                quality.insert("ffffff".to_string(), ok);
+        for known in [None, Some(SMALL_SCAN)] {
+            if let Some(status) = known {
+                quality.insert("ffffff".to_string(), status.to_string());
             }
-            let shown = localized(&card, "fr", &quality);
+            let shown = localized(&card, "fr", &quality, false);
             assert_eq!((shown.name.as_str(), shown.image_url.contains("aaaaaa")), ("Sortir", true));
             // The text still comes from the French printing.
             assert_eq!(shown.scryfall_id, "ffffff");
         }
-        quality.insert("ffffff".to_string(), true);
-        assert!(localized(&card, "fr", &quality).image_url.contains("ffffff"));
+        // A small scan does for a booster printed in that language.
+        assert!(localized(&card, "fr", &quality, true).image_url.contains("ffffff"));
+        // No image at all never does.
+        quality.insert("ffffff".to_string(), "missing".to_string());
+        assert!(localized(&card, "fr", &quality, true).image_url.contains("aaaaaa"));
+        quality.insert("ffffff".to_string(), GOOD_SCAN.to_string());
+        assert!(localized(&card, "fr", &quality, false).image_url.contains("ffffff"));
     }
 
     #[test]
@@ -2598,6 +2622,46 @@ mod tests {
         let view = g.collection("TST").unwrap();
         assert_eq!((view.owned_count, view.total_count, view.extras_owned), (0, 2, 1));
         assert_eq!(view.extras[0].foil_quantity, 1);
+    }
+
+    #[test]
+    fn a_japanese_booster_shows_its_cards_in_japanese() {
+        let mut g = game("japanese");
+        // A Japanese booster like the play one; the common was printed in Japanese, the mythic was not.
+        let set = SET
+            .replace(
+                r#""name": "Common", "number": "10","#,
+                r#""name": "Common", "number": "10", "foreign": { "ja": { "name": "コモン", "scryfallId": "ja0001" } },"#,
+            )
+            .replace(
+                r#""sourceSetCodes": ["TST"] } } }"#,
+                r#""sourceSetCodes": ["TST"] },
+                  "jp": {
+                    "boosters": [ { "contents": { "mythic": 1, "common": 1 }, "weight": 1 } ],
+                    "boostersTotalWeight": 1,
+                    "sheets": {
+                      "common": { "cards": { "c1": 1 }, "foil": false, "totalWeight": 1 },
+                      "mythic": { "cards": { "m1": 1 }, "foil": false, "totalWeight": 1 }
+                    },
+                    "sourceSetCodes": ["TST"] } } }"#,
+            );
+        fs::write(g.data_dir.join("sets/TST.json"), set).unwrap();
+
+        // Its Japanese images are checked even when the cards are read in English.
+        assert_eq!(g.unchecked_images("TST").unwrap(), ["ja0001"]);
+        // Only a small scan, as most Japanese printings on Scryfall: good enough for a Japanese booster.
+        g.record_image_quality(&["ja0001".to_string()], &HashMap::from([("ja0001".to_string(), "lowres".to_string())]));
+        assert!(g.booster_image_paths("TST", "jp").unwrap().iter().any(|p| p.contains("ja0001")));
+        g.set_card_language("ja");
+        assert!(!g.collection("TST").unwrap().cards[1].image_url.contains("ja0001"), "not for the binder in Japanese");
+        g.set_card_language("en");
+
+        g.buy_boosters("TST", "jp", 1).unwrap();
+        let cards = g.open_booster("TST", "jp").unwrap();
+        let shown: Vec<(&str, bool)> = cards.iter().map(|c| (c.name.as_str(), c.image_url.contains("ja0001"))).collect();
+        assert_eq!(shown, [("コモン", true), ("Mythic", false)]);
+        // The binder keeps the player's language.
+        assert_eq!(g.collection("TST").unwrap().cards[1].name, "Common");
     }
 
     #[test]

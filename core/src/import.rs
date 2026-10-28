@@ -3,7 +3,7 @@
 use crate::booster::{BoosterConfig, BoosterPack, BoosterSheet, ConfigError};
 use crate::catalog::{
     foil_kind, ArtistCard, ArtistIndex, BoxTopper, CardEntry, FeaturedCard, ForeignCard, GuestCard, GuestIndex, PriceSet, SetFile,
-    is_collector_kind, kind_wanted, COLLECTOR_KIND, FOREIGN_LANGUAGES,
+    is_collector_kind, kind_wanted, usual_kind, COLLECTOR_KIND, FOREIGN_LANGUAGES,
 };
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -563,7 +563,7 @@ pub fn add_art_slots(set: &mut SetFile, odds: &ArtCardOdds) {
     let released = set.release_date.clone();
     for (kind, cfg) in set.boosters.iter_mut() {
         // Shares of the packs: (regular art card, signed one, none).
-        let (regular, gold, none) = match kind.as_str() {
+        let (regular, gold, none) = match usual_kind(kind) {
             "set" => (odds.set_signed_one_in.max(1) - 1, 1, 0),
             "play" if released < odds.play_until => {
                 (odds.play_percent, odds.play_signed_percent, 100u64.saturating_sub(odds.play_percent + odds.play_signed_percent))

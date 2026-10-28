@@ -35,6 +35,16 @@ export const en = {
   "kind.phyrexian": "Phyrexian faction booster",
   "kind.premium": "Premium foil booster",
   "kind.collectorSpecial": "Special Edition collector booster",
+  "kind.japanese": "{kind} (Japan)",
+  "jpNote.title": "A booster from Japan",
+  "jpNote.why":
+    "Sold only in Japan. The game offers no booster per language, but this one holds cards found in no other booster, so it is offered apart. Its cards come out in Japanese; the binder keeps the card language chosen.",
+  "jpNote.WAR":
+    "Every planeswalker of the set may come in an alternate-art version drawn by a Japanese artist (36 cards, Liliana by Yoshitaka Amano among them): about one booster in two holds one, sometimes in foil. To tell it: a star ★ after its collector number, a manga-style illustration, and the artist's name written in Japanese on the card.",
+  "jpNote.IKO":
+    "The Godzilla series (cards no. 370 to 387) comes more often, its cards bearing the Japanese names of the films' monsters: about one draft booster in seven, one collector booster in four.",
+  "jpNote.STX":
+    "Its Mystical Archive card is the Japanese alternate-art version (STA no. 64 to 126), drawn by Japanese artists, with the artist's name in Japanese: about one booster in two.",
   // A theme booster ("theme-b", "theme-boros"…): {theme} is a color, a guild, a college…
   "kind.theme": "Theme booster · {theme}",
   "theme.w": "White",

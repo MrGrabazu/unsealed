@@ -46,7 +46,7 @@ fn default_boosters() -> Vec<String> {
     // "theme-*": every theme booster ("theme-b", "theme-boros"…).
     [
         "play", "draft", "set", "default", "six", "value", "theme-*", "jumpstart", "jumpstart-v2", "mirran", "phyrexian", "premium",
-        "collector", "collector-special",
+        "collector", "collector-special", "jp", "set-jp", "collector-jp",
     ]
     .map(String::from)
     .to_vec()

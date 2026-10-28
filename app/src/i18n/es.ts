@@ -30,6 +30,16 @@ export const es: Messages = {
   "kind.phyrexian": "Sobre de facción pirexiana",
   "kind.premium": "Sobre premium foil",
   "kind.collectorSpecial": "Sobre de coleccionista Edición especial",
+  "kind.japanese": "{kind} japonés",
+  "jpNote.title": "Un sobre venido de Japón",
+  "jpNote.why":
+    "Vendido solo en Japón. El juego no ofrece sobres por idioma, pero este contiene cartas que ningún otro sobre da, así que se ofrece aparte. Sus cartas salen en japonés; la carpeta mantiene el idioma de cartas elegido.",
+  "jpNote.WAR":
+    "Cada planeswalker de la edición puede salir en una versión con ilustración alternativa de un artista japonés (36 cartas, entre ellas Liliana por Yoshitaka Amano): alrededor de un sobre de cada dos contiene una, a veces en foil. Para reconocerla: una estrella ★ tras su número de colección, una ilustración de estilo manga y el nombre del artista escrito en japonés en la carta.",
+  "jpNote.IKO":
+    "La serie Godzilla (cartas n.º 370 a 387) sale más a menudo, sus cartas con el nombre japonés de los monstruos de las películas: alrededor de un sobre de draft de cada siete, un sobre de coleccionista de cada cuatro.",
+  "jpNote.STX":
+    "Su carta del Mystical Archive es la versión japonesa con ilustración alternativa (STA n.º 64 a 126), dibujada por artistas japoneses, con el nombre del artista en japonés: alrededor de un sobre de cada dos.",
   "kind.theme": "Sobre temático · {theme}",
   "theme.w": "Blanco",
   "theme.u": "Azul",

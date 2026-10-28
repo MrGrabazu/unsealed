@@ -108,7 +108,7 @@ impl Game {
         let owned = self.owned_with_tokens(set_code)?;
         let set = &self.sets[set_code];
         let card = &set.file.cards[*set.index.get(uuid).ok_or_else(|| format!("card {uuid} not in {set_code}"))?];
-        let shown = localized(card, &self.card_lang, &self.image_quality);
+        let shown = localized(card, &self.card_lang, &self.image_quality, false);
         let have = owned.get(uuid).copied().unwrap_or_default();
         let query = DetailsQuery {
             english_id: card.scryfall_id.clone(),

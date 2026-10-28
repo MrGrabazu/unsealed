@@ -30,6 +30,16 @@ export const fr: Messages = {
   "kind.phyrexian": "Booster de faction phyrexian",
   "kind.premium": "Booster premium foil",
   "kind.collectorSpecial": "Booster collector Édition spéciale",
+  "kind.japanese": "{kind} japonais",
+  "jpNote.title": "Un booster venu du Japon",
+  "jpNote.why":
+    "Vendu seulement au Japon. Le jeu ne propose pas de boosters par langue, mais celui-ci contient des cartes qu'aucun autre booster ne donne : il est donc proposé à part. Ses cartes sortent en japonais ; le classeur, lui, garde la langue des cartes choisie.",
+  "jpNote.WAR":
+    "Chaque planeswalker du set peut y sortir dans une version à illustration alternative, dessinée par un artiste japonais (36 cartes, dont Liliana par Yoshitaka Amano) : environ un booster sur deux en contient une, parfois en foil. Pour la reconnaître : une étoile ★ après son numéro de collection, une illustration de style manga, et le nom de l'artiste écrit en japonais sur la carte.",
+  "jpNote.IKO":
+    "La série Godzilla (cartes n° 370 à 387) y sort plus souvent, ses cartes portant le nom japonais des monstres des films : environ un booster de draft sur sept, un booster collector sur quatre.",
+  "jpNote.STX":
+    "Sa carte du Mystical Archive est la version japonaise à illustration alternative (STA n° 64 à 126), dessinée par des artistes japonais, avec le nom de l'artiste en japonais : environ un booster sur deux.",
   "kind.theme": "Booster thématique · {theme}",
   "theme.w": "Blanc",
   "theme.u": "Bleu",

@@ -155,6 +155,23 @@ pub fn is_collector_kind(kind: &str) -> bool {
     kind == COLLECTOR_KIND || kind.strip_prefix(COLLECTOR_KIND).is_some_and(|rest| rest.starts_with('-'))
 }
 
+/// The kind a regional edition of a booster is made like: Japan's ("jp", the Japanese Draft
+/// Booster; "set-jp", "collector-jp") are their English kind with a few cards of their own (War
+/// of the Spark's alternate-art planeswalkers, Ikoria's Godzilla series, Strixhaven's Japanese
+/// Mystical Archive). Any other kind is its own.
+pub fn usual_kind(kind: &str) -> &str {
+    match kind {
+        "jp" => "draft",
+        _ => kind.strip_suffix("-jp").unwrap_or(kind),
+    }
+}
+
+/// The language a booster's cards are printed in, when it is not the player's: Japanese for
+/// Japan's boosters (see `usual_kind`), whose cards are shown as they come out of it.
+pub fn booster_language(kind: &str) -> Option<&'static str> {
+    (kind == "jp" || kind.ends_with("-jp")).then_some("ja")
+}
+
 /// Whether a booster kind is one `data.json` asks for: listed as is, or matching an entry
 /// ending with "*" ("theme-*": every theme booster, "theme-b", "theme-boros"…).
 pub fn kind_wanted(kind: &str, wanted: &[&str]) -> bool {

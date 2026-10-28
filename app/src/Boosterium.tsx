@@ -8,6 +8,7 @@ import { useI18n } from "./i18n";
 import { Money, useAmountsInText, useMoney, useMoneyText } from "./money";
 import { PriceTrend } from "./PriceTrend";
 import { BoxGauge } from "./SealedBoosters";
+import { JapaneseNote } from "./JapaneseNote";
 import { SetIcon } from "./SetIcon";
 
 interface Props {
@@ -317,6 +318,7 @@ export function Boosterium({ shop, sets, wallet, onBuy, onClaimCharity, busy, fo
             ))}
             {/* The chosen kind's box holds a box topper: how far the next one is. */}
             {item.boxProgress && <BoxGauge progress={item.boxProgress} />}
+            <JapaneseNote setCode={item.setCode} kind={item.kind} />
             </div>
             <div className="buy-bar">
               <div className="buy-row">

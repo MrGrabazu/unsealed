@@ -5,6 +5,7 @@
 //! Adding an artifact takes no code, as long as its effects are of the kinds below.
 
 use crate::booster::ConfigError;
+use crate::catalog::usual_kind;
 use crate::economy::EconomyConfig;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -215,7 +216,7 @@ impl Bonuses {
         self.discounts
             .iter()
             .filter(|(_, kinds, before)| {
-                (kinds.is_empty() || kinds.iter().any(|k| k == kind)) && released_before(released, before.as_deref())
+                (kinds.is_empty() || kinds.iter().any(|k| k == usual_kind(kind))) && released_before(released, before.as_deref())
             })
             .map(|(percent, _, _)| *percent)
             .sum::<u32>()
@@ -360,7 +361,9 @@ impl ArtifactsConfig {
             .filter(|a| self.can_get(a, owned))
             .filter_map(|a| match &a.source {
                 ArtifactSource::Booster { one_in, kinds, released_before: before }
-                    if (kinds.is_empty() || kinds.iter().any(|k| k == kind)) && released_before(released, before.as_deref()) =>
+                    // A Japanese booster is found in like its English kind (`usual_kind`).
+                    if (kinds.is_empty() || kinds.iter().any(|k| k == usual_kind(kind)))
+                        && released_before(released, before.as_deref()) =>
                 {
                     Some((a, *one_in))
                 }

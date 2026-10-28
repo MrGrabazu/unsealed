@@ -21,10 +21,17 @@ const KIND_ORDER = [
   "collector-special",
 ];
 
-export const kindRank = (kind: string) => {
+export const kindRank = (kind: string): number => {
+  // A Japanese booster comes right after its English kind.
+  if (isJapaneseKind(kind)) return kindRank(usualKind(kind)) + 0.5;
   const i = KIND_ORDER.indexOf(kind.startsWith("theme-") ? "theme-*" : kind);
   return i === -1 ? KIND_ORDER.length : i;
 };
+
+/** A booster of Japan ("jp", the Japanese Draft Booster; "set-jp", "collector-jp"): its English
+ * kind with a few cards of its own (catalog.rs, `usual_kind`). */
+export const isJapaneseKind = (kind: string) => kind === "jp" || kind.endsWith("-jp");
+const usualKind = (kind: string) => (kind === "jp" ? "draft" : kind.replace(/-jp$/, ""));
 
 /** A collector booster, or one of its editions ("collector-special"). */
 const isCollectorKind = (kind: string) => kind === "collector" || kind.startsWith("collector-");
@@ -51,6 +58,7 @@ export function wrapperFinish(kind: string): WrapperFinish {
   // A box topper (a pouch of a booster's size, with a card or two): the prism, the collector's
   // opposite, a pearly lacquer all iridescent (mockup .cache/da/v10.html, proposal D).
   if (isTopperKind(kind)) return "prism";
+  if (isJapaneseKind(kind)) return wrapperFinish(usualKind(kind));
   if (isCollectorKind(kind)) return "collector";
   if (kind.startsWith("theme-")) return "matte";
   switch (kind) {
@@ -69,6 +77,7 @@ export function wrapperFinish(kind: string): WrapperFinish {
 export function kindLabel(t: I18n["t"], kind: string): string {
   if (isTopperKind(kind)) return t(kind.startsWith("box-topper-foil") ? "kind.topperFoil" : "kind.topper");
   if (kind.startsWith("theme-")) return t("kind.theme", { theme: themeName(t, kind.slice("theme-".length)) });
+  if (isJapaneseKind(kind)) return t("kind.japanese", { kind: kindLabel(t, usualKind(kind)) });
   switch (kind) {
     case "six":
       return t("kind.six");
