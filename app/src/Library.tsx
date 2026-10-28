@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { getLibrary, type LibraryBinder, type SetSummary } from "./api";
 import { coverOf, seeded } from "./Binder";
 import { useI18n } from "./i18n";
@@ -56,20 +56,56 @@ function nameStyle(name: string, spineWidth: number): React.CSSProperties {
   return best.lines === 1 ? { fontSize } : { fontSize, whiteSpace: "normal", lineHeight: 1.1 };
 }
 
+/** The last binders read, shown at once the next time while they are read again (counting
+ * them after a change takes a moment): the shelves rarely change much. */
+let lastBinders: LibraryBinder[] | null = null;
+
+/** Another game's shelves are not this one's: forgotten whenever a game is shown. */
+export function forgetLibrary() {
+  lastBinders = null;
+}
+
 /** The collection as a bookcase: one binder per set owned, standing on shelves, oldest first.
  * Each binder has the cover of its set's binder; hovering one tells how full it is, clicking
  * it opens it. */
 export function Library({ sets, refreshKey, onOpen }: Props) {
   const { t, plural } = useI18n();
-  const [binders, setBinders] = useState<LibraryBinder[] | null>(null);
+  const [binders, setBinders] = useState<LibraryBinder[] | null>(lastBinders);
   const [error, setError] = useState<string | null>(null);
   const [width, setWidth] = useState(0);
-  const [hover, setHover] = useState<{ book: Book; x: number; y: number } | null>(null);
+  const [hovered, setHovered] = useState<Book | null>(null);
   const caseRef = useRef<HTMLDivElement>(null);
+  // The tooltip follows the mouse without React: re-rendering the shelves at every move made
+  // the page lag. Its place is written once a frame, as a transform (no layout, no repaint).
+  const tipRef = useRef<HTMLDivElement>(null);
+  const mouse = useRef({ x: 0, y: 0 });
+  const frame = useRef(0);
+  const placeTip = useCallback(() => {
+    frame.current = 0;
+    const tip = tipRef.current;
+    if (!tip) return;
+    const { x, y } = mouse.current;
+    const left = x + 18 + tip.offsetWidth > window.innerWidth ? x - 18 - tip.offsetWidth : x + 18;
+    const top = Math.max(8, Math.min(y + 18, window.innerHeight - tip.offsetHeight - 8));
+    tip.style.transform = `translate3d(${left}px, ${top}px, 0)`;
+  }, []);
+  const followMouse = useCallback(
+    (e: React.MouseEvent) => {
+      mouse.current = { x: e.clientX, y: e.clientY };
+      if (!frame.current) frame.current = requestAnimationFrame(placeTip);
+    },
+    [placeTip],
+  );
+  useLayoutEffect(() => {
+    if (hovered) placeTip();
+  }, [hovered, placeTip]);
+  useEffect(() => () => cancelAnimationFrame(frame.current), []);
+  const leave = useCallback(() => setHovered(null), []);
 
   useEffect(() => {
     getLibrary()
       .then((list) => {
+        lastBinders = list;
         setBinders(list);
         setError(null);
       })
@@ -128,38 +164,33 @@ export function Library({ sets, refreshKey, onOpen }: Props) {
           </>
         )}
       </p>
-      <div className="bookcase" ref={caseRef} onMouseLeave={() => setHover(null)}>
+      <div className="bookcase" ref={caseRef} onMouseMove={followMouse} onMouseLeave={leave}>
         {shelves.map((row, i) => (
           <div key={i} className="shelf">
             <div className="shelf-books">
               {row.map((book) => (
-                <Spine
-                  key={book.binder.setCode}
-                  book={book}
-                  onOpen={onOpen}
-                  onHover={(x, y) => setHover({ book, x, y })}
-                  onLeave={() => setHover(null)}
-                />
+                <Spine key={book.binder.setCode} book={book} onOpen={onOpen} onEnter={setHovered} onLeave={leave} />
               ))}
             </div>
             <div className="shelf-plank" aria-hidden="true" />
           </div>
         ))}
       </div>
-      {hover && <BinderTooltip book={hover.book} x={hover.x} y={hover.y} />}
+      {hovered && <BinderTooltip ref={tipRef} book={hovered} />}
     </div>
   );
 }
 
-function Spine({
+/** Memoised: hovering a binder re-renders the library, not its every spine. */
+const Spine = memo(function Spine({
   book,
   onOpen,
-  onHover,
+  onEnter,
   onLeave,
 }: {
   book: Book;
   onOpen: (setCode: string) => void;
-  onHover: (x: number, y: number) => void;
+  onEnter: (book: Book) => void;
   onLeave: () => void;
 }) {
   const { binder, set } = book;
@@ -173,7 +204,7 @@ function Spine({
       style={{ "--cover-h": cover.hue, width: book.width, height: book.height } as React.CSSProperties}
       aria-label={name}
       onClick={() => onOpen(binder.setCode)}
-      onMouseMove={(e) => onHover(e.clientX, e.clientY)}
+      onMouseEnter={() => onEnter(book)}
       onMouseLeave={onLeave}
     >
       <span className="spine-icon">
@@ -187,19 +218,12 @@ function Spine({
       <span className="spine-code">{binder.setCode}</span>
     </button>
   );
-}
+});
 
-/** What a binder holds, next to the mouse (and kept inside the window). */
-function BinderTooltip({ book, x, y }: { book: Book; x: number; y: number }) {
+/** What a binder holds, next to the mouse (placed by the library, kept inside the window). */
+const BinderTooltip = forwardRef<HTMLDivElement, { book: Book }>(function BinderTooltip({ book }, ref) {
   const { t, plural, formatNumber } = useI18n();
-  const ref = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ width: 300, height: 320 });
-  useLayoutEffect(() => {
-    if (ref.current) setSize({ width: ref.current.offsetWidth, height: ref.current.offsetHeight });
-  }, [book]);
   const { binder: b, set } = book;
-  const left = x + 18 + size.width > window.innerWidth ? x - 18 - size.width : x + 18;
-  const top = Math.max(8, Math.min(y + 18, window.innerHeight - size.height - 8));
   const count = (owned: number, total: number) => `${formatNumber(owned)} / ${formatNumber(total)}`;
   const rows: [string, React.ReactNode][] = [
     [t("library.rares"), count(b.raresOwned, b.raresTotal)],
@@ -216,7 +240,7 @@ function BinderTooltip({ book, x, y }: { book: Book; x: number; y: number }) {
     [t("library.sellValue"), <Money cents={b.sellValueCents} />],
   );
   return (
-    <div className="library-tooltip" ref={ref} style={{ left, top }} role="tooltip">
+    <div className="library-tooltip" ref={ref} role="tooltip">
       <div className="library-tooltip-head">
         <span className="medallion">
           <SetIcon url={set?.iconUrl ?? null} name={set?.name ?? b.setCode} />
@@ -257,4 +281,4 @@ function BinderTooltip({ book, x, y }: { book: Book; x: number; y: number }) {
       <p className="hint library-tooltip-open">{t("library.open")}</p>
     </div>
   );
-}
+});

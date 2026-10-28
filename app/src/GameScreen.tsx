@@ -53,6 +53,7 @@ import { canUseWebGL, getOpening3d } from "./settings";
 const PackOpening3D = lazy(() => import("./PackOpening3D").then((m) => ({ default: m.PackOpening3D })));
 import { Boosterium, CURIOS } from "./Boosterium";
 import { Collection } from "./Collection";
+import { forgetLibrary } from "./Library";
 import { isTopperKind, kindLabel, rewardText } from "./boosterKinds";
 import { DataPreparing, DataStatusBar, useDataStatus } from "./DataStatus";
 import { Ambience } from "./Ambience";
@@ -73,6 +74,15 @@ const TABS: Tab[] = ["boosterium", "open", "collection", "achievements", "curios
 
 /** How long a notification stays on screen. */
 const TOAST_MS = 8000;
+/** A passing word (save point, booster sold) stays less than an achievement. */
+const NOTICE_MS = 5000;
+
+interface Notice {
+  id: number;
+  icon: IconName;
+  title?: string;
+  text: string;
+}
 
 /** The collection's income is paid about each time a whole Seal is earned, within these bounds. */
 const INCOME_MIN_MS = 1_000;
@@ -221,7 +231,21 @@ function Keys({ hints }: { hints: [string, string][] }) {
 export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => void }) {
   const i18n = useI18n();
   const { t, lang } = i18n;
-  const [notice, setNotice] = useState<string | null>(null);
+  // A game shown (another one, or the same after the menu): the shelves kept are not its own.
+  // During the first render, before the collection can read them.
+  const shelvesForgotten = useRef(false);
+  if (!shelvesForgotten.current) {
+    shelvesForgotten.current = true;
+    forgetLibrary();
+  }
+  // A passing word (a save point made, a booster sold): a toast that leaves on its own.
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const noticeId = useRef(0);
+  const setNotice = useCallback((text: string, icon: IconName = "pack", title?: string) => {
+    const id = ++noticeId.current;
+    setNotices((current) => [...current, { id, icon, title, text }]);
+    setTimeout(() => setNotices((current) => current.filter((n) => n.id !== id)), NOTICE_MS);
+  }, []);
   const [sets, setSets] = useState<SetSummary[]>([]);
   const [shop, setShop] = useState<ShopItem[]>([]);
   const [wallet, setWallet] = useState<WalletView | null>(null);
@@ -653,7 +677,8 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     try {
       const name = t("game.savePointName", { game: save.name, date: i18n.formatDate(Date.now() / 1000) });
       const point = await createSavePoint(name);
-      setNotice(t("game.savePointCreated", { name: point.name }));
+      sounds.click();
+      setNotice(t("game.savePointCreated", { name: point.name }), "save", t("game.savePointDone"));
     } catch (e) {
       setError(String(e));
     }
@@ -767,7 +792,6 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
         <main className="stage" ref={stage}>
         {!waitingForData && <DataStatusBar status={dataStatus} />}
         {error && <p className="error">{error}</p>}
-        {notice && <p className="notice">{notice}</p>}
         {!wallet && !error && <Loading label={t("game.loading")} />}
         {wallet && !error && sets.length === 0 && dataStatus.state === "upToDate" && <p className="hint">{t("data.none")}</p>}
         {/* No set yet, the data being prepared: say so, rather than show empty screens. */}
@@ -1015,6 +1039,22 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
         )}
 
         <div className="toasts" aria-live="polite">
+          {notices.map((n) => (
+            <button
+              key={`notice-${n.id}`}
+              className="toast notice-toast"
+              onClick={() => setNotices((current) => current.filter((other) => other.id !== n.id))}
+            >
+              <span className="notice-toast-seal">
+                <Icon name={n.icon} />
+              </span>
+              <div className="toast-text">
+                {n.title && <strong>{n.title}</strong>}
+                <span>{n.text}</span>
+              </div>
+              <i className="notice-toast-time" style={{ animationDuration: `${NOTICE_MS}ms` }} />
+            </button>
+          ))}
           {toasts.map((a) => (
             <button
               key={a.id}

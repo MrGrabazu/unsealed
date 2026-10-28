@@ -922,6 +922,20 @@ impl Store {
     /// Where each owned card came from: (uuid, its own set code, the set of a booster that
     /// gave it, if any). Tokens, art cards and Special Guests bear another code than the
     /// booster's set, whose file holds them.
+    /// A summary of everything that changes what the collection holds or is worth: the
+    /// copies owned, the latest opening and wallet movement (every purchase, sale, undo…),
+    /// the artifacts (their sell rates). Equal stamps, same collection.
+    pub fn collection_stamp(&self) -> StoreResult<String> {
+        Ok(self.conn.query_row(
+            "SELECT (SELECT COUNT(*) || ':' || TOTAL(quantity) || ':' || TOTAL(foil * quantity) || ':' || IFNULL(MAX(first_acquired_at), 0) FROM collection)
+                 || '/' || (SELECT IFNULL(MAX(id), 0) FROM openings)
+                 || '/' || (SELECT IFNULL(MAX(id), 0) FROM ledger)
+                 || '/' || (SELECT COUNT(*) FROM artifacts)",
+            [],
+            |r| r.get(0),
+        )?)
+    }
+
     pub fn owned_card_sources(&self) -> StoreResult<Vec<(String, String, Option<String>)>> {
         let mut stmt = self.conn.prepare(
             "SELECT c.card_uuid, MIN(c.set_code), MIN(o.set_code)

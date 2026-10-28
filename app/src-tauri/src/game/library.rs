@@ -4,9 +4,22 @@
 use super::{err, CollectionCard, Game};
 use serde::Serialize;
 use std::collections::{BTreeSet, HashMap};
+use std::fs;
+use std::time::SystemTime;
+
+/// What the library's binders were counted on: the collection (`Store::collection_stamp`),
+/// the prices, the data, the card language and the day (sets appear on their release day).
+#[derive(Debug, PartialEq)]
+pub struct LibraryStamp {
+    collection: String,
+    prices: Option<SystemTime>,
+    data: Option<SystemTime>,
+    card_lang: String,
+    day: String,
+}
 
 /// A binder on the library's shelves: a set the player owns cards of.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LibraryBinder {
     pub set_code: String,
@@ -40,7 +53,7 @@ pub struct LibraryBinder {
     pub boosters_opened: u32,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BestCard {
     pub name: String,
@@ -50,8 +63,28 @@ pub struct BestCard {
 
 impl Game {
     /// The binders of the library: every set offered that the player owns a card of, by
-    /// release (oldest first, as on a shelf filled over the years).
+    /// release (oldest first, as on a shelf filled over the years). Counting them reads the
+    /// whole collection of every set owned: they are kept until the game changes.
     pub fn library(&mut self) -> Result<Vec<LibraryBinder>, String> {
+        self.ensure_prices();
+        let stamp = LibraryStamp {
+            collection: self.store.collection_stamp().map_err(err)?,
+            prices: self.prices_stamp,
+            data: fs::metadata(self.data_dir.join("manifest.json")).and_then(|m| m.modified()).ok(),
+            card_lang: self.card_lang.clone(),
+            day: (self.clock)().day,
+        };
+        if let Some((kept, binders)) = &self.library_cache {
+            if *kept == stamp {
+                return Ok(binders.clone());
+            }
+        }
+        let binders = self.count_library()?;
+        self.library_cache = Some((stamp, binders.clone()));
+        Ok(binders)
+    }
+
+    fn count_library(&mut self) -> Result<Vec<LibraryBinder>, String> {
         let offered = self.offered_sets();
         // A card is filed under its own set; tokens, art cards and Special Guests bear another
         // code than the set whose booster gave them ("TLTR", "ALTR": "LTR").

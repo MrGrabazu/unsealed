@@ -395,6 +395,8 @@ pub struct Game {
     artifacts: artifacts::Artifacts,
     /// Sets complete, counted at most once a minute: (when, how many).
     completed_sets_cache: Option<(i64, usize)>,
+    /// The library's binders, with the state of the game they were counted on (see `library`).
+    library_cache: Option<(library::LibraryStamp, Vec<library::LibraryBinder>)>,
     /// The sets' cycles (see `cycles`), shared by the games of a session.
     cycles: Option<std::sync::Arc<unsealed_core::cycles::Cycles>>,
     /// The sets' scenes (see `scenes`), shared by the games of a session.
@@ -467,6 +469,7 @@ impl Game {
             guests: None,
             artifacts: artifacts::Artifacts::default(),
             completed_sets_cache: None,
+            library_cache: None,
             cycles: None,
             scenes: None,
             release_dates: None,
@@ -2802,6 +2805,12 @@ mod tests {
         assert_eq!((binder.value_cents, binder.sell_value_cents), (1200, 960));
         let best = binder.best_card.as_ref().unwrap();
         assert_eq!((best.name.as_str(), best.foil, best.price_cents), ("Mythic", false, 1000));
+
+        // Kept until the collection changes: a sale is counted at once.
+        assert_eq!(g.library().unwrap()[0].copies, 3);
+        g.sell_cards(&[SaleRequest { uuid: "m1".into(), foil: false, quantity: 1 }]).unwrap();
+        let binder = &g.library().unwrap()[0];
+        assert_eq!((binder.owned_count, binder.copies, binder.value_cents), (1, 2, 200));
     }
 
     #[test]
@@ -3286,6 +3295,45 @@ mod tests {
 
     /// Needs the real data: run `data-builder` first, then
     /// `cargo test -p unsealed-app -- --ignored --nocapture`.
+    /// Times the library on a copy of the newest game of `.dev-data/saves`:
+    /// `cargo test --release -p unsealed-app library_timing -- --ignored --nocapture`.
+    #[test]
+    #[ignore = "needs the data built in dist/ and a game in .dev-data/saves/"]
+    fn library_timing() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let save = std::fs::read_dir(root.join(".dev-data/saves"))
+            .unwrap()
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .filter(|p| p.extension().is_some_and(|x| x == "sqlite"))
+            .max_by_key(|p| p.metadata().and_then(|m| m.modified()).ok())
+            .expect("a game");
+        let copy = std::env::temp_dir().join("unsealed-library-timing.sqlite");
+        let _ = std::fs::remove_file(&copy);
+        rusqlite::Connection::open(&save).unwrap().execute("VACUUM INTO ?1", [copy.to_str().unwrap()]).unwrap();
+        let mut g = Game::with_parts(
+            root.join("dist"),
+            Store::open(&copy).unwrap(),
+            EconomyConfig::from_json(ECONOMY).unwrap(),
+            Engine::from_json(include_str!("../../../config/achievements.json")).unwrap(),
+            ChaCha8Rng::seed_from_u64(7),
+            Box::new(system_clock),
+        )
+        .unwrap();
+        for round in ["cold", "warm"] {
+            let start = std::time::Instant::now();
+            let binders = g.library().unwrap();
+            println!("library ({round}): {} binders in {:?}", binders.len(), start.elapsed());
+        }
+        let start = std::time::Instant::now();
+        let offered = g.offered_sets();
+        println!("offered_sets: {} in {:?}", offered.len(), start.elapsed());
+        for b in g.library().unwrap() {
+            let start = std::time::Instant::now();
+            g.collection(&b.set_code).unwrap();
+            println!("  collection {}: {:?}", b.set_code, start.elapsed());
+        }
+    }
+
     #[test]
     #[ignore]
     fn real_data_smoke_test() {

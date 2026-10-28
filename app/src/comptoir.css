@@ -52,7 +52,8 @@
 .collection-bar.compact .collection-bar-middle select, .collection-bar.compact .collection-bar-middle input { flex: 0 1 auto; padding: 6px 10px; font-size: 14px; max-width: 240px; min-width: 90px; }
 .collection-bar.compact .segmented button { padding: 6px 12px; font-size: 12px; }
 .collection-bar.compact .collection-bar-right { margin-left: auto; }
-.split { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 18px; }
+/* Every split screen has the same side panel: going from one to the next moves nothing. */
+.split { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; }
 .split > .frame { min-height: 0; display: flex; flex-direction: column; }
 .split > .frame > .scroll { flex: 1; min-height: 0; overflow: auto; margin: 0 -10px; padding: 6px 10px 0; }
 
@@ -111,6 +112,21 @@
   background: linear-gradient(160deg, #241f19, #070605 60%, #15120e); box-shadow: inset 0 0 0 2px #f5d68a, 0 0 14px #f5b84a66; color: #f5d68a; }
 .topper-toast-pack svg { width: 34px; height: 34px; fill: currentColor; }
 .topper-no-bets { margin: 12px 4px; }
+/* A passing word (save point, booster sold): a wax seal with its icon, and a gold thread
+   that runs out until the toast leaves (GameScreen's NOTICE_MS). */
+.notice-toast { position: relative; max-width: 380px; overflow: hidden; padding: 12px 18px 14px 12px;
+  background: var(--leather), linear-gradient(180deg, #2e1f15, #1f150e);
+  box-shadow: inset 0 0 0 1px #d9a4411c, inset 0 0 0 4px #1a110a, inset 0 0 0 5px #d9a44144, 0 12px 28px #000c; }
+.notice-toast::before { content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit; background: var(--corners); }
+.notice-toast-seal { display: grid; place-items: center; flex: none; width: 46px; height: 46px; border-radius: 50%; color: #f5d68a;
+  background: radial-gradient(circle at 35% 30%, #c9473a, var(--wax) 55%, #5e1510);
+  box-shadow: inset 0 0 0 3px #00000026, inset 0 -3px 6px #0006, 0 3px 6px #0009; }
+.notice-toast-seal svg { width: 22px; height: 22px; fill: currentColor; filter: drop-shadow(0 1px 0 #0008); }
+.notice-toast .toast-text span { color: #e6d6b8; }
+.notice-toast-time { position: absolute; left: 12px; right: 12px; bottom: 6px; height: 2px; border-radius: 1px; transform-origin: left;
+  background: linear-gradient(90deg, var(--gold-lo), var(--gold-hi)); animation: notice-time linear forwards; }
+@keyframes notice-time { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@media (prefers-reduced-motion: reduce) { .notice-toast-time { animation: none; } }
 .preparing-legal { max-width: 720px; font-size: 12px; color: var(--muted); text-align: center; }
 /* The notice's translation, on its own line under the official English text. */
 .notice-translated { display: block; margin-top: 4px; }
@@ -411,7 +427,6 @@ button.reserve-cell.sel::after { content: ""; position: absolute; top: 172px; le
 /* A mythic card unlocked glows like the fire of its rim. */
 .ach-card.mythic.unlocked:not(.lite) { filter: drop-shadow(0 0 12px #ff7a2a88) drop-shadow(0 6px 14px #0008); }
 .ach-card.rare.unlocked:not(.lite) { filter: drop-shadow(0 0 8px #f5b84a55) drop-shadow(0 6px 14px #0008); }
-.ach-split { grid-template-columns: minmax(0, 1fr) 340px; }
 .ach-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; margin-bottom: 14px; }
 .ach-progress { display: flex; align-items: center; gap: 10px; flex: 1 1 220px; max-width: 360px; font: 700 13px var(--font-title); color: var(--gold-hi); white-space: nowrap; }
 .ach-progress .bar { flex: 1; }
@@ -450,7 +465,6 @@ button.ach-item.sel::before { box-shadow: 0 0 14px #f5b84aaa, 0 0 6px #f5b84a88,
 .artifact-glyph .hole-line { fill: none; stroke: #2a1a0c; }
 .artifact-glyph.silhouette { color: #000; opacity: .55; filter: drop-shadow(0 0 1px #d9a44155); }
 .artifact-glyph.silhouette .hole, .artifact-glyph.silhouette .hole-line { fill: #000; stroke: #000; }
-.curios-split { grid-template-columns: minmax(0, 1fr) 340px; }
 /* A glass case of dark wood, shelves of niches lined with velvet. */
 .cabinet { position: relative; padding: 14px 16px 12px; border-radius: 6px; background: linear-gradient(90deg, #2a1709, #3a220f 50%, #2a1709);
   box-shadow: inset 0 0 0 3px #1a0d05, inset 0 0 0 4px #8a5a2b, 0 8px 18px #000c; }
@@ -673,7 +687,6 @@ button.curios-slot { display: block; width: 100%; height: 96px; margin-bottom: 1
 .set-side .ready-line em { color: var(--muted); font-size: 13px; text-align: right; }
 
 /* ---- history: the account book, and the movement chosen beside it ----------------------- */
-.history-split { grid-template-columns: minmax(0, 1fr) 360px; }
 .ledger { width: 100%; border-collapse: collapse; font-size: 14.5px; }
 .ledger td { padding: 9px 10px; border-bottom: 1px solid #3d2b1b; vertical-align: middle; }
 .ledger tr:not(.ledger-day) { cursor: pointer; }
@@ -731,7 +744,6 @@ button.curios-slot { display: block; width: 100%; height: 96px; margin-bottom: 1
 .stat-ledger tr { cursor: default !important; }
 
 /* ---- an opening: the pack alone in the light, the bets beside it ------------------------ */
-.opening-split { grid-template-columns: minmax(0, 1fr) 380px; }
 .opening-stage > .cartouche { z-index: 7; }
 /* The light on the pack, inside the frame (which must not clip its cartouche). */
 .opening-light { position: absolute; inset: 8px; pointer-events: none; z-index: 0; border-radius: 6px;
@@ -848,7 +860,6 @@ button.bet-add { width: 100%; margin-top: 10px; padding: 9px; border: 1px dashed
 .bet-side .buy-bar > button:not(.big) { width: 100%; }
 
 /* ---- an opening's result: the hand, and its tally beside it ----------------------------- */
-.result-split { grid-template-columns: minmax(0, 1fr) 330px; }
 /* The whole hand in view: a booster's 14 or 15 cards on two rows. */
 .result-split .revealed-row.final { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 14px 10px; margin-top: 4px; }
 .result-split .revealed-card .card-caption { font-size: 12px; }
@@ -883,7 +894,6 @@ button.bet-add { width: 100%; margin-top: 10px; padding: 9px; border: 1px dashed
 .home-panel.frame { padding-top: 30px; }
 
 /* ---- the collection: one set's binder beside its completion ------------------------------ */
-.collection-split { grid-template-columns: minmax(0, 1fr) 340px; }
 .set-side h2 { margin: 6px 0 2px; padding: 0; background: none; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 19px; line-height: 1.2; color: var(--gold-hi); text-align: center; }
 .set-side .meta { text-align: center; color: var(--muted); font-size: 14px; }
 .ring { position: relative; width: 132px; height: 132px; margin: 14px auto 10px; border-radius: 50%;
