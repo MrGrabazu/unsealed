@@ -15,9 +15,12 @@ watch your cards follow **real market prices**, and fill your binders. With virt
 &nbsp;
 [![Discord](https://img.shields.io/badge/Discord-The_Boosterium-5865F2?style=for-the-badge&logo=discord&logoColor=white&labelColor=2e1f15)](https://discord.gg/YVRdaBGWvb)
 &nbsp;
+[![Wiki](https://img.shields.io/badge/📖_Wiki-Game_guide-d9a441?style=for-the-badge&labelColor=2e1f15)](https://github.com/MrGrabazu/unsealed/wiki)
+&nbsp;
 [![License](https://img.shields.io/badge/license-GPL--3.0-d9a441?style=for-the-badge&labelColor=2e1f15)](LICENSE)
 
-**[🌐 mrgrabazu.github.io/unsealed](https://mrgrabazu.github.io/unsealed/)**: the showcase page, with the installer for your system.
+**[🌐 mrgrabazu.github.io/unsealed](https://mrgrabazu.github.io/unsealed/)**: the showcase page, with the installer for your system.<br>
+**[📖 The wiki](https://github.com/MrGrabazu/unsealed/wiki)**: the game guide, how everything works.
 
 <br>
 
@@ -40,6 +43,13 @@ watch your cards follow **real market prices**, and fill your binders. With virt
 - **96 achievements.** Each one unlocks a card of its own, drawn for the game, from the first steps to the secret ones.
 - **Bets on your boosters**, in Seals, at the true odds of the draw.
 - **5 languages** for the interface (English, French, German, Spanish, Italian), and cards in Japanese too.
+
+Every rule of the game, with its numbers, is explained in **[the wiki](https://github.com/MrGrabazu/unsealed/wiki)**:
+the [Seals and the collection's income](https://github.com/MrGrabazu/unsealed/wiki/Seals-and-Economy),
+[booster kinds](https://github.com/MrGrabazu/unsealed/wiki/Booster-Kinds), [openings](https://github.com/MrGrabazu/unsealed/wiki/Opening-Boosters),
+[bets](https://github.com/MrGrabazu/unsealed/wiki/Bets), [binders](https://github.com/MrGrabazu/unsealed/wiki/Collection-and-Binders),
+[groups, scenes and assemblies](https://github.com/MrGrabazu/unsealed/wiki/Groups-Scenes-and-Assemblies),
+[achievements](https://github.com/MrGrabazu/unsealed/wiki/Achievements)…
 
 ## ✧ 100% free, 100% virtual
 
@@ -122,6 +132,7 @@ to Wizards of the Coast; card data and prices come from Scryfall and MTGJSON, un
 ## 💬 Community
 
 Join **The Boosterium** on [Discord](https://discord.gg/YVRdaBGWvb) to share your best pulls, report a bug or suggest a feature.
+Questions on how something works? The [wiki](https://github.com/MrGrabazu/unsealed/wiki) probably has the answer, with its [FAQ](https://github.com/MrGrabazu/unsealed/wiki/FAQ).
 Issues and ideas are welcome here too.
 
 <details>
@@ -135,7 +146,8 @@ bibliothèque de classeurs à compléter, 96 succès avec leurs propres cartes, 
 que rien ne convertit en argent réel. Interface en français, anglais, allemand, espagnol et italien.
 
 **Téléchargement** pour Windows, macOS et Linux sur la [page du jeu](https://mrgrabazu.github.io/unsealed/) ;
-la communauté se retrouve sur [Discord](https://discord.gg/YVRdaBGWvb).
+la communauté se retrouve sur [Discord](https://discord.gg/YVRdaBGWvb). Le fonctionnement détaillé du jeu est expliqué
+dans le [wiki](https://github.com/MrGrabazu/unsealed/wiki) (en anglais).
 
 </details>
 
