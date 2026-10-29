@@ -8,11 +8,16 @@ import { largeImage } from "./images";
 import { CARD_LANGUAGES, useI18n, type I18n } from "./i18n";
 import { Loading } from "./Loading";
 import { ManaText } from "./ManaText";
-import { Money, useMoney } from "./money";
+import { Money, useMoney, useMoneyText } from "./money";
+import { drawCardShare, type CardShare } from "./sharePicture";
+import { ShareButton } from "./Share";
 
 interface Props {
   setCode: string;
   uuid: string;
+  /** The finish it was pulled in, opened from a booster: the one its shared picture shows
+   * (otherwise foil when a foil copy is owned). */
+  foil?: boolean;
   onClose: () => void;
 }
 
@@ -37,9 +42,10 @@ const rarityName = (t: I18n["t"], rarity: string) => {
 
 /** A card in detail: large image (turned over for double-faced cards), rules text, prices,
  * copies owned and every other printing. */
-export function CardDetails({ setCode, uuid, onClose }: Props) {
+export function CardDetails({ setCode, uuid, foil, onClose }: Props) {
   const { t, tx, cardLang } = useI18n();
   const money = useMoney();
+  const moneyText = useMoneyText();
   const [details, setDetails] = useState<CardDetailsView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const printingList = useRef<HTMLDivElement>(null);
@@ -65,6 +71,25 @@ export function CardDetails({ setCode, uuid, onClose }: Props) {
   const price = (cents: number | null) =>
     cents == null ? t("common.none") : <Money cents={cents} estimated={details?.priceEstimated} />;
 
+  /** The picture to share: the card in the finish it was pulled in (or the finest owned). */
+  const cardShare = (d: CardDetailsView): CardShare => {
+    const shownFoil = d.canBeFoil && (foil ?? (d.ownedFoil > 0 || !d.canBeNonfoil));
+    const cents = shownFoil ? (d.foilPriceCents ?? d.priceCents) : (d.priceCents ?? d.foilPriceCents);
+    return {
+      card: {
+        imageUrl: largeImage(d.imageUrl),
+        name: d.name,
+        foil: shownFoil,
+        foilLabel: shownFoil ? (foilLabel(d.foilKind) ?? t(d.rarity === "art" ? "collection.signedBadge" : "collection.foilBadge")) : null,
+        newLabel: null,
+      },
+      subtitle: t("details.set", { set: d.setName, number: d.number, rarity: rarityName(t, d.rarity) }),
+      priceLabel: t("share.marketValue"),
+      priceText: cents == null ? null : `${d.priceEstimated ? "≈ " : ""}${moneyText(cents)}`,
+      tagline: t("share.tagline"),
+    };
+  };
+
   return (
     <Backdrop onClose={onClose}>
       <div className="modal details" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
@@ -75,6 +100,7 @@ export function CardDetails({ setCode, uuid, onClose }: Props) {
         {!details && !error && <Loading label={t("details.loading")} />}
         {details && (
           <div className={`details-layout ${reading && turned ? `turned-${reading}` : ""}`}>
+            <div className="details-image-col">
             <div className="details-image">
               {/* Shown large: the sharper image. */}
               <CardImage
@@ -98,6 +124,9 @@ export function CardDetails({ setCode, uuid, onClose }: Props) {
                   {reading === "flip" ? "↻" : reading === "left" ? "⤺" : "⤻"}
                 </button>
               )}
+            </div>
+            {/* Under the image, in the room it leaves. */}
+            <ShareButton make={() => drawCardShare(cardShare(details))} fileName={details.name} />
             </div>
 
             {/* The text, then the printings, which scroll on their own: the sheet never

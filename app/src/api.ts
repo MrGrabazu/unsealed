@@ -56,6 +56,8 @@ export interface CollectionCard {
   backImageUrl: string | null;
   quantity: number;
   foilQuantity: number;
+  /** Printed in foil: it counts towards the foil completion. */
+  canBeFoil: boolean;
   /** Its foil's kind, when special (see foils.tsx). */
   foilKind?: string;
   priceCents: number | null;

@@ -77,7 +77,7 @@ const sectionsOf = (view: CollectionView) => [
 
 /** For a search: lower case, without accents ("Magali Villeneuve" ~ "magali villeneuve"). */
 const fold = (text: string) => text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
-import { Binder, type BinderSection } from "./Binder";
+import { Binder, shownPriceCents, type BinderSection } from "./Binder";
 import { CardDetails } from "./CardDetails";
 import { CardImage } from "./CardImage";
 import { CyclesList, CyclesPanel } from "./Cycles";
@@ -359,6 +359,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
 
   function cardTile(c: CollectionCard) {
     const total = c.quantity + c.foilQuantity;
+    const price = shownPriceCents(c);
     return (
       <div key={c.uuid} className={`collection-card ${total > 0 ? "" : "missing"}`} data-rarity={c.rarity}>
         <div
@@ -383,7 +384,9 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
           <span className="name">
             #{c.number} {c.name}
           </span>
-          <span className="price">{c.priceCents == null ? "—" : <Money cents={c.priceCents} estimated={c.priceEstimated} />}</span>
+          <span className="price">
+            {price == null ? "—" : <Money cents={price} estimated={c.priceEstimated} />}
+          </span>
         </div>
         {"setName" in c && <div className="card-set hint">{(c as ArtistCard).setName}</div>}
         {!("setName" in c) && c.boosters && c.boosters.length > 0 && (
@@ -721,17 +724,27 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
     const cards = rarityCards.filter((c) => rarities.includes(c.rarity));
     return { owned: cards.filter((c) => c.quantity + c.foilQuantity > 0).length, total: cards.length };
   };
-  const rows: [string, { owned: number; total: number }][] = (
-    [
-      [t("sell.common"), byRarity(["common"])],
-      [t("sell.uncommon"), byRarity(["uncommon"])],
-      [t("sell.rare"), byRarity(["rare"])],
-      [t("sell.mythic"), byRarity(["mythic"])],
-      [t("sell.other"), byRarity(["special", "bonus"])],
-      [t("collection.tokens"), byArtist ? byRarity(["token"]) : { owned: 0, total: 0 }],
-      [t("collection.arts"), byArtist ? byRarity(["art"]) : { owned: 0, total: 0 }],
-    ] as [string, { owned: number; total: number }][]
-  ).filter(([, r]) => r.total > 0);
+  // The same rows in foil: the cards printed in foil, and those owned in foil (as the foil
+  // completion of the achievements counts them).
+  const foilsByRarity = (rarities: string[]) => {
+    const cards = rarityCards.filter((c) => c.canBeFoil && (rarities.length === 0 || rarities.includes(c.rarity)));
+    return { owned: cards.filter((c) => c.foilQuantity > 0).length, total: cards.length };
+  };
+  const rarityRows = (count: typeof byRarity): [string, { owned: number; total: number }][] =>
+    (
+      [
+        [t("sell.common"), count(["common"])],
+        [t("sell.uncommon"), count(["uncommon"])],
+        [t("sell.rare"), count(["rare"])],
+        [t("sell.mythic"), count(["mythic"])],
+        [t("sell.other"), count(["special", "bonus"])],
+        [t("collection.tokens"), byArtist ? count(["token"]) : { owned: 0, total: 0 }],
+        [t("collection.arts"), byArtist ? count(["art"]) : { owned: 0, total: 0 }],
+      ] as [string, { owned: number; total: number }][]
+    ).filter(([, r]) => r.total > 0);
+  const rows = rarityRows(byRarity);
+  const foilRows = rarityRows(foilsByRarity);
+  const allFoils = foilsByRarity([]);
   const percent = progress?.percent ?? 0;
   // An artist's years: from their oldest card to their latest.
   const years =
@@ -803,6 +816,25 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
               </b>
             </div>
           ))}
+          {allFoils.total > 0 && (
+            <>
+              <div className="side-title">{t("collection.foils")}</div>
+              <div className="ready-line">
+                <span>{t("collection.foilsAll")}</span>
+                <b>
+                  {allFoils.owned} / {allFoils.total}
+                </b>
+              </div>
+              {foilRows.map(([label, r]) => (
+                <div key={label} className="ready-line">
+                  <span>{label}</span>
+                  <b>
+                    {r.owned} / {r.total}
+                  </b>
+                </div>
+              ))}
+            </>
+          )}
           <div className="ready-line">
             <span>{t("collection.valueResale")}</span>
             <b>

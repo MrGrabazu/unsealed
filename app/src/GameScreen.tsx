@@ -254,7 +254,8 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   // The pack being opened: shown sealed until torn (then `cards` holds what it gave).
   const [pack, setPack] = useState<{ setCode: string; kind: string; quick: boolean } | null>(null);
   // The card whose details are open.
-  const [detailsOf, setDetailsOf] = useState<{ setCode: string; uuid: string } | null>(null);
+  // A card's details; `foil`: the finish it was pulled in (for its shared picture).
+  const [detailsOf, setDetailsOf] = useState<{ setCode: string; uuid: string; foil?: boolean } | null>(null);
   // The 3D opening, unless turned off in the options or impossible on this machine.
   const [opening3d] = useState(() => getOpening3d() && canUseWebGL());
   const [soundOn, setSoundOnState] = useState(getSoundOn);
@@ -829,7 +830,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
                 bets={betResults}
                 skipped={betSkipped}
                 cardName={betCardName}
-                onDetails={(card) => setDetailsOf({ setCode: pack.setCode, uuid: card.uuid })}
+                onDetails={(card) => setDetailsOf({ setCode: pack.setCode, uuid: card.uuid, foil: card.foil })}
                 onSold={refreshWallet}
                 remaining={remaining ?? null}
                 busy={busy}
@@ -855,7 +856,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
                         cards={cards}
                         onTear={tear}
                         onReveal={(count) => void reveal(count)}
-                        onDetails={(card) => setDetailsOf({ setCode: pack.setCode, uuid: card.uuid })}
+                        onDetails={(card) => setDetailsOf({ setCode: pack.setCode, uuid: card.uuid, foil: card.foil })}
                         onSold={refreshWallet}
                         onFinished={() => setResultShown(true)}
                         tearRequest={tearRequest}
@@ -871,7 +872,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
                       onReveal={(count) => void reveal(count)}
                       busy={busy}
                       // The details live in the booster's set file (it holds cards from other sets too).
-                      onDetails={(card) => setDetailsOf({ setCode: pack.setCode, uuid: card.uuid })}
+                      onDetails={(card) => setDetailsOf({ setCode: pack.setCode, uuid: card.uuid, foil: card.foil })}
                       onSold={refreshWallet}
                       onFinished={() => setResultShown(true)}
                       tearRequest={tearRequest}
@@ -956,7 +957,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
                 {batch && (
                   <BatchOpening
                     boosters={batch}
-                    onDetails={(card) => last && setDetailsOf({ setCode: last.setCode, uuid: card.uuid })}
+                    onDetails={(card) => last && setDetailsOf({ setCode: last.setCode, uuid: card.uuid, foil: card.foil })}
                     onFinished={() => {
                       releaseToasts();
                       setAllSeen(true);
@@ -991,7 +992,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
         )}
 
         {tab === "open" && detailsOf && (
-          <CardDetails setCode={detailsOf.setCode} uuid={detailsOf.uuid} onClose={() => setDetailsOf(null)} />
+          <CardDetails setCode={detailsOf.setCode} uuid={detailsOf.uuid} foil={detailsOf.foil} onClose={() => setDetailsOf(null)} />
         )}
 
         {tab === "collection" && !waitingForData && (

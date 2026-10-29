@@ -203,9 +203,16 @@ export function Placeholder({ card }: { card: CollectionCard }) {
   );
 }
 
+/** The price of the finish a card is shown in: foil once a foil copy is owned (it then wears
+ * the foil sheen), else the normal one; the other finish's when that one has none. */
+export function shownPriceCents(card: CollectionCard): number | null {
+  return card.foilQuantity > 0 ? (card.foilPriceCents ?? card.priceCents) : (card.priceCents ?? card.foilPriceCents);
+}
+
 function Pocket({ card, onOpen }: { card: CollectionCard; onOpen: (uuid: string) => void }) {
   const { t } = useI18n();
   const total = card.quantity + card.foilQuantity;
+  const price = shownPriceCents(card);
   return (
     <div
       className={`pocket ${total > 0 ? "" : "missing"}`}
@@ -229,8 +236,8 @@ function Pocket({ card, onOpen }: { card: CollectionCard; onOpen: (uuid: string)
           <span className="name">
             #{card.number} {card.name}
           </span>
-          {card.priceCents != null ? (
-            <Money cents={card.priceCents} estimated={card.priceEstimated} />
+          {price != null ? (
+            <Money cents={price} estimated={card.priceEstimated} />
           ) : (
             <span>{t("common.none")}</span>
           )}

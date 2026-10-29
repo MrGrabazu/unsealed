@@ -136,6 +136,44 @@ fn set_display_fullscreen(app: tauri::AppHandle, on: bool) -> Result<(), String>
     fs::write(path, serde_json::json!({ "fullscreen": on }).to_string()).map_err(|e| e.to_string())
 }
 
+/// Saves a picture of a pull (a PNG drawn by the interface, sent as raw bytes, its file name in
+/// the `name` header) in the player's pictures, in an "Unsealed" folder, without replacing an
+/// earlier one. Returns where.
+#[tauri::command]
+fn save_share_image(app: tauri::AppHandle, request: tauri::ipc::Request<'_>) -> Result<String, String> {
+    let tauri::ipc::InvokeBody::Raw(png) = request.body() else {
+        return Err("expected the picture's bytes".into());
+    };
+    if !png.starts_with(b"\x89PNG") {
+        return Err("not a PNG picture".into());
+    }
+    let name = request.headers().get("name").and_then(|v| v.to_str().ok()).unwrap_or("");
+    let stem: String = name
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, ' ' | '-' | '.'))
+        .take(80)
+        .collect::<String>()
+        .trim_matches(|c: char| c == '.' || c == ' ')
+        .to_string();
+    let stem = if stem.is_empty() { "Unsealed".to_string() } else { stem };
+    let dir = app
+        .path()
+        .picture_dir()
+        .or_else(|_| app.path().download_dir())
+        .or_else(|_| app.path().home_dir())
+        .map_err(|e| e.to_string())?
+        .join("Unsealed");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let mut path = dir.join(format!("{stem}.png"));
+    let mut n = 2;
+    while path.exists() {
+        path = dir.join(format!("{stem} ({n}).png"));
+        n += 1;
+    }
+    fs::write(&path, png).map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().into_owned())
+}
+
 fn now() -> i64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0)
 }
@@ -720,6 +758,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            save_share_image,
             list_saves,
             current_save,
             new_game,

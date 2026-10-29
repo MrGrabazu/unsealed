@@ -5,8 +5,11 @@ import { BetResults } from "./BetResults";
 import { kindLabel } from "./boosterKinds";
 import { SellDuplicatesButton, useBoosterSale } from "./BoosterSale";
 import { useI18n } from "./i18n";
-import { Money, useMoney } from "./money";
+import { foilLabel } from "./foils";
+import { Money, useMoney, useMoneyText } from "./money";
 import { RevealedCards } from "./RevealedCards";
+import { ShareButton } from "./Share";
+import { drawBoosterShare, type BoosterShare } from "./sharePicture";
 import { bestCard, revealSound, sounds } from "./sound";
 
 /** Delay between two cards dealt (ms), as in `.revealed-row.final`. */
@@ -42,6 +45,7 @@ export function OpeningResult(props: Props) {
   const { set, setCode, kind, cards, priceCents, quick, bets, skipped, cardName, onDetails, onSold, remaining, busy } = props;
   const { t, tx } = useI18n();
   const money = useMoney();
+  const moneyText = useMoneyText();
   const sale = useBoosterSale(cards, onSold);
   const list = useRef<HTMLDivElement>(null);
 
@@ -59,6 +63,25 @@ export function OpeningResult(props: Props) {
   const fresh = cards.filter((c) => c.isNew).length;
   const freshFoils = cards.filter((c) => c.newFoil).length;
   const gain = priceCents == null ? null : value - priceCents;
+
+  /** The picture to share: every card of the booster, its value, its best card large. */
+  const boosterShare = (): BoosterShare => ({
+    title: `${set?.name ?? setCode} · ${kindLabel(t, kind)}`,
+    valueText: t("share.boosterValue", { amount: moneyText(value) }),
+    gainText: gain == null ? null : t(gain >= 0 ? "share.gain" : "share.loss", { amount: moneyText(Math.abs(gain)) }),
+    gain: (gain ?? 0) >= 0,
+    cards: cards.map((c) => ({
+      imageUrl: c.imageUrl,
+      name: c.name,
+      foil: c.foil,
+      foilLabel: c.foil ? (foilLabel(c.foilKind) ?? t(c.rarity === "art" ? "collection.signedBadge" : "collection.foilBadge")) : null,
+      newLabel: c.isNew ? t("open.new") : c.newFoil ? t("open.newFoil") : null,
+    })),
+    best: best ? cards.indexOf(best) : 0,
+    bestLabel: t("open.tallyBest"),
+    bestText: best ? `${best.name} · ${moneyText(best.priceCents ?? 0)}` : "",
+    tagline: t("share.tagline"),
+  });
 
   return (
     <div className="split result-split">
@@ -112,6 +135,11 @@ export function OpeningResult(props: Props) {
             </b>
           </div>
           {(bets.length > 0 || skipped.length > 0) && <BetResults bets={bets} skipped={skipped} cardName={cardName} />}
+          <ShareButton
+            className="result-share"
+            make={() => drawBoosterShare(boosterShare())}
+            fileName={`${set?.name ?? setCode} ${kindLabel(t, kind)}`}
+          />
         </div>
         <div className="buy-bar">
           <div className="result-sell">

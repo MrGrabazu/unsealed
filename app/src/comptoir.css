@@ -112,6 +112,15 @@
   background: linear-gradient(160deg, #241f19, #070605 60%, #15120e); box-shadow: inset 0 0 0 2px #f5d68a, 0 0 14px #f5b84a66; color: #f5d68a; }
 .topper-toast-pack svg { width: 34px; height: 34px; fill: currentColor; }
 .topper-no-bets { margin: 12px 4px; }
+/* Sharing a pull (Share.tsx): the picture as it will be shared, then copying or saving it. */
+.share-button { margin-top: 12px; width: 100%; }
+.modal.share-modal { width: min(980px, 92vw); max-height: 92vh; display: flex; flex-direction: column; gap: 10px; overflow: auto; }
+.share-modal h2 { margin: 0; font-family: var(--font-title); color: var(--gold-hi); }
+.share-preview { display: grid; place-items: center; min-height: 240px; border-radius: 8px; background: #0b0705; box-shadow: inset 0 0 0 1px #d9a44133; }
+.share-preview img { display: block; max-width: 100%; max-height: 62vh; border-radius: 6px; }
+.share-modal .hint, .share-modal .notice, .share-modal .error { margin: 0; }
+.share-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.share-actions .big { flex: 1; }
 /* A Japanese booster: why it is offered and what it may give (JapaneseNote.tsx). */
 .jp-note { margin: 14px 4px 4px; padding: 10px 12px; border-radius: 6px; border-left: 3px solid var(--wax);
   background: linear-gradient(180deg, #2a1d14cc, #1d140ecc); box-shadow: inset 0 0 0 1px #d9a4411f; font-size: 13px; line-height: 1.4; color: #e6d6b8; }
@@ -146,7 +155,9 @@
 /* A card's sheet: never beyond the window. The image keeps its ratio within the height;
    on the right, the text then the printings, which scroll on their own. */
 .modal.details { max-height: calc(100vh - 48px); overflow: hidden; }
-.modal.details .details-layout { grid-template-columns: min(340px, calc((100vh - 96px) * 63 / 88)) minmax(0, 1fr); align-items: start; }
+/* The image column also holds the share button beneath the image (52 px kept for it). */
+.modal.details .details-layout { grid-template-columns: min(340px, calc((100vh - 148px) * 63 / 88)) minmax(0, 1fr); align-items: start; }
+.details-image-col { min-width: 0; }
 /* A card printed sideways, turned to be read: lying, at the same scale (its short side keeps
    the column's width), the text beside it narrower; or upside down, in place. */
 .modal.details .details-layout:is(.turned-right, .turned-left) { grid-template-columns: min(475px, calc(100vh - 96px)) minmax(0, 1fr); }

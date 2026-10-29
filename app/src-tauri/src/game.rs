@@ -119,6 +119,8 @@ pub struct CollectionCard {
     pub back_image_url: Option<String>,
     pub quantity: u32,
     pub foil_quantity: u32,
+    /// Printed in foil: it counts towards the foil completion (as `SetProgress`'s).
+    pub can_be_foil: bool,
     /// Its foil's kind, when special (see `CardEntry::foil_kind`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub foil_kind: Option<String>,
@@ -1024,6 +1026,7 @@ impl Game {
             back_image_url: shown.back_image_url,
             quantity: have.normal,
             foil_quantity: have.foil,
+            can_be_foil: c.finishes.iter().any(|f| f == "foil"),
             foil_kind: c.foil_kind.clone(),
             price_cents: self.market_price(&c.uuid, false),
             foil_price_cents: self.market_price(&c.uuid, true),
