@@ -7,6 +7,7 @@
 //! the least premium first: the best copy owned of any of them fills the slot.
 
 use crate::booster::ConfigError;
+use crate::catalog::{CardEntry, SetFile};
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -34,6 +35,8 @@ pub enum GroupKind {
     #[default]
     Cycle,
     Story,
+    /// A Secret Lair drop: made from the set's cards (`drop_groups`), never configured.
+    Drop,
 }
 
 impl GroupKind {
@@ -41,8 +44,44 @@ impl GroupKind {
         match self {
             GroupKind::Cycle => "cycle",
             GroupKind::Story => "story",
+            GroupKind::Drop => "drop",
         }
     }
+}
+
+/// The Secret Lair drops of a set (`CardEntry::drop`), as groups to complete: in the order of
+/// their first card's number, a slot per card, its foil or step-and-compleat twin (the same
+/// number followed by "★" or "Φ") as its premium printing. Their id is the drop's name.
+pub fn drop_groups(set: &SetFile) -> Vec<Cycle> {
+    let mut cards: Vec<&CardEntry> = set.cards.iter().filter(|c| !c.token && !c.art && c.drop.is_some()).collect();
+    cards.sort_by_key(|c| {
+        let digits: String = c.number.chars().take_while(char::is_ascii_digit).collect();
+        (digits.parse::<u32>().unwrap_or(u32::MAX), c.number.clone())
+    });
+    let mut groups: Vec<Cycle> = Vec::new();
+    for card in cards {
+        let drop = card.drop.as_deref().unwrap_or_default();
+        let i = match groups.iter().position(|g| g.id == drop) {
+            Some(i) => i,
+            None => {
+                groups.push(Cycle {
+                    id: drop.to_string(),
+                    names: BTreeMap::from([("en".to_string(), drop.to_string())]),
+                    custom: false,
+                    kind: GroupKind::Drop,
+                    slots: Vec::new(),
+                });
+                groups.len() - 1
+            }
+        };
+        let twin = card.number.trim_end_matches(|c: char| !c.is_ascii_alphanumeric());
+        let slots = &mut groups[i].slots;
+        match slots.iter_mut().find(|s| twin != card.number && s[0] == twin) {
+            Some(slot) => slot.push(card.number.clone()),
+            None => slots.push(vec![card.number.clone()]),
+        }
+    }
+    groups
 }
 
 /// Our own cycles (`config/cycles.custom.json`).

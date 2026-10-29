@@ -13,9 +13,12 @@ export function NewBadge({ card }: { card: OpenedCard }) {
   return null;
 }
 
-/** Said as a card is revealed, if it is new to the collection: over the 3D scene or the pile.
- * `card` is the card just shown (null between two); keyed by `index`, so that each card comes
- * with its own mention. */
+/** A Secret Lair card found in another set's booster (`CRAFTED_GUEST_SHEET` of game.rs). */
+export const isCraftedGuest = (card: OpenedCard) => card.sheet === "craftedGuest";
+
+/** Said as a card is revealed, if it is new to the collection, or a Secret Lair card hiding in
+ * another set's booster: over the 3D scene or the pile. `card` is the card just shown (null
+ * between two); keyed by `index`, so that each card comes with its own mention. */
 export function RevealMention({ card, index }: { card: OpenedCard | null; index: number }) {
   const { t } = useI18n();
   // Gone a few seconds after the card shows: a mention, not a label.
@@ -25,7 +28,16 @@ export function RevealMention({ card, index }: { card: OpenedCard | null; index:
     const timer = setTimeout(() => setShown(false), 2600);
     return () => clearTimeout(timer);
   }, [card, index]);
-  if (!card || !shown || !(card.isNew || card.newFoil)) return null;
+  if (!card || !shown) return null;
+  if (isCraftedGuest(card)) {
+    return (
+      <div key={index} className="reveal-mention crafted-guest" role="status">
+        <span className="star">✦</span> {t("open.mentionSecretLair")}
+        {card.isNew && <em> · {t("open.new")}</em>}
+      </div>
+    );
+  }
+  if (!(card.isNew || card.newFoil)) return null;
   const special = card.foil ? foilLabel(card.foilKind) : null;
   const text = card.isNew ? t("open.mentionNew") : t("open.mentionNewFoil");
   return (

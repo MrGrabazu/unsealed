@@ -7,6 +7,7 @@
 //! The wallet is a ledger: the balance is the sum of its rows, so it can never drift
 //! from the history that explains it.
 
+use crate::seal;
 use rusqlite::{params, Connection, OptionalExtension, Transaction};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -336,8 +337,16 @@ impl Store {
 
     fn init(mut conn: Connection) -> StoreResult<Self> {
         conn.pragma_update(None, "foreign_keys", true)?;
+        // Before anything is written: the seal's triggers call this function.
+        seal::register(&conn)?;
         migrate(&mut conn)?;
+        seal::install(&conn)?;
         Ok(Self { conn })
+    }
+
+    /// Whether the save is as the game left it, not edited by hand (see `seal`).
+    pub fn seal_intact(&self) -> StoreResult<bool> {
+        Ok(seal::intact(&self.conn)?)
     }
 
     // ---- save description -------------------------------------------------------

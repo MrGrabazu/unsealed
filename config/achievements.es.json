@@ -271,6 +271,14 @@
   "cycle-double": { "name": "Ciclo doble", "description": "Completa un ciclo de 10 cartas o más." },
   "cycle-mythic": { "name": "Ciclo mítico", "description": "Completa un ciclo cuyas cartas son todas raras míticas." },
   "cycle-lands": { "name": "Agrimensor", "description": "Completa un ciclo de tierras." },
+  "lair-open": { "name": "En la guarida", "description": "Abre un sobre Secret Lair." },
+  "lair-open-100": { "name": "Habitual de la guarida", "description": "Abre 100 sobres Secret Lair." },
+  "drop-1": { "name": "Coleccionista de drops", "description": "Completa un drop de Secret Lair." },
+  "drop-5": { "name": "Conservador de drops", "description": "Completa 5 drops de Secret Lair." },
+  "drop-25": { "name": "Guardián de la guarida", "description": "Completa 25 drops de Secret Lair." },
+  "drop-prestige": { "name": "Drop reluciente", "description": "Completa un drop de Secret Lair con cada carta en su mejor versión, en foil cuando exista." },
+  "smart-boy": { "name": "Listillo", "description": "Intenta cargar una partida modificada fuera del juego. Buen intento." },
+  "lair-guest": { "name": "Algo en la guarida", "description": "Encuentra una carta Secret Lair en el sobre de otra edición." },
   "the-nine": { "name": "Los Nueve", "description": "Reúne a los nueve Nazgûl de El Señor de los Anillos, cada uno con su propia ilustración." },
   "the-nine-prestige": { "name": "Nueve para los Hombres Mortales", "description": "Reúne a los nueve Nazgûl, cada uno en su versión sin bordes foil." }
 }

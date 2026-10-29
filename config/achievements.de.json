@@ -109,6 +109,14 @@
   "cycle-double": { "name": "Doppelzyklus", "description": "Vervollständige einen Zyklus mit 10 oder mehr Karten." },
   "cycle-mythic": { "name": "Mythischer Zyklus", "description": "Vervollständige einen Zyklus, dessen Karten alle mythisch selten sind." },
   "cycle-lands": { "name": "Landvermesser", "description": "Vervollständige einen Zyklus aus Ländern." },
+  "lair-open": { "name": "In der Höhle", "description": "Öffne einen Secret-Lair-Booster." },
+  "lair-open-100": { "name": "Stammgast der Höhle", "description": "Öffne 100 Secret-Lair-Booster." },
+  "drop-1": { "name": "Drop-Sammler", "description": "Vervollständige einen Secret-Lair-Drop." },
+  "drop-5": { "name": "Drop-Kurator", "description": "Vervollständige 5 Secret-Lair-Drops." },
+  "drop-25": { "name": "Hüter der Höhle", "description": "Vervollständige 25 Secret-Lair-Drops." },
+  "drop-prestige": { "name": "Glänzender Drop", "description": "Vervollständige einen Secret-Lair-Drop mit jeder Karte in ihrer schönsten Version, als Foil, wenn es sie gibt." },
+  "smart-boy": { "name": "Schlaumeier", "description": "Versuche, einen außerhalb des Spiels bearbeiteten Spielstand zu laden. Netter Versuch." },
+  "lair-guest": { "name": "Etwas in der Höhle", "description": "Finde eine Secret-Lair-Karte im Booster eines anderen Sets." },
   "the-nine": { "name": "Die Neun", "description": "Versammle die neun Nazgûl aus Der Herr der Ringe, jeden in seiner eigenen Illustration." },
   "the-nine-prestige": { "name": "Neun den Sterblichen Menschen", "description": "Versammle die neun Nazgûl, jeden in seiner randlosen Foil-Version." }
 }

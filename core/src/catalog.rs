@@ -74,7 +74,7 @@ pub fn set_code_of_file(name: &str) -> Option<&str> {
 
 /// Bump when the compact files change in a way older data cannot satisfy: the app then
 /// rebuilds its data at the next launch.
-pub const DATA_FORMAT_VERSION: u32 = 13;
+pub const DATA_FORMAT_VERSION: u32 = 14;
 
 /// Languages kept for card and set names, as (MTGJSON language name, code). Cards printed
 /// in other languages, or never translated, stay in English.
@@ -309,6 +309,9 @@ pub struct CardEntry {
     /// foil, a surge foil…, MTGJSON `promoTypes`), or "etched" (an etched foil, its finish).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub foil_kind: Option<String>,
+    /// The Secret Lair drop it was sold in (MTGJSON `subsets`, see `import::crafted_set`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub drop: Option<String>,
 }
 
 /// The special foils told apart in the game, as MTGJSON and Scryfall name them in their

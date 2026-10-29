@@ -31,6 +31,9 @@
     "maxPerMinuteCents": 1000,
     "offlineCapMinutes": 480
   },
+  "craftedGuests": {
+    "SLD": { "oneIn": 1000, "collectorOneIn": 100 }
+  },
   "charity": {
     "amountCents": 2000,
     "maxClaimsPerDay": 1

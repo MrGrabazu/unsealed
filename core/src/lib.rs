@@ -8,6 +8,7 @@ pub mod betting;
 pub mod booster;
 pub mod builder;
 pub mod catalog;
+pub mod crafted;
 pub mod cycles;
 pub mod draw;
 pub mod economy;

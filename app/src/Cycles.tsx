@@ -3,15 +3,31 @@ import type { CycleView, CyclesView } from "./api";
 import { Placeholder } from "./Binder";
 import { CardImage } from "./CardImage";
 import { useI18n } from "./i18n";
+import type { MessageKey } from "./i18n/en";
 import { FoilSheen } from "./foils";
 import { smallImage } from "./images";
 
 type Filter = "all" | "progress" | "complete" | "todo";
 const FILTERS: Filter[] = ["all", "progress", "complete", "todo"];
-/** A group's sort, as the player tells them apart: the wiki's cycles, its stories, ours. */
-type Kind = "cycle" | "story" | "ours";
-const KINDS: Kind[] = ["cycle", "story", "ours"];
+/** A group's sort, as the player tells them apart: the wiki's cycles, its stories, ours, and
+ * the Secret Lair drops. */
+type Kind = "cycle" | "story" | "ours" | "drop";
+const KINDS: Kind[] = ["cycle", "story", "ours", "drop"];
 const kindOf = (c: CycleView): Kind => (c.custom ? "ours" : c.kind);
+
+/** Each sort's badge, the class it is drawn with, and what it means. */
+const BADGES: Record<Kind, { mark: string; className: string; title: MessageKey; count: MessageKey }> = {
+  cycle: { mark: "◆", className: "official", title: "cycles.official", count: "cycles.countCycles" },
+  story: { mark: "¶", className: "story", title: "cycles.story", count: "cycles.countStories" },
+  ours: { mark: "U", className: "ours", title: "cycles.ours", count: "cycles.countOurs" },
+  drop: { mark: "✦", className: "drop", title: "cycles.drop", count: "cycles.countDrops" },
+};
+
+/** Past this many groups (Secret Lair's hundreds of drops), a search field finds one by name. */
+const SEARCH_FROM = 30;
+
+/** A name as searched: lower case, without accents. */
+const folded = (text: string) => text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 
 const matches = (c: CycleView, filter: Filter) =>
   filter === "all" ||
@@ -21,13 +37,12 @@ const matches = (c: CycleView, filter: Filter) =>
 
 /** A group's badge: a gold diamond for the wiki's cycles, a pilcrow for its stories, our
  * red seal for ours. */
-function Badge({ group }: { group: CycleView }) {
+function Badge({ kind }: { kind: Kind }) {
   const { t } = useI18n();
-  const kind = kindOf(group);
-  const [mark, title] = kind === "ours" ? ["U", t("cycles.ours")] : kind === "story" ? ["¶", t("cycles.story")] : ["◆", t("cycles.official")];
+  const badge = BADGES[kind];
   return (
-    <span className={`cycle-badge ${kind === "ours" ? "ours" : kind === "story" ? "story" : "official"}`} title={title}>
-      {mark}
+    <span className={`cycle-badge ${badge.className}`} title={t(badge.title)}>
+      {badge.mark}
     </span>
   );
 }
@@ -38,12 +53,19 @@ export function CyclesList({ view, onOpen }: { view: CyclesView; onOpen: (uuid: 
   const { t, plural } = useI18n();
   const [filter, setFilter] = useState<Filter>("all");
   const [kind, setKind] = useState<Kind | "all">("all");
+  const [search, setSearch] = useState("");
   // The sorts the set has: the choice is only offered when there are several.
   const kinds = KINDS.filter((k) => view.cycles.some((c) => kindOf(c) === k));
-  const shown = view.cycles.filter((c) => matches(c, filter) && (kind === "all" || kindOf(c) === kind));
+  const query = folded(search.trim());
+  const shown = view.cycles.filter(
+    (c) => matches(c, filter) && (kind === "all" || kindOf(c) === kind) && (!query || folded(c.name).includes(query)),
+  );
   return (
     <div className="cycles">
       <div className="cycles-tools">
+        {view.cycles.length > SEARCH_FROM && (
+          <input type="search" className="cycles-search" placeholder={t("cycles.search")} value={search} onChange={(e) => setSearch(e.target.value)} />
+        )}
         {kinds.length > 1 && (
           <div className="segmented" role="group">
             {(["all", ...kinds] as const).map((k) => (
@@ -69,7 +91,7 @@ export function CyclesList({ view, onOpen }: { view: CyclesView; onOpen: (uuid: 
       {shown.map((c) => (
         <article key={c.id} className={`cycle ${c.complete ? "done" : ""} ${c.prestige ? "prestige" : ""}`}>
           <header>
-            <Badge group={c} />
+            <Badge kind={kindOf(c)} />
             <b>{c.name}</b>
             <span className="cycle-count">
               {c.owned} / {c.total}
@@ -127,18 +149,12 @@ export function CyclesPanel({ view, onShop }: { view: CyclesView; onShop?: () =>
           </b>
         </div>
         <p className="cycles-ring-label">{t("cycles.completeCount")}</p>
-        {(
-          [
-            ["cycle", "cycles.countCycles"],
-            ["story", "cycles.countStories"],
-            ["ours", "cycles.countOurs"],
-          ] as const
-        ).map(([kind, label]) => {
+        {KINDS.map((kind) => {
           const groups = view.cycles.filter((c) => kindOf(c) === kind);
           return (
             groups.length > 0 && (
               <div key={kind} className="ready-line">
-                <span>{t(label)}</span>
+                <span>{t(BADGES[kind].count)}</span>
                 <b>
                   {groups.filter((c) => c.complete).length} / {groups.length}
                 </b>
@@ -172,11 +188,11 @@ export function CyclesPanel({ view, onShop }: { view: CyclesView; onShop?: () =>
           </>
         )}
         <p className="hint cycles-note">
-          <span className="cycle-badge official">◆</span> {t("cycles.official")}
-          <br />
-          <span className="cycle-badge story">¶</span> {t("cycles.story")}
-          <br />
-          <span className="cycle-badge ours">U</span> {t("cycles.ours")}
+          {KINDS.filter((kind) => view.cycles.some((c) => kindOf(c) === kind)).map((kind) => (
+            <span key={kind} className="cycles-note-line">
+              <Badge kind={kind} /> {t(BADGES[kind].title)}
+            </span>
+          ))}
         </p>
       </div>
       {onShop && (

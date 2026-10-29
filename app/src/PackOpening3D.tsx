@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { OpenedCard, SetSummary } from "./api";
 import { SellBoosterButton, useBoosterSale } from "./BoosterSale";
 import { useI18n } from "./i18n";
+import type { MessageKey } from "./i18n/en";
 import { CardImage } from "./CardImage";
 import { Money, useMoney } from "./money";
 import { FoilSheen } from "./foils";
@@ -14,6 +15,14 @@ import { PackScene, type PassRequest } from "./scene/PackScene";
 /** The rarities whose runs can be passed; foils never are. */
 const PASSABLE = ["common", "uncommon", "rare", "mythic"] as const;
 type Passable = (typeof PASSABLE)[number];
+
+/** "Pass the commons"…: always plural, whatever their number (it would give away the rest). */
+const PASS_LABELS = {
+  common: "open.passCommons",
+  uncommon: "open.passUncommons",
+  rare: "open.passRares",
+  mythic: "open.passMythics",
+} as const satisfies Record<Passable, MessageKey>;
 
 function passableRarity(card: OpenedCard): Passable | null {
   return !card.foil && (PASSABLE as readonly string[]).includes(card.rarity) ? (card.rarity as Passable) : null;
@@ -39,7 +48,7 @@ interface Props {
  * by one. Once the last card has left, the scene gives way to the list of the cards, and a
  * click on one shows its details. */
 export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onDetails, onSold, onFinished, tearRequest = 0 }: Props) {
-  const { t, tx, plural } = useI18n();
+  const { t, tx } = useI18n();
   const money = useMoney();
   const sale = useBoosterSale(cards, onSold);
   const [top, setTop] = useState(0);
@@ -93,7 +102,7 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
     if (!rarity) return null;
     let to = top;
     while (to < total && passableRarity(cards[to]) === rarity) to++;
-    return { rarity, to, count: to - top };
+    return { rarity, to };
   }, [cards, top, finished, total]);
   // Hidden while its cards are being passed.
   const passingRun = passRequest != null && top < passRequest.to;
@@ -129,9 +138,8 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
           <>
             <span>{t("open.revealed", { revealed: finished ? total : Math.min(top + 1, total), total })}</span>
             {run && !passingRun && (
-              <button onClick={() => setPassRequest({ to: run.to })}>
-                {t("open.pass", { cards: plural(`rarity.${run.rarity}`, run.count) })}
-              </button>
+              // Never how many: it would tell what follows (9 commons rather than 10: a foil).
+              <button onClick={() => setPassRequest({ to: run.to })}>{t(PASS_LABELS[run.rarity])}</button>
             )}
             {seen.length > 0 && <strong className="total">{tx("open.boosterValue", { amount: money(value) })}</strong>}
             {finished && <SellBoosterButton sale={sale} />}

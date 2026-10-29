@@ -29,6 +29,20 @@ pub struct EconomyConfig {
     pub betting: Betting,
     #[serde(default)]
     pub income: Income,
+    /// The cards of a set the game crafts a booster for (Secret Lair), found now and then in the
+    /// boosters of the other sets, by that set's code. Not counted in the boosters' expected
+    /// value: a rare bonus.
+    #[serde(default)]
+    pub crafted_guests: BTreeMap<String, CraftedGuest>,
+}
+
+/// How often a crafted set's card hides in another set's booster: one booster in this many (0:
+/// never), a collector one more often. The card is one of a booster of its own, drawn apart.
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CraftedGuest {
+    pub one_in: u32,
+    pub collector_one_in: u32,
 }
 
 /// What the collection earns by itself: each minute, a share of what it would sell for. No

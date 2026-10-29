@@ -31,6 +31,7 @@ fn parse_args() -> Result<(BuildOptions, Option<PathBuf>), String> {
         sim_boosters: 50_000,
         token_foil_one_in: defaults.token_foil_one_in,
         art_cards: defaults.art_cards,
+        crafted_boosters: defaults.crafted_boosters,
     };
     let mut pack = None;
     let mut args = std::env::args().skip(1);

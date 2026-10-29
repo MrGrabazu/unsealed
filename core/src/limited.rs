@@ -104,6 +104,7 @@ mod tests {
             types: vec![],
             color_identity: vec![],
             foil_kind: None,
+            drop: None,
         }
     }
 

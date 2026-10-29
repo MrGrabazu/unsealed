@@ -63,6 +63,8 @@ struct RawSealed {
     #[serde(default)]
     uuid: String,
     #[serde(default)]
+    name: String,
+    #[serde(default)]
     category: Option<String>,
     #[serde(default)]
     subtype: Option<String>,
@@ -78,6 +80,15 @@ struct RawContents {
     /// Boosters drawn from a booster config: a box topper pack's.
     #[serde(default)]
     pack: Vec<RawPack>,
+    /// Cards inside (a Secret Lair drop's).
+    #[serde(default)]
+    card: Vec<RawSealedCard>,
+}
+
+#[derive(Deserialize)]
+struct RawSealedCard {
+    #[serde(default)]
+    uuid: String,
 }
 
 #[derive(Deserialize)]
@@ -233,6 +244,9 @@ struct RawCard {
     supertypes: Vec<String>,
     #[serde(default)]
     color_identity: Vec<String>,
+    /// The Secret Lair drop(s) of the card.
+    #[serde(default)]
+    subsets: Vec<String>,
 }
 
 #[derive(Deserialize, Clone, Default)]
@@ -292,6 +306,7 @@ fn to_entry(c: &RawCard) -> Result<CardEntry, ConfigError> {
             || c.frame_effects.iter().any(|f| f == "showcase" || f == "extendedart"),
         types: c.supertypes.iter().chain(&c.types).map(|t| t.to_lowercase()).collect(),
         color_identity: c.color_identity,
+        drop: c.subsets.into_iter().next(),
     })
 }
 
@@ -719,6 +734,61 @@ pub fn compact_set(raw: &RawSet, version: &str, kinds: &[&str], extra_sets: &[&R
         box_toppers: BTreeMap::new(),
         topper_boosters: BTreeMap::new(),
     })
+}
+
+/// The prefix of the sealed product of a single Secret Lair drop ("Secret Lair Drop Bitterblossom
+/// Dreams").
+const DROP_PRODUCT_PREFIX: &str = "Secret Lair Drop ";
+
+/// A set sold without boosters, for the game to craft one (see `crafted`): its cards and
+/// tokens, no booster yet. Each card is filed under its Secret Lair drop: MTGJSON's `subsets`,
+/// else its twin's (the same number without its "★" or "Φ": a foil or a step-and-compleat
+/// version), else the drop whose sealed product lists it (its name matched to a known drop's,
+/// spelled alike). The others have none.
+pub fn crafted_set(raw: &RawSet, version: &str) -> SetFile {
+    let mut entries: Vec<CardEntry> = raw.cards.iter().filter_map(|c| to_entry(c).ok()).collect();
+    let key = |name: &str| name.chars().filter(char::is_ascii_alphanumeric).collect::<String>().to_lowercase();
+    let known: HashMap<String, String> = entries.iter().filter_map(|c| c.drop.clone()).map(|d| (key(&d), d)).collect();
+    let by_number: HashMap<String, String> =
+        entries.iter().filter_map(|c| Some((c.number.clone(), c.drop.clone()?))).collect();
+    // A product is named after its drop, more or less: "Secret Lair x Stranger Things Foil" for
+    // the drop "Stranger Things".
+    let drop_of_product = |name: &str| {
+        let name = name.strip_prefix("Secret Lair x ").unwrap_or(name);
+        let name = [" Non Foil", " Nonfoil", " Foil", " Etched"].iter().find_map(|s| name.strip_suffix(s)).unwrap_or(name);
+        let k = key(name);
+        known
+            .get(&k)
+            .or_else(|| known.iter().filter(|(drop, _)| drop.len() >= 6 && k.ends_with(drop.as_str())).max_by_key(|(drop, _)| drop.len()).map(|(_, d)| d))
+            .cloned()
+            .unwrap_or_else(|| name.to_string())
+    };
+    let mut in_product: HashMap<&str, String> = HashMap::new();
+    for product in &raw.sealed_product {
+        let Some(name) = product.name.strip_prefix(DROP_PRODUCT_PREFIX) else { continue };
+        let name = drop_of_product(name);
+        for card in &product.contents.card {
+            in_product.entry(card.uuid.as_str()).or_insert_with(|| name.clone());
+        }
+    }
+    for card in entries.iter_mut().filter(|c| c.drop.is_none()) {
+        let twin = card.number.trim_end_matches(|c: char| !c.is_ascii_alphanumeric());
+        card.drop = (twin != card.number).then(|| by_number.get(twin).cloned()).flatten().or_else(|| in_product.get(card.uuid.as_str()).cloned());
+    }
+    entries.extend(raw.tokens.iter().filter_map(to_token_entry));
+    SetFile {
+        code: raw.code.clone(),
+        name: raw.name.clone(),
+        release_date: raw.release_date.clone(),
+        set_type: raw.set_type.clone(),
+        source_version: version.to_string(),
+        cards: entries,
+        boosters: BTreeMap::new(),
+        names: raw.names(),
+        foil_aliases: BTreeMap::new(),
+        box_toppers: BTreeMap::new(),
+        topper_boosters: BTreeMap::new(),
+    }
 }
 
 /// Merges the foil versions MTGJSON lists as printings of their own ("★" numbers: the foils of

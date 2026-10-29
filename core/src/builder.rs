@@ -8,7 +8,8 @@ use crate::catalog::{
     set_code_of_file, set_file_name, BoosterValue, Manifest, ManifestSet, PriceFile, PriceSet, SetFile, SetSelection,
     is_collector_kind, kind_wanted, ARTISTS_FILE, COLLECTOR_KIND, DATA_FORMAT_VERSION, GUESTS_FILE,
 };
-use crate::import::{add_art_cards_from, add_art_slots, artist_index, box_toppers, guest_index, topper_cards, add_token_slots, add_tokens_from, art_set_code, compact_set, merge_foil_printings, merge_token_faces, ArtCardOdds, featured_card, token_set_code, prices_by_uuid, prices_from_scryfall_jsonl, read_all_printings, AllPrintings};
+use crate::crafted::{craft_booster, CraftedBooster};
+use crate::import::{add_art_cards_from, add_art_slots, artist_index, box_toppers, crafted_set, guest_index, topper_cards, add_token_slots, add_tokens_from, art_set_code, compact_set, merge_foil_printings, merge_token_faces, ArtCardOdds, featured_card, token_set_code, prices_by_uuid, prices_from_scryfall_jsonl, read_all_printings, AllPrintings, RawSet};
 use crate::sim::expected_value_cents;
 use crate::{simulate, ColorIndex};
 use flate2::read::GzDecoder;
@@ -61,6 +62,8 @@ pub struct BuildOptions {
     pub token_foil_one_in: u64,
     /// See `DataConfig::art_cards`.
     pub art_cards: ArtCardOdds,
+    /// See `DataConfig::crafted_boosters`.
+    pub crafted_boosters: BTreeMap<String, CraftedBooster>,
 }
 
 /// A GET with the headers Scryfall and MTGJSON ask for (shared with `scryfall`).
@@ -254,10 +257,32 @@ fn build_set(
     let added = topper_cards(&set, &all.data);
     set.cards.extend(added);
 
+    validate_boosters(&mut set, sim_boosters, validated, dropped)?;
+    // A box topper goes with its kind's boosters, and needs its packs' configs.
+    set.box_toppers.retain(|kind, _| set.boosters.contains_key(kind));
+    for topper in set.box_toppers.values_mut() {
+        topper.packs.retain(|key, _| set.topper_boosters.contains_key(key));
+    }
+    set.box_toppers.retain(|_, topper| !topper.packs.is_empty());
+    if set.boosters.is_empty() {
+        return Err("every booster failed the simulation".into());
+    }
+    Ok(set)
+}
+
+/// Checks a set's booster configs by simulation, unless an identical config already passed
+/// (`validated` maps config keys to fingerprints). A config that fails is dropped (and reported
+/// in `dropped` as "CODE/kind").
+fn validate_boosters(
+    set: &mut SetFile,
+    sim_boosters: u64,
+    validated: &mut BTreeMap<String, String>,
+    dropped: &mut BTreeMap<String, String>,
+) -> Result<(), BuildError> {
     let colors = ColorIndex::from_cards(&set.cards);
     let mut failed = Vec::new();
     for (kind, cfg) in set.boosters.iter().chain(&set.topper_boosters) {
-        let key = format!("{code}/{kind}");
+        let key = format!("{}/{kind}", set.code);
         let print = fingerprint(cfg, sim_boosters)?;
         if validated.get(&key) == Some(&print) {
             continue;
@@ -275,16 +300,38 @@ fn build_set(
         set.boosters.remove(&kind);
         set.topper_boosters.remove(&kind);
     }
-    // A box topper goes with its kind's boosters, and needs its packs' configs.
-    set.box_toppers.retain(|kind, _| set.boosters.contains_key(kind));
-    for topper in set.box_toppers.values_mut() {
-        topper.packs.retain(|key, _| set.topper_boosters.contains_key(key));
+    Ok(())
+}
+
+/// The cards of a set sold without boosters, whose booster the game crafts once prices are
+/// known (`finish_crafted_set`).
+fn crafted_cards(raw: &RawSet, version: &str, all: &AllPrintings) -> SetFile {
+    let mut set = crafted_set(raw, version);
+    merge_foil_printings(&mut set);
+    if let Some(token_set) = all.data.get(&token_set_code(raw)) {
+        add_tokens_from(&mut set, token_set);
     }
-    set.box_toppers.retain(|_, topper| !topper.packs.is_empty());
+    merge_token_faces(&mut set);
+    set
+}
+
+/// Crafts the booster of such a set from its cards' prices (see `crafted`), gives it a token,
+/// and checks it by simulation like any other.
+fn finish_crafted_set(
+    set: &mut SetFile,
+    recipe: &CraftedBooster,
+    prices: &BTreeMap<String, PriceSet>,
+    opts: &BuildOptions,
+    validated: &mut BTreeMap<String, String>,
+    dropped: &mut BTreeMap<String, String>,
+) -> Result<(), BuildError> {
+    craft_booster(set, recipe, prices)?;
+    add_token_slots(set, opts.token_foil_one_in);
+    validate_boosters(set, opts.sim_boosters, validated, dropped)?;
     if set.boosters.is_empty() {
-        return Err("every booster failed the simulation".into());
+        return Err("its crafted booster failed the simulation".into());
     }
-    Ok(set)
+    Ok(())
 }
 
 /// Bump whenever the draw or the expected rates change: every config is validated again.
@@ -412,6 +459,24 @@ fn build_steps(opts: &BuildOptions, progress: Progress<'_>) -> Result<Manifest, 
         );
         built_sets.push(set);
     }
+    // The sets sold without boosters (Secret Lair), for which the game crafts one: their cards
+    // now, their booster once the prices are known. A set that has real boosters keeps them.
+    let mut crafted = Vec::new();
+    for (code, recipe) in &opts.crafted_boosters {
+        if manifest_sets.contains_key(code) {
+            continue;
+        }
+        let Some(raw) = all.data.get(code) else {
+            skipped.insert(code.clone(), "unknown set".to_string());
+            continue;
+        };
+        // Not left out for having no booster of a kind kept, then.
+        skipped.remove(code);
+        let set = crafted_cards(raw, &all.meta.version, &all);
+        wanted.extend(set.cards.iter().flat_map(|c| [Some(c.scryfall_id.clone()), c.foil_scryfall_id.clone()]).flatten());
+        all_cards.extend(set.cards.iter().cloned());
+        crafted.push((set, recipe));
+    }
     // The guest series, named while every set of MTGJSON is at hand.
     let mut guests = guest_index(&built_sets);
     for (code, series) in &mut guests.series {
@@ -428,7 +493,6 @@ fn build_steps(opts: &BuildOptions, progress: Progress<'_>) -> Result<Manifest, 
     if built_sets.is_empty() {
         return Err("no set could be built".into());
     }
-    write_json(&validated_path, &validated)?;
 
     // Prices come from the Scryfall "default_cards" bulk file, cached by file name
     // (the name embeds its timestamp, so a new version is downloaded automatically).
@@ -451,6 +515,33 @@ fn build_steps(opts: &BuildOptions, progress: Progress<'_>) -> Result<Manifest, 
     let reader = BufReader::new(GzDecoder::new(BufReader::new(File::open(&bulk_path)?)));
     let by_scryfall_id = prices_from_scryfall_jsonl(reader, &wanted)?;
     let cards = prices_by_uuid(&by_scryfall_id, &all_cards);
+    for (mut set, recipe) in crafted {
+        let code = set.code.clone();
+        if let Err(e) = finish_crafted_set(&mut set, recipe, &cards, opts, &mut validated, &mut skipped) {
+            eprintln!("{code} left out: {e}");
+            skipped.insert(code, e.to_string());
+            continue;
+        }
+        for (kind, cfg) in &set.boosters {
+            built_boosters.push((format!("{code}/{kind}"), cfg.clone()));
+        }
+        write_json(&sets_dir.join(set_file_name(&code)), &set)?;
+        manifest_sets.insert(
+            code,
+            ManifestSet {
+                name: set.name.clone(),
+                names: set.names.clone(),
+                release_date: set.release_date.clone(),
+                source_version: set.source_version.clone(),
+                boosters: set.boosters.keys().cloned().collect(),
+                featured: None,
+                icon_svg_uri: None,
+                box_toppers: BTreeMap::new(),
+            },
+        );
+        built_sets.push(set);
+    }
+    write_json(&validated_path, &validated)?;
     let icons = set_icons();
     for set in &built_sets {
         if let Some(entry) = manifest_sets.get_mut(&set.code) {

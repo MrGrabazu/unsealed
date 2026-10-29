@@ -63,6 +63,7 @@ import { useI18n } from "./i18n";
 import { Icon, type IconName } from "./icons";
 import { Loading } from "./Loading";
 import { Coin, CurrencyContext, DEFAULT_CURRENCY, useMoneyText } from "./money";
+import { errorText } from "./errors";
 import { SealedBoosters } from "./SealedBoosters";
 import { Stats } from "./Stats";
 import { ArtifactReveal } from "./ArtifactReveal";
@@ -76,12 +77,16 @@ const TABS: Tab[] = ["boosterium", "open", "collection", "achievements", "curios
 const TOAST_MS = 8000;
 /** A passing word (save point, booster sold) stays less than an achievement. */
 const NOTICE_MS = 5000;
+/** An error stays a little longer: it has more to say. */
+const ERROR_MS = 8000;
 
 interface Notice {
   id: number;
   icon: IconName;
   title?: string;
   text: string;
+  /** An error: red, and longer. */
+  error?: boolean;
 }
 
 /** The collection's income is paid about each time a whole Seal is earned, within these bounds. */
@@ -241,10 +246,10 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   // A passing word (a save point made, a booster sold): a toast that leaves on its own.
   const [notices, setNotices] = useState<Notice[]>([]);
   const noticeId = useRef(0);
-  const setNotice = useCallback((text: string, icon: IconName = "pack", title?: string) => {
+  const setNotice = useCallback((text: string, icon: IconName = "pack", title?: string, error = false) => {
     const id = ++noticeId.current;
-    setNotices((current) => [...current, { id, icon, title, text }]);
-    setTimeout(() => setNotices((current) => current.filter((n) => n.id !== id)), NOTICE_MS);
+    setNotices((current) => [...current, { id, icon, title, text, error }]);
+    setTimeout(() => setNotices((current) => current.filter((n) => n.id !== id)), error ? ERROR_MS : NOTICE_MS);
   }, []);
   const [sets, setSets] = useState<SetSummary[]>([]);
   const [shop, setShop] = useState<ShopItem[]>([]);
@@ -261,6 +266,8 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   const [soundOn, setSoundOnState] = useState(getSoundOn);
   // The booster kind shown in the opening view, to offer the next one.
   const [last, setLast] = useState<{ setCode: string; kind: string } | null>(null);
+  // The game could not be loaded: said in place of the screens (an action that failed is a
+  // toast, `showError`).
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<Tab>("boosterium");
@@ -313,7 +320,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
 
   function changeKept(next: KeptBet[]) {
     setKept(next);
-    saveKeptBets(next).catch((e) => setError(String(e)));
+    saveKeptBets(next).catch(showError);
   }
 
   const betCardName = (uuid: string) =>
@@ -325,6 +332,14 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   // This component renders the currency provider, so it cannot use `useMoneyText` itself.
   const currency = wallet?.currency ?? DEFAULT_CURRENCY;
   const money = (cents: number) => i18n.plural("currency.amount", Math.round(cents * currency.sealsPerCent));
+
+  // An action that failed (not enough Seals…): said in a toast that leaves on its own, in the
+  // player's language. The same error again replaces the one shown (a button clicked in a row).
+  function showError(e: unknown) {
+    const text = errorText(t, money, e);
+    setNotices((current) => current.filter((n) => !(n.error && n.text === text)));
+    setNotice(text, "alert", t("error.title"), true);
+  }
 
   const [toasts, setToasts] = useState<AchievementView[]>([]);
   // Bumped when achievements unlock so the achievements tab reloads.
@@ -388,7 +403,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
         setArtifactCount((n) => n + 1);
       }
     } catch (e) {
-      setError(String(e));
+      showError(e);
     }
   }, [lang, showToasts, showToppers]);
 
@@ -420,7 +435,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
         }
         return paid;
       } catch (e) {
-        setError(String(e));
+        showError(e);
         return null;
       }
     },
@@ -454,7 +469,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
       await revealCards(count);
       await refreshWallet();
     } catch (e) {
-      setError(String(e));
+      showError(e);
     }
   }
 
@@ -481,16 +496,14 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   /** Buys an artifact at the Boosterium: it is revealed at once, and the prices it changes
    * (discounts) are read again. */
   async function buyCurio(id: string) {
-    setBusy(true);
-    setError(null);
-    try {
+    setBusy(true);    try {
       const bought = await buyArtifact(id, lang);
       sounds.coins();
       setArtifactQueue((queue) => [...queue, bought]);
       setArtifactCount((n) => n + 1);
       await refreshWallet();
     } catch (e) {
-      setError(String(e));
+      showError(e);
     } finally {
       setBusy(false);
     }
@@ -507,12 +520,10 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
 
   /** Runs a game action with the busy flag and error handling. */
   async function run(action: () => Promise<void>) {
-    setBusy(true);
-    setError(null);
-    try {
+    setBusy(true);    try {
       await action();
     } catch (e) {
-      setError(String(e));
+      showError(e);
     } finally {
       setBusy(false);
       await refreshWallet();
@@ -576,9 +587,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     setPack({ setCode, kind, quick: true });
     setLast({ setCode, kind });
     setTab("open");
-    setBusy(true);
-    setError(null);
-    try {
+    setBusy(true);    try {
       await checkSetImages(setCode).catch(() => {});
       const opened = await openBooster(setCode, kind, false, bets);
       setCards(opened.cards);
@@ -590,7 +599,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
       setAllSeen(true);
       setResultShown(true);
     } catch (e) {
-      setError(String(e));
+      showError(e);
       setPack(null);
     } finally {
       setBusy(false);
@@ -602,9 +611,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
    * then shows sealed again, with the error). */
   async function tear(): Promise<boolean> {
     if (!pack) return false;
-    setBusy(true);
-    setError(null);
-    try {
+    setBusy(true);    try {
       const opened = await openBooster(pack.setCode, pack.kind, true, activeBets(slip));
       setCards(opened.cards);
       setFoundArtifact(opened.artifact);
@@ -613,7 +620,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
       setOpenings((n) => n + 1);
       return true;
     } catch (e) {
-      setError(String(e));
+      showError(e);
       return false;
     } finally {
       setBusy(false);
@@ -681,7 +688,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
       sounds.click();
       setNotice(t("game.savePointCreated", { name: point.name }), "save", t("game.savePointDone"));
     } catch (e) {
-      setError(String(e));
+      showError(e);
     }
   }
 
@@ -792,7 +799,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
 
         <main className="stage" ref={stage}>
         {!waitingForData && <DataStatusBar status={dataStatus} />}
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error">{errorText(t, money, error)}</p>}
         {!wallet && !error && <Loading label={t("game.loading")} />}
         {wallet && !error && sets.length === 0 && dataStatus.state === "upToDate" && <p className="hint">{t("data.none")}</p>}
         {/* No set yet, the data being prepared: say so, rather than show empty screens. */}
@@ -1043,7 +1050,8 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
           {notices.map((n) => (
             <button
               key={`notice-${n.id}`}
-              className="toast notice-toast"
+              className={`toast notice-toast ${n.error ? "notice-error" : ""}`}
+              role={n.error ? "alert" : undefined}
               onClick={() => setNotices((current) => current.filter((other) => other.id !== n.id))}
             >
               <span className="notice-toast-seal">
@@ -1053,7 +1061,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
                 {n.title && <strong>{n.title}</strong>}
                 <span>{n.text}</span>
               </div>
-              <i className="notice-toast-time" style={{ animationDuration: `${NOTICE_MS}ms` }} />
+              <i className="notice-toast-time" style={{ animationDuration: `${n.error ? ERROR_MS : NOTICE_MS}ms` }} />
             </button>
           ))}
           {toasts.map((a) => (

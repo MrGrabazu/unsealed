@@ -14,5 +14,16 @@
     "collectorPercent": 45,
     "collectorSignedPercent": 5,
     "collectorFrom": "2025-02-14"
+  },
+  "craftedBoosters": {
+    "SLD": {
+      "kind": "secret-lair",
+      "tiers": { "uncommon": 800, "rare": 2000, "mythic": 5000 },
+      "slots": [
+        { "count": 3, "rarities": { "common": 1 } },
+        { "count": 1, "foil": true, "rarities": { "common": 800, "uncommon": 170, "rare": 27, "mythic": 3 } },
+        { "count": 1, "rarities": { "uncommon": 72, "rare": 25, "mythic": 3 } }
+      ]
+    }
   }
 }

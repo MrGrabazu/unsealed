@@ -4,6 +4,7 @@
 mod game;
 mod images;
 mod saves;
+mod seal;
 mod store;
 mod updater;
 
@@ -105,6 +106,10 @@ impl Session {
         game.set_cycles(self.cycles.clone());
         game.set_scenes(self.scenes.clone());
         game.set_card_language(&self.card_lang);
+        // A save edited by hand was refused: the game played now has a word for it.
+        if self.saves.take_caught() {
+            game.caught_editing_a_save();
+        }
         self.current = Some((info.clone(), game));
         Ok(info)
     }
@@ -230,6 +235,30 @@ fn rename_save(state: State<'_, SessionState>, id: String, name: String) -> Resu
         current.name = info.name.clone();
     }
     Ok(info)
+}
+
+/// Copies a game into one file, in the player's documents ("Unsealed" folder), to carry it to
+/// another computer. Returns where.
+#[tauri::command]
+fn export_save(app: tauri::AppHandle, state: State<'_, SessionState>, id: String) -> Result<String, String> {
+    let dir = app
+        .path()
+        .document_dir()
+        .or_else(|_| app.path().download_dir())
+        .or_else(|_| app.path().home_dir())
+        .map_err(|e| e.to_string())?
+        .join("Unsealed");
+    let path = session(&state)?.saves.export(&id, &dir)?;
+    Ok(path.to_string_lossy().into_owned())
+}
+
+/// Adds a game exported on another computer (the file's bytes, sent raw): a new save.
+#[tauri::command]
+fn import_save(state: State<'_, SessionState>, request: tauri::ipc::Request<'_>) -> Result<SaveInfo, String> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err("expected the save's bytes".into());
+    };
+    session(&state)?.saves.import(bytes, now())
 }
 
 /// Deletes a save for good. Deleting the game being played closes it first.
@@ -766,6 +795,8 @@ pub fn run() {
             create_save_point,
             rename_save,
             delete_save,
+            export_save,
+            import_save,
             get_data_status,
             retry_data_update,
             get_data_info,

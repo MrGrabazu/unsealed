@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { BoxProgress, SealedStack, SetSummary } from "./api";
 import { BackToTop } from "./BackToTop";
 import { kindLabel, wrapperFinish } from "./boosterKinds";
-import { JapaneseNote } from "./JapaneseNote";
+import { BoosterNote } from "./BoosterNote";
 import { useI18n } from "./i18n";
 import { Icon } from "./icons";
 import { Money, useMoney } from "./money";
@@ -181,7 +181,7 @@ export function SealedBoosters({ sealed, sets, busy, onOpen, onOpenQuick, onOpen
             </>
           )}
           {current.boxProgress && <BoxGauge progress={current.boxProgress} />}
-          <JapaneseNote setCode={current.setCode} kind={current.kind} />
+          <BoosterNote setCode={current.setCode} kind={current.kind} />
         </div>
         <div className="buy-bar">
           <button className="big wax" disabled={busy} onClick={() => onOpen(current)}>

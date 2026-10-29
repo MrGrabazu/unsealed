@@ -109,6 +109,14 @@
   "cycle-double": { "name": "Double cycle", "description": "Complétez un cycle de 10 cartes ou plus." },
   "cycle-mythic": { "name": "Cycle mythique", "description": "Complétez un cycle dont toutes les cartes sont des rares mythiques." },
   "cycle-lands": { "name": "Arpenteur", "description": "Complétez un cycle de terrains." },
+  "lair-open": { "name": "Dans l'antre", "description": "Ouvrez un booster Secret Lair." },
+  "lair-open-100": { "name": "Habitué de l'antre", "description": "Ouvrez 100 boosters Secret Lair." },
+  "drop-1": { "name": "Collectionneur de drops", "description": "Complétez un drop Secret Lair." },
+  "drop-5": { "name": "Conservateur de drops", "description": "Complétez 5 drops Secret Lair." },
+  "drop-25": { "name": "Gardien de l'antre", "description": "Complétez 25 drops Secret Lair." },
+  "drop-prestige": { "name": "Drop étincelant", "description": "Complétez un drop Secret Lair avec chaque carte dans sa plus belle impression, en foil quand elle existe." },
+  "smart-boy": { "name": "Petit malin", "description": "Tentez de charger une sauvegarde modifiée en dehors du jeu. Bien essayé." },
+  "lair-guest": { "name": "Quelque chose dans l'antre", "description": "Trouvez une carte Secret Lair dans le booster d'un autre set." },
   "the-nine": { "name": "Les Neuf", "description": "Réunissez les neuf Nazgûl du Seigneur des Anneaux, chacun dans son illustration." },
   "the-nine-prestige": { "name": "Neuf furent donnés aux Hommes", "description": "Réunissez les neuf Nazgûl, chacun dans sa version sans bordure foil." }
 }

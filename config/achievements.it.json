@@ -271,6 +271,14 @@
   "cycle-double": { "name": "Ciclo doppio", "description": "Completa un ciclo di 10 carte o più." },
   "cycle-mythic": { "name": "Ciclo mitico", "description": "Completa un ciclo le cui carte sono tutte rare mitiche." },
   "cycle-lands": { "name": "Agrimensore", "description": "Completa un ciclo di terre." },
+  "lair-open": { "name": "Nella tana", "description": "Apri una busta Secret Lair." },
+  "lair-open-100": { "name": "Habitué della tana", "description": "Apri 100 buste Secret Lair." },
+  "drop-1": { "name": "Collezionista di drop", "description": "Completa un drop di Secret Lair." },
+  "drop-5": { "name": "Curatore di drop", "description": "Completa 5 drop di Secret Lair." },
+  "drop-25": { "name": "Custode della tana", "description": "Completa 25 drop di Secret Lair." },
+  "drop-prestige": { "name": "Drop scintillante", "description": "Completa un drop di Secret Lair con ogni carta nella sua versione più bella, in foil quando esiste." },
+  "smart-boy": { "name": "Furbetto", "description": "Prova a caricare un salvataggio modificato fuori dal gioco. Bel tentativo." },
+  "lair-guest": { "name": "Qualcosa nella tana", "description": "Trova una carta Secret Lair nella busta di un'altra espansione." },
   "the-nine": { "name": "I Nove", "description": "Riunisci i nove Nazgûl de Il Signore degli Anelli, ognuno nella sua illustrazione." },
   "the-nine-prestige": { "name": "Nove agli Uomini Mortali", "description": "Riunisci i nove Nazgûl, ognuno nella sua versione senza bordo foil." }
 }

@@ -32,7 +32,8 @@ pub use details::CardDetailsView;
 pub use history::HistoryView;
 
 use crate::store::{OpeningCard, OpeningOrder, OpeningRow, Owned, Sale, Store};
-use rand::SeedableRng;
+use rand::seq::SliceRandom;
+use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -45,7 +46,7 @@ use unsealed_core::import::ART_RARITY;
 use unsealed_core::economy::{charity_available, EconomyConfig};
 use unsealed_core::limited::LimitedConfig;
 use unsealed_core::artifacts::SoldCard;
-use unsealed_core::{open_booster_excluding, ColorIndex};
+use unsealed_core::{open_booster, open_booster_excluding, ColorIndex, DrawnCard};
 
 /// Largest number of boosters bought in one purchase.
 const MAX_PURCHASE: u32 = 100;
@@ -760,19 +761,27 @@ impl Game {
             .filter(|(uuid, pulled)| self.print_runs.get(uuid).is_some_and(|run| pulled >= run))
             .map(|(uuid, _)| uuid)
             .collect();
-        let Self { sets, prices, rng, economy, card_lang, print_runs, limited, image_quality, .. } = self;
+        let drawn = {
+            let set = &self.sets[set_code];
+            // One of its boosters, or of its box toppers.
+            let cfg = set.file.booster_config(kind).ok_or_else(|| format!("set {set_code} has no `{kind}` booster"))?;
+            open_booster_excluding(cfg, &set.colors, &mut self.rng, &exhausted).map_err(err)?
+        };
+        // Each card with the set it comes from: the booster's, or a crafted set's for a card
+        // hiding in it (a Secret Lair card, drawn after the others, never changing them).
+        let mut drawn: Vec<(String, DrawnCard)> = drawn.into_iter().map(|d| (set_code.to_string(), d)).collect();
+        drawn.extend(self.crafted_guest(set_code, kind)?);
+
+        let Self { sets, prices, economy, card_lang, print_runs, limited, image_quality, .. } = self;
         // A Japanese booster's cards are shown in Japanese, as they come out of it.
         let japanese = booster_language(kind);
-        let card_lang = japanese.unwrap_or(card_lang.as_str());
-        let set = &sets[set_code];
-        // One of its boosters, or of its box toppers.
-        let cfg = set.file.booster_config(kind).ok_or_else(|| format!("set {set_code} has no `{kind}` booster"))?;
-        let drawn = open_booster_excluding(cfg, &set.colors, rng, &exhausted).map_err(err)?;
-
         let mut cards: Vec<OpenedCard> = drawn
             .into_iter()
-            .map(|d| {
+            .map(|(code, d)| {
+                let set = &sets[&code];
                 let card = &set.file.cards[set.index[&d.uuid]];
+                let japanese = japanese.filter(|_| code == set_code);
+                let card_lang = japanese.unwrap_or(card_lang.as_str());
                 let own = |foil| market_price(prices.as_ref(), economy, limited, print_runs, &d.uuid, foil);
                 let unpriced = own(false).is_none() && own(true).is_none();
                 // As `Game::market_price`: the other finish's price, else the rarity's.
@@ -841,6 +850,40 @@ impl Game {
         let (artifact, found) = self.find_artifact(set_code, kind);
         events.booster.extend(found);
         Ok((OpenedBooster { cards, bets: settled, skipped, artifact }, events))
+    }
+
+    /// Now and then, a card of a set the game crafts a booster for (Secret Lair) hides in the
+    /// booster of another set (`craftedGuests` of the economy; never in a box topper): one of the
+    /// cards (token aside) of a booster of that set drawn apart, so mostly its cheapest, at times
+    /// a foil, rarely a mythic. Its sheet (`CRAFTED_GUEST_SHEET`) tells it, and it comes last.
+    /// None when the set is not in the data.
+    fn crafted_guest(&mut self, set_code: &str, kind: &str) -> Result<Option<(String, DrawnCard)>, String> {
+        if self.sets[set_code].file.is_topper(kind) {
+            return Ok(None);
+        }
+        let collector = is_collector_kind(usual_kind(kind));
+        let candidates: Vec<(String, u32)> = self
+            .economy
+            .crafted_guests
+            .iter()
+            .filter(|(code, _)| *code != set_code)
+            .map(|(code, odds)| (code.clone(), if collector { odds.collector_one_in } else { odds.one_in }))
+            .filter(|&(_, one_in)| one_in > 0)
+            .collect();
+        for (code, one_in) in candidates {
+            // A set the data lacks (an old pack, a test) hides nothing, and draws no chance.
+            if self.ensure_loaded(&code).is_err() || self.rng.gen_range(0..one_in) != 0 {
+                continue;
+            }
+            let set = &self.sets[&code];
+            let Some(cfg) = set.file.boosters.values().next() else { continue };
+            let pack = open_booster(cfg, &set.colors, &mut self.rng).map_err(err)?;
+            let cards: Vec<DrawnCard> = pack.into_iter().filter(|d| !set.file.cards[set.index[&d.uuid]].token).collect();
+            if let Some(card) = cards.choose(&mut self.rng) {
+                return Ok(Some((code, DrawnCard { sheet: CRAFTED_GUEST_SHEET.to_string(), ..card.clone() })));
+            }
+        }
+        Ok(None)
     }
 
     /// Opens up to `quantity` sealed boosters in a row. Each opening is its own transaction, so
@@ -1653,6 +1696,10 @@ fn scryfall_image_face(scryfall_id: &str, version: &str, face: &str) -> String {
     }
 }
 
+/// The sheet of a crafted set's card found in another set's booster (`Game::crafted_guest`): the
+/// interface announces it.
+const CRAFTED_GUEST_SHEET: &str = "craftedGuest";
+
 /// Reveal order, as cards come in a real booster of each kind (MTGJSON gives none: each
 /// card's place is told by its rarity and the sheet it was drawn from). The token always
 /// comes last; cards of a same place keep their drawing order.
@@ -1671,6 +1718,10 @@ fn scryfall_image_face(scryfall_id: &str, version: &str, face: &str) -> String {
 fn reveal_rank(kind: &str, card: &OpenedCard) -> u8 {
     if card.rarity == "token" {
         return 99;
+    }
+    // A Secret Lair card hiding in the booster: the last surprise, before the token.
+    if card.sheet == CRAFTED_GUEST_SHEET {
+        return 97;
     }
     if card.rarity == ART_RARITY {
         return if usual_kind(kind) == "set" { 0 } else { 98 };
@@ -1735,6 +1786,7 @@ mod tests {
     use std::sync::atomic::{AtomicU32, Ordering};
     use betting::{SkipReason, Unpriced};
     use unsealed_core::betting::{Bet, CardFilter, Clause, Compare};
+    use unsealed_core::economy::CraftedGuest;
     use std::sync::Arc;
 
     const ECONOMY: &str = include_str!("../../../config/economy.json");
@@ -1837,6 +1889,51 @@ mod tests {
         let mut g = game(name);
         g.buy_boosters("TST", "play", 1).unwrap();
         g
+    }
+
+    #[test]
+    fn a_game_played_normally_keeps_its_seal() {
+        let mut g = game_with_booster("seal");
+        g.open_booster("TST", "play").unwrap();
+        g.buy_boosters("TST", "play", 3).unwrap();
+        g.open_boosters("TST", "play", 2).unwrap();
+        g.sell_duplicates("TST").unwrap();
+        g.collect_income().unwrap();
+        assert!(g.store.seal_intact().unwrap());
+    }
+
+    #[test]
+    fn a_secret_lair_card_may_hide_in_another_sets_booster() {
+        let mut g = game("crafted-guest");
+        let lair = r#"{ "code": "SLD", "name": "Secret Lair Drop", "releaseDate": "2019-12-02", "setType": "box", "sourceVersion": "v1",
+          "cards": [ { "uuid": "s1", "setCode": "SLD", "scryfallId": "abcabc", "name": "Lair Card", "number": "1", "rarity": "rare",
+                       "finishes": ["nonfoil"], "layout": "normal", "drop": "Cats" } ],
+          "boosters": { "secret-lair": { "boosters": [ { "contents": { "craftedRare": 1 }, "weight": 1 } ], "boostersTotalWeight": 1,
+            "sheets": { "craftedRare": { "cards": { "s1": 1 }, "foil": false, "totalWeight": 1 } } } } }"#;
+        fs::write(g.data_dir.join("sets/SLD.json"), lair).unwrap();
+        fs::write(
+            g.data_dir.join("manifest.json"),
+            MANIFEST.replace(
+                r#"} } }"#,
+                r#"}, "SLD": { "name": "Secret Lair Drop", "releaseDate": "2019-12-02", "sourceVersion": "v1", "boosters": ["secret-lair"] } } }"#,
+            ),
+        )
+        .unwrap();
+        g.reload_data();
+        g.economy.crafted_guests.insert("SLD".into(), CraftedGuest { one_in: 1, collector_one_in: 1 });
+
+        g.buy_boosters("TST", "play", 1).unwrap();
+        let cards = g.open_booster("TST", "play").unwrap();
+        // The last card before the token: the bets and the booster's own cards are untouched.
+        let guest = cards.iter().find(|c| c.sheet == CRAFTED_GUEST_SHEET).expect("a Secret Lair card");
+        assert_eq!((guest.uuid.as_str(), guest.set_code.as_str()), ("s1", "SLD"));
+        assert!(cards.iter().skip_while(|c| c.sheet != CRAFTED_GUEST_SHEET).skip(1).all(|c| c.rarity == "token"));
+        assert_eq!(g.collection("SLD").unwrap().owned_count, 1);
+
+        // Never in a booster of its own set.
+        g.buy_boosters("SLD", "secret-lair", 1).unwrap();
+        let own = g.open_booster("SLD", "secret-lair").unwrap();
+        assert!(own.iter().all(|c| c.sheet != CRAFTED_GUEST_SHEET));
     }
 
     #[test]

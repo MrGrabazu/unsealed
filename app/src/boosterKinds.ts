@@ -19,7 +19,12 @@ const KIND_ORDER = [
   "premium",
   "collector",
   "collector-special",
+  "secret-lair",
 ];
+
+/** A booster the game crafts for a set sold without any (Secret Lair, `craftedBoosters` of
+ * data.json): it does not exist, the game says so wherever it is sold. */
+export const isCraftedKind = (kind: string) => kind === "secret-lair";
 
 export const kindRank = (kind: string): number => {
   // A Japanese booster comes right after its English kind.
@@ -59,7 +64,8 @@ export function wrapperFinish(kind: string): WrapperFinish {
   // opposite, a pearly lacquer all iridescent (mockup .cache/da/v10.html, proposal D).
   if (isTopperKind(kind)) return "prism";
   if (isJapaneseKind(kind)) return wrapperFinish(usualKind(kind));
-  if (isCollectorKind(kind)) return "collector";
+  // Secret Lair, a premium booster of a single kind: the collector's black lacquer.
+  if (isCollectorKind(kind) || isCraftedKind(kind)) return "collector";
   if (kind.startsWith("theme-")) return "matte";
   switch (kind) {
     case "draft":
@@ -95,6 +101,8 @@ export function kindLabel(t: I18n["t"], kind: string): string {
       return t("kind.premium");
     case "collector-special":
       return t("kind.collectorSpecial");
+    case "secret-lair":
+      return t("kind.secretLair");
     case "play":
       return t("kind.play");
     case "draft":

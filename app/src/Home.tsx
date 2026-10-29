@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Ambience } from "./Ambience";
-import { deleteSave, listSaves, listSets, loadGame, newGame, renameSave, type SaveInfo } from "./api";
+import { deleteSave, exportSave, importSave, listSaves, listSets, loadGame, newGame, renameSave, type SaveInfo } from "./api";
 import { DataStatusBar, useDataStatus } from "./DataStatus";
+import { errorText } from "./errors";
+import { useMoneyText } from "./money";
 import { Footer } from "./Footer";
 import { quitApp } from "./fullscreen";
 import { UpdateNotice } from "./UpdateNotice";
@@ -35,7 +38,12 @@ export function Home({ current, onPlay, onCurrentChanged, onOptions, onAbout }: 
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // What an export or an import did: said under the list, with the exported file's folder.
+  const [transfer, setTransfer] = useState<{ text: string; path?: string } | null>(null);
+  // The file picker of an import (a game exported on another computer).
+  const importInput = useRef<HTMLInputElement>(null);
   const dataStatus = useDataStatus();
+  const moneyText = useMoneyText();
 
   const reload = useCallback(() => {
     listSaves()
@@ -65,11 +73,27 @@ export function Home({ current, onPlay, onCurrentChanged, onOptions, onAbout }: 
     try {
       await action();
     } catch (e) {
-      setError(String(e));
+      setError(errorText(t, moneyText, e));
     } finally {
       setBusy(false);
     }
   }
+
+  /** Exports a game into one file, to carry it to another computer. */
+  const exportGame = (save: SaveInfo) =>
+    act(async () => {
+      const path = await exportSave(save.id);
+      setTransfer({ text: t("home.exported", { file: path.split(/[\\/]/).pop() ?? path }), path });
+    });
+
+  /** Imports the game chosen in the file picker: it shows first in the list. */
+  const importGame = (file: File) =>
+    act(async () => {
+      const imported = await importSave(file);
+      setTransfer({ text: t("home.imported", { name: imported.name }) });
+      setPanel("load");
+      reload();
+    });
 
   const play = (id: string) => act(async () => onPlay(await loadGame(id)));
   const date = (seconds: number) => (seconds > 0 ? formatDate(seconds) : t("common.none"));
@@ -95,6 +119,17 @@ export function Home({ current, onPlay, onCurrentChanged, onOptions, onAbout }: 
       <DataStatusBar status={dataStatus} />
       <UpdateNotice />
       {error && <p className="error">{error}</p>}
+      <input
+        ref={importInput}
+        type="file"
+        accept=".unsealed"
+        hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (file) void importGame(file);
+        }}
+      />
       {saves === null && !error && <Loading />}
 
       {saves !== null && panel === "menu" && (
@@ -120,10 +155,15 @@ export function Home({ current, onPlay, onCurrentChanged, onOptions, onAbout }: 
           >
             {t("home.newGame")}
           </button>
-          {saves.length > 0 && (
+          {saves.length > 0 ? (
             <button disabled={busy} onClick={() => setPanel("load")}>
               {t("home.loadGame")}
               <span className="home-sub">{plural("home.saveCount", saves.length)}</span>
+            </button>
+          ) : (
+            // No game here yet: one may come from another computer.
+            <button disabled={busy} onClick={() => importInput.current?.click()}>
+              {t("home.import")}
             </button>
           )}
           <button onClick={onOptions}>{t("home.options")}</button>
@@ -212,6 +252,9 @@ export function Home({ current, onPlay, onCurrentChanged, onOptions, onAbout }: 
                   <button disabled={busy} onClick={() => setRenaming({ id: s.id, name: s.name })}>
                     {t("home.rename")}
                   </button>
+                  <button disabled={busy} title={t("home.exportHint")} onClick={() => void exportGame(s)}>
+                    {t("home.export")}
+                  </button>
                   <button
                     className={`sell ${confirmDelete === s.id ? "confirm" : ""}`}
                     disabled={busy}
@@ -235,8 +278,18 @@ export function Home({ current, onPlay, onCurrentChanged, onOptions, onAbout }: 
               </div>
             ))}
           </div>
+          {transfer && (
+            <p className="save-transfer">
+              {transfer.text}
+              {transfer.path && <button onClick={() => void revealItemInDir(transfer.path!)}>{t("share.showFolder")}</button>}
+            </p>
+          )}
+          <p className="hint">{t("home.transferHint")}</p>
           <div className="controls">
             <button onClick={() => setPanel("menu")}>{t("common.back")}</button>
+            <button disabled={busy} onClick={() => importInput.current?.click()}>
+              {t("home.import")}
+            </button>
           </div>
         </div>
       )}

@@ -168,6 +168,12 @@ impl Game {
         Ok(unlocked)
     }
 
+    /// A save edited outside the game was refused (see `seal`): its secret achievement, for
+    /// fun, rewarding nothing.
+    pub fn caught_editing_a_save(&mut self) {
+        self.emit(vec![Event::new("SaveTampered")]);
+    }
+
     pub(super) fn balance_event(&self) -> Option<Event> {
         let balance = self.store.balance().ok()?;
         Some(Event::new("BalanceChanged").with("balanceCents", balance))
@@ -199,6 +205,8 @@ impl Game {
                     .with("priceCents", i64::from(c.price_cents.unwrap_or(0)))
                     .with("isNew", c.is_new)
                     .with("newFoil", c.new_foil)
+                    // A Secret Lair card found in another set's booster.
+                    .with("craftedGuest", c.sheet == super::CRAFTED_GUEST_SHEET)
             })
             .collect();
         let mut booster = vec![Event::new("BoosterOpened")
@@ -222,6 +230,14 @@ impl Game {
         booster.extend(self.scene_events(set_code));
         booster.extend(self.assembly_events(set_code));
         booster.extend(self.year_progress_event(set_code));
+        // A card of another set found in it (Secret Lair): that set's progress and drops too.
+        let mut others: Vec<&str> =
+            cards.iter().filter(|c| c.sheet == super::CRAFTED_GUEST_SHEET).map(|c| c.set_code.as_str()).collect();
+        others.dedup();
+        for other in others {
+            booster.extend(self.set_progress_event(other));
+            booster.extend(self.cycle_events(other));
+        }
         booster.extend(self.balance_event());
         OpeningEvents { per_card, booster }
     }

@@ -89,7 +89,7 @@ export interface CycleView {
   name: string;
   custom: boolean;
   /** A cycle, or a story told card after card (Story Spotlights). */
-  kind: "cycle" | "story";
+  kind: "cycle" | "story" | "drop";
   owned: number;
   total: number;
   complete: boolean;
@@ -668,6 +668,11 @@ export const loadGame = (id: string) => invoke<SaveInfo>("load_game", { id });
 export const createSavePoint = (name: string) => invoke<SaveInfo>("create_save_point", { name });
 export const renameSave = (id: string, name: string) => invoke<SaveInfo>("rename_save", { id, name });
 export const deleteSave = (id: string) => invoke<void>("delete_save", { id });
+/** Copies a game into one file in the player's documents (Unsealed folder); returns where. */
+export const exportSave = (id: string) => invoke<string>("export_save", { id });
+/** Adds a game exported on another computer: its file's bytes, sent raw. */
+export const importSave = async (file: File) =>
+  tauriInvoke<SaveInfo>("import_save", new Uint8Array(await file.arrayBuffer()));
 export const getDataInfo = () => invoke<DataInfo>("get_data_info");
 /** Language of card names, card images and set names (English when not printed in it). */
 export const setCardLanguage = (lang: string) => invoke<void>("set_card_language", { lang });

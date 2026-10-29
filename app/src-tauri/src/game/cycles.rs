@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use unsealed_core::achievements::Event;
 use unsealed_core::catalog::CardEntry;
-use unsealed_core::cycles::{Cycle, Cycles, GroupKind};
+use unsealed_core::cycles::{drop_groups, Cycle, Cycles, GroupKind};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -84,9 +84,8 @@ impl Game {
         self.ensure_loaded(set_code)?;
         self.ensure_prices();
         let owned = self.owned_with_tokens(set_code)?;
-        let cycles = self.cycles.clone().unwrap_or_default();
         let mut view = CyclesView { set_code: set_code.to_string(), completed: 0, total: 0, slots_owned: 0, slots_total: 0, cycles: Vec::new() };
-        for cycle in cycles.of_set(set_code) {
+        for cycle in &self.groups_of(set_code) {
             let Some(state) = self.cycle_state(set_code, cycle, &owned) else { continue };
             let slots: Vec<CycleSlot> = state
                 .slots
@@ -118,6 +117,15 @@ impl Game {
             });
         }
         Ok(view)
+    }
+
+    /// A set's groups: its configured cycles and stories, then its Secret Lair drops.
+    fn groups_of(&self, set_code: &str) -> Vec<Cycle> {
+        let mut groups = self.cycles.as_ref().map(|c| c.of_set(set_code).to_vec()).unwrap_or_default();
+        if let Some(set) = self.sets.get(set_code) {
+            groups.extend(drop_groups(&set.file));
+        }
+        groups
     }
 
     /// What fills a cycle's slots: of each slot's printings found in the set's file, the best
@@ -161,11 +169,11 @@ impl Game {
     }
 
     /// The events of a set's groups, for the achievements: one `CycleCompleted` per complete
-    /// cycle, or `StoryCompleted` per complete story (achievements count them once by their
-    /// key), then the set's `CyclesProgress` (its cycles only).
+    /// cycle, `StoryCompleted` per complete story or `DropCompleted` per complete Secret Lair
+    /// drop (achievements count them once by their key), then the set's `CyclesProgress` (its
+    /// cycles only).
     pub(super) fn cycle_events(&self, set_code: &str) -> Vec<Event> {
-        let Some(cycles) = self.cycles.clone() else { return Vec::new() };
-        let list = cycles.of_set(set_code);
+        let list = self.groups_of(set_code);
         if list.is_empty() || !self.sets.contains_key(set_code) {
             return Vec::new();
         }
@@ -179,17 +187,22 @@ impl Game {
             .unwrap_or(0);
         let mut events = Vec::new();
         let (mut complete, mut total) = (0i64, 0i64);
-        for cycle in list {
+        for cycle in &list {
             let Some(state) = self.cycle_state(set_code, cycle, &owned) else { continue };
-            let story = cycle.kind == GroupKind::Story;
-            total += i64::from(!story);
+            let is_cycle = cycle.kind == GroupKind::Cycle;
+            total += i64::from(is_cycle);
             if !state.complete() {
                 continue;
             }
-            complete += i64::from(!story);
+            complete += i64::from(is_cycle);
             let cards: Vec<&CardEntry> = state.slots.iter().map(|s| s.0).collect();
+            let name = match cycle.kind {
+                GroupKind::Cycle => "CycleCompleted",
+                GroupKind::Story => "StoryCompleted",
+                GroupKind::Drop => "DropCompleted",
+            };
             events.push(
-                Event::new(if story { "StoryCompleted" } else { "CycleCompleted" })
+                Event::new(name)
                     .with("cycle", format!("{set_code}/{}", cycle.id))
                     .with("setCode", set_code)
                     .with("custom", cycle.custom)

@@ -66,6 +66,8 @@
       "op": "distinct",
       "field": "setCode"
     },
+    "lair_boosters_opened": { "event": "BoosterOpened", "where": [{ "field": "kind", "op": "eq", "value": "secret-lair" }], "op": "sum" },
+    "drops_completed": { "event": "DropCompleted", "op": "distinct", "field": "cycle" },
     "boosters_watched": { "event": "BoosterOpened", "where": [{ "field": "animated", "op": "eq", "value": true }], "op": "sum" },
     "boosters_rushed": { "event": "BoosterOpened", "where": [{ "field": "animated", "op": "eq", "value": false }], "op": "sum" }
   },
@@ -729,6 +731,55 @@
       "rarity": "mythic", "emblem": "crown", "palette": "onyx",
       "condition": { "type": "event", "event": "CycleCompleted", "where": [{ "field": "cycle", "op": "eq", "value": "LTR/the-nine" }, { "field": "prestige", "op": "eq", "value": true }] },
       "reward": { "sealed": { "setCode": "LTR", "kind": "collector", "quantity": 3 } }
+    },
+
+    {
+      "id": "lair-open", "name": "Into the Lair", "description": "Open a Secret Lair booster.",
+      "rarity": "common", "emblem": "pack", "palette": "royal",
+      "condition": { "type": "metric", "metric": "lair_boosters_opened", "atLeast": 1 },
+      "reward": { "cashCents": 500 }
+    },
+    {
+      "id": "lair-open-100", "name": "Lair Regular", "description": "Open 100 Secret Lair boosters.",
+      "rarity": "rare", "emblem": "pack", "palette": "onyx",
+      "condition": { "type": "metric", "metric": "lair_boosters_opened", "atLeast": 100 },
+      "reward": { "sealed": { "setCode": "SLD", "kind": "secret-lair", "quantity": 3 } }
+    },
+    {
+      "id": "drop-1", "name": "Drop Collector", "description": "Complete a Secret Lair drop.",
+      "rarity": "uncommon", "emblem": "cards", "palette": "royal",
+      "condition": { "type": "metric", "metric": "drops_completed", "atLeast": 1 },
+      "reward": { "sealed": { "setCode": "SLD", "kind": "secret-lair", "quantity": 1 } }
+    },
+    {
+      "id": "drop-5", "name": "Drop Curator", "description": "Complete 5 Secret Lair drops.",
+      "rarity": "rare", "emblem": "cards", "palette": "rose",
+      "condition": { "type": "metric", "metric": "drops_completed", "atLeast": 5 },
+      "reward": { "sealed": { "setCode": "SLD", "kind": "secret-lair", "quantity": 3 } }
+    },
+    {
+      "id": "drop-25", "name": "Keeper of the Lair", "description": "Complete 25 Secret Lair drops.",
+      "rarity": "mythic", "emblem": "crown", "palette": "royal",
+      "condition": { "type": "metric", "metric": "drops_completed", "atLeast": 25 },
+      "reward": { "cashCents": 25000, "sealed": { "setCode": "SLD", "kind": "secret-lair", "quantity": 5 } }
+    },
+    {
+      "id": "drop-prestige", "name": "Shiny Drop", "description": "Complete a Secret Lair drop with every card in its finest printing, in foil when it has one.",
+      "rarity": "rare", "emblem": "gem", "palette": "ice",
+      "condition": { "type": "event", "event": "DropCompleted", "where": [{ "field": "prestige", "op": "eq", "value": true }] },
+      "reward": { "sealed": { "setCode": "SLD", "kind": "secret-lair", "quantity": 3 } }
+    },
+    {
+      "id": "lair-guest", "name": "Something in the Lair", "description": "Find a Secret Lair card in another set's booster.",
+      "rarity": "rare", "emblem": "eye", "palette": "onyx",
+      "condition": { "type": "event", "event": "CardAcquired", "where": [{ "field": "craftedGuest", "op": "eq", "value": true }] },
+      "reward": { "cashCents": 2000 }
+    },
+    {
+      "id": "smart-boy", "name": "Smart Boy", "secret": true, "optional": true,
+      "description": "Try to load a save edited outside the game. Nice try.",
+      "rarity": "uncommon", "emblem": "eye", "palette": "onyx",
+      "condition": { "type": "event", "event": "SaveTampered" }
     },
 
     {

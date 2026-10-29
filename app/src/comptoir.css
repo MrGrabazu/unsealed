@@ -125,7 +125,8 @@ button.share-round { height: 46px; padding: 0 20px; border-radius: 23px; display
 .share-modal .hint, .share-modal .notice, .share-modal .error { margin: 0; }
 .share-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .share-actions .big { flex: 1; }
-/* A Japanese booster: why it is offered and what it may give (JapaneseNote.tsx). */
+/* A Japanese booster: why it is offered and what it may give; a booster crafted by the game
+   (Secret Lair): that it does not exist (BoosterNote.tsx). */
 .jp-note { margin: 14px 4px 4px; padding: 10px 12px; border-radius: 6px; border-left: 3px solid var(--wax);
   background: linear-gradient(180deg, #2a1d14cc, #1d140ecc); box-shadow: inset 0 0 0 1px #d9a4411f; font-size: 13px; line-height: 1.4; color: #e6d6b8; }
 .jp-note strong { display: block; margin-bottom: 4px; font-family: var(--font-title); font-size: 13px; color: var(--gold-hi); letter-spacing: 0.04em; }
@@ -146,6 +147,13 @@ button.share-round { height: 46px; padding: 0 20px; border-radius: 23px; display
   background: linear-gradient(90deg, var(--gold-lo), var(--gold-hi)); animation: notice-time linear forwards; }
 @keyframes notice-time { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 @media (prefers-reduced-motion: reduce) { .notice-toast-time { animation: none; } }
+/* A game exported or imported (Home.tsx): what happened, and the exported file's folder. */
+.save-transfer { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 10px 0 0; color: var(--gold-hi); }
+/* An action that failed (showError of GameScreen): a dark iron seal, a red rim and thread. */
+.notice-toast.notice-error { box-shadow: inset 0 0 0 1px #e2545a33, inset 0 0 0 4px #1a110a, inset 0 0 0 5px #c9473a88, 0 12px 28px #000c; }
+.notice-error .notice-toast-seal { color: #ffd2c4; background: radial-gradient(circle at 35% 30%, #5a4a40, #2c221c 60%, #120c08); }
+.notice-error .toast-text strong { color: #f08a7e; }
+.notice-error .notice-toast-time { background: linear-gradient(90deg, #7a1f18, #e2545a); }
 .preparing-legal { max-width: 720px; font-size: 12px; color: var(--muted); text-align: center; }
 /* The notice's translation, on its own line under the official English text. */
 .notice-translated { display: block; margin-top: 4px; }
@@ -582,6 +590,10 @@ button.curios-slot { display: block; width: 100%; height: 96px; margin-bottom: 1
 .cycle-badge.official { color: #3a2108; background: radial-gradient(circle at 35% 30%, #fbe7ac, #d9a441 60%, #8a5a1c); }
 .cycle-badge.story { color: #2a1a0c; background: radial-gradient(circle at 35% 30%, #fbf3dc, #d8cba8 60%, #9c8a63); font-family: var(--font-text); font-size: 13px; }
 .cycle-badge.ours { color: #fbe7ac; background: radial-gradient(circle at 35% 30%, #e2545a, #a61f28 55%, #4f080e); box-shadow: 0 0 0 1px #3d060b; }
+/* A Secret Lair drop: a gold star on deep violet. */
+.cycle-badge.drop { color: #f5d68a; background: radial-gradient(circle at 35% 30%, #7d5aa8, #3e2366 60%, #1c0e33); box-shadow: 0 0 0 1px #12081f; }
+.cycles-search { width: 220px; }
+.cycles-note-line { display: block; }
 .cycle-count { margin-left: auto; font: 700 13px var(--font-title); color: var(--gold-hi); white-space: nowrap; }
 .cycle-bar { width: 120px; flex: none; }
 .cycle-tag { padding: 2px 9px; border-radius: 10px; font: 700 10px var(--font-title); letter-spacing: .1em; text-transform: uppercase; color: #1a0d03; background: linear-gradient(180deg, #fbe7ac, #d9a441); white-space: nowrap; }
@@ -817,6 +829,8 @@ button.seen-card:hover:not(:disabled) { box-shadow: none; transform: translateX(
 .reveal-mention.new-foil { color: #1a1020; background: linear-gradient(100deg, #ffc6ee, #c9bbff 35%, #a6eaff 65%, #c9ffd3);
   box-shadow: 0 0 0 1px #fffa, 0 0 16px #c9b8ffaa, 0 6px 18px #000b; }
 .reveal-mention.new-foil .star { color: #7a3fd0; }
+/* A Secret Lair card hiding in another set's booster: deep violet, as the drops' badge. */
+.reveal-mention.crafted-guest { color: #f5d68a; background: linear-gradient(180deg, #5b3a86, #2c1747); box-shadow: 0 0 0 1px #f5d68a66, 0 0 22px #7d5aa8aa; }
 @keyframes mention-in { from { opacity: 0; transform: translate(-50%, -10px) scale(.92); } }
 @keyframes mention-out { to { opacity: 0; transform: translate(-50%, -6px); } }
 /* Under the classic pile: its room kept, so that nothing moves as it comes and goes. */

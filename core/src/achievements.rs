@@ -86,6 +86,10 @@ pub struct AchievementDef {
     /// Secret achievements hide their name, goal and reward until unlocked.
     #[serde(default)]
     pub secret: bool,
+    /// For fun only: the ultimate achievement does not ask for it (Smart Boy, caught editing a
+    /// save: no player must have to cheat).
+    #[serde(default)]
+    pub optional: bool,
     /// Proportional to the difficulty of the achievement.
     pub rarity: Rarity,
     pub emblem: String,
@@ -288,7 +292,7 @@ impl Engine {
             }
             Condition::Event { .. } => None,
             Condition::AllOthers => {
-                let others = self.config.achievements.iter().filter(|a| a.id != def.id);
+                let others = self.config.achievements.iter().filter(|a| a.id != def.id && !a.optional);
                 let total = others.clone().count() as i64;
                 let done = others.filter(|a| progress.unlocked.contains_key(&a.id)).count() as i64;
                 Some((done, total))
@@ -343,7 +347,7 @@ impl Engine {
                 .config
                 .achievements
                 .iter()
-                .filter(|a| a.id != def.id)
+                .filter(|a| a.id != def.id && !a.optional)
                 .all(|a| progress.unlocked.contains_key(&a.id)),
         }
     }

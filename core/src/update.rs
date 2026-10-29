@@ -3,8 +3,10 @@
 //! Pure logic: no network, no clock access, so it is testable.
 
 use crate::catalog::{Manifest, SetSelection, DATA_FORMAT_VERSION};
+use crate::crafted::CraftedBooster;
 pub use crate::import::ArtCardOdds;
 use serde::Deserialize;
+use std::collections::BTreeMap;
 
 /// What to download and how fresh it must be (shipped as `config/data.json`).
 #[derive(Debug, Clone, Deserialize)]
@@ -35,6 +37,9 @@ pub struct DataConfig {
     /// its pack are found under. None: the game always builds its data itself.
     #[serde(default)]
     pub pack_url: Option<String>,
+    /// The boosters the game crafts for sets sold without any, by set code (Secret Lair).
+    #[serde(default)]
+    pub crafted_boosters: BTreeMap<String, CraftedBooster>,
 }
 
 pub fn default_token_foil_one_in() -> u64 {

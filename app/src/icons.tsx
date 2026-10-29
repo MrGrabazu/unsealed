@@ -18,6 +18,8 @@ const PATHS = {
   undo: "M9 5L3 10l6 5v-3.5h6a3.5 3.5 0 010 7h-3v3h3a6.5 6.5 0 000-13H9V5z",
   // A curio under its glass bell (the cabinet of curiosities).
   curio: "M12 2a1.5 1.5 0 0 1 1.5 1.5v.7A7 7 0 0 1 19 11v7h1.5v3h-17v-3H5v-7a7 7 0 0 1 5.5-6.8v-.7A1.5 1.5 0 0 1 12 2zm0 9.5l-2.5 2.5 2.5 2.5 2.5-2.5z",
+  // A warning: a triangle with its exclamation mark cut out (an error's toast).
+  alert: "M12 2L1 21h22L12 2zm-1 7h2v6h-2V9zm0 7.5h2v2h-2v-2z",
   keyboard:
     "M3 5h18a2 2 0 012 2v10a2 2 0 01-2 2H3a2 2 0 01-2-2V7a2 2 0 012-2zm1 3v2h2V8H4zm3.5 0v2h2V8h-2zm3.5 0v2h2V8h-2zm3.5 0v2h2V8h-2zM18 8v2h2V8h-2zM5.5 11.5v2h2v-2h-2zm3.5 0v2h2v-2H9zm3.5 0v2h2v-2h-2zm3.5 0v2h2v-2h-2zM7 15v2h10v-2H7z",
 } as const;
@@ -25,7 +27,7 @@ const PATHS = {
 export type IconName = keyof typeof PATHS;
 
 /** Icons drawn with holes (a die's pips, a keyboard's keys). */
-const EVEN_ODD = new Set<IconName>(["dice", "keyboard", "curio"]);
+const EVEN_ODD = new Set<IconName>(["dice", "keyboard", "curio", "alert"]);
 
 export function Icon({ name, className }: { name: IconName; className?: string }) {
   return (
