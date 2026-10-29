@@ -203,6 +203,7 @@ export const en = {
   "open.soldBoosterLoss": "Sold 1 {set} booster for {amount} (loss {loss}).",
   "open.revealed": "{revealed} / {total} revealed",
   "open.revealAll": "Reveal all",
+  "open.pass": "Pass {cards}",
   "open.boosterValue": "Booster value: {amount}",
   "open.clickToReveal": "Click the highlighted card to reveal it.",
   "open.new": "NEW",

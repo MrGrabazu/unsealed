@@ -9,7 +9,15 @@ import { smallImage } from "./images";
 import { NewBadge, RevealMention } from "./NewBadge";
 import { RevealedCards } from "./RevealedCards";
 import { packLookOf } from "./scene/packArt";
-import { PackScene } from "./scene/PackScene";
+import { PackScene, type PassRequest } from "./scene/PackScene";
+
+/** The rarities whose runs can be passed; foils never are. */
+const PASSABLE = ["common", "uncommon", "rare", "mythic"] as const;
+type Passable = (typeof PASSABLE)[number];
+
+function passableRarity(card: OpenedCard): Passable | null {
+  return !card.foil && (PASSABLE as readonly string[]).includes(card.rarity) ? (card.rarity as Passable) : null;
+}
 
 interface Props {
   setCode: string;
@@ -31,7 +39,7 @@ interface Props {
  * by one. Once the last card has left, the scene gives way to the list of the cards, and a
  * click on one shows its details. */
 export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onDetails, onSold, onFinished, tearRequest = 0 }: Props) {
-  const { t, tx } = useI18n();
+  const { t, tx, plural } = useI18n();
   const money = useMoney();
   const sale = useBoosterSale(cards, onSold);
   const [top, setTop] = useState(0);
@@ -51,6 +59,7 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
     setSlideRequest(0);
     setTearing(false);
     setShown(null);
+    setPassRequest(null);
   }, [setCode, kind, cards]);
 
   // The thumbnails of the cards seen beside the scene, loaded and decoded as soon as the booster
@@ -73,6 +82,21 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
   }, [cards]);
 
   const total = cards?.length ?? 0;
+
+  // The run of cards from the top of the pile that share its rarity, foils aside: in a real
+  // booster's order, the commons, then the uncommons… so they can be passed in one go, and the
+  // rest seen card by card (a foil is never passed: it may be the one awaited).
+  const [passRequest, setPassRequest] = useState<PassRequest | null>(null);
+  const run = useMemo(() => {
+    if (!cards || finished) return null;
+    const rarity = passableRarity(cards[top]);
+    if (!rarity) return null;
+    let to = top;
+    while (to < total && passableRarity(cards[to]) === rarity) to++;
+    return { rarity, to, count: to - top };
+  }, [cards, top, finished, total]);
+  // Hidden while its cards are being passed.
+  const passingRun = passRequest != null && top < passRequest.to;
 
   // The card on top of the pile is seen: its achievements happen now.
   useEffect(() => {
@@ -99,12 +123,16 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
   const value = seen.reduce((sum, c) => sum + (c.priceCents ?? 0), 0);
 
   return (
-    <section className="pack-opening">
+    <section className={`pack-opening ${finished ? "" : "scene-live"}`}>
       <div className="opening-bar">
         {cards ? (
           <>
             <span>{t("open.revealed", { revealed: finished ? total : Math.min(top + 1, total), total })}</span>
-            {!finished && <button onClick={() => setFinished(true)}>{t("open.revealAll")}</button>}
+            {run && !passingRun && (
+              <button onClick={() => setPassRequest({ to: run.to })}>
+                {t("open.pass", { cards: plural(`rarity.${run.rarity}`, run.count) })}
+              </button>
+            )}
             {seen.length > 0 && <strong className="total">{tx("open.boosterValue", { amount: money(value) })}</strong>}
             {finished && <SellBoosterButton sale={sale} />}
           </>
@@ -126,6 +154,7 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
               cards={cards}
               top={top}
               slideRequest={slideRequest}
+              passRequest={passRequest}
               tearRequest={tearRequest}
               onNext={() => setTop((n) => Math.min(n + 1, total - 1))}
               onFinished={() => setFinished(true)}

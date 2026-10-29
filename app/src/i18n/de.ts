@@ -195,6 +195,7 @@ export const de: Messages = {
   "open.soldBoosterLoss": "1 {set}-Booster für {amount} verkauft (Verlust {loss}).",
   "open.revealed": "{revealed} / {total} aufgedeckt",
   "open.revealAll": "Alle aufdecken",
+  "open.pass": "{cards} überspringen",
   "open.boosterValue": "Booster-Wert: {amount}",
   "open.clickToReveal": "Klicke auf die hervorgehobene Karte, um sie aufzudecken.",
   "open.new": "NEU",

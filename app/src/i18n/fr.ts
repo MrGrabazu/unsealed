@@ -195,6 +195,7 @@ export const fr: Messages = {
   "open.soldBoosterLoss": "1 booster {set} revendu {amount} (perte : {loss}).",
   "open.revealed": "{revealed} / {total} révélées",
   "open.revealAll": "Tout révéler",
+  "open.pass": "Passer {cards}",
   "open.boosterValue": "Valeur du booster : {amount}",
   "open.clickToReveal": "Cliquez sur la carte en surbrillance pour la révéler.",
   "open.new": "NOUVEAU",

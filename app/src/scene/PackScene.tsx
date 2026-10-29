@@ -30,8 +30,10 @@ const PACK_FALLS = 0.6;
  * its first card (seconds). */
 const PILE_TURNS = 0.5;
 const SETTLED = CARDS_OUT + PACK_FALLS + PILE_TURNS;
-/** Out of the wrapper, the pile is brought closer to the player: its cards read better. */
-const CARD_ZOOM = 1.5;
+/** Out of the wrapper, the pile is brought closer to the player: its cards read better. Its top
+ * card then takes about 65 % of the scene's height (the camera's field is vertical: whatever the
+ * window), leaving room for its glow; at ×1.5 it took 80 %. */
+const CARD_ZOOM = 1.2;
 /** How long the last card stays before leaving (seconds). */
 const LAST_CARD_STAYS = 2.2;
 
@@ -350,6 +352,7 @@ function Cards({
   onFinished,
   onShown,
   slideRequest,
+  passRequest,
 }: {
   cards: OpenedCard[];
   top: number;
@@ -361,6 +364,8 @@ function Cards({
   onShown?: (index: number | null) => void;
   /** Bumped to send the top card off without a drag (Space). */
   slideRequest: number;
+  /** A new one passes the cards up to `to` (excluded): flicked off one after the other. */
+  passRequest?: PassRequest | null;
 }) {
   const camera = useThree((s) => s.camera);
   const dom = useThree((s) => s.gl.domElement);
@@ -387,6 +392,10 @@ function Cards({
   // The top card is on its way out (its glow and sparkles fade).
   const leaving = useRef(false);
   if (top > current.current) current.current = top;
+  // The cards before this index are being passed (a run of commons…): each one leaves as soon
+  // as it comes on top, without its sound nor its mention.
+  const passTo = useRef(-1);
+  const passing = () => current.current < passTo.current;
   /** The pile is out of the wrapper and in place: its cards can be slid. */
   const settled = () => appearedAt.current != null && clock.current - appearedAt.current >= SETTLED;
 
@@ -440,9 +449,11 @@ function Cards({
       } else {
         current.current += 1;
         topSince.current = clock.current;
+        onNext();
+        // A passed card goes on its way at the next frame (see the frame loop).
+        if (passing()) return;
         revealSound(cards[current.current]);
         onShown?.(current.current);
-        onNext();
       }
     });
   }
@@ -452,6 +463,12 @@ function Cards({
     if (slideRequest === 0 || slide.current.kind !== "idle" || !settled()) return;
     sendOff(new THREE.Vector2(1, 0.35), 0.45);
   }, [slideRequest]);
+
+  // Passing a run of cards: one after the other, quickly, from the next frame where the pile is
+  // in place and idle (asked while a card leaves, the run goes on from the next one).
+  useEffect(() => {
+    if (passRequest) passTo.current = passRequest.to;
+  }, [passRequest]);
 
   function grab(e: ThreeEvent<PointerEvent>, k: number) {
     if (k !== current.current || !settled()) return;
@@ -523,6 +540,12 @@ function Cards({
       sounds.flip();
     }
     const turn = Math.PI * (1 - ease((since - turnStart) / PILE_TURNS));
+
+    // Cards being passed leave one after the other.
+    if (passing() && slide.current.kind === "idle" && settled()) {
+      if (isLast) finishing.current = true;
+      sendOff(new THREE.Vector2(1, 0.35), PASS_SLIDE);
+    }
 
     // The last card stays a moment, then leaves on its own.
     if (isLast && !finishing.current && slide.current.kind === "idle" && clock.current - topSince.current > LAST_CARD_STAYS) {
@@ -641,11 +664,21 @@ interface Props {
   /** The card of this index is seen on top of the pile; null once it starts leaving. */
   onShown?: (index: number | null) => void;
   slideRequest: number;
+  /** A new one passes the cards up to `to` (excluded). */
+  passRequest?: PassRequest | null;
   /** Bumped to tear the pack open without touching it. */
   tearRequest: number;
 }
 
-export function PackScene({ look, cards, top, onTorn, onNext, onFinished, onShown, slideRequest, tearRequest }: Props) {
+/** Passes the cards from the top of the pile up to `to` (excluded); a new object each time. */
+export interface PassRequest {
+  to: number;
+}
+
+/** Seconds a passed card takes to leave the pile. */
+const PASS_SLIDE = 0.14;
+
+export function PackScene({ look, cards, top, onTorn, onNext, onFinished, onShown, slideRequest, passRequest, tearRequest }: Props) {
   // Once the cards are drawn they slide out of the wrapper, which then falls away.
   const [packGone, setPackGone] = useState(false);
   useEffect(() => {
@@ -663,7 +696,15 @@ export function PackScene({ look, cards, top, onTorn, onNext, onFinished, onShow
       <PointerLight />
       {!packGone && <Pack look={look} onTorn={onTorn} leaving={cards != null} tearRequest={tearRequest} />}
       {cards && (
-        <Cards cards={cards} top={top} onNext={onNext} onFinished={onFinished} onShown={onShown} slideRequest={slideRequest} />
+        <Cards
+          cards={cards}
+          top={top}
+          onNext={onNext}
+          onFinished={onFinished}
+          onShown={onShown}
+          slideRequest={slideRequest}
+          passRequest={passRequest}
+        />
       )}
     </Canvas>
   );

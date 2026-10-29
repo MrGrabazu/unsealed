@@ -195,6 +195,7 @@ export const it: Messages = {
   "open.soldBoosterLoss": "Venduta 1 busta {set} per {amount} (perdita {loss}).",
   "open.revealed": "{revealed} / {total} rivelate",
   "open.revealAll": "Rivela tutte",
+  "open.pass": "Salta {cards}",
   "open.boosterValue": "Valore della busta: {amount}",
   "open.clickToReveal": "Clicca sulla carta evidenziata per rivelarla.",
   "open.new": "NUOVA",
