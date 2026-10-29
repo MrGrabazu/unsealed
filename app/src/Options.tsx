@@ -4,7 +4,7 @@ import { DataStatusBar, useDataStatus } from "./DataStatus";
 import { CARD_LANGUAGES, LANGUAGES, useI18n, type CardLangSetting, type Lang } from "./i18n";
 import { Loading } from "./Loading";
 import { getFullscreen, setFullscreen } from "./fullscreen";
-import { getOpening3d, setOpening3d } from "./settings";
+import { getOpening3d, getSeasonalOn, setOpening3d, setSeasonalOn } from "./settings";
 import { getMusicOn, getMusicVolume, refreshMusic, setMusicOn, setMusicVolume } from "./music";
 import { getSoundOn, getVolume, setSoundOn, setVolume, sounds } from "./sound";
 
@@ -13,6 +13,7 @@ export function Options({ onBack }: { onBack: () => void }) {
   const { t, lang, setLang, cardLangSetting, setCardLangSetting, formatDate, formatNumber } = useI18n();
   const [info, setInfo] = useState<DataInfo | null>(null);
   const [opening3d, setOpening3dState] = useState(getOpening3d);
+  const [seasonal, setSeasonalState] = useState(getSeasonalOn);
   const [fullscreen, setFullscreenState] = useState(getFullscreen);
   const [soundOn, setSoundOnState] = useState(getSoundOn);
   const [volume, setVolumeState] = useState(getVolume);
@@ -89,6 +90,20 @@ export function Options({ onBack }: { onBack: () => void }) {
         {t("options.opening3d")}
       </label>
       <p className="hint">{t("options.opening3dHint")}</p>
+
+      <h3>{t("options.seasonal")}</h3>
+      <label className="checkbox">
+        <input
+          type="checkbox"
+          checked={seasonal}
+          onChange={(e) => {
+            setSeasonalOn(e.target.checked);
+            setSeasonalState(e.target.checked);
+          }}
+        />
+        {t("options.seasonalOn")}
+      </label>
+      <p className="hint">{t("options.seasonalHint")}</p>
 
       <h3>{t("options.sound")}</h3>
       <label className="checkbox">

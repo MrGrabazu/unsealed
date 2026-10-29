@@ -7,6 +7,7 @@ mod artists;
 mod betting;
 mod cycles;
 mod details;
+mod eggs;
 mod guests;
 mod history;
 mod income;
@@ -30,6 +31,7 @@ pub use achievements::{AchievementTexts, AchievementView, AchievementsView};
 use achievements::{OpeningEvents, PendingReveal};
 pub use details::CardDetailsView;
 pub use history::HistoryView;
+pub use eggs::{is_egg, EggFound};
 
 use crate::store::{OpeningCard, OpeningOrder, OpeningRow, Owned, Sale, Store};
 use rand::seq::SliceRandom;
@@ -845,6 +847,7 @@ impl Game {
 
         let mut events = self.opening_events(set_code, kind, &cards, outcome.cost_cents, animated);
         events.booster.extend(settled.iter().map(betting::bet_event));
+        events.booster.extend(self.birthday_egg(set_code));
         // An artifact may hide in the booster: drawn apart, after its cards (never affecting
         // them), and shown at the end of the opening.
         let (artifact, found) = self.find_artifact(set_code, kind);
@@ -1889,6 +1892,24 @@ mod tests {
         let mut g = game(name);
         g.buy_boosters("TST", "play", 1).unwrap();
         g
+    }
+
+    #[test]
+    fn the_oldest_code_brings_its_card_once_in_foil() {
+        let mut g = game("konami");
+        let unh = r#"{ "code": "UNH", "name": "Unhinged", "releaseDate": "2004-11-19", "setType": "funny", "sourceVersion": "v1",
+          "cards": [ { "uuid": "a4f6b074-48d6-57eb-92a1-becb2fb7ab8b", "setCode": "UNH", "scryfallId": "ab857e73", "name": "Cheatyface",
+                       "number": "30", "rarity": "uncommon", "finishes": ["nonfoil", "foil"], "layout": "normal" } ],
+          "boosters": { "draft": { "boosters": [ { "contents": { "u": 1 }, "weight": 1 } ], "boostersTotalWeight": 1,
+            "sheets": { "u": { "cards": { "a4f6b074-48d6-57eb-92a1-becb2fb7ab8b": 1 }, "foil": false, "totalWeight": 1 } } } } }"#;
+        fs::write(g.data_dir.join("sets/UNH.json"), unh).unwrap();
+        g.reload_data();
+
+        assert_eq!(g.found_egg("konami").unwrap().card.as_deref(), Some("Cheatyface"));
+        assert_eq!(g.found_egg("konami").unwrap().card, None, "once per game");
+        let owned = g.store.owned_in_set("UNH").unwrap();
+        assert_eq!(owned["a4f6b074-48d6-57eb-92a1-becb2fb7ab8b"].foil, 1);
+        assert!(g.found_egg("nothing").is_err());
     }
 
     #[test]

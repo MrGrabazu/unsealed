@@ -5,9 +5,15 @@ import { useI18n } from "./i18n";
 import { Money } from "./money";
 import { FoilSheen } from "./foils";
 import { sounds } from "./sound";
+import { findEgg } from "./eggs";
 
 /** Cards per binder page: 3 rows of 3, like a real binder page. */
 const PER_PAGE = 9;
+
+/** Spreads turned in a row, each within `QUICK_FLIP_MS` of the last, before a page flies off:
+ * fifty pages. */
+const QUICK_FLIPS = 25;
+const QUICK_FLIP_MS = 400;
 
 export interface BinderSection {
   /** Names the section's tab (none for the set's main cards). */
@@ -57,11 +63,21 @@ export function Binder({ setCode, sections, onOpen, active, onSection }: Props) 
   }, [sections]);
   const spreads = Math.max(1, Math.ceil(pages.length / 2));
   const [spread, setSpread] = useState(0);
+  // Pages turned in a quick row, and the page that flies off after too many (eggs.tsx).
+  const flips = useRef({ count: 0, at: 0 });
+  const [flying, setFlying] = useState(false);
   const go = (to: number) => {
     const target = Math.min(spreads - 1, Math.max(0, to));
     if (target === spread) return;
     sounds.page();
     setSpread(target);
+    const now = Date.now();
+    flips.current = { count: now - flips.current.at < QUICK_FLIP_MS ? flips.current.count + 1 : 1, at: now };
+    if (flips.current.count >= QUICK_FLIPS) {
+      flips.current.count = 0;
+      setFlying(true);
+      findEgg("pages");
+    }
   };
 
   useEffect(() => {
@@ -103,6 +119,7 @@ export function Binder({ setCode, sections, onOpen, active, onSection }: Props) 
 
   return (
     <div className="binder">
+      {flying && <div className="binder-flying-page" aria-hidden="true" onAnimationEnd={() => setFlying(false)} />}
       {sections.length > 1 && (
         <div className="binder-bar">
           {sections.map((s, i) => {

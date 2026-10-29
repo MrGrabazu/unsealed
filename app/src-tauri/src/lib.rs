@@ -84,6 +84,8 @@ pub(crate) struct Session {
     cycles: Arc<Cycles>,
     /// The sets' scenes, read once and shared by the games.
     scenes: Arc<Scenes>,
+    /// Little secrets found on the home screen, for the next game played.
+    pending_eggs: Vec<String>,
 }
 
 impl Session {
@@ -109,6 +111,9 @@ impl Session {
         // A save edited by hand was refused: the game played now has a word for it.
         if self.saves.take_caught() {
             game.caught_editing_a_save();
+        }
+        for egg in std::mem::take(&mut self.pending_eggs) {
+            let _ = game.found_egg(&egg);
         }
         self.current = Some((info.clone(), game));
         Ok(info)
@@ -259,6 +264,21 @@ fn import_save(state: State<'_, SessionState>, request: tauri::ipc::Request<'_>)
         return Err("expected the save's bytes".into());
     };
     session(&state)?.saves.import(bytes, now())
+}
+
+/// A little secret found (see `game::eggs`). Found on the home screen, before any game is
+/// played, it waits for the next game played.
+#[tauri::command]
+fn found_easter_egg(state: State<'_, SessionState>, egg: String) -> Result<game::EggFound, String> {
+    let mut session = session(&state)?;
+    match session.current.as_mut() {
+        Some((_, game)) => game.found_egg(&egg),
+        None if game::is_egg(&egg) => {
+            session.pending_eggs.push(egg);
+            Ok(game::EggFound::default())
+        }
+        None => Err(format!("unknown secret `{egg}`")),
+    }
 }
 
 /// Deletes a save for good. Deleting the game being played closes it first.
@@ -771,6 +791,7 @@ pub fn run() {
                 card_lang: "en".to_string(),
                 cycles: Arc::new(load_cycles(&data_dir)?),
                 scenes: Arc::new(load_scenes(&data_dir)?),
+                pending_eggs: Vec::new(),
             }));
 
             app.manage(Arc::new(scryfall::Client::default()));
@@ -797,6 +818,7 @@ pub fn run() {
             delete_save,
             export_save,
             import_save,
+            found_easter_egg,
             get_data_status,
             retry_data_update,
             get_data_info,

@@ -6,6 +6,12 @@ const OPENING_3D = "unsealed.opening3d";
 export const getOpening3d = () => localStorage.getItem(OPENING_3D) !== "off";
 export const setOpening3d = (on: boolean) => localStorage.setItem(OPENING_3D, on ? "on" : "off");
 
+const SEASONAL = "unsealed.seasonal";
+
+/** Whether the game dresses up for the feasts of the year (seasons.tsx). On by default. */
+export const getSeasonalOn = () => localStorage.getItem(SEASONAL) !== "off";
+export const setSeasonalOn = (on: boolean) => localStorage.setItem(SEASONAL, on ? "on" : "off");
+
 const COLLECTION_VIEW = "unsealed.collectionView";
 
 /** How the collection shows a set: a binder of 9-card pages (the default), or a grid. */

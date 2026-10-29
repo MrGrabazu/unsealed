@@ -668,6 +668,8 @@ export const loadGame = (id: string) => invoke<SaveInfo>("load_game", { id });
 export const createSavePoint = (name: string) => invoke<SaveInfo>("create_save_point", { name });
 export const renameSave = (id: string, name: string) => invoke<SaveInfo>("rename_save", { id, name });
 export const deleteSave = (id: string) => invoke<void>("delete_save", { id });
+/** A little secret found (see eggs.tsx): the card it brings, if any. */
+export const foundEasterEgg = (egg: string) => invoke<{ card: string | null }>("found_easter_egg", { egg });
 /** Copies a game into one file in the player's documents (Unsealed folder); returns where. */
 export const exportSave = (id: string) => invoke<string>("export_save", { id });
 /** Adds a game exported on another computer: its file's bytes, sent raw. */

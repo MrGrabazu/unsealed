@@ -363,6 +363,17 @@ impl Store {
         Ok(())
     }
 
+    /// Adds one copy of a card to the collection, outside any booster (a gift).
+    pub fn give_card(&mut self, uuid: &str, set_code: &str, foil: bool, now: i64) -> StoreResult<()> {
+        self.conn.execute(
+            "INSERT INTO collection (card_uuid, foil, set_code, quantity, first_acquired_at)
+             VALUES (?1, ?2, ?3, 1, ?4)
+             ON CONFLICT (card_uuid, foil) DO UPDATE SET quantity = quantity + 1",
+            params![uuid, foil, set_code, now],
+        )?;
+        Ok(())
+    }
+
     /// Writes a consistent copy of the whole save to `path` (which must not exist).
     pub fn copy_to(&self, path: &Path) -> StoreResult<()> {
         self.conn.execute("VACUUM INTO ?1", [path.to_string_lossy()])?;

@@ -781,6 +781,54 @@
       "rarity": "uncommon", "emblem": "eye", "palette": "onyx",
       "condition": { "type": "event", "event": "SaveTampered" }
     },
+    {
+      "id": "egg-konami", "name": "Up, Up, Down, Down", "secret": true, "optional": true,
+      "description": "Enter the oldest code of all.",
+      "rarity": "rare", "emblem": "key", "palette": "royal",
+      "condition": { "type": "event", "event": "EasterEgg", "where": [{ "field": "egg", "op": "eq", "value": "konami" }] }
+    },
+    {
+      "id": "egg-seal", "name": "Literally Unsealed", "secret": true, "optional": true,
+      "description": "Break the seal of the title screen.",
+      "rarity": "uncommon", "emblem": "coin", "palette": "ember",
+      "condition": { "type": "event", "event": "EasterEgg", "where": [{ "field": "egg", "op": "eq", "value": "seal" }] }
+    },
+    {
+      "id": "egg-speck", "name": "Lucky Speck", "secret": true, "optional": true,
+      "description": "Catch the speck of dust that shines a little brighter.",
+      "rarity": "rare", "emblem": "star", "palette": "gold",
+      "condition": { "type": "event", "event": "EasterEgg", "where": [{ "field": "egg", "op": "eq", "value": "speck" }] }
+    },
+    {
+      "id": "egg-lotus", "name": "Lotus Sighting", "secret": true, "optional": true,
+      "description": "Look for a lotus in the Boosterium.",
+      "rarity": "uncommon", "emblem": "gem", "palette": "rose",
+      "condition": { "type": "event", "event": "EasterEgg", "where": [{ "field": "egg", "op": "eq", "value": "lotus" }] }
+    },
+    {
+      "id": "egg-birthday", "name": "Happy Birthday, Magic", "secret": true, "optional": true,
+      "description": "Open an Alpha booster on August 5, the day Magic was born in 1993.",
+      "rarity": "rare", "emblem": "trophy", "palette": "gold",
+      "condition": { "type": "event", "event": "EasterEgg", "where": [{ "field": "egg", "op": "eq", "value": "birthday" }] }
+    },
+    {
+      "id": "egg-insomniac", "name": "Insomniac", "secret": true, "optional": true,
+      "description": "Open a booster between 3 and 4 in the morning.",
+      "rarity": "uncommon", "emblem": "hourglass", "palette": "onyx",
+      "condition": { "type": "event", "event": "EasterEgg", "where": [{ "field": "egg", "op": "eq", "value": "insomniac" }] }
+    },
+    {
+      "id": "egg-melody", "name": "The Hidden Tune", "secret": true, "optional": true,
+      "description": "Linger on the title screen until it plays.",
+      "rarity": "uncommon", "emblem": "question", "palette": "ocean",
+      "condition": { "type": "event", "event": "EasterEgg", "where": [{ "field": "egg", "op": "eq", "value": "melody" }] }
+    },
+    {
+      "id": "egg-pages", "name": "Page Flipper", "secret": true, "optional": true,
+      "description": "Leaf through a binder at lightning speed.",
+      "rarity": "common", "emblem": "bolt", "palette": "ice",
+      "condition": { "type": "event", "event": "EasterEgg", "where": [{ "field": "egg", "op": "eq", "value": "pages" }] }
+    },
 
     {
       "id": "achiever", "name": "Achiever", "description": "Unlock 10 achievements.",

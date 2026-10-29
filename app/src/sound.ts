@@ -177,6 +177,36 @@ export const sounds = {
     );
   },
 
+  /** An old console's jingle: the oldest code of all, entered. */
+  arcade() {
+    const a = context();
+    if (!a) return;
+    [523.3, 659.3, 784, 1046.5, 784, 1046.5].forEach((f, i) =>
+      tone(a.ctx, a.out, { at: i * 0.09, frequency: f, duration: i === 5 ? 0.5 : 0.12, type: "square", gain: 0.05 }),
+    );
+  },
+
+  /** A music box, in the key of the game's music (D minor): the tune hidden on the title
+   * screen. An original melody. */
+  hiddenTune() {
+    const a = context();
+    if (!a) return;
+    // (semitones above D4, beats)
+    const notes: [number, number][] = [
+      [0, 1], [3, 1], [7, 1], [10, 2], [8, 1], [7, 1], [5, 2],
+      [3, 1], [5, 1], [7, 1], [12, 2], [10, 1], [7, 1], [3, 3],
+      [5, 1], [7, 1], [8, 1], [7, 1], [5, 1], [3, 1], [2, 1], [0, 4],
+    ];
+    const beat = 0.32;
+    let at = 0.1;
+    for (const [step, beats] of notes) {
+      const frequency = 293.66 * 2 ** (step / 12);
+      tone(a.ctx, a.out, { at, frequency: frequency * 2, duration: 1.4, type: "sine", gain: 0.07 });
+      tone(a.ctx, a.out, { at: at + 0.004, frequency: frequency * 4, duration: 0.7, type: "sine", gain: 0.02 });
+      at += beats * beat;
+    }
+  },
+
   /** A page turned in a binder. */
   page() {
     const a = context();

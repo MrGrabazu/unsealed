@@ -64,6 +64,8 @@ import { Icon, type IconName } from "./icons";
 import { Loading } from "./Loading";
 import { Coin, CurrencyContext, DEFAULT_CURRENCY, useMoneyText } from "./money";
 import { errorText } from "./errors";
+import { BirthdayRibbon, EGG_FOUND, isMagicBirthday, nightOwl, useKonamiCode } from "./eggs";
+import { greetToday, SeasonalDecor, SeasonalRailFoot, useSeason } from "./seasons";
 import { SealedBoosters } from "./SealedBoosters";
 import { Stats } from "./Stats";
 import { ArtifactReveal } from "./ArtifactReveal";
@@ -407,6 +409,25 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     }
   }, [lang, showToasts, showToppers]);
 
+  // The feasts of the year (seasons.tsx): the game dresses up, and says a word once a day.
+  const season = useSeason();
+  useEffect(() => {
+    if (season && greetToday()) setNotice(t(`season.${season}`), "star");
+  }, [season]);
+
+  // The little secrets (eggs.tsx): the oldest code of all, and what a secret found brings (its
+  // achievement, and the code's card).
+  useKonamiCode();
+  useEffect(() => {
+    const onEgg = (e: Event) => {
+      const { egg, card } = (e as CustomEvent<{ egg: string; card: string | null }>).detail;
+      if (card) setNotice(t("egg.card", { card }), "star", egg === "konami" ? "↑ ↑ ↓ ↓ ← → ← → B A" : undefined);
+      void refreshWallet();
+    };
+    window.addEventListener(EGG_FOUND, onEgg);
+    return () => window.removeEventListener(EGG_FOUND, onEgg);
+  }, [refreshWallet, setNotice, t]);
+
   // The Seals per cent, for the income's pace (read from a ref: it must not restart the timer).
   const sealsPerCent = useRef(currency.sealsPerCent);
   sealsPerCent.current = currency.sealsPerCent;
@@ -496,7 +517,8 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   /** Buys an artifact at the Boosterium: it is revealed at once, and the prices it changes
    * (discounts) are read again. */
   async function buyCurio(id: string) {
-    setBusy(true);    try {
+    setBusy(true);
+    try {
       const bought = await buyArtifact(id, lang);
       sounds.coins();
       setArtifactQueue((queue) => [...queue, bought]);
@@ -520,7 +542,8 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
 
   /** Runs a game action with the busy flag and error handling. */
   async function run(action: () => Promise<void>) {
-    setBusy(true);    try {
+    setBusy(true);
+    try {
       await action();
     } catch (e) {
       showError(e);
@@ -556,6 +579,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     setBetSkipped([...skipped.values()]);
     setLast({ setCode, kind });
     setOpenings((n) => n + 1);
+    if (opened.length > 0) nightOwl();
     setTab("open");
   }
 
@@ -587,7 +611,8 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     setPack({ setCode, kind, quick: true });
     setLast({ setCode, kind });
     setTab("open");
-    setBusy(true);    try {
+    setBusy(true);
+    try {
       await checkSetImages(setCode).catch(() => {});
       const opened = await openBooster(setCode, kind, false, bets);
       setCards(opened.cards);
@@ -595,6 +620,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
       setBetResults(opened.bets);
       setBetSkipped(opened.skipped);
       setOpenings((n) => n + 1);
+      nightOwl();
       await revealCards(Number.MAX_SAFE_INTEGER);
       setAllSeen(true);
       setResultShown(true);
@@ -611,13 +637,15 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
    * then shows sealed again, with the error). */
   async function tear(): Promise<boolean> {
     if (!pack) return false;
-    setBusy(true);    try {
+    setBusy(true);
+    try {
       const opened = await openBooster(pack.setCode, pack.kind, true, activeBets(slip));
       setCards(opened.cards);
       setFoundArtifact(opened.artifact);
       setBetResults(opened.bets);
       setBetSkipped(opened.skipped);
       setOpenings((n) => n + 1);
+      nightOwl();
       return true;
     } catch (e) {
       showError(e);
@@ -737,7 +765,8 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
 
   return (
     <CurrencyContext.Provider value={currency}>
-      <div className="game">
+      <div className="game" data-season={season ?? undefined}>
+        {season && <SeasonalDecor season={season} />}
         <header className="hud">
           <div title={t("game.nameTitle") + " · " + save.name}>
             <Logo />
@@ -777,6 +806,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
         </header>
 
         <nav className="rail">
+          {season && <SeasonalRailFoot season={season} />}
           {TABS.map((each) => {
             const badge =
               each === "open" ? wallet?.sealed.reduce((n, s) => n + s.quantity, 0) ?? 0 : each === "achievements" ? unseenAchievements : 0;
@@ -1039,6 +1069,8 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
           />
         )}
         <BackToTop target={stage} />
+        {/* Magic's birthday (August 5): a ribbon and confetti over each opening. */}
+        {tab === "open" && pack && isMagicBirthday() && <BirthdayRibbon key={`${pack.setCode}-${pack.kind}-${openings}`} />}
         </main>
 
         <Ambience />

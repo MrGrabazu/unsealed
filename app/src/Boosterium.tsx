@@ -9,6 +9,7 @@ import { Money, useAmountsInText, useMoney, useMoneyText } from "./money";
 import { PriceTrend } from "./PriceTrend";
 import { BoxGauge } from "./SealedBoosters";
 import { BoosterNote } from "./BoosterNote";
+import { isLotus, LotusPassing } from "./eggs";
 import { SetIcon } from "./SetIcon";
 
 interface Props {
@@ -57,6 +58,7 @@ export function Boosterium({ shop, sets, wallet, onBuy, onClaimCharity, busy, fo
       .catch(() => setCurios([]));
   }, [artifactsKey, lang]);
   const [search, setSearch] = useState("");
+  const [lotus, setLotus] = useState(false);
   const [year, setYear] = useState("all");
   const [maxPrice, setMaxPrice] = useState(0);
   const [chosen, setChosen] = useState<string | null>(null);
@@ -202,7 +204,17 @@ export function Boosterium({ shop, sets, wallet, onBuy, onClaimCharity, busy, fo
           </div>
         )}
         <div className="shop-tools">
-          <input type="search" placeholder={t("shop.search")} value={search} onChange={(e) => setSearch(e.target.value)} />
+          <input
+            type="search"
+            placeholder={t("shop.search")}
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              // Looking for the lotus: one drifts by.
+              if (isLotus(e.target.value) && !isLotus(search)) setLotus(true);
+            }}
+          />
+          {lotus && <LotusPassing onGone={() => setLotus(false)} />}
           <select value={year} onChange={(e) => setYear(e.target.value)}>
             <option value="all">{t("shop.allYears")}</option>
             {years.map((y) => (

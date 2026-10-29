@@ -4,6 +4,8 @@ import { Ambience } from "./Ambience";
 import { deleteSave, exportSave, importSave, listSaves, listSets, loadGame, newGame, renameSave, type SaveInfo } from "./api";
 import { DataStatusBar, useDataStatus } from "./DataStatus";
 import { errorText } from "./errors";
+import { findEgg, useQuickClicks } from "./eggs";
+import { sounds } from "./sound";
 import { useMoneyText } from "./money";
 import { Footer } from "./Footer";
 import { quitApp } from "./fullscreen";
@@ -13,6 +15,9 @@ import { Loading } from "./Loading";
 import { Logo } from "./Logo";
 
 type Panel = "menu" | "new" | "load";
+
+/** How long the title screen waits, untouched, before its hidden tune: ten minutes. */
+const HIDDEN_TUNE_AFTER_MS = 10 * 60 * 1000;
 
 /** How the cards behind the logo fan out, in degrees (the newest set's in the middle). */
 const FAN_ANGLES = [0, -15, 15, -30, 30];
@@ -44,6 +49,30 @@ export function Home({ current, onPlay, onCurrentChanged, onOptions, onAbout }: 
   const importInput = useRef<HTMLInputElement>(null);
   const dataStatus = useDataStatus();
   const moneyText = useMoneyText();
+  // The title's seal, broken by seven quick clicks.
+  const sealClicks = useQuickClicks(7);
+  const [cracked, setCracked] = useState(false);
+  // Left alone long enough, the title screen plays its hidden tune (once a visit).
+  useEffect(() => {
+    let timer = 0;
+    let played = false;
+    const wait = () => {
+      window.clearTimeout(timer);
+      if (played) return;
+      timer = window.setTimeout(() => {
+        played = true;
+        sounds.hiddenTune();
+        findEgg("melody");
+      }, HIDDEN_TUNE_AFTER_MS);
+    };
+    const events = ["mousemove", "mousedown", "keydown", "wheel"] as const;
+    events.forEach((name) => window.addEventListener(name, wait));
+    wait();
+    return () => {
+      window.clearTimeout(timer);
+      events.forEach((name) => window.removeEventListener(name, wait));
+    };
+  }, []);
 
   const reload = useCallback(() => {
     listSaves()
@@ -111,7 +140,16 @@ export function Home({ current, onPlay, onCurrentChanged, onOptions, onAbout }: 
             <img key={url} src={url} alt="" draggable={false} style={{ transform: `rotate(${FAN_ANGLES[i]}deg)`, zIndex: FAN_ANGLES[i] === 0 ? 2 : 1 }} />
           ))}
         </div>
-        <h1 className="home-title">
+        <h1
+          className={`home-title${cracked ? " cracked" : ""}`}
+          onClick={() => {
+            if (!sealClicks()) return;
+            setCracked(true);
+            sounds.seal();
+            findEgg("seal");
+          }}
+          onAnimationEnd={() => setCracked(false)}
+        >
           <Logo />
         </h1>
       </div>

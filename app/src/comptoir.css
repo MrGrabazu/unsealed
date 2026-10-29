@@ -35,6 +35,109 @@
 .motes i { position: absolute; width: 2px; height: 2px; border-radius: 50%; background: #ffe2a0; opacity: 0; box-shadow: 0 0 6px 1px #ffcf7a88; animation: mote 14s linear infinite; }
 @keyframes mote { 0% { opacity: 0; transform: translate(0, 0); } 15% { opacity: .7; } 85% { opacity: .5; } 100% { opacity: 0; transform: translate(60px, -220px); } }
 @media (prefers-reduced-motion: reduce) { .motes { display: none; } }
+/* ---- the feasts of the year (seasons.tsx; mockup .cache/da/v11.html) ----------------------
+   The dust, the vignette, the wax and the cartouches change; ornaments sit on the strap, the
+   rail and the frames' edges, or pass over the stage without taking the mouse. */
+.game[data-season="halloween"] { background: radial-gradient(ellipse at 50% 30%, #2f1a24 0%, #170c14 55%, #08050a 100%); }
+.game[data-season="christmas"] { background: radial-gradient(ellipse at 50% 30%, #33241e 0%, #1a120f 55%, #0a0808 100%); }
+.game[data-season="easter"] { background: radial-gradient(ellipse at 50% 30%, #3e2e1a 0%, #1f170c 55%, #0c0a06 100%); }
+.game-vignette.season-halloween { background: radial-gradient(ellipse at 50% 45%, transparent 48%, #2a0d3add 100%); }
+.game-vignette.season-christmas { background: radial-gradient(ellipse at 50% 45%, transparent 52%, #9ec8ff2e 82%, #e8f4ff66 100%); }
+.game-vignette.season-easter { background: radial-gradient(ellipse at 50% 45%, transparent 56%, #3d5a2499 100%); }
+/* Embers and will-o'-the-wisps; snow, flakes of every size; pastel petals. */
+.motes.season-halloween i { width: 3px; height: 3px; background: #ff9a3c; box-shadow: 0 0 8px 2px #ff6a1a99; animation-name: ember; }
+.motes.season-halloween i:nth-child(4n) { background: #9cff6a; box-shadow: 0 0 8px 2px #6aff3a88; }
+@keyframes ember { 0% { opacity: 0; transform: translate(0, 40px); } 20% { opacity: .9; } 100% { opacity: 0; transform: translate(-30px, -260px); } }
+.motes.season-christmas i { width: 4px; height: 4px; background: #ffffff; box-shadow: 0 0 6px 1px #ffffffaa; animation-name: snow; }
+.motes.season-christmas i:nth-child(3n) { width: 6px; height: 6px; }
+.motes.season-christmas i:nth-child(5n) { width: 2px; height: 2px; }
+@keyframes snow { 0% { opacity: 0; transform: translate(0, -320px); } 10% { opacity: .95; } 90% { opacity: .85; } 100% { opacity: 0; transform: translate(-50px, 320px); } }
+.motes.season-easter i { width: 12px; height: 9px; border-radius: 70% 0 70% 0; background: #ffc6dc; box-shadow: 0 0 4px #ffc6dc66; animation-name: petal; }
+.motes.season-easter i:nth-child(3n) { background: #fff3c4; }
+.motes.season-easter i:nth-child(4n) { background: #d8f0c0; }
+.motes.season-easter i:nth-child(5n) { background: #cfe4ff; }
+@keyframes petal { 0% { opacity: 0; transform: translate(-60px, -260px) rotate(0); } 12% { opacity: .95; } 88% { opacity: .85; } 100% { opacity: 0; transform: translate(90px, 280px) rotate(620deg); } }
+/* The wax ribbon, the wax buttons and the cartouches take the feast's colours. */
+.game[data-season="halloween"] .hud-title { color: #2a1206; text-shadow: 0 1px 0 #ffb066; background: linear-gradient(180deg, #ff9a3c, #c2541a); }
+.game[data-season="halloween"] button.big.wax { color: #2a1206; text-shadow: 0 1px 0 #ffb066; background: radial-gradient(circle at 35% 25%, #ffa64a, #d2601a 55%, #6e2a06); }
+.game[data-season="halloween"] .cartouche { background: linear-gradient(180deg, #ffd8a0, #e08a3a 60%, #a8541a); }
+.game[data-season="halloween"] .hud .logo { filter: drop-shadow(0 0 8px #ff7a1aaa); }
+.game[data-season="christmas"] .hud-title { background: linear-gradient(180deg, #c22a32, #7e1219); }
+.game[data-season="easter"] .hud-title { color: #3a1426; text-shadow: 0 1px 0 #ffe0ee; background: linear-gradient(180deg, #f7c9de, #c27a9e); }
+.game[data-season="easter"] button.big.wax { color: #3a1426; text-shadow: 0 1px 0 #ffe0ee; background: radial-gradient(circle at 35% 25%, #f9d4e5, #d98bb0 55%, #8a4a6a); }
+.game[data-season="easter"] .cartouche { background: linear-gradient(180deg, #fff6d8, #f3c9a8 60%, #c9926a); }
+/* On every frame's edges: cobwebs; snow on its top with holly at its corners, frost at its
+   foot; a flowering branch and grass. Over the frame, never taking the mouse. */
+.game[data-season] .frame::after { content: ""; position: absolute; z-index: 5; inset: -9px -6px 0 -6px; pointer-events: none; }
+.game[data-season="halloween"] .frame::after {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 110 110'%3E%3Cg stroke='%23e8e0f0' stroke-opacity='.55' stroke-width='1.2' fill='none'%3E%3Cpath d='M0 0L110 30M0 0L80 80M0 0L30 110'/%3E%3Cpath d='M28 8Q22 22 8 28M55 15Q45 45 15 55M82 22Q66 66 22 82'/%3E%3C/g%3E%3C/svg%3E") left 8px top 11px / 72px 72px no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 110 110'%3E%3Cg transform='rotate(180 55 55)' stroke='%23e8e0f0' stroke-opacity='.45' stroke-width='1.2' fill='none'%3E%3Cpath d='M0 0L110 30M0 0L80 80M0 0L30 110'/%3E%3Cpath d='M28 8Q22 22 8 28M55 15Q45 45 15 55M82 22Q66 66 22 82'/%3E%3C/g%3E%3C/svg%3E") right 8px bottom 2px / 46px 46px no-repeat; }
+.game[data-season="christmas"] .frame::after {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 48'%3E%3Cpath d='M6 30q8-18 26-20q-4 8 2 12q-8 2-10 10q-6-6-18-2z' fill='%232e6b3a'/%3E%3Cpath d='M30 26q14-14 30-8q-6 6-2 12q-8-1-12 6q-4-8-16-10z' fill='%233d8a4a'/%3E%3Cg fill='%23d8343c'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3Ccircle cx='37' cy='33' r='3.6'/%3E%3Ccircle cx='33' cy='37' r='3.4'/%3E%3C/g%3E%3C/svg%3E") left -4px top -2px / 60px 45px no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 48'%3E%3Cg transform='matrix(-1 0 0 1 64 0)'%3E%3Cpath d='M6 30q8-18 26-20q-4 8 2 12q-8 2-10 10q-6-6-18-2z' fill='%232e6b3a'/%3E%3Cpath d='M30 26q14-14 30-8q-6 6-2 12q-8-1-12 6q-4-8-16-10z' fill='%233d8a4a'/%3E%3Cg fill='%23d8343c'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3Ccircle cx='37' cy='33' r='3.6'/%3E%3Ccircle cx='33' cy='37' r='3.4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E") right -4px top -2px / 60px 45px no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 16' preserveAspectRatio='none'%3E%3Cpath d='M0 9Q25 0 50 7T100 6T150 9T200 7V16H0z' fill='%23f4f8ff'/%3E%3C/svg%3E") left 6px top 2px / 200px 15px repeat-x,
+    linear-gradient(to top, #e8f4ff26, transparent 44px); }
+.game[data-season="easter"] .frame::after {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 90'%3E%3Cpath d='M2 4Q60 10 140 70' stroke='%236b8a3a' stroke-width='2.6' fill='none'/%3E%3Cg fill='%239ccb6a'%3E%3Cpath d='M40 10q-2-12 10-10q-2 10-10 10z'/%3E%3Cpath d='M96 40q6-10 14-2q-8 6-14 2z'/%3E%3C/g%3E%3Cg fill='%23ffc6dc'%3E%3Ccircle cx='24' cy='8' r='7'/%3E%3Ccircle cx='66' cy='22' r='7.5'/%3E%3Ccircle cx='116' cy='54' r='6'/%3E%3C/g%3E%3Ccircle cx='90' cy='36' r='6' fill='%23fff3c4'/%3E%3Cg fill='%23f5d68a'%3E%3Ccircle cx='24' cy='8' r='2.4'/%3E%3Ccircle cx='66' cy='22' r='2.6'/%3E%3Ccircle cx='116' cy='54' r='2'/%3E%3Ccircle cx='90' cy='36' r='2'/%3E%3C/g%3E%3C/svg%3E") left 8px top 12px / 90px 54px no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 16'%3E%3Cg fill='%235f8a34'%3E%3Cpath d='M2 16q1-8 3-14q1 8 2 14z'/%3E%3Cpath d='M14 16q2-6 6-11q-2 6-1 11z'/%3E%3Cpath d='M30 16q0-7 2-13q2 7 1 13z'/%3E%3Cpath d='M44 16q2-5 6-9q-2 5-2 9z'/%3E%3C/g%3E%3Cg fill='%237aa84a'%3E%3Cpath d='M8 16q0-5-3-9q4 4 5 9z'/%3E%3Cpath d='M24 16q-1-6-4-10q4 4 6 10z'/%3E%3Cpath d='M38 16q0-5-2-8q3 3 4 8z'/%3E%3Cpath d='M54 16q1-6-1-11q3 5 3 11z'/%3E%3C/g%3E%3C/svg%3E") left 8px bottom 1px / 60px 16px repeat-x; }
+/* What crosses or hangs over the stage (SeasonalDecor), and the rail's foot (SeasonalRailFoot). */
+.season { position: absolute; inset: 0; pointer-events: none; }
+.season > * { position: absolute; pointer-events: none; }
+.season-garland { z-index: 41; left: 0; right: 0; top: calc(var(--hud-h) - 8px); width: 100%; height: 32px; }
+.season-swag svg { position: absolute; inset: 0; width: 100%; height: 30px; }
+.season-swag b { position: absolute; width: 8px; height: 12px; margin-left: -4px; border-radius: 50% 50% 45% 45%; animation: season-blink 1.8s ease-in-out infinite; }
+@keyframes season-blink { 0%, 100% { opacity: 1; filter: drop-shadow(0 0 7px currentColor); } 50% { opacity: .3; filter: none; } }
+.season-bauble { z-index: 41; top: calc(var(--hud-h) - 2px); transform-origin: 50% 0; animation: season-sway 3.6s ease-in-out infinite alternate; }
+@keyframes season-sway { from { transform: rotate(-5deg); } to { transform: rotate(5deg); } }
+.season-moon { z-index: 9; top: calc(var(--hud-h) + 24px); right: 26%; }
+/* Behind the panels: over them, it dimmed their buttons. */
+.season-fog { z-index: 9; left: var(--rail-w); right: 0; bottom: 0; height: 150px; overflow: hidden; }
+.season-fog i { position: absolute; bottom: -40px; width: 40%; height: 140px; border-radius: 50%; filter: blur(22px); animation: season-fog 18s ease-in-out infinite alternate; }
+@keyframes season-fog { from { transform: translateX(-120px); } to { transform: translateX(160px); } }
+.season-bat { z-index: 32; left: 0; animation: season-bat 10s linear infinite; }
+@keyframes season-bat { 0% { transform: translate(-80px, 60px) scale(.7); } 50% { transform: translate(50vw, -20px) scale(1); } 100% { transform: translate(calc(100vw + 80px), 80px) scale(.7); } }
+.season-bat path { animation: season-flap .22s ease-in-out infinite alternate; transform-origin: 50% 50%; }
+@keyframes season-flap { from { transform: scaleY(1); } to { transform: scaleY(.4); } }
+.season-ghost { z-index: 32; left: 0; top: 0; animation: season-ghost 16s ease-in-out infinite; }
+@keyframes season-ghost { 0% { transform: translate(20vw, 75vh); opacity: 0; } 15% { opacity: .5; } 50% { transform: translate(50vw, 35vh); opacity: .4; } 85% { opacity: .45; } 100% { transform: translate(80vw, 65vh); opacity: 0; } }
+.season-rays { z-index: 9; left: var(--rail-w); right: 0; top: var(--hud-h); height: 65vh;
+  background: conic-gradient(from 160deg at 70% -10%, transparent 0deg, #fff3c41c 8deg, transparent 16deg, #fff3c414 26deg, transparent 34deg, #fff3c41a 44deg, transparent 52deg);
+  -webkit-mask-image: linear-gradient(180deg, #000 30%, transparent 100%); mask-image: linear-gradient(180deg, #000 30%, transparent 100%); }
+.season-butterfly { z-index: 32; left: 0; top: 0; animation: season-flutter 13s ease-in-out infinite; }
+@keyframes season-flutter { 0% { transform: translate(10vw, 80vh); } 25% { transform: translate(30vw, 40vh); } 50% { transform: translate(52vw, 62vh); } 75% { transform: translate(74vw, 28vh); } 100% { transform: translate(100vw, 48vh); } }
+.season-butterfly .wing { animation: season-wing .18s ease-in-out infinite alternate; transform-origin: 50% 50%; }
+@keyframes season-wing { from { transform: scaleX(1); } to { transform: scaleX(.25); } }
+.season-rail { position: absolute; left: 0; bottom: 76px; width: var(--rail-w); display: flex; justify-content: center; pointer-events: none; }
+.season-glow { animation: season-flicker 2.3s ease-in-out infinite; }
+@keyframes season-flicker { 0%, 100% { opacity: .55; } 30% { opacity: .9; } 55% { opacity: .45; } 80% { opacity: .75; } }
+.season-bunny { animation: season-peek 7s ease-in-out infinite; }
+@keyframes season-peek { 0%, 55%, 100% { transform: translateY(14px); } 65%, 90% { transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .season *, .season-rail * { animation: none !important; } }
+/* A speck shining brighter than the others, for a few seconds (Ambience.tsx). */
+.mote-lucky { position: absolute; z-index: 33; width: 22px; height: 22px; margin: -11px; padding: 0; border: 0; border-radius: 50%; cursor: pointer;
+  background: radial-gradient(circle, #fff6d8 0 2px, #ffd76a88 3px, transparent 10px); animation: mote-lucky 1.6s ease-in-out infinite alternate; }
+.mote-lucky:hover { background: radial-gradient(circle, #fff6d8 0 3px, #ffd76acc 4px, transparent 11px); }
+@keyframes mote-lucky { from { opacity: .55; transform: translateY(0) scale(.9); } to { opacity: 1; transform: translateY(-8px) scale(1.15); } }
+/* A Black Lotus drifting across the screen, whole and unaltered (eggs.tsx). */
+.lotus-passing { position: fixed; z-index: 60; left: -260px; bottom: 8vh; width: 220px; border-radius: 10px; pointer-events: none;
+  box-shadow: 0 10px 30px #000c, 0 0 40px #ffd76a55; animation: lotus-pass 5.5s ease-in-out forwards; }
+@keyframes lotus-pass { 0% { transform: translate(0, 0) rotate(-12deg); } 50% { transform: translate(60vw, -30vh) rotate(6deg); } 100% { transform: translate(calc(100vw + 300px), -10vh) rotate(18deg); } }
+/* Magic's birthday: a ribbon and confetti over each opening (eggs.tsx). */
+.birthday { position: fixed; inset: 0; z-index: 55; pointer-events: none; overflow: hidden; }
+.birthday-ribbon { position: absolute; top: 90px; left: 50%; transform: translateX(-50%); padding: 8px 22px; border-radius: 20px; white-space: nowrap;
+  font: 700 15px var(--font-title); color: #1a0d03; background: linear-gradient(180deg, #fff6d8, #f5d68a 40%, #d9a441); box-shadow: 0 6px 18px #000a; }
+.confetti i { position: absolute; top: -12px; width: 8px; height: 12px; border-radius: 2px; background: hsl(var(--hue) 80% 60%); animation: confetti 3.2s ease-in forwards; }
+@keyframes confetti { to { transform: translateY(110vh) rotate(540deg); opacity: .6; } }
+/* The title's seal broken (seven quick clicks), and a binder leafed through too fast. */
+.home-title.cracked { animation: seal-crack .7s ease-out; }
+@keyframes seal-crack { 0%, 100% { transform: none; filter: none; } 15% { transform: translateX(-6px) rotate(-1deg); } 30% { transform: translateX(6px) rotate(1deg); filter: drop-shadow(0 0 18px #ffd76a); } 45% { transform: translateX(-4px); } 60% { transform: translateX(3px); } }
+.binder-flying-page { position: fixed; z-index: 60; left: 50%; top: 40%; width: 180px; height: 240px; margin-left: -90px; pointer-events: none;
+  background: linear-gradient(135deg, #f3e7c9, #d8c49a); border-radius: 3px; box-shadow: 0 8px 24px #0009; animation: page-fly 1.4s ease-in forwards; }
+@keyframes page-fly { to { transform: translate(40vw, -70vh) rotate(720deg) scale(.4); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .lotus-passing, .confetti i, .home-title.cracked, .binder-flying-page, .mote-lucky { animation: none; } }
 
 .stage { position: absolute; z-index: 10; top: var(--hud-h); left: var(--rail-w); right: 0; bottom: var(--keys-h); overflow: auto; padding: 26px 22px 18px 24px; }
 /* A screen made of panels side by side: they scroll, the stage does not. */
@@ -929,9 +1032,9 @@ button.bet-add { width: 100%; margin-top: 10px; padding: 9px; border: 1px dashed
 .library-tooltip dd { font-family: var(--font-title); color: var(--gold-hi); }
 
 /* ---- the home screen: the menu in an ornate frame, in the same light as the game -------- */
-.home .game-vignette, .home .motes { position: fixed; }
+.home .game-vignette, .home .motes, .home > .mote-lucky { position: fixed; }
 /* Not the update notice either: it sits in the corner (position: fixed), above the rest. */
-.home > :not(.game-vignette):not(.motes):not(.update-notice) { position: relative; z-index: 32; }
+.home > :not(.game-vignette):not(.motes):not(.update-notice):not(.mote-lucky) { position: relative; z-index: 32; }
 .home-menu.frame { padding: 34px 30px 24px; margin-top: 18px; }
 .home-hero { position: relative; display: flex; justify-content: center; padding-top: 60px; }
 .home-hero .home-title { position: relative; z-index: 3; width: min(700px, 90vw); filter: drop-shadow(0 10px 20px #000); }
