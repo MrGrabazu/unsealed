@@ -5,13 +5,28 @@ import { useI18n } from "./i18n";
 import { Loading } from "./Loading";
 import { copyPicture, savePicture } from "./sharePicture";
 
-/** A button that opens the sharing of a pull: its picture, to copy or save. `make` draws it. */
-export function ShareButton({ make, fileName, className }: { make: () => Promise<Blob>; fileName: string; className?: string }) {
+/** A button that opens the sharing of a pull: its picture, to copy or save. `make` draws it.
+ * `round`: a rounded pill, floating over a corner rather than taking a line. */
+export function ShareButton({
+  make,
+  fileName,
+  className,
+  round = false,
+}: {
+  make: () => Promise<Blob>;
+  fileName: string;
+  className?: string;
+  round?: boolean;
+}) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button className={`share-button ${className ?? ""}`} onClick={() => setOpen(true)} title={t("share.hint")}>
+      <button
+        className={`${round ? "share-round" : "share-button"} ${className ?? ""}`}
+        onClick={() => setOpen(true)}
+        title={t("share.hint")}
+      >
         {t("share.button")}
       </button>
       {open && <SharePicture make={make} fileName={fileName} onClose={() => setOpen(false)} />}

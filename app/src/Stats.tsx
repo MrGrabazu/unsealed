@@ -5,7 +5,9 @@ import { CardImage } from "./CardImage";
 import { useI18n } from "./i18n";
 import { Loading } from "./Loading";
 import { Money, useMoney, useMoneyText } from "./money";
-import { FoilSheen } from "./foils";
+import { FoilSheen, foilLabel } from "./foils";
+import { ShareButton } from "./Share";
+import { drawStatsShare, type StatsShare } from "./sharePicture";
 
 /** A big number in its own medallion. */
 function Tile({ label, children, sub, hint }: { label: string; children: ReactNode; sub?: ReactNode; hint?: string }) {
@@ -72,6 +74,7 @@ function OpeningsChart({ openings }: { openings: OpeningView[] }) {
  * all time, and the latest openings. */
 export function Stats({ refreshKey }: { refreshKey: string }) {
   const money = useMoney();
+  const moneyText = useMoneyText();
   const { t, tx, formatDate, formatNumber } = useI18n();
   const [stats, setStats] = useState<StatsView | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -101,8 +104,46 @@ export function Stats({ refreshKey }: { refreshKey: string }) {
   const topAverage = Math.max(1, ...byAverage.map((b) => b.averageCents));
   const betsNet = s.betsWonCents - s.betsStakedCents;
 
+  /** The picture to share: the big numbers and the finest pulls. */
+  const statsShare = (): StatsShare => ({
+    title: t("share.statsTitle"),
+    tiles: [
+      {
+        label: t("stats.boostersOpened"),
+        value: formatNumber(s.boostersOpened),
+        sub: `${t("stats.cardsPulledShort", { count: formatNumber(s.cardsPulled) })}${t("stats.foils", { count: formatNumber(s.foilsPulled) })}`,
+      },
+      {
+        label: t("stats.valuePulled"),
+        value: moneyText(s.valuePulledCents),
+        sub: returnPercent === null ? null : t("stats.returnShort", { percent: returnPercent.toFixed(0) }),
+      },
+      {
+        label: t("stats.collectionValue"),
+        value: moneyText(s.collectionValueCents),
+        sub: t("share.distinctCards", { count: formatNumber(s.distinctCards) }),
+      },
+      ...(s.bestBooster
+        ? [{ label: t("stats.best"), value: moneyText(s.bestBooster.valueCents), sub: `${s.bestBooster.setName} · ${kindLabel(t, s.bestBooster.kind)}` }]
+        : []),
+    ],
+    pullsLabel: t("stats.bestPulls"),
+    pulls: s.bestPulls.slice(0, 5).map((p) => ({
+      card: {
+        imageUrl: p.card.imageUrl,
+        name: p.card.name,
+        foil: p.card.foil,
+        foilLabel: p.card.foil ? (foilLabel(p.card.foilKind) ?? t(p.card.rarity === "art" ? "collection.signedBadge" : "collection.foilBadge")) : null,
+        newLabel: null,
+      },
+      priceText: p.card.priceCents == null ? "—" : moneyText(p.card.priceCents),
+    })),
+    tagline: t("share.taglineStats"),
+  });
+
   return (
     <div className="stats-screen">
+      <ShareButton make={() => drawStatsShare(statsShare())} fileName={t("share.statsTitle")} round className="stats-share" />
       <div className="stat-medals">
         <Tile
           label={t("stats.boostersOpened")}

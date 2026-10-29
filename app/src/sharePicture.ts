@@ -382,6 +382,103 @@ export async function drawBoosterShare(share: BoosterShare): Promise<Blob> {
   return toBlob(canvas);
 }
 
+/** A player's statistics: a few big numbers, and their finest pulls of all time. */
+export interface StatsShare {
+  title: string;
+  /** The big numbers, as on the Stats screen (each with a line beneath). */
+  tiles: { label: string; value: string; sub: string | null }[];
+  pullsLabel: string;
+  pulls: { card: ShareCard; priceText: string }[];
+  tagline: string;
+}
+
+/** The statistics: the game's name and the title, the big numbers in medallions, then the
+ * finest pulls side by side, each with its price. */
+export async function drawStatsShare(share: StatsShare): Promise<Blob> {
+  await fontsReady();
+  const images = await Promise.all(share.pulls.map((p) => loadImage(p.card.imageUrl).catch(() => null)));
+  const [w, h] = [1400, 820];
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const g = canvas.getContext("2d")!;
+  backdrop(g, w, h);
+
+  brand(g, 52, 44, 48);
+  g.textBaseline = "alphabetic";
+  g.textAlign = "right";
+  g.font = `700 32px ${TITLE_FONT}`;
+  g.fillStyle = "#f5e6c4";
+  g.fillText(share.title, w - 52, 98);
+  g.textAlign = "left";
+  g.fillStyle = "#d9a44166";
+  g.fillRect(40, 146, w - 80, 1);
+
+  // The big numbers, in medallions across the width.
+  const tileGap = 20;
+  const tileW = (w - 104 - (share.tiles.length - 1) * tileGap) / Math.max(1, share.tiles.length);
+  const tileY = 172;
+  const tileH = 150;
+  share.tiles.forEach((tile, i) => {
+    const x = 52 + i * (tileW + tileGap);
+    g.save();
+    roundedRect(g, x, tileY, tileW, tileH, 10);
+    g.fillStyle = "#2a1b11d9";
+    g.shadowColor = "#000a";
+    g.shadowBlur = 12;
+    g.fill();
+    g.shadowBlur = 0;
+    g.strokeStyle = "#d9a44166";
+    g.lineWidth = 1;
+    g.stroke();
+    g.restore();
+    g.font = `700 14px ${TITLE_FONT}`;
+    g.fillStyle = "#a8957a";
+    g.letterSpacing = "2px";
+    wrapped(g, tile.label.toUpperCase(), x + 18, tileY + 32, tileW - 36, 18, 1);
+    g.letterSpacing = "0px";
+    // As large as the medallion allows ("1,234,567 Seals" is long).
+    let size = 36;
+    do g.font = `900 ${size}px ${TITLE_FONT}`;
+    while (g.measureText(tile.value).width > tileW - 36 && --size > 18);
+    g.fillStyle = gold(g, tileY + 48, tileY + 88);
+    g.fillText(tile.value, x + 18, tileY + 84);
+    if (tile.sub) {
+      g.font = `400 18px ${TEXT_FONT}`;
+      g.fillStyle = "#cdbb9b";
+      wrapped(g, tile.sub, x + 18, tileY + 114, tileW - 36, 22, 2);
+    }
+  });
+
+  // The finest pulls, side by side, their price beneath.
+  if (share.pulls.length > 0) {
+    g.font = `700 16px ${TITLE_FONT}`;
+    g.fillStyle = "#a8957a";
+    g.letterSpacing = "3px";
+    g.fillText(share.pullsLabel.toUpperCase(), 52, 366);
+    g.letterSpacing = "0px";
+    // Their prices end above the footer's lines (at the bottom right).
+    const cardH = 290;
+    const cardW = cardH / CARD_RATIO;
+    const gap = 28;
+    const rowW = share.pulls.length * cardW + (share.pulls.length - 1) * gap;
+    const x0 = (w - rowW) / 2;
+    const y0 = 382;
+    share.pulls.forEach((pull, i) => {
+      const x = x0 + i * (cardW + gap);
+      drawCard(g, images[i], pull.card, x, y0, cardW);
+      g.font = `700 20px ${TITLE_FONT}`;
+      g.fillStyle = gold(g, y0 + cardH + 14, y0 + cardH + 36);
+      g.textAlign = "center";
+      g.fillText(pull.priceText, x + cardW / 2, y0 + cardH + 34);
+      g.textAlign = "left";
+    });
+  }
+
+  footer(g, w, h, share.tagline);
+  return toBlob(canvas);
+}
+
 /** Puts the picture in the clipboard, to paste it anywhere. */
 export async function copyPicture(blob: Blob): Promise<void> {
   await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
