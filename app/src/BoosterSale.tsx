@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getDuplicatesValue, sellCards, sellDuplicates, type OpenedCard, type SaleRequest } from "./api";
 import { useI18n } from "./i18n";
 import { useMoney } from "./money";
+import { useSaleNotice } from "./notice";
 import { sounds } from "./sound";
 
 /** Selling the cards of the booster just opened: one by one, or all those left at once. */
@@ -27,6 +28,7 @@ export function useBoosterSale(cards: OpenedCard[] | null, onSold: () => void): 
   const [soldCents, setSoldCents] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const saleNotice = useSaleNotice();
 
   useEffect(() => {
     setSold([]);
@@ -51,6 +53,7 @@ export function useBoosterSale(cards: OpenedCard[] | null, onSold: () => void): 
     try {
       const result = await sellCards([...requests.values()]);
       sounds.coins();
+      saleNotice(result.soldCount, result.totalCents, indices.length === 1 ? cards[indices[0]].name : undefined);
       setSold((s) => {
         const next = [...s];
         indices.forEach((i) => (next[i] = true));
@@ -106,6 +109,7 @@ export function SellDuplicatesButton(props: { setCode: string; opened: unknown; 
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const saleNotice = useSaleNotice();
 
   useEffect(() => setSoldCents(null), [opened]);
 
@@ -128,6 +132,7 @@ export function SellDuplicatesButton(props: { setCode: string; opened: unknown; 
     try {
       const result = await sellDuplicates(setCode);
       sounds.coins();
+      saleNotice(result.soldCount, result.totalCents);
       sale?.markSold(result.sold);
       setSoldCents((n) => (n ?? 0) + result.totalCents);
       setError(null);

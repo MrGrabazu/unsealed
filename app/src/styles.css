@@ -64,9 +64,10 @@ code { background: var(--panel); padding: 2px 6px; border-radius: 4px; }
 
 /* Card corners, measured on Scryfall's images (corners.ts): the same radius across and down,
    so a share of the width, then that radius as a share of the height (× 63 / 88). Alpha's
-   cards were cut rounder. */
-:root { --card-radius: 4.12% / 2.95%; }
-.alpha-corners { --card-radius: 6.87% / 4.92%; }
+   cards were cut rounder. A pixel and a half more: the images have their own corners, cut out
+   of white, and their antialiasing left a white edge along the arc, whatever the card's size. */
+:root { --card-radius: calc(4.12% + 1.5px) / calc(2.95% + 1.5px); }
+.alpha-corners { --card-radius: calc(6.87% + 1.5px) / calc(4.92% + 1.5px); }
 
 /* Card format: 63 x 88 mm. */
 .card {

@@ -305,12 +305,12 @@ fn retry_data_update(app: tauri::AppHandle, status: State<'_, SharedStatus>, ref
 }
 
 #[tauri::command]
-fn get_data_info(state: State<'_, SessionState>) -> Result<DataInfo, String> {
+async fn get_data_info(state: State<'_, SessionState>) -> Result<DataInfo, String> {
     game::data_info(&session(&state)?.data_dir)
 }
 
 #[tauri::command]
-fn list_sets(state: State<'_, SessionState>) -> Result<Vec<SetSummary>, String> {
+async fn list_sets(state: State<'_, SessionState>) -> Result<Vec<SetSummary>, String> {
     let session = session(&state)?;
     game::read_sets(&session.data_dir, &session.card_lang, &game::system_clock().day)
 }
@@ -330,12 +330,12 @@ fn set_card_language(state: State<'_, SessionState>, lang: String) -> Result<(),
 // ---- the game being played ----------------------------------------------------------
 
 #[tauri::command]
-fn get_wallet(state: State<'_, SessionState>) -> Result<WalletView, String> {
+async fn get_wallet(state: State<'_, SessionState>) -> Result<WalletView, String> {
     with_game(&state, |g| g.wallet())
 }
 
 #[tauri::command]
-fn get_shop(state: State<'_, SessionState>) -> Result<Vec<ShopItem>, String> {
+async fn get_shop(state: State<'_, SessionState>) -> Result<Vec<ShopItem>, String> {
     with_game(&state, |g| g.shop())
 }
 
@@ -379,7 +379,7 @@ fn open_boosters(
 
 /// The sets pinned at the top of the Boosterium.
 #[tauri::command]
-fn get_pinned_sets(state: State<'_, SessionState>) -> Result<Vec<String>, String> {
+async fn get_pinned_sets(state: State<'_, SessionState>) -> Result<Vec<String>, String> {
     with_game(&state, |g| g.pinned_sets())
 }
 
@@ -390,19 +390,19 @@ fn set_pinned_sets(state: State<'_, SessionState>, codes: Vec<String>) -> Result
 
 /// Pays what the collection earned since the last call.
 #[tauri::command]
-fn collect_income(state: State<'_, SessionState>) -> Result<game::IncomeView, String> {
+async fn collect_income(state: State<'_, SessionState>) -> Result<game::IncomeView, String> {
     with_game(&state, |g| g.collect_income())
 }
 
 /// What a bet slip needs to know of a booster (its price, the house's margin, the minimum stake).
 #[tauri::command]
-fn get_bet_context(state: State<'_, SessionState>, set_code: String, kind: String) -> Result<game::BetContext, String> {
+async fn get_bet_context(state: State<'_, SessionState>, set_code: String, kind: String) -> Result<game::BetContext, String> {
     with_game(&state, |g| g.bet_context(&set_code, &kind))
 }
 
 /// How likely a bet is on a booster of this kind.
 #[tauri::command]
-fn get_bet_chance(
+async fn get_bet_chance(
     state: State<'_, SessionState>,
     set_code: String,
     kind: String,
@@ -413,7 +413,7 @@ fn get_bet_chance(
 
 /// The bets kept from one opening to the next, with the game.
 #[tauri::command]
-fn get_kept_bets(state: State<'_, SessionState>) -> Result<Vec<game::KeptBet>, String> {
+async fn get_kept_bets(state: State<'_, SessionState>) -> Result<Vec<game::KeptBet>, String> {
     with_game(&state, |g| g.kept_bets())
 }
 
@@ -433,7 +433,7 @@ fn reveal_cards(state: State<'_, SessionState>, count: usize) -> Result<(), Stri
 }
 
 #[tauri::command]
-fn get_collection(state: State<'_, SessionState>, set_code: String) -> Result<CollectionView, String> {
+async fn get_collection(state: State<'_, SessionState>, set_code: String) -> Result<CollectionView, String> {
     with_game(&state, |g| g.collection(&set_code))
 }
 
@@ -491,29 +491,29 @@ async fn prefetch_sealed_images(
 
 /// Every card owned, across the sets (the collection's "all sets" list).
 #[tauri::command]
-fn get_owned_cards(state: State<'_, SessionState>) -> Result<Vec<game::ArtistCardView>, String> {
+async fn get_owned_cards(state: State<'_, SessionState>) -> Result<Vec<game::ArtistCardView>, String> {
     with_game(&state, |g| g.owned_everywhere())
 }
 
 /// The library's binders: one per set the player owns cards of.
 #[tauri::command]
-fn get_library(state: State<'_, SessionState>) -> Result<Vec<game::LibraryBinder>, String> {
+async fn get_library(state: State<'_, SessionState>) -> Result<Vec<game::LibraryBinder>, String> {
     with_game(&state, |g| g.library())
 }
 
 #[tauri::command]
-fn list_artists(state: State<'_, SessionState>) -> Result<Vec<game::ArtistSummary>, String> {
+async fn list_artists(state: State<'_, SessionState>) -> Result<Vec<game::ArtistSummary>, String> {
     with_game(&state, |g| g.artists())
 }
 
 /// The guest series with a binder of their own (Special Guests, The List…).
 #[tauri::command]
-fn list_guest_series(state: State<'_, SessionState>) -> Result<Vec<game::SetSummary>, String> {
+async fn list_guest_series(state: State<'_, SessionState>) -> Result<Vec<game::SetSummary>, String> {
     with_game(&state, |g| Ok(g.guest_series()))
 }
 
 #[tauri::command]
-fn get_artist_collection(state: State<'_, SessionState>, name: String) -> Result<game::ArtistView, String> {
+async fn get_artist_collection(state: State<'_, SessionState>, name: String) -> Result<game::ArtistView, String> {
     with_game(&state, |g| g.artist_collection(&name))
 }
 
@@ -523,13 +523,25 @@ fn sell_cards(state: State<'_, SessionState>, requests: Vec<SaleRequest>) -> Res
 }
 
 #[tauri::command]
-fn sell_duplicates(state: State<'_, SessionState>, set_code: String) -> Result<game::DuplicatesSale, String> {
+async fn sell_duplicates(state: State<'_, SessionState>, set_code: String) -> Result<game::DuplicatesSale, String> {
     with_game(&state, |g| g.sell_listed_duplicates(&set_code))
 }
 
 #[tauri::command]
-fn get_duplicates_value(state: State<'_, SessionState>, set_code: String) -> Result<SaleResult, String> {
+async fn get_duplicates_value(state: State<'_, SessionState>, set_code: String) -> Result<SaleResult, String> {
     with_game(&state, |g| g.duplicates_value(&set_code))
+}
+
+// Async, as every command that may read many sets: a synchronous command runs on the main
+// thread, and the window stops answering until it is done.
+#[tauri::command]
+async fn sell_all_duplicates(state: State<'_, SessionState>) -> Result<game::AllDuplicatesSale, String> {
+    with_game(&state, |g| g.sell_all_duplicates())
+}
+
+#[tauri::command]
+async fn get_all_duplicates_value(state: State<'_, SessionState>) -> Result<SaleResult, String> {
+    with_game(&state, |g| g.all_duplicates_value())
 }
 
 #[tauri::command]
@@ -539,44 +551,44 @@ fn claim_charity(state: State<'_, SessionState>) -> Result<(), String> {
 
 /// Every achievement, with its texts in `lang` (a language code such as "fr").
 #[tauri::command]
-fn get_achievements(state: State<'_, SessionState>, lang: String) -> Result<AchievementsView, String> {
+async fn get_achievements(state: State<'_, SessionState>, lang: String) -> Result<AchievementsView, String> {
     with_game(&state, |g| g.achievements(&lang))
 }
 
 /// Achievements unlocked since the last call, with their texts in `lang`.
 #[tauri::command]
-fn take_unlocks(state: State<'_, SessionState>, lang: String) -> Result<Vec<AchievementView>, String> {
+async fn take_unlocks(state: State<'_, SessionState>, lang: String) -> Result<Vec<AchievementView>, String> {
     with_game(&state, |g| Ok(g.take_unlocks(&lang)))
 }
 
 /// The box toppers given since the last call (the first call also gives those of the boxes
 /// opened before), to show the player.
 #[tauri::command]
-fn take_box_toppers(state: State<'_, SessionState>) -> Result<Vec<game::ToppersGiven>, String> {
+async fn take_box_toppers(state: State<'_, SessionState>) -> Result<Vec<game::ToppersGiven>, String> {
     with_game(&state, |g| g.take_box_toppers())
 }
 
 /// A set's cycles, as far as the player is, their names in `lang`.
 #[tauri::command]
-fn get_cycles(state: State<'_, SessionState>, set_code: String, lang: String) -> Result<game::CyclesView, String> {
+async fn get_cycles(state: State<'_, SessionState>, set_code: String, lang: String) -> Result<game::CyclesView, String> {
     with_game(&state, |g| g.cycles(&set_code, &lang))
 }
 
 /// A set's scenes, as far as the player is, their names in `lang`.
 #[tauri::command]
-fn get_scenes(state: State<'_, SessionState>, set_code: String, lang: String) -> Result<game::ScenesView, String> {
+async fn get_scenes(state: State<'_, SessionState>, set_code: String, lang: String) -> Result<game::ScenesView, String> {
     with_game(&state, |g| g.scenes(&set_code, &lang))
 }
 
 /// A set's assemblies (Unstable's augments over its hosts), as far as the player is.
 #[tauri::command]
-fn get_assemblies(state: State<'_, SessionState>, set_code: String) -> Result<game::AssembliesView, String> {
+async fn get_assemblies(state: State<'_, SessionState>, set_code: String) -> Result<game::AssembliesView, String> {
     with_game(&state, |g| g.assemblies(&set_code))
 }
 
 /// The cabinet of curiosities: every artifact, owned, on sale or still hidden.
 #[tauri::command]
-fn get_artifacts(state: State<'_, SessionState>, lang: String) -> Result<Vec<game::ArtifactView>, String> {
+async fn get_artifacts(state: State<'_, SessionState>, lang: String) -> Result<Vec<game::ArtifactView>, String> {
     with_game(&state, |g| Ok(g.artifacts(&lang)))
 }
 
@@ -587,18 +599,18 @@ fn buy_artifact(state: State<'_, SessionState>, id: String, lang: String) -> Res
 
 /// Artifacts given since the last call (by achievements), to celebrate.
 #[tauri::command]
-fn take_given_artifacts(state: State<'_, SessionState>, lang: String) -> Result<Vec<game::ArtifactView>, String> {
+async fn take_given_artifacts(state: State<'_, SessionState>, lang: String) -> Result<Vec<game::ArtifactView>, String> {
     with_game(&state, |g| Ok(g.take_given_artifacts(&lang)))
 }
 
 #[tauri::command]
-fn get_stats(state: State<'_, SessionState>) -> Result<StatsView, String> {
+async fn get_stats(state: State<'_, SessionState>) -> Result<StatsView, String> {
     with_game(&state, |g| g.stats())
 }
 
 /// The wallet's movements, newest first (`limit` of them, after `offset`).
 #[tauri::command]
-fn get_history(state: State<'_, SessionState>, limit: u32, offset: u32) -> Result<HistoryView, String> {
+async fn get_history(state: State<'_, SessionState>, limit: u32, offset: u32) -> Result<HistoryView, String> {
     with_game(&state, |g| g.history(limit.min(200), offset))
 }
 
@@ -849,6 +861,8 @@ pub fn run() {
             sell_cards,
             sell_duplicates,
             get_duplicates_value,
+            sell_all_duplicates,
+            get_all_duplicates_value,
             claim_charity,
             get_achievements,
             take_unlocks,

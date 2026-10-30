@@ -4,7 +4,7 @@ import { About } from "./About";
 import { BackToTop } from "./BackToTop";
 import { useDataStatus } from "./DataStatus";
 import { Preparing } from "./Preparing";
-import { getFullscreen, setFullscreen, toggleFullscreen } from "./fullscreen";
+import { getFullscreen, isFullscreenKey, setFullscreen, toggleFullscreen } from "./fullscreen";
 import { GameScreen } from "./GameScreen";
 import { Home } from "./Home";
 import { Options } from "./Options";
@@ -28,11 +28,11 @@ export function App() {
   const dataStatus = useDataStatus(checkData);
 
   // The window opens in the display chosen; this keeps the app's copy of the choice in step
-  // with this window's (a choice made before the app kept one). F11 switches.
+  // with this window's (a choice made before the app kept one). F11 (⌃⌘F on macOS) switches.
   useEffect(() => {
     void setFullscreen(getFullscreen());
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "F11") return;
+      if (!isFullscreenKey(e)) return;
       e.preventDefault();
       void toggleFullscreen();
     };

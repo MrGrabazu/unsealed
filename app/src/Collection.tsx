@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   checkSetImages,
+  getAllDuplicatesValue,
   getArtistCollection,
   getCollection,
   getCycles,
@@ -9,6 +10,7 @@ import {
   getOwnedCards,
   listArtists,
   listGuestSeries,
+  sellAllDuplicates,
   sellCards,
   sellDuplicates,
   type ArtistCard,
@@ -91,7 +93,8 @@ import { duplicatesOf, SaleModal, type SoldLine } from "./SaleModal";
 import { FoilSheen, foilLabel } from "./foils";
 import { SellPicker } from "./SellPicker";
 import { SetIcon } from "./SetIcon";
-import { Money, useMoney, useMoneyText } from "./money";
+import { Money, useMoney } from "./money";
+import { useSaleNotice } from "./notice";
 import { getCollectionLayout, setCollectionLayout, type CollectionLayout } from "./settings";
 import { sounds } from "./sound";
 
@@ -123,7 +126,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
       return { ...l, unitCents: Math.max(l.unitCents, Math.min(boosted, best)) };
     });
   const money = useMoney();
-  const moneyText = useMoneyText();
+  const saleNotice = useSaleNotice();
   const { t, tx, plural, lang } = useI18n();
   const [setCode, setSetCode] = useState("");
   const [view, setView] = useState<CollectionView | null>(null);
@@ -162,6 +165,13 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
   const [series, setSeries] = useState<SetSummary[]>([]);
   const known = useMemo(() => [...sets, ...series], [sets, series]);
   const isSeries = (code: string) => series.some((s) => s.code === code);
+  // The duplicates of every binder (from the library and "All sets"): what they would bring
+  // in, and whether the button waits for its second click.
+  const [allDuplicatesCents, setAllDuplicatesCents] = useState(0);
+  const [confirmingAll, setConfirmingAll] = useState(false);
+  const [sellingAll, setSellingAll] = useState(false);
+  // Counts the sales of every duplicate: the library reads its binders again after each.
+  const [allSold, setAllSold] = useState(0);
 
   useEffect(() => {
     if (!setCode && sets.length > 0) setSetCode(sets[0].code);
@@ -216,6 +226,18 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
     void reload();
   }, [reload, refreshKey]);
 
+  const everywhere = source === "library" || (source === "sets" && setCode === ALL_SETS);
+  useEffect(() => {
+    if (!everywhere) return;
+    let live = true;
+    getAllDuplicatesValue()
+      .then((v) => live && setAllDuplicatesCents(v.totalCents))
+      .catch(() => live && setAllDuplicatesCents(0));
+    return () => {
+      live = false;
+    };
+  }, [everywhere, refreshKey, allSold, ownedAll]);
+
   async function sell(card: CollectionCard, foil: boolean) {
     const key = `${card.uuid}:${foil}`;
     const lastCopy = card.quantity + card.foilQuantity === 1;
@@ -228,7 +250,8 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
     try {
       const result = await sellCards([{ uuid: card.uuid, foil, quantity: 1 }]);
       sounds.coins();
-      setNotice(t("collection.sold", { card: card.name, amount: moneyText(result.totalCents) }));
+      setNotice(null);
+      saleNotice(1, result.totalCents, card.name);
       await reload();
       onChanged();
     } catch (e) {
@@ -252,6 +275,29 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
       onChanged();
     } catch (e) {
       setError(String(e));
+    }
+  }
+
+  /** Sells the duplicates of every binder, then shows what went. */
+  async function sellEveryDuplicate() {
+    setSellingAll(true);
+    try {
+      // The game says what went: reading every card owned first took seconds.
+      const result = await sellAllDuplicates();
+      if (result.soldCount > 0) {
+        sounds.coins();
+        setNotice(null);
+        setSale({ soldCount: result.soldCount, totalCents: result.totalCents, lines: result.lines });
+      } else {
+        setNotice(t("collection.noDuplicates"));
+      }
+      setAllSold((n) => n + 1);
+      await reload();
+      onChanged();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setSellingAll(false);
     }
   }
 
@@ -510,6 +556,21 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
         )}
         </div>
         <div className="collection-bar-right">
+          {everywhere && allDuplicatesCents > 0 && (
+            <button
+              className={`sell-all${confirmingAll ? " confirm" : ""}`}
+              title={t("collection.sellAllDuplicatesHint")}
+              disabled={sellingAll}
+              onClick={() => {
+                if (!confirmingAll) return setConfirmingAll(true);
+                setConfirmingAll(false);
+                void sellEveryDuplicate();
+              }}
+              onMouseLeave={() => setConfirmingAll(false)}
+            >
+              {tx(confirmingAll ? "open.sellBoosterConfirm" : "collection.sellAllDuplicates", { amount: money(allDuplicatesCents) })}
+            </button>
+          )}
           {!allSets && !library && (
             <div className="segmented" role="group" aria-label={t("collection.layout")}>
               <button className={layout === "binder" && !extraShown ? "active" : ""} onClick={() => changeLayout("binder")}>
@@ -544,7 +605,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
 
   const content = (
     <>
-      {library && <Library sets={known} refreshKey={refreshKey} onOpen={openBinder} />}
+      {library && <Library sets={known} refreshKey={refreshKey + allSold} onOpen={openBinder} />}
       {!library && !(byArtist ? artistView : allSets ? ownedAll : view) && !error && <Loading label={t("collection.loading")} />}
       {byArtist && artistView && (
         <>

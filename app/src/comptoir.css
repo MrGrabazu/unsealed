@@ -128,7 +128,7 @@
 .mote-lucky:hover { background: radial-gradient(circle, #fff6d8 0 3px, #ffd76acc 4px, transparent 11px); }
 @keyframes mote-lucky { from { opacity: .55; transform: translateY(0) scale(.9); } to { opacity: 1; transform: translateY(-8px) scale(1.15); } }
 /* A Black Lotus drifting across the screen, whole and unaltered (eggs.tsx). */
-.lotus-passing { position: fixed; z-index: 60; left: -260px; bottom: 8vh; width: 220px; border-radius: 10px; pointer-events: none;
+.lotus-passing { position: fixed; z-index: 60; left: -260px; bottom: 8vh; width: 220px; border-radius: var(--card-radius); pointer-events: none;
   box-shadow: 0 10px 30px #000c, 0 0 40px #ffd76a55; animation: lotus-pass 5.5s ease-in-out forwards; }
 @keyframes lotus-pass { 0% { transform: translate(0, 0) rotate(-12deg); } 50% { transform: translate(60vw, -30vh) rotate(6deg); } 100% { transform: translate(calc(100vw + 300px), -10vh) rotate(18deg); } }
 /* Magic's birthday: a ribbon and confetti over each opening (eggs.tsx). */
@@ -161,6 +161,9 @@
 .collection-bar.compact .collection-bar-middle select, .collection-bar.compact .collection-bar-middle input { flex: 0 1 auto; padding: 6px 10px; font-size: 14px; max-width: 240px; min-width: 90px; }
 .collection-bar.compact .segmented button { padding: 6px 12px; font-size: 12px; }
 .collection-bar.compact .collection-bar-right { margin-left: auto; }
+/* Selling every binder's duplicates (library, "All sets"): gilded, wax to confirm. */
+.collection-bar button.sell-all { padding: 6px 12px; font-size: 12px; white-space: nowrap; color: var(--gold-hi); border-color: var(--accent); }
+.collection-bar button.sell-all.confirm { background: linear-gradient(180deg, var(--wax-hi), var(--wax)); border-color: #f08a8e; color: #fff; }
 /* Every split screen has the same side panel: going from one to the next moves nothing. */
 .split { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; }
 .split > .frame { min-height: 0; display: flex; flex-direction: column; }
@@ -241,6 +244,11 @@ button.share-round { height: 46px; padding: 0 20px; border-radius: 23px; display
 .jp-note strong { display: block; margin-bottom: 4px; font-family: var(--font-title); font-size: 13px; color: var(--gold-hi); letter-spacing: 0.04em; }
 .jp-note p { margin: 0 0 6px; }
 .jp-note p:last-child { margin-bottom: 0; }
+/* Toasts rise from the bottom of the window, centred: in the bottom right corner, they covered
+   the action buttons, and a second click meant for the button closed the toast unread. */
+.game .toasts { left: 50%; right: auto; bottom: 16px; transform: translateX(-50%); align-items: center; }
+.game .toast { animation-name: toast-rise; }
+@keyframes toast-rise { from { transform: translateY(60px); opacity: 0; } to { transform: none; opacity: 1; } }
 /* A passing word (save point, booster sold): a wax seal with its icon, and a gold thread
    that runs out until the toast leaves (GameScreen's NOTICE_MS). */
 .notice-toast { position: relative; max-width: 380px; overflow: hidden; padding: 12px 18px 14px 12px;

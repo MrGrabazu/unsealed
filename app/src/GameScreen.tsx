@@ -61,6 +61,8 @@ import { BackToTop } from "./BackToTop";
 import { History } from "./History";
 import { useI18n } from "./i18n";
 import { Icon, type IconName } from "./icons";
+import { NoticeContext, type Notify } from "./notice";
+import { FULLSCREEN_KEY } from "./fullscreen";
 import { Loading } from "./Loading";
 import { Coin, CurrencyContext, DEFAULT_CURRENCY, useMoneyText } from "./money";
 import { errorText } from "./errors";
@@ -253,6 +255,8 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     setNotices((current) => [...current, { id, icon, title, text, error }]);
     setTimeout(() => setNotices((current) => current.filter((n) => n.id !== id)), error ? ERROR_MS : NOTICE_MS);
   }, []);
+  // The same toasts, for the screens below (a sale's, `useSaleNotice`).
+  const notify = useCallback<Notify>((text, icon, title) => setNotice(text, icon, title), [setNotice]);
   const [sets, setSets] = useState<SetSummary[]>([]);
   const [shop, setShop] = useState<ShopItem[]>([]);
   const [wallet, setWallet] = useState<WalletView | null>(null);
@@ -683,7 +687,8 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   }
 
   function switchTab(t: Tab) {
-    if (t !== tab) closeOpening();
+    // The opening's bookmark, from an opening (sealed pack, cards, result): back to the reserve.
+    if (t !== tab || t === "open") closeOpening();
     if (t === "achievements") setUnseenAchievements(0);
     setTab(t);
   }
@@ -767,11 +772,12 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
           ? [["← →", t("keys.turnPage")]]
           : []) as [string, string][]),
     ...(detailsOf ? ([[t("keys.esc"), t("keys.close")]] as [string, string][]) : []),
-    ["F11", t("keys.fullscreen")],
+    [FULLSCREEN_KEY, t("keys.fullscreen")],
   ];
 
   return (
     <CurrencyContext.Provider value={currency}>
+      <NoticeContext.Provider value={notify}>
       <div className="game" data-season={season ?? undefined}>
         {season && <SeasonalDecor season={season} />}
         <header className="hud">
@@ -1026,6 +1032,8 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
                       sale.profitCents >= 0
                         ? t("open.soldBooster", { set: s.setCode, amount, profit: money(sale.profitCents) })
                         : t("open.soldBoosterLoss", { set: s.setCode, amount, loss: money(-sale.profitCents) }),
+                      "coin",
+                      t("sale.done"),
                     );
                   })
                 }
@@ -1141,6 +1149,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
           ))}
         </div>
       </div>
+      </NoticeContext.Provider>
     </CurrencyContext.Provider>
   );
 }

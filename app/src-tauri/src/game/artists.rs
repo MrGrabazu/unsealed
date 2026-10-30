@@ -50,7 +50,7 @@ impl Game {
     }
 
     /// Copies owned of every card, by uuid.
-    fn owned_by_uuid(&self) -> Result<HashMap<String, Owned>, String> {
+    pub(super) fn owned_by_uuid(&self) -> Result<HashMap<String, Owned>, String> {
         let mut owned: HashMap<String, Owned> = HashMap::new();
         for (uuid, foil, quantity) in self.store.owned_cards().map_err(err)? {
             let have = owned.entry(uuid).or_default();

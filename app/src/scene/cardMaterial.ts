@@ -56,6 +56,7 @@ uniform float uFoil;
 uniform float uKind;
 uniform float uTime;
 uniform vec2 uLight;
+uniform float uCorner;
 varying vec2 vUv;
 varying float vFacing;
 
@@ -93,6 +94,20 @@ void main() {
   if (vFacing > 0.0) {
     if (uHasFront > 0.5) {
       c = texture2D(uFront, vUv);
+      // Scryfall's images have their own rounded corners, cut out of white: a pixel or two of
+      // it shows along the arc. There, the card's own border, taken a little further in on the
+      // same line from the corner's centre, covers it: black, white, silver, gold or the grey
+      // of the Un-sets alike.
+      vec2 at = vUv * vec2(${CARD_W.toFixed(3)}, ${CARD_H.toFixed(3)});
+      float radius = uCorner * ${CARD_W.toFixed(3)};
+      vec2 centre = clamp(at, vec2(radius), vec2(${CARD_W.toFixed(3)} - radius, ${CARD_H.toFixed(3)} - radius));
+      vec2 out0 = at - centre;
+      float dist = length(out0);
+      if (out0.x != 0.0 && out0.y != 0.0 && dist > radius - 0.03) {
+        vec2 inside = centre + out0 / dist * (radius - 0.045);
+        vec4 border = texture2D(uFront, inside / vec2(${CARD_W.toFixed(3)}, ${CARD_H.toFixed(3)}));
+        c = mix(c, border, smoothstep(radius - 0.03, radius - 0.012, dist));
+      }
       if (uFoil > 0.5) {
         // The same foil as the CSS one (.foil-sheen): a faint rainbow (bands 18° off the
         // vertical, one period every 2.07 units, drifting a period every 9 s) in "soft-light",
@@ -206,6 +221,7 @@ export interface CardUniforms {
   uKind: THREE.IUniform<number>;
   uTime: THREE.IUniform<number>;
   uLight: THREE.IUniform<THREE.Vector2>;
+  uCorner: THREE.IUniform<number>;
 }
 
 /** The shader's number for each look of foils.tsx (`foilEffect`); 0 is the usual foil. */
@@ -251,8 +267,9 @@ function starsTexture(): THREE.CanvasTexture {
   return stars;
 }
 
-/** Materials of one card: [face and back, edge] (the geometry's groups 0 and 1). */
-export function createCardMaterials(back: THREE.Texture, foil: boolean, foilKind?: string | null) {
+/** Materials of one card: [face and back, edge] (the geometry's groups 0 and 1). `corner`:
+ * that of its geometry (corners.ts), for the border to cover the white of the image's own. */
+export function createCardMaterials(back: THREE.Texture, foil: boolean, foilKind: string | null | undefined, corner: number) {
   const kind = KINDS[foilEffect(foilKind)] ?? 0;
   const uniforms: CardUniforms = {
     uFront: { value: null },
@@ -264,6 +281,7 @@ export function createCardMaterials(back: THREE.Texture, foil: boolean, foilKind
     uKind: { value: kind },
     uTime: { value: 0 },
     uLight: { value: new THREE.Vector2() },
+    uCorner: { value: corner },
   };
   const faces = new THREE.ShaderMaterial({ uniforms, vertexShader: VERTEX, fragmentShader: FRAGMENT });
   // The edge of the cardboard: off-white, like a real card's.

@@ -89,7 +89,7 @@ export function LotusPassing({ onGone }: { onGone: () => void }) {
       findEgg("lotus");
     }
   }, []);
-  return <img className="lotus-passing" src={BLACK_LOTUS} alt="" aria-hidden="true" draggable={false} onAnimationEnd={onGone} />;
+  return <img className="lotus-passing alpha-corners" src={BLACK_LOTUS} alt="" aria-hidden="true" draggable={false} onAnimationEnd={onGone} />;
 }
 
 /** Counts quick clicks (each within `gap` ms of the last): true once `count` are reached. */

@@ -375,7 +375,7 @@ function Cards({
   const geometry = useMemo(() => createCardGeometry(CORNER), []);
   // Alpha's cards were cut with rounder corners.
   const alphaGeometry = useMemo(() => createCardGeometry(ALPHA_CORNER), []);
-  const materials = useMemo(() => cards.map((c) => createCardMaterials(back, c.foil, c.foilKind)), [cards, back]);
+  const materials = useMemo(() => cards.map((c) => createCardMaterials(back, c.foil, c.foilKind, cornerOf(c.setCode))), [cards, back]);
   const sparkles = useMemo(() => createSparkles(), []);
   const stack = useRef<THREE.Group>(null);
   const meshes = useRef<(THREE.Mesh | null)[]>([]);

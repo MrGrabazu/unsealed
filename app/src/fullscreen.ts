@@ -1,10 +1,20 @@
 // The window in full screen, as a game: on by default. Kept in the browser storage of the
 // window, and given to the app (`set_display_fullscreen`), which opens the window hidden and
-// shows it straight in the display chosen. F11 switches it.
+// shows it straight in the display chosen. F11 switches it, or ⌃⌘F on macOS, where the F keys
+// drive the hardware (brightness, volume…) and F11 shows the desktop.
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 const FULLSCREEN = "unsealed.fullscreen";
+
+const IS_MAC = /Mac/i.test(navigator.userAgent);
+
+/** The full screen key, as shown to the player. */
+export const FULLSCREEN_KEY = IS_MAC ? "⌃⌘F" : "F11";
+
+/** Whether a key press asks to switch full screen (F11 is kept on macOS too, with Fn). */
+export const isFullscreenKey = (e: KeyboardEvent) =>
+  e.key === "F11" || (IS_MAC && e.ctrlKey && e.metaKey && e.code === "KeyF");
 
 export const getFullscreen = () => localStorage.getItem(FULLSCREEN) !== "off";
 

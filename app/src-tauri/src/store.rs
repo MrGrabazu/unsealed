@@ -129,6 +129,8 @@ const MIGRATIONS: &[&str] = &[
         boxes INTEGER NOT NULL,
         PRIMARY KEY (set_code, kind)
     ) WITHOUT ROWID;",
+    // 14: the opening that gave a card, found by the card (every card owned, across the sets)
+    "CREATE INDEX opening_cards_card ON opening_cards (card_uuid);",
 ];
 
 /// Key of `save_meta`: the last day a lost bet's stake was given back (an artifact's effect).
@@ -966,6 +968,13 @@ impl Store {
              GROUP BY c.card_uuid",
         )?;
         let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    /// The sets the collection files the cards owned under.
+    pub fn owned_set_codes(&self) -> StoreResult<Vec<String>> {
+        let mut stmt = self.conn.prepare("SELECT DISTINCT set_code FROM collection WHERE quantity > 0")?;
+        let rows = stmt.query_map([], |r| r.get(0))?;
         Ok(rows.collect::<Result<_, _>>()?)
     }
 

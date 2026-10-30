@@ -339,6 +339,25 @@ pub struct DuplicatesSale {
     pub sold: Vec<SaleRequest>,
 }
 
+/// The duplicates of every binder sold, with each line to show: the card, its finish, the
+/// copies sold and what each brought in.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AllDuplicatesSale {
+    pub sold_count: u32,
+    pub total_cents: i64,
+    pub lines: Vec<SoldLine>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SoldLine {
+    pub card: CollectionCard,
+    pub foil: bool,
+    pub quantity: u32,
+    pub unit_cents: u32,
+}
+
 /// Current time and local calendar day ("YYYY-MM-DD", used for the daily charity).
 pub struct Clock {
     pub now: i64,
@@ -1165,21 +1184,83 @@ impl Game {
     /// What selling a binder's duplicates would bring in, without selling them.
     pub fn duplicates_value(&mut self, set_code: &str) -> Result<SaleResult, String> {
         let requests = self.duplicate_requests(set_code)?;
+        Ok(self.requests_value(&requests))
+    }
+
+    /// Sells the duplicates of every binder at once: one copy of each card owned is kept, as
+    /// `sell_duplicates` keeps it in each binder.
+    pub fn sell_all_duplicates(&mut self) -> Result<AllDuplicatesSale, String> {
+        let requests = self.all_duplicate_requests()?;
+        if requests.is_empty() {
+            return Ok(AllDuplicatesSale { sold_count: 0, total_cents: 0, lines: Vec::new() });
+        }
+        // Read before the sale: the copies owned change with it.
+        let owned = self.owned_by_uuid()?;
+        let mut lines: Vec<SoldLine> = requests
+            .iter()
+            .filter_map(|r| {
+                let card = self.sets.values().find_map(|s| s.index.get(&r.uuid).map(|&i| &s.file.cards[i]))?;
+                Some(SoldLine {
+                    card: self.collection_card(card, owned.get(&r.uuid).copied().unwrap_or_default()),
+                    foil: r.foil,
+                    quantity: r.quantity,
+                    unit_cents: self.unit_sale_value(&r.uuid, r.foil, true),
+                })
+            })
+            .collect();
+        lines.sort_by_key(|l| std::cmp::Reverse(i64::from(l.quantity) * i64::from(l.unit_cents)));
+        let result = self.sell_cards_at(&requests, true)?;
+        Ok(AllDuplicatesSale { sold_count: result.sold_count, total_cents: result.total_cents, lines })
+    }
+
+    /// What selling the duplicates of every binder would bring in, without selling them.
+    pub fn all_duplicates_value(&mut self) -> Result<SaleResult, String> {
+        let requests = self.all_duplicate_requests()?;
+        Ok(self.requests_value(&requests))
+    }
+
+    /// The copies `sell_all_duplicates` sells: those of every card owned, across the sets.
+    /// Read from the collection's rows alone (fast: the library asks for it each time it is
+    /// shown); only the sets of cards owned more than once are loaded, for their rarity and
+    /// fallback price, from the set the collection files them under or its parent ("TLTR":
+    /// "LTR").
+    fn all_duplicate_requests(&mut self) -> Result<Vec<SaleRequest>, String> {
+        self.ensure_prices();
+        let owned = self.owned_by_uuid()?;
+        if owned.values().any(|o| o.normal + o.foil > 1) {
+            for code in self.store.owned_set_codes().map_err(err)? {
+                let parent = code.get(1..).map(str::to_string);
+                for code in [Some(code), parent].into_iter().flatten() {
+                    let _ = self.ensure_loaded(&code);
+                }
+            }
+        }
+        let mut cards: Vec<_> = owned.into_iter().filter(|(_, o)| o.normal + o.foil > 1).collect();
+        cards.sort_by(|a, b| a.0.cmp(&b.0));
+        Ok(self.duplicates_among(cards.into_iter()))
+    }
+
+    fn requests_value(&mut self, requests: &[SaleRequest]) -> SaleResult {
         self.ensure_prices();
         let sold_count = requests.iter().map(|r| r.quantity).sum();
         let total_cents =
             requests.iter().map(|r| i64::from(r.quantity) * i64::from(self.unit_sale_value(&r.uuid, r.foil, true))).sum();
-        Ok(SaleResult { sold_count, total_cents })
+        SaleResult { sold_count, total_cents }
     }
 
     /// The copies `sell_duplicates` sells.
     fn duplicate_requests(&mut self, set_code: &str) -> Result<Vec<SaleRequest>, String> {
         let view = self.collection(set_code)?;
         let sections = [view.cards, view.extras, view.tokens, view.arts, view.guests, view.elsewhere, view.toppers];
+        let cards = sections.into_iter().flatten().map(|c| (c.uuid, Owned { normal: c.quantity, foil: c.foil_quantity }));
+        Ok(self.duplicates_among(cards))
+    }
+
+    /// Every copy beyond the one kept of each card listed (a card listed twice counts once).
+    fn duplicates_among(&self, cards: impl Iterator<Item = (String, Owned)>) -> Vec<SaleRequest> {
         let mut seen = HashSet::new();
         let mut requests = Vec::new();
-        for card in sections.into_iter().flatten().filter(|c| seen.insert(c.uuid.clone())) {
-            let (uuid, have) = (card.uuid, Owned { normal: card.quantity, foil: card.foil_quantity });
+        for (uuid, have) in cards.filter(|(uuid, _)| seen.insert(uuid.clone())) {
             // One copy of each card is kept, whatever its finish: the foil one if there is one.
             let kept_foil = u32::from(have.foil > 0);
             let to_sell = [(false, have.normal - (1 - kept_foil).min(have.normal)), (true, have.foil - kept_foil)];
@@ -1189,7 +1270,7 @@ impl Game {
                 }
             }
         }
-        Ok(requests)
+        requests
     }
 
     // ---- statistics ------------------------------------------------------------------
@@ -3048,6 +3129,21 @@ mod tests {
         assert_eq!(sale.sold, [SaleRequest { uuid: "c1".into(), foil: false, quantity: 1 }]);
         assert_eq!(balance(&mut g), before + 80);
         assert_eq!(g.duplicates_value("TST").unwrap(), SaleResult { sold_count: 0, total_cents: 0 });
+    }
+
+    #[test]
+    fn every_binder_s_duplicates_sell_at_once() {
+        let mut g = game_with_booster("dupes-everywhere");
+        g.open_booster("TST", "play").unwrap();
+        let before = balance(&mut g);
+        assert_eq!(g.all_duplicates_value().unwrap(), SaleResult { sold_count: 1, total_cents: 80 });
+        let sale = g.sell_all_duplicates().unwrap();
+        assert_eq!((sale.sold_count, sale.total_cents), (1, 80));
+        assert_eq!(sale.lines.len(), 1);
+        assert_eq!((sale.lines[0].card.uuid.as_str(), sale.lines[0].quantity, sale.lines[0].unit_cents), ("c1", 1, 80));
+        assert_eq!(balance(&mut g), before + 80);
+        assert_eq!(g.collection("TST").unwrap().owned_count, 2);
+        assert_eq!(g.all_duplicates_value().unwrap(), SaleResult { sold_count: 0, total_cents: 0 });
     }
 
     /// `SET` where one booster in four has the mythic (the others two commons only).

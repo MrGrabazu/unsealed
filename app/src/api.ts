@@ -748,5 +748,13 @@ export const sellDuplicates = (setCode: string) =>
   invoke<SaleResult & { sold: SaleRequest[] }>("sell_duplicates", { setCode });
 /** What selling a binder's duplicates would bring in, without selling them. */
 export const getDuplicatesValue = (setCode: string) => invoke<SaleResult>("get_duplicates_value", { setCode });
+/** Sells the duplicates of every binder at once (one copy of each card owned kept), with
+ * each line sold, most lucrative first. */
+export const sellAllDuplicates = () =>
+  invoke<SaleResult & { lines: { card: CollectionCard; foil: boolean; quantity: number; unitCents: number }[] }>(
+    "sell_all_duplicates",
+  );
+/** What selling the duplicates of every binder would bring in, without selling them. */
+export const getAllDuplicatesValue = () => invoke<SaleResult>("get_all_duplicates_value");
 export const claimCharity = () => invoke<void>("claim_charity");
 export const getStats = () => invoke<StatsView>("get_stats");

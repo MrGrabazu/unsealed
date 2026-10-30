@@ -3,7 +3,7 @@ import { getDataInfo, type DataInfo } from "./api";
 import { DataStatusBar, useDataStatus } from "./DataStatus";
 import { CARD_LANGUAGES, LANGUAGES, useI18n, type CardLangSetting, type Lang } from "./i18n";
 import { Loading } from "./Loading";
-import { getFullscreen, setFullscreen } from "./fullscreen";
+import { FULLSCREEN_KEY, getFullscreen, setFullscreen } from "./fullscreen";
 import { getOpening3d, getSeasonalOn, setOpening3d, setSeasonalOn } from "./settings";
 import { getMusicOn, getMusicVolume, refreshMusic, setMusicOn, setMusicVolume } from "./music";
 import { getSoundOn, getVolume, setSoundOn, setVolume, sounds } from "./sound";
@@ -75,7 +75,7 @@ export function Options({ onBack }: { onBack: () => void }) {
         <option value="fullscreen">{t("options.fullscreen")}</option>
         <option value="windowed">{t("options.windowed")}</option>
       </select>
-      <p className="hint">{t("options.displayHint")}</p>
+      <p className="hint">{t("options.displayHint", { key: FULLSCREEN_KEY })}</p>
 
       <h3>{t("options.opening")}</h3>
       <label className="checkbox">
