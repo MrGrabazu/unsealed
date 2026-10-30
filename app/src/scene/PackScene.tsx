@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { OpenedCard } from "../api";
 import { isBigCard } from "../BatchOpening";
+import { ALPHA_CORNER, CORNER, cornerOf } from "../corners";
 import { largeImage } from "../images";
 import { revealSound, sounds } from "../sound";
 import { CARD_H, CARD_W, createCardGeometry, createCardMaterials } from "./cardMaterial";
@@ -371,7 +372,9 @@ function Cards({
   const dom = useThree((s) => s.gl.domElement);
   const back = useMemo(() => cardBackTexture(), []);
   const glow = useMemo(() => glowTexture(), []);
-  const geometry = useMemo(() => createCardGeometry(), []);
+  const geometry = useMemo(() => createCardGeometry(CORNER), []);
+  // Alpha's cards were cut with rounder corners.
+  const alphaGeometry = useMemo(() => createCardGeometry(ALPHA_CORNER), []);
   const materials = useMemo(() => cards.map((c) => createCardMaterials(back, c.foil, c.foilKind)), [cards, back]);
   const sparkles = useMemo(() => createSparkles(), []);
   const stack = useRef<THREE.Group>(null);
@@ -420,8 +423,8 @@ function Cards({
     };
   }, [cards, materials]);
   useEffect(
-    () => () => [back, glow, geometry, sparkles.geometry, sparkles.material].forEach((r) => r.dispose()),
-    [back, glow, geometry, sparkles],
+    () => () => [back, glow, geometry, alphaGeometry, sparkles.geometry, sparkles.material].forEach((r) => r.dispose()),
+    [back, glow, geometry, alphaGeometry, sparkles],
   );
 
   const slide = useRef<Slide>({ kind: "idle" });
@@ -641,7 +644,7 @@ function Cards({
           ref={(m) => {
             meshes.current[k] = m;
           }}
-          geometry={geometry}
+          geometry={cornerOf(card.setCode) === ALPHA_CORNER ? alphaGeometry : geometry}
           material={[materials[k].faces, materials[k].edge]}
           // Cards that left still sit under the pointer (hidden): they let the event through.
           onPointerDown={(e) => grab(e, k)}

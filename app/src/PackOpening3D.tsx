@@ -4,6 +4,7 @@ import { SellBoosterButton, useBoosterSale } from "./BoosterSale";
 import { useI18n } from "./i18n";
 import type { MessageKey } from "./i18n/en";
 import { CardImage } from "./CardImage";
+import { cornersClass } from "./corners";
 import { Money, useMoney } from "./money";
 import { FoilSheen } from "./foils";
 import { smallImage } from "./images";
@@ -183,7 +184,7 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
             <div className="seen-strip" aria-label={t("open.revealed", { revealed: seen.length, total })}>
               {[...seen].reverse().map((card, i) => (
                 <button key={seen.length - i} className={`seen-card ${card.rarity}`} onClick={() => onDetails(card)} title={card.name}>
-                  <span className="thumb">
+                  <span className={`thumb ${cornersClass(card.setCode)}`}>
                     <CardImage front={smallImage(card.imageUrl)} back={smallImage(card.backImageUrl)} alt={card.name} />
                     {card.foil && <FoilSheen rarity={card.rarity} kind={card.foilKind} badge={false} />}
                     <NewBadge card={card} />

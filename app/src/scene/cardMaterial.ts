@@ -9,24 +9,24 @@ import { foilEffect, glintPath, STAR_FIELDS, STAR_TWINKLES } from "../foils";
 export const CARD_W = 2.5;
 export const CARD_H = 3.49;
 const CARD_DEPTH = 0.025;
-const CORNER = 0.12;
 
-/** A card-shaped slab: rounded rectangle extruded by the card's thickness. Its caps get UVs
- * spanning the whole card (0 to 1); group 0 holds both caps, group 1 the edge. */
-export function createCardGeometry(): THREE.ExtrudeGeometry {
+/** A card-shaped slab: rounded rectangle extruded by the card's thickness, its corners round
+ * arcs of `corner` (a share of the card's width, corners.ts). Its caps get UVs spanning the
+ * whole card (0 to 1); group 0 holds both caps, group 1 the edge. */
+export function createCardGeometry(corner: number): THREE.ExtrudeGeometry {
   const w = CARD_W / 2;
   const h = CARD_H / 2;
-  const r = CORNER;
+  const r = CARD_W * corner;
   const shape = new THREE.Shape();
   shape.moveTo(-w + r, -h);
   shape.lineTo(w - r, -h);
-  shape.quadraticCurveTo(w, -h, w, -h + r);
+  shape.absarc(w - r, -h + r, r, -Math.PI / 2, 0, false);
   shape.lineTo(w, h - r);
-  shape.quadraticCurveTo(w, h, w - r, h);
+  shape.absarc(w - r, h - r, r, 0, Math.PI / 2, false);
   shape.lineTo(-w + r, h);
-  shape.quadraticCurveTo(-w, h, -w, h - r);
+  shape.absarc(-w + r, h - r, r, Math.PI / 2, Math.PI, false);
   shape.lineTo(-w, -h + r);
-  shape.quadraticCurveTo(-w, -h, -w + r, -h);
+  shape.absarc(-w + r, -h + r, r, Math.PI, (3 * Math.PI) / 2, false);
   const geometry = new THREE.ExtrudeGeometry(shape, { depth: CARD_DEPTH, bevelEnabled: false, curveSegments: 6 });
   geometry.translate(0, 0, -CARD_DEPTH / 2);
   const pos = geometry.attributes.position;

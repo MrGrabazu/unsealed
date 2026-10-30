@@ -221,6 +221,8 @@ export const de: Messages = {
   "open.next": "Nächsten öffnen (noch {count})",
   "open.soldBooster": "1 {set}-Booster für {amount} verkauft (Gewinn {profit}).",
   "open.soldBoosterLoss": "1 {set}-Booster für {amount} verkauft (Verlust {loss}).",
+  "shop.bought": "Kauf abgeschlossen",
+  "shop.boughtText": "{quantity} × {kind} · {set}, sie warten in deinem Vorrat.",
   "open.revealed": "{revealed} / {total} aufgedeckt",
   "open.revealAll": "Alle aufdecken",
   "open.passCommons": "Häufige überspringen",

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { getSeasonalOn } from "./settings";
 
 /** The feasts the game dresses up for (mockup .cache/da/v11.html): the dust, the vignette, the
@@ -104,9 +104,9 @@ export function SeasonalDecor({ season }: { season: Season }) {
             ))}
           </svg>
           <div className="season-fog">
-            <i style={{ left: "0%", background: "#6a2a8a44" }} />
-            <i style={{ left: "35%", background: "#2a8a4a2a", animationDelay: "-6s" }} />
-            <i style={{ left: "65%", background: "#6a2a8a38", animationDelay: "-11s" }} />
+            <i style={{ left: "0%", "--fog": "#6a2a8a44" } as CSSProperties} />
+            <i style={{ left: "35%", "--fog": "#2a8a4a2a", animationDelay: "-6s" } as CSSProperties} />
+            <i style={{ left: "65%", "--fog": "#6a2a8a38", animationDelay: "-11s" } as CSSProperties} />
           </div>
           {[
             [12, 0, 9, 46],

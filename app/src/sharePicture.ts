@@ -7,9 +7,8 @@ import { TITLE_FONT, drawSeal, gold } from "./canvasArt";
 
 const TEXT_FONT = "Alegreya, Georgia, serif";
 const SITE = "mrgrabazu.github.io/unsealed";
-/** A card's proportions, and the radius of its corners (a share of its width). */
+/** A card's proportions. */
 const CARD_RATIO = 88 / 63;
-const CORNER = 0.045;
 
 /** A card of the picture: its image, how it was pulled, and its texts already written. */
 export interface ShareCard {
@@ -20,6 +19,8 @@ export interface ShareCard {
   foilLabel: string | null;
   /** "New", "New foil", or nothing. */
   newLabel: string | null;
+  /** The radius of its corners, a share of its width (`cornerOf`: Alpha's are rounder). */
+  corner: number;
 }
 
 /** A card shared on its own. */
@@ -123,7 +124,7 @@ function drawCard(
   tags = true,
 ) {
   const h = w * CARD_RATIO;
-  const r = w * CORNER;
+  const r = w * card.corner;
   g.save();
   if (card.foil) {
     const halo = g.createLinearGradient(x, y, x + w, y + h);

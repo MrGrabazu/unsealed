@@ -2,6 +2,7 @@ import { useState, type CSSProperties } from "react";
 import type { CycleView, CyclesView } from "./api";
 import { Placeholder } from "./Binder";
 import { CardImage } from "./CardImage";
+import { cornersClass } from "./corners";
 import { useI18n } from "./i18n";
 import type { MessageKey } from "./i18n/en";
 import { FoilSheen } from "./foils";
@@ -61,7 +62,7 @@ export function CyclesList({ view, onOpen }: { view: CyclesView; onOpen: (uuid: 
     (c) => matches(c, filter) && (kind === "all" || kindOf(c) === kind) && (!query || folded(c.name).includes(query)),
   );
   return (
-    <div className="cycles">
+    <div className={`cycles ${cornersClass(view.setCode)}`}>
       <div className="cycles-tools">
         {view.cycles.length > SEARCH_FROM && (
           <input type="search" className="cycles-search" placeholder={t("cycles.search")} value={search} onChange={(e) => setSearch(e.target.value)} />

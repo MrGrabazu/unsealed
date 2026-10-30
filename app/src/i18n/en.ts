@@ -229,6 +229,8 @@ export const en = {
   "open.next": "Open the next one ({count} left)",
   "open.soldBooster": "Sold 1 {set} booster for {amount} (profit {profit}).",
   "open.soldBoosterLoss": "Sold 1 {set} booster for {amount} (loss {loss}).",
+  "shop.bought": "Purchase made",
+  "shop.boughtText": "{quantity} × {kind} · {set}, waiting in your reserve.",
   "open.revealed": "{revealed} / {total} revealed",
   "open.revealAll": "Reveal all",
   "open.passCommons": "Pass the commons",

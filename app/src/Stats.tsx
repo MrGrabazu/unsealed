@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { getStats, type OpenedCard, type OpeningView, type StatsView } from "./api";
 import { kindLabel } from "./boosterKinds";
 import { CardImage } from "./CardImage";
+import { cornerOf, cornersClass } from "./corners";
 import { useI18n } from "./i18n";
 import { Loading } from "./Loading";
 import { Money, useMoney, useMoneyText } from "./money";
@@ -135,6 +136,7 @@ export function Stats({ refreshKey }: { refreshKey: string }) {
         foil: p.card.foil,
         foilLabel: p.card.foil ? (foilLabel(p.card.foilKind) ?? t(p.card.rarity === "art" ? "collection.signedBadge" : "collection.foilBadge")) : null,
         newLabel: null,
+        corner: cornerOf(p.card.setCode),
       },
       priceText: p.card.priceCents == null ? "—" : moneyText(p.card.priceCents),
     })),
@@ -210,7 +212,7 @@ export function Stats({ refreshKey }: { refreshKey: string }) {
             <div className="stat-pulls">
               {s.bestPulls.slice(0, 5).map((p, i) => (
                 <div key={`${p.card.uuid}-${p.openedAt}-${i}`} title={`${cardName(t, p.card)} · ${formatDate(p.openedAt)}`}>
-                  <div className={`thumb pull-thumb ${p.card.rarity}`}>
+                  <div className={`thumb pull-thumb ${p.card.rarity} ${cornersClass(p.card.setCode)}`}>
                     <CardImage front={p.card.imageUrl} back={p.card.backImageUrl} alt={p.card.name} lazy />
                     {p.card.foil && <FoilSheen rarity={p.card.rarity} kind={p.card.foilKind} />}
                   </div>

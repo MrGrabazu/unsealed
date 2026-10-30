@@ -80,6 +80,7 @@ const fold = (text: string) => text.normalize("NFD").replace(/\p{Diacritic}/gu, 
 import { Binder, shownPriceCents, type BinderSection } from "./Binder";
 import { CardDetails } from "./CardDetails";
 import { CardImage } from "./CardImage";
+import { cornersClass } from "./corners";
 import { CyclesList, CyclesPanel } from "./Cycles";
 import { ScenesGallery, ScenesPanel } from "./Scenes";
 import { AssembliesList, AssembliesPanel } from "./Assemblies";
@@ -363,7 +364,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
     return (
       <div key={c.uuid} className={`collection-card ${total > 0 ? "" : "missing"}`} data-rarity={c.rarity}>
         <div
-          className="thumb clickable-thumb"
+          className={`thumb clickable-thumb ${cornersClass("setCode" in c ? (c as ArtistCard).setCode : view?.setCode)}`}
           role="button"
           tabIndex={0}
           title={t("details.open")}

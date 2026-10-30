@@ -221,6 +221,8 @@ export const fr: Messages = {
   "open.next": "Ouvrir le suivant (encore {count})",
   "open.soldBooster": "1 booster {set} revendu {amount} (gain : {profit}).",
   "open.soldBoosterLoss": "1 booster {set} revendu {amount} (perte : {loss}).",
+  "shop.bought": "Achat effectué",
+  "shop.boughtText": "{quantity} × {kind} · {set}, qui t'attendent dans la réserve.",
   "open.revealed": "{revealed} / {total} révélées",
   "open.revealAll": "Tout révéler",
   "open.passCommons": "Passer les communes",

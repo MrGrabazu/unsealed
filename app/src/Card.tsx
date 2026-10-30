@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import type { OpenedCard } from "./api";
 import { CardImage } from "./CardImage";
+import { cornersClass } from "./corners";
 import { Money } from "./money";
 import { FoilSheen } from "./foils";
 import { NewBadge } from "./NewBadge";
@@ -19,7 +20,7 @@ export function Card({ card, faceUp, clickable, onReveal, lazy = false }: Props)
   return (
     <div className="card-slot">
       <motion.div
-        className={`card ${clickable ? "clickable" : ""}`}
+        className={`card ${clickable ? "clickable" : ""} ${cornersClass(card.setCode)}`}
         data-rarity={card.rarity}
         animate={{ rotateY: faceUp ? 180 : 0 }}
         transition={{ duration: 0.55, ease: "easeInOut" }}

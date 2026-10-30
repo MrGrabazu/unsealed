@@ -221,6 +221,8 @@ export const it: Messages = {
   "open.next": "Apri la prossima (ne restano {count})",
   "open.soldBooster": "Venduta 1 busta {set} per {amount} (guadagno {profit}).",
   "open.soldBoosterLoss": "Venduta 1 busta {set} per {amount} (perdita {loss}).",
+  "shop.bought": "Acquisto effettuato",
+  "shop.boughtText": "{quantity} × {kind} · {set}, ti aspettano nella tua riserva.",
   "open.revealed": "{revealed} / {total} rivelate",
   "open.revealAll": "Rivela tutte",
   "open.passCommons": "Salta le comuni",

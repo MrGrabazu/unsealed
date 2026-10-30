@@ -5,6 +5,7 @@ import { isBigCard } from "./BatchOpening";
 import { SellBoosterButton, SellCardButton, useBoosterSale } from "./BoosterSale";
 import { cardBackUrl } from "./canvasArt";
 import { CardImage } from "./CardImage";
+import { cornersClass } from "./corners";
 import { useI18n } from "./i18n";
 import { Money, useMoney } from "./money";
 import { Pack } from "./Pack";
@@ -57,7 +58,7 @@ function FlipCard({ card, faceUp }: { card: OpenedCard; faceUp: boolean }) {
   const backUrl = useCardBack();
   return (
     <motion.div
-      className="card"
+      className={`card ${cornersClass(card.setCode)}`}
       data-rarity={card.rarity}
       initial={false}
       animate={{ rotateY: faceUp ? 180 : 0 }}

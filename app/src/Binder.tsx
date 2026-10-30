@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CollectionCard } from "./api";
 import { CardImage } from "./CardImage";
+import { cornersClass } from "./corners";
 import { useI18n } from "./i18n";
 import { Money } from "./money";
 import { FoilSheen } from "./foils";
@@ -118,7 +119,7 @@ export function Binder({ setCode, sections, onOpen, active, onSection }: Props) 
   const to = Math.min(pages.length, from + 1);
 
   return (
-    <div className="binder">
+    <div className={`binder ${cornersClass(setCode)}`}>
       {flying && <div className="binder-flying-page" aria-hidden="true" onAnimationEnd={() => setFlying(false)} />}
       {sections.length > 1 && (
         <div className="binder-bar">
@@ -239,7 +240,7 @@ function Pocket({ card, onOpen }: { card: CollectionCard; onOpen: (uuid: string)
       onClick={() => onOpen(card.uuid)}
       onKeyDown={(e) => e.key === "Enter" && onOpen(card.uuid)}
     >
-      <div className="thumb">
+      <div className={`thumb ${"setCode" in card ? cornersClass(card.setCode as string) : ""}`}>
         {/* Not lazy: a binder shows one spread at a time (18 cards), and the next ones are
             preloaded; waiting for the observer only delayed each page. */}
         {total > 0 ? (

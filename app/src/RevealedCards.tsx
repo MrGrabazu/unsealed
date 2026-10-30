@@ -2,6 +2,7 @@ import type { OpenedCard } from "./api";
 import { isBigCard } from "./BatchOpening";
 import { SellCardButton, type BoosterSale } from "./BoosterSale";
 import { CardImage } from "./CardImage";
+import { cornersClass } from "./corners";
 import { FoilSheen } from "./foils";
 import { useI18n } from "./i18n";
 import { Money } from "./money";
@@ -38,7 +39,7 @@ export function RevealedCards({
           onKeyDown={(e) => e.key === "Enter" && onDetails(card)}
           title={t("details.open")}
         >
-          <div className="thumb">
+          <div className={`thumb ${cornersClass(card.setCode)}`}>
             <CardImage front={card.imageUrl} back={card.backImageUrl} alt={card.name} />
             {card.foil && <FoilSheen rarity={card.rarity} kind={card.foilKind} />}
             <NewBadge card={card} />

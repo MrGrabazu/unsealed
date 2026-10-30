@@ -62,20 +62,26 @@ code { background: var(--panel); padding: 2px 6px; border-radius: 4px; }
 
 .card-slot { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 
+/* Card corners, measured on Scryfall's images (corners.ts): the same radius across and down,
+   so a share of the width, then that radius as a share of the height (× 63 / 88). Alpha's
+   cards were cut rounder. */
+:root { --card-radius: 4.12% / 2.95%; }
+.alpha-corners { --card-radius: 6.87% / 4.92%; }
+
 /* Card format: 63 x 88 mm. */
 .card {
   position: relative;
   width: 100%;
   aspect-ratio: 63 / 88;
   transform-style: preserve-3d;
-  border-radius: 4.5%;
+  border-radius: var(--card-radius);
 }
 .card.clickable { cursor: pointer; box-shadow: 0 0 0 3px var(--accent), 0 0 24px #e0a52655; }
 
 .face {
   position: absolute;
   inset: 0;
-  border-radius: 4.5%;
+  border-radius: var(--card-radius);
   overflow: hidden;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
@@ -163,7 +169,7 @@ footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #2a2c3a; col
 .progress-label { color: var(--muted); margin: 8px 0 18px; }
 
 .collection-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px 12px; }
-.collection-card .thumb { position: relative; aspect-ratio: 63 / 88; border-radius: 4.5%; overflow: hidden; background: #000; }
+.collection-card .thumb { position: relative; aspect-ratio: 63 / 88; border-radius: var(--card-radius); overflow: hidden; background: #000; }
 .collection-card .thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
 /* Missing cards stay visible but greyed out. */
 .collection-card.missing .thumb img { filter: grayscale(1) brightness(0.35); }
@@ -225,12 +231,12 @@ footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #2a2c3a; col
 .binder-page.right { border-radius: 2px 8px 8px 2px; }
 .binder-pockets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 10px; }
 .pocket { position: relative; min-width: 0; cursor: pointer; }
-.pocket .thumb { position: relative; aspect-ratio: 63 / 88; border-radius: 4.5%; overflow: hidden; background: #0006; }
+.pocket .thumb { position: relative; aspect-ratio: 63 / 88; border-radius: var(--card-radius); overflow: hidden; background: #0006; }
 .pocket .thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
 /* The plastic sleeve: a faint glare over the card, and an outline even when empty. */
-.pocket .thumb::after, .pocket.empty::after { content: ""; position: absolute; inset: 0; border-radius: 4.5%; pointer-events: none;
+.pocket .thumb::after, .pocket.empty::after { content: ""; position: absolute; inset: 0; border-radius: var(--card-radius); pointer-events: none;
   background: linear-gradient(125deg, #ffffff14 0%, transparent 30%, transparent 70%, #ffffff0a 100%); box-shadow: inset 0 0 0 1px #ffffff1c; }
-.pocket.empty { aspect-ratio: 63 / 88; border-radius: 4.5%; background: #0000001f; cursor: default; }
+.pocket.empty { aspect-ratio: 63 / 88; border-radius: var(--card-radius); background: #0000001f; cursor: default; }
 /* A missing card: an empty sleeve holding a scrap of paper written by hand (Placeholder). */
 .pocket.missing .thumb { background: #00000026; container-type: inline-size; }
 .paper { position: absolute; left: 50%; top: 50%; width: var(--paper-width); height: var(--paper-height);
@@ -397,7 +403,7 @@ button.sell.confirm { background: #7a1d1d; border-color: #c24040; color: #fff; }
 .scene-frame canvas { cursor: grab; }
 .scene-frame canvas:active { cursor: grabbing; }
 .scene-hint { text-align: center; }
-.revealed-card .thumb { position: relative; aspect-ratio: 63 / 88; border-radius: 4.5%; overflow: hidden; background: #000; }
+.revealed-card .thumb { position: relative; aspect-ratio: 63 / 88; border-radius: var(--card-radius); overflow: hidden; background: #000; }
 .revealed-card .thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .revealed-row.final { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); margin-top: 8px; }
 .revealed-row.final .revealed-card { animation: card-in 0.35s ease-out backwards; animation-delay: calc(var(--i, 0) * 30ms); }
@@ -435,7 +441,7 @@ label.checkbox { display: inline-flex; align-items: center; gap: 8px; cursor: po
 .modal { position: relative; background: var(--bg); border: 1px solid #343748; border-radius: 14px; width: min(1080px, 100%); max-height: 100%; overflow: auto; padding: 24px; box-shadow: 0 20px 60px #000c; }
 .modal-close { position: absolute; top: 12px; right: 12px; width: 34px; height: 34px; padding: 0; font-size: 20px; line-height: 1; border-radius: 50%; }
 .details-layout { display: grid; grid-template-columns: minmax(240px, 340px) 1fr; gap: 24px; }
-.details-image { position: relative; aspect-ratio: 63 / 88; border-radius: 4.5%; overflow: hidden; background: #000; }
+.details-image { position: relative; aspect-ratio: 63 / 88; border-radius: var(--card-radius); overflow: hidden; background: #000; }
 .details-image img:not(.mana) { width: 100%; height: 100%; object-fit: contain; display: block; }
 .details-info h2 { margin-top: 0; }
 .details-face { border-top: 1px solid #2a2c3a; padding-top: 10px; margin-top: 10px; }

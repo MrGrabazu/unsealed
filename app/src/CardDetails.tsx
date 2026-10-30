@@ -3,6 +3,7 @@ import { getCardDetails, type CardDetailsView } from "./api";
 import { Backdrop } from "./Backdrop";
 import { BackToTop } from "./BackToTop";
 import { CardImage, NearImage } from "./CardImage";
+import { cornerOf, cornersClass } from "./corners";
 import { foilLabel } from "./foils";
 import { largeImage } from "./images";
 import { CARD_LANGUAGES, useI18n, type I18n } from "./i18n";
@@ -82,6 +83,7 @@ export function CardDetails({ setCode, uuid, foil, onClose }: Props) {
         foil: shownFoil,
         foilLabel: shownFoil ? (foilLabel(d.foilKind) ?? t(d.rarity === "art" ? "collection.signedBadge" : "collection.foilBadge")) : null,
         newLabel: null,
+        corner: cornerOf(d.setCode),
       },
       subtitle: t("details.set", { set: d.setName, number: d.number, rarity: rarityName(t, d.rarity) }),
       priceLabel: t("share.marketValue"),
@@ -101,7 +103,7 @@ export function CardDetails({ setCode, uuid, foil, onClose }: Props) {
         {details && (
           <div className={`details-layout ${reading && turned ? `turned-${reading}` : ""}`}>
             <div className="details-image-col">
-            <div className="details-image">
+            <div className={`details-image ${cornersClass(details.setCode)}`}>
               {/* Shown large: the sharper image. */}
               <CardImage
                 front={largeImage(details.imageUrl)}

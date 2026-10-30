@@ -95,7 +95,10 @@
 .season-moon { z-index: 9; top: calc(var(--hud-h) + 24px); right: 26%; }
 /* Behind the panels: over them, it dimmed their buttons. */
 .season-fog { z-index: 9; left: var(--rail-w); right: 0; bottom: 0; height: 150px; overflow: hidden; }
-.season-fog i { position: absolute; bottom: -40px; width: 40%; height: 140px; border-radius: 50%; filter: blur(22px); animation: season-fog 18s ease-in-out infinite alternate; }
+/* Soft by its own gradient: a blur filter, animated, made WebKit (macOS) repaint the screen
+   at every frame, and every scroll lag. */
+.season-fog i { position: absolute; bottom: -62px; width: 46%; height: 184px; margin-left: -3%;
+  background: radial-gradient(closest-side, var(--fog) 45%, transparent); animation: season-fog 18s ease-in-out infinite alternate; }
 @keyframes season-fog { from { transform: translateX(-120px); } to { transform: translateX(160px); } }
 .season-bat { z-index: 32; left: 0; animation: season-bat 10s linear infinite; }
 @keyframes season-bat { 0% { transform: translate(-80px, 60px) scale(.7); } 50% { transform: translate(50vw, -20px) scale(1); } 100% { transform: translate(calc(100vw + 80px), 80px) scale(.7); } }
@@ -388,7 +391,10 @@ button.big:disabled { filter: grayscale(.6) brightness(.7); }
 .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 16px; margin-bottom: 18px; }
 button.slot { position: relative; height: 150px; padding: 0; border: none; border-radius: 6px; overflow: hidden; text-align: left; letter-spacing: 0;
   background: radial-gradient(circle at 50% 40%, var(--slot-hue, #4a3220), #160e08); box-shadow: 0 0 0 1px #000, 0 0 0 2px #6b4d2a, 0 0 0 4px #1a110a, 0 0 0 5px #d9a44144, 0 6px 12px #000b;
-  transition: transform .15s, box-shadow .15s; }
+  transition: transform .15s, box-shadow .15s;
+  /* About 190 slots: the browser skips drawing those far from sight (WebKit on macOS lagged
+     scrolling them all). */
+  content-visibility: auto; contain-intrinsic-size: auto 150px; }
 button.slot:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 0 0 1px #000, 0 0 0 2px var(--accent), 0 0 0 4px #1a110a, 0 0 0 5px #d9a44188, 0 8px 14px #000b; }
 button.slot.sel { transform: translateY(-3px); box-shadow: 0 0 0 1px #000, 0 0 0 2px var(--gold-hi), 0 0 0 4px #3a2208, 0 0 0 5px var(--gold-hi), 0 0 24px #f5b84a99, 0 8px 16px #000b; }
 .slot > img.slot-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 30%; }
@@ -404,10 +410,14 @@ button.slot.sel { transform: translateY(-3px); box-shadow: 0 0 0 1px #000, 0 0 0
 .slot-plate span { display: flex; align-items: center; gap: 5px; margin-top: 3px; font: 700 13px var(--font-title); color: var(--gold-hi); }
 .slot-new { position: absolute; z-index: 3; right: -26px; top: 12px; transform: rotate(45deg); width: 100px; text-align: center; font: 800 10px var(--font-title); letter-spacing: .14em;
   color: #fff; background: linear-gradient(180deg, #c8323a, #8e1c22); box-shadow: 0 2px 4px #000a; }
-.star-toggle { width: 26px; height: 26px; display: grid; place-items: center; cursor: pointer; }
-.star-toggle svg { width: 21px; height: 21px; fill: none; stroke: var(--gold-hi); stroke-width: 1.6; stroke-linejoin: round; filter: drop-shadow(0 1px 2px #000); transition: transform .15s; }
+/* Its shadow and glow are a gradient behind it, not a filter: a drop-shadow on each of ~190
+   stars made WebKit (macOS) lag scrolling the Boosterium. */
+.star-toggle { width: 26px; height: 26px; display: grid; place-items: center; cursor: pointer; border-radius: 50%;
+  background: radial-gradient(closest-side, #000a, #0000); }
+.star-toggle svg { width: 21px; height: 21px; fill: none; stroke: var(--gold-hi); stroke-width: 1.6; stroke-linejoin: round; transition: transform .15s; }
 .star-toggle:hover svg { transform: scale(1.15); }
-.star-toggle.on svg { fill: var(--gold-hi); filter: drop-shadow(0 0 4px #ffd27a); }
+.star-toggle.on { background: radial-gradient(closest-side, #ffd27a88, #ffd27a00); }
+.star-toggle.on svg { fill: var(--gold-hi); }
 
 .set-plate-art { position: relative; height: 170px; flex: none; border-radius: 4px; overflow: hidden; box-shadow: 0 0 0 1px #000, 0 0 0 3px #d9a441aa, 0 0 0 4px #000, 0 8px 18px #000b;
   background: radial-gradient(circle at 50% 45%, #4a3220, #160e08); display: grid; place-items: center; }
@@ -806,7 +816,7 @@ button.curios-slot { display: block; width: 100%; height: 96px; margin-bottom: 1
    them); a missing one an empty card-shaped place with its scrap of paper. */
 .museum-fresco { display: grid; grid-template-columns: repeat(var(--columns), var(--cw)); }
 .scene-cell { width: var(--cw); cursor: inherit; }
-.scene-cell .thumb { border-radius: 4.8% / 3.4%; background: transparent; }
+.scene-cell .thumb { border-radius: var(--card-radius); background: transparent; }
 .scene-cell .thumb::after { display: none; }
 .scene-cell.missing .thumb { background: #00000059; box-shadow: inset 0 0 0 1px #f5d68a1f; }
 
@@ -862,7 +872,7 @@ button.curios-slot { display: block; width: 100%; height: 96px; margin-bottom: 1
 .stat-bar-row .bar { height: 12px; }
 .stat-bar-row b { font-family: var(--font-title); color: var(--gold-hi); text-align: right; }
 .stat-pulls { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
-.pull-thumb { position: relative; aspect-ratio: 63 / 88; border-radius: 4.6% / 3.4%; overflow: hidden; box-shadow: 0 4px 10px #000c; }
+.pull-thumb { position: relative; aspect-ratio: 63 / 88; border-radius: var(--card-radius); overflow: hidden; box-shadow: 0 4px 10px #000c; }
 .pull-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .stat-pulls > div { min-width: 0; align-self: start; }
 .pull-thumb.mythic { box-shadow: 0 0 0 2px #ff9a4a, 0 0 16px #ff7a2acc, 0 4px 10px #000c; }
@@ -907,7 +917,7 @@ button.curios-slot { display: block; width: 100%; height: 96px; margin-bottom: 1
 .seen-strip { position: absolute; z-index: 2; top: 0; right: 0; bottom: 0; width: 112px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 4px 8px 4px 4px; }
 button.seen-card { position: relative; flex: none; padding: 0; border: none; background: none; box-shadow: none; letter-spacing: 0; animation: seen-in .3s ease-out; }
 button.seen-card:hover:not(:disabled) { box-shadow: none; transform: translateX(-3px); }
-.seen-card .thumb { position: relative; display: block; aspect-ratio: 63 / 88; border-radius: 4.6% / 3.4%; overflow: hidden; background: #000; box-shadow: 0 4px 10px #000c; }
+.seen-card .thumb { position: relative; display: block; aspect-ratio: 63 / 88; border-radius: var(--card-radius); overflow: hidden; background: #000; box-shadow: 0 4px 10px #000c; }
 .seen-card .thumb img { width: 100%; height: 100%; display: block; object-fit: contain; }
 .seen-card.mythic .thumb { box-shadow: 0 0 0 2px #ff9a4a, 0 0 12px #ff7a2acc; }
 .seen-card.rare .thumb { box-shadow: 0 0 0 2px var(--gold-hi), 0 0 10px #f5b84a99; }
@@ -972,7 +982,7 @@ button.seen-card:hover:not(:disabled) { box-shadow: none; transform: translateX(
 .assembly { margin: 0; }
 .assembly-pair { position: relative; height: calc(var(--w) * 680 / 488); width: calc(var(--w) * (1 + var(--aug) - var(--host))); }
 .assembly-pair > div { position: absolute; top: 0; width: var(--w); height: 100%; cursor: zoom-in; }
-.assembly-pair > div img { width: 100%; height: 100%; display: block; border-radius: 4.5% / 3.3%; transition: filter .15s; }
+.assembly-pair > div img { width: 100%; height: 100%; display: block; border-radius: var(--card-radius); transition: filter .15s; }
 .assembly-pair > .assembly-host { left: calc(var(--w) * (var(--aug) - var(--host))); z-index: 1; }
 .assembly-pair > .assembly-augment { left: 0; z-index: 2; clip-path: inset(0 calc((1 - var(--cut)) * 100%) 0 0); }
 /* A card not owned yet: darkened in grey on its side, like a missing card of the grid (never
@@ -1039,7 +1049,7 @@ button.bet-add { width: 100%; margin-top: 10px; padding: 9px; border: 1px dashed
 .home-hero { position: relative; display: flex; justify-content: center; padding-top: 60px; }
 .home-hero .home-title { position: relative; z-index: 3; width: min(700px, 90vw); filter: drop-shadow(0 10px 20px #000); }
 .home-fan { position: absolute; z-index: 1; left: 50%; top: 10px; width: 0; height: 0; pointer-events: none; }
-.home-fan img { position: absolute; left: -85px; top: 0; width: 170px; border-radius: 4.6% / 3.4%; transform-origin: 50% 160%;
+.home-fan img { position: absolute; left: -85px; top: 0; width: 170px; border-radius: var(--card-radius); transform-origin: 50% 160%;
   opacity: .3; box-shadow: 0 8px 20px #000; animation: fan-in .8s ease-out both; }
 @keyframes fan-in { from { opacity: 0; } }
 .home-panel.frame { padding-top: 30px; }

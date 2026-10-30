@@ -37,7 +37,9 @@ body {
     radial-gradient(#00000030 0.7px, transparent 1.4px);
   background-size: 100% 100%, 100% 100%, 5px 5px, 7px 7px;
   background-position: 0 0, 0 0, 0 0, 2px 3px;
-  background-attachment: fixed;
+  /* Never `background-attachment: fixed`: the page never scrolls (the game is a fixed screen),
+     and on WebKit (macOS) a fixed background forces a repaint at every scroll of a panel. */
+  min-height: 100vh;
 }
 
 h1, h2, h3, .shop-name, .stat-title, .tabs button, .home-menu button, .binder-tab, .segmented button {
@@ -215,7 +217,7 @@ button.brand-link { display: inline-flex; align-items: center; gap: 8px; white-s
   border-top: 1px solid var(--edge); border-bottom: 1px solid var(--edge); }
 .sale-lines li { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 6px 4px; border-bottom: 1px solid #3d2b1b; }
 .sale-lines li:last-child { border-bottom: none; }
-.sale-thumb { position: relative; width: 34px; aspect-ratio: 63 / 88; border-radius: 3px; overflow: hidden; }
+.sale-thumb { position: relative; width: 34px; aspect-ratio: 63 / 88; border-radius: var(--card-radius); overflow: hidden; }
 .sale-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .sale-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sale-name .tag { margin-left: 6px; font-size: 11px; }

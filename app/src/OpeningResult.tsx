@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import type { OpenedCard, SealedStack, SetSummary, SettledBet, SkippedBet } from "./api";
 import { BackToTop } from "./BackToTop";
 import { BetResults } from "./BetResults";
+import { cornerOf } from "./corners";
 import { kindLabel } from "./boosterKinds";
 import { SellDuplicatesButton, useBoosterSale } from "./BoosterSale";
 import { useI18n } from "./i18n";
@@ -76,6 +77,7 @@ export function OpeningResult(props: Props) {
       foil: c.foil,
       foilLabel: c.foil ? (foilLabel(c.foilKind) ?? t(c.rarity === "art" ? "collection.signedBadge" : "collection.foilBadge")) : null,
       newLabel: c.isNew ? t("open.new") : c.newFoil ? t("open.newFoil") : null,
+      corner: cornerOf(c.setCode),
     })),
     best: best ? cards.indexOf(best) : 0,
     bestLabel: t("open.tallyBest"),

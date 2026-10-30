@@ -728,7 +728,14 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     run(async () => {
       await buyBoosters(item.setCode, item.kind, quantity);
       sounds.coins();
+      // Opened at once, the opening says it; else only the balance would.
       if (openNow) open(item.setCode, item.kind);
+      else
+        setNotice(
+          t("shop.boughtText", { quantity, kind: kindLabel(t, item.kind), set: item.setName }),
+          "pack",
+          t("shop.bought"),
+        );
     });
 
   // What the keys do on this screen (shown by the last bookmark of the rail).
