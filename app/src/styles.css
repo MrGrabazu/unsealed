@@ -141,6 +141,21 @@ code { background: var(--panel); padding: 2px 6px; border-radius: 4px; }
   animation: foil-halo 6s linear infinite;
 }
 @keyframes foil-halo { to { --foil-hue: 360; } }
+/* In lists (the grid, the binder and its groups, the cards seen beside an opening, a sale), a
+   foil holds still until hovered: its gradients, mask and halo animate custom properties,
+   which the browser repaints at every frame, foil by foil; on a large screen full of foils,
+   WebKit (macOS) lagged. Held a third into its light's way, so its band shows on the card. */
+:is(.collection-card, .pocket, .seen-card, .sale-thumb.thumb) :is(.foil-sheen, .foil-stars),
+:is(.collection-card, .pocket, .seen-card, .sale-thumb.thumb) :is(.foil-sheen, .foil-stars)::before,
+:is(.collection-card, .pocket, .seen-card, .sale-thumb.thumb) :is(.foil-sheen, .foil-stars)::after { animation-delay: -1.4s; }
+:is(.collection-card, .pocket, .seen-card):not(:hover) .thumb,
+:is(.collection-card, .pocket, .seen-card):not(:hover) :is(.foil-sheen, .foil-stars),
+:is(.collection-card, .pocket, .seen-card):not(:hover) :is(.foil-sheen, .foil-stars)::before,
+:is(.collection-card, .pocket, .seen-card):not(:hover) :is(.foil-sheen, .foil-stars)::after,
+.sale-thumb.thumb, .sale-thumb.thumb :is(.foil-sheen, .foil-stars),
+.sale-thumb.thumb :is(.foil-sheen, .foil-stars)::before, .sale-thumb.thumb :is(.foil-sheen, .foil-stars)::after {
+  animation-play-state: paused;
+}
 
 .card-caption { display: flex; justify-content: space-between; width: 100%; font-size: 13px; opacity: 0; transition: opacity 0.4s 0.3s; }
 .card-caption.visible { opacity: 1; }
@@ -345,11 +360,13 @@ button.sell.confirm { background: #7a1d1d; border-color: #c24040; color: #fff; }
 
 /* Batch opening: smaller cards, big pulls pulse. */
 .cards.compact { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 14px 10px; }
-.big { animation: big-pulse 0.9s ease-in-out infinite alternate; border-radius: 6px; }
-@keyframes big-pulse {
-  from { filter: drop-shadow(0 0 4px var(--accent)); }
-  to { filter: drop-shadow(0 0 16px var(--accent)); }
-}
+/* Only the batch's cards (`.big` also names the large gilded buttons, which it made pulse
+   too), and by the opacity of a glow behind the card: an animated filter repainted each card
+   at every frame (WebKit, on macOS, lagged). */
+.cards > .big { position: relative; isolation: isolate; border-radius: 6px; }
+.cards > .big::before { content: ""; position: absolute; z-index: -1; inset: 0; border-radius: 6px; pointer-events: none;
+  box-shadow: 0 0 16px 2px var(--accent); animation: big-pulse 0.9s ease-in-out infinite alternate; }
+@keyframes big-pulse { from { opacity: .25; } to { opacity: 1; } }
 
 .trend { display: inline-flex; align-items: center; gap: 8px; font-size: 0.85rem; white-space: nowrap; }
 .trend svg { color: var(--muted); }

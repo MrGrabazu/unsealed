@@ -458,6 +458,7 @@ export const de: Messages = {
   "sell.sell": "Verkaufen",
   "sell.confirm": "Bestätigen?",
   "library.empty": "Noch keine Ordner im Regal: Öffne einen Booster, um einen anzufangen.",
+  "library.reading": "Der Bibliothekar räumt die Ordner ein …",
   "library.summary_one": "{count} Ordner",
   "library.summary_other": "{count} Ordner",
   "library.cardCount_one": "{count} Karte",

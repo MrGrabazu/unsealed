@@ -458,6 +458,7 @@ export const it: Messages = {
   "sell.sell": "Vendi",
   "sell.confirm": "Confermi?",
   "library.empty": "Ancora nessun raccoglitore sugli scaffali: apri una busta per iniziarne uno.",
+  "library.reading": "Il bibliotecario sta sistemando i raccoglitori…",
   "library.summary_one": "{count} raccoglitore",
   "library.summary_other": "{count} raccoglitori",
   "library.cardCount_one": "{count} carta",

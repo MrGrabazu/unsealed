@@ -458,6 +458,7 @@ export const fr: Messages = {
   "sell.sell": "Vendre",
   "sell.confirm": "Confirmer ?",
   "library.empty": "Aucun classeur sur les étagères pour l'instant : ouvrez un booster pour en commencer un.",
+  "library.reading": "Le bibliothécaire range les classeurs…",
   "library.summary_one": "{count} classeur",
   "library.summary_other": "{count} classeurs",
   "library.cardCount_one": "{count} carte",

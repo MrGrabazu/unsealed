@@ -2,7 +2,6 @@ import { forwardRef, memo, useCallback, useEffect, useLayoutEffect, useMemo, use
 import { getLibrary, type LibraryBinder, type SetSummary } from "./api";
 import { coverOf, seeded } from "./Binder";
 import { useI18n } from "./i18n";
-import { Loading } from "./Loading";
 import { Money } from "./money";
 import { SetIcon } from "./SetIcon";
 
@@ -128,7 +127,7 @@ export function Library({ sets, refreshKey, onOpen }: Props) {
       binder,
       set: byCode.get(binder.setCode),
       width: widthOf(binder),
-      height: 226 + Math.round(seeded(binder.setCode, 103) * 22),
+      height: heightOf(binder.setCode),
     }));
   }, [binders, sets]);
 
@@ -150,7 +149,7 @@ export function Library({ sets, refreshKey, onOpen }: Props) {
   }, [books, width]);
 
   if (error) return <p className="error">{error}</p>;
-  if (!binders) return <Loading label={t("collection.loading")} />;
+  if (!binders) return <LibraryReading />;
 
   const totalValue = binders.reduce((sum, b) => sum + b.valueCents, 0);
   return (
@@ -177,6 +176,117 @@ export function Library({ sets, refreshKey, onOpen }: Props) {
         ))}
       </div>
       {hovered && <BinderTooltip ref={tipRef} book={hovered} />}
+    </div>
+  );
+}
+
+/** A binder's height on its shelf, and how high the binders reach above a shelf's top (keep
+ * in sync with `.shelf-books`). */
+const heightOf = (code: string) => 226 + Math.round(seeded(code, 103) * 22);
+const BOOKS_TOP = 14;
+const TALLEST = 248;
+
+/** The bookcase while its binders are read (mockup .cache/da/v12.html, C): binders drawn in
+ * dotted gold, of the usual sizes, and a candle wandering from spot to spot, most often from
+ * one shelf to the other, to light them. Only transforms and opacities move (no filter, no
+ * blend mode): the compositor moves them without repainting, even on WebKit (macOS). */
+function LibraryReading() {
+  const { t } = useI18n();
+  const caseRef = useRef<HTMLDivElement>(null);
+  const candleX = useRef<HTMLDivElement>(null);
+  const candleY = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+
+  useLayoutEffect(() => {
+    const node = caseRef.current;
+    if (!node) return;
+    const observer = new ResizeObserver(() => setWidth(node.clientWidth));
+    observer.observe(node);
+    setWidth(node.clientWidth);
+    return () => observer.disconnect();
+  }, []);
+
+  // Made-up binders filling the shelves, always the same ones.
+  const shelves = useMemo(() => {
+    const room = Math.max(200, width - SHELF_PADDING * 2);
+    let n = 0;
+    return Array.from({ length: MIN_SHELVES }, () => {
+      const row: { width: number; height: number }[] = [];
+      let used = -GAP;
+      for (;;) {
+        const key = `ghost-${n++}`;
+        const w = Math.round(34 + Math.pow(seeded(key, 101), 1.6) * 70);
+        if (used + GAP + w > room) break;
+        used += GAP + w;
+        row.push({ width: w, height: heightOf(key) });
+      }
+      return row;
+    });
+  }, [width]);
+
+  // The candle: the next spot at random, at a fair distance from the last; x and y glide with
+  // different easings (theme.css), so the way between two spots curves; a pause, then on.
+  useEffect(() => {
+    const box = caseRef.current;
+    const x = candleX.current;
+    const y = candleY.current;
+    if (!box || !x || !y) return;
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let shelf = 0;
+    let lastX = 0.15;
+    let timer = 0;
+    const go = (first: boolean) => {
+      const rows = box.querySelectorAll<HTMLElement>(".shelf");
+      if (rows.length === 0) return;
+      if (!first && Math.random() < 0.7) shelf = (shelf + 1) % rows.length;
+      let nx = lastX;
+      while (Math.abs(nx - lastX) < 0.2) nx = 0.06 + Math.random() * 0.88;
+      // The flame between the binders' middle and their upper third.
+      const top = rows[shelf].offsetTop + BOOKS_TOP + TALLEST * (0.3 + Math.random() * 0.25);
+      const move = first ? 0 : 1.8 + Math.abs(nx - lastX) * 3.2 + Math.random() * 0.6;
+      x.style.setProperty("--move", `${move}s`);
+      y.style.setProperty("--move", `${move}s`);
+      x.style.transform = `translateX(${nx * box.clientWidth}px)`;
+      y.style.transform = `translateY(${top}px)`;
+      lastX = nx;
+      if (!still) timer = window.setTimeout(() => go(false), (move + 0.5 + Math.random() * 0.9) * 1000);
+    };
+    const frame = requestAnimationFrame(() => go(true));
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(timer);
+    };
+  }, []);
+
+  return (
+    <div className="library" aria-busy="true">
+      <p className="progress-label">{t("collection.loading")}</p>
+      <div className="bookcase reading" ref={caseRef}>
+        {shelves.map((row, i) => (
+          <div key={i} className="shelf" aria-hidden="true">
+            <div className="shelf-books">
+              {row.map((b, j) => (
+                <span key={j} className="ghost-spine" style={{ width: b.width, height: b.height }} />
+              ))}
+            </div>
+            <div className="shelf-plank" />
+          </div>
+        ))}
+        <div className="candle" ref={candleX} aria-hidden="true">
+          <div className="candle-y" ref={candleY}>
+            <div className="candle-light" />
+            <div className="candle-bob">
+              <div className="candle-stick">
+                <i />
+                <i />
+              </div>
+              <div className="candle-holder" />
+              <div className="candle-flame" />
+            </div>
+          </div>
+        </div>
+        <p className="reading-caption">{t("library.reading")}</p>
+      </div>
     </div>
   );
 }

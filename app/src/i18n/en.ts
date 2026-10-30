@@ -466,6 +466,7 @@ export const en = {
   "sell.sell": "Sell",
   "sell.confirm": "Confirm?",
   "library.empty": "No binder on the shelves yet: open a booster to start one.",
+  "library.reading": "The librarian is shelving the binders…",
   "library.summary_one": "{count} binder",
   "library.summary_other": "{count} binders",
   "library.cardCount_one": "{count} card",

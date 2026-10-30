@@ -458,6 +458,7 @@ export const es: Messages = {
   "sell.sell": "Vender",
   "sell.confirm": "¿Confirmar?",
   "library.empty": "Aún no hay carpetas en las estanterías: abre un sobre para empezar una.",
+  "library.reading": "El bibliotecario está colocando las carpetas…",
   "library.summary_one": "{count} carpeta",
   "library.summary_other": "{count} carpetas",
   "library.cardCount_one": "{count} carta",

@@ -340,6 +340,43 @@ button.bet-remove { width: 28px; height: 28px; padding: 0; border-radius: 50%; }
 .shelf-plank::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 22px;
   background: linear-gradient(180deg, #0009, transparent); pointer-events: none; }
 
+/* The bookcase while it is read (LibraryReading of Library.tsx): in the dark, binders drawn
+   in dotted gold, and a candle carried along the shelves. Only transforms and opacities move,
+   each moving part a layer of its own: no filter, no blend mode (its light is a plain
+   translucent gradient), nothing repainted as it goes, even on WebKit (macOS). */
+.bookcase.reading { overflow: hidden; background: radial-gradient(ellipse at 50% 0%, #24170d 0%, #120b06 80%); }
+.ghost-spine { position: relative; flex: none; border-radius: 4px 4px 2px 2px; border: 1px dashed #d9a44155; }
+.ghost-spine::before { content: ""; position: absolute; left: 7px; right: 7px; top: 46px; bottom: 30px; border-radius: 3px; border: 1px solid #d9a44133; }
+.reading-caption { position: absolute; z-index: 5; left: 0; right: 0; bottom: 34px; margin: 0; text-align: center; font: 700 13px var(--font-title);
+  letter-spacing: .22em; text-transform: uppercase; color: #f5d68acc; text-shadow: 0 1px 2px #000; pointer-events: none; }
+/* Across (its own easing) and down (another): the way between two spots curves. */
+.candle { position: absolute; z-index: 4; left: 0; top: 0; width: 0; height: 0; pointer-events: none; will-change: transform;
+  transition: transform var(--move, 2.6s) cubic-bezier(.45, .05, .35, 1); }
+.candle-y { position: absolute; will-change: transform; transition: transform var(--move, 2.6s) cubic-bezier(.6, 0, .25, 1); }
+.candle-light { position: absolute; left: -210px; top: -190px; width: 420px; height: 380px; will-change: transform, opacity;
+  background: radial-gradient(closest-side, #ffc46a2e, #ffb35a12 55%, transparent); animation: candle-breathe 2.2s ease-in-out infinite alternate; }
+.candle-bob { position: absolute; will-change: transform; animation: candle-bob 1.9s ease-in-out infinite alternate; }
+.candle-flame { position: absolute; left: -5px; top: -14px; width: 10px; height: 18px; border-radius: 50% 50% 45% 45%; transform-origin: 50% 100%; will-change: transform, opacity;
+  background: radial-gradient(circle at 50% 70%, #fff6d8, #ffc24a 45%, #ff7a1a00 75%); box-shadow: 0 0 22px 8px #ffb35a66;
+  animation: candle-flicker .18s infinite alternate; }
+.candle-flame::after { content: ""; position: absolute; left: 4px; top: 16px; width: 2px; height: 5px; background: #2a1a0c; border-radius: 1px; }
+/* The candle itself: wax lit from above, two drips, in a brass chamberstick with its handle. */
+.candle-stick { position: absolute; left: -8px; top: 6px; width: 16px; height: 46px; border-radius: 3px 3px 1px 1px;
+  background: linear-gradient(180deg, #fff8e033, transparent 40%), linear-gradient(90deg, #b8a27a, #f3e6c4 35%, #fff3d6 50%, #d8c49c 80%, #a48e66);
+  box-shadow: inset 0 3px 3px -1px #fff7dd, inset 0 -6px 8px #0005; }
+.candle-stick::before { content: ""; position: absolute; left: 1px; right: 1px; top: -2px; height: 5px; border-radius: 50%; background: radial-gradient(ellipse at 50% 60%, #fff6d8, #e6d3a8); }
+.candle-stick i { position: absolute; top: 0; width: 4px; border-radius: 0 0 3px 3px; background: linear-gradient(90deg, #e9d8b0, #fff3d6, #d9c59c); }
+.candle-stick i:nth-child(1) { left: 1px; height: 15px; }
+.candle-stick i:nth-child(2) { right: 3px; height: 9px; }
+.candle-holder { position: absolute; left: -22px; top: 50px; width: 44px; height: 9px; border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 30%, #ffe3a0, #b07a2c 55%, #5a3a12); box-shadow: 0 3px 6px #000a; }
+.candle-holder::before { content: ""; position: absolute; left: 13px; top: -4px; width: 18px; height: 6px; border-radius: 3px 3px 0 0; background: linear-gradient(90deg, #6a4618, #e9b860 45%, #8a5c22); }
+.candle-holder::after { content: ""; position: absolute; left: 36px; top: -9px; width: 14px; height: 14px; border-radius: 50%; border: 3px solid #b07a2c; border-left-color: transparent; }
+@keyframes candle-flicker { from { transform: scale(1, 1) skewX(-3deg); opacity: .9; } to { transform: scale(.92, 1.08) skewX(3deg); opacity: 1; } }
+@keyframes candle-breathe { from { opacity: .85; transform: scale(.97); } to { opacity: 1; transform: scale(1.03); } }
+@keyframes candle-bob { from { transform: translate(-3px, -4px); } to { transform: translate(3px, 4px); } }
+@media (prefers-reduced-motion: reduce) { .candle-light, .candle-bob, .candle-flame { animation: none; } }
+
 /* A binder's spine: its cover's colour and material, a paper label with the set's name. */
 button.library-spine { position: relative; flex: none; display: flex; flex-direction: column; align-items: center; gap: 8px;
   padding: 10px 0 10px; border: none; border-radius: 4px 4px 2px 2px; overflow: hidden; cursor: pointer;
