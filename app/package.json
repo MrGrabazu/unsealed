@@ -2,7 +2,7 @@
   "name": "unsealed-app",
   "private": true,
   "license": "GPL-3.0-or-later",
-  "version": "0.9.15",
+  "version": "0.9.16",
   "type": "module",
   "scripts": {
     "dev": "vite",
