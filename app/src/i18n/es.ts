@@ -50,15 +50,17 @@ export const es: Messages = {
   "craftedNote.content":
     "5 cartas y una ficha: 3 comunes, un foil de cualquier rareza, y una infrecuente, una rara o una mítica. Aquí la rareza de una carta viene de su precio de mercado, las más caras son míticas. Los drops se completan en Colección › Conjuntos.",
   "kind.japanese": "{kind} japonés",
-  "jpNote.title": "Un sobre venido de Japón",
+  "jpNote.title": "Cartas venidas de Japón",
   "jpNote.why":
-    "Vendido solo en Japón. El juego no ofrece sobres por idioma, pero este contiene cartas que ningún otro sobre da, así que se ofrece aparte. Sus cartas salen en japonés; la carpeta mantiene el idioma de cartas elegido.",
+    "Los sobres de esta edición vendidos en Japón contienen cartas que ningún otro sobre da. El juego no vende sobres por idioma, pero a veces una de esas cartas se esconde en este, en japonés; la carpeta mantiene el idioma de cartas elegido.",
+  "jpNote.sealed":
+    "Vendido solo en Japón, este sobre da las mismas cartas que su equivalente inglés, más algunas propias: el Boosterium ya no lo vende, esas cartas se esconden ahora en los sobres ingleses. Los comprados antes se siguen abriendo, con sus cartas en japonés.",
   "jpNote.WAR":
-    "Cada planeswalker de la edición puede salir en una versión con ilustración alternativa de un artista japonés (36 cartas, entre ellas Liliana por Yoshitaka Amano): alrededor de un sobre de cada dos contiene una, a veces en foil. Para reconocerla: una estrella ★ tras su número de colección, una ilustración de estilo manga y el nombre del artista escrito en japonés en la carta.",
+    "Un planeswalker con ilustración alternativa de un artista japonés (36 cartas, entre ellas Liliana por Yoshitaka Amano), a veces en foil: alrededor de un sobre de draft de cada 20. Para reconocerlo: una estrella ★ tras su número de colección, una ilustración de estilo manga y el nombre del artista escrito en japonés en la carta.",
   "jpNote.IKO":
-    "La serie Godzilla (cartas n.º 370 a 387) sale más a menudo, sus cartas con el nombre japonés de los monstruos de las películas: alrededor de un sobre de draft de cada siete, un sobre de coleccionista de cada cuatro.",
+    "Una carta de la serie Godzilla japonesa (n.º 370 a 387), con el nombre japonés de los monstruos de las películas: alrededor de un sobre de draft de cada 70, un sobre de coleccionista de cada 40.",
   "jpNote.STX":
-    "Su carta del Mystical Archive es la versión japonesa con ilustración alternativa (STA n.º 64 a 126), dibujada por artistas japoneses, con el nombre del artista en japonés: alrededor de un sobre de cada dos.",
+    "La versión japonesa con ilustración alternativa de una carta del Mystical Archive (STA n.º 64 a 126), dibujada por artistas japoneses, con el nombre del artista en japonés: alrededor de un sobre de cada 20.",
   "kind.theme": "Sobre temático · {theme}",
   "theme.w": "Blanco",
   "theme.u": "Azul",
@@ -254,6 +256,7 @@ export const es: Messages = {
   "open.mentionNew": "Carta nueva",
   "open.mentionNewFoil": "Primera foil de esta carta",
   "open.mentionSecretLair": "¡Una carta Secret Lair se escondía en este sobre!",
+  "open.mentionJapanese": "¡Una carta venida de Japón se escondía en este sobre!",
   "pack.tear": "Haz clic en el sobre para rasgarlo",
   "scene.tearHint": "Desliza a lo largo de la parte superior del sobre para rasgarlo, o simplemente haz clic en él.",
   "scene.shakeHint": "Mantén pulsado el sobre y muévelo para agitarlo.",

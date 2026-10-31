@@ -548,7 +548,9 @@ impl Game {
         let opened = self.opened_counts();
         let mut items = Vec::new();
         for set in self.list_sets()? {
-            for kind in &set.boosters {
+            // Japan's boosters give their English kind's cards: their own hide in those
+            // (`japanese_guest`). Sealed ones still open.
+            for kind in set.boosters.iter().filter(|k| booster_language(k).is_none()) {
                 let price_cents = self.booster_price(&set.code, kind);
                 items.push(ShopItem {
                     price_cents,
@@ -624,6 +626,9 @@ impl Game {
         self.ensure_loaded(set_code)?;
         if !self.sets[set_code].file.boosters.contains_key(kind) {
             return Err(format!("set {set_code} has no `{kind}` booster"));
+        }
+        if booster_language(kind).is_some() {
+            return Err(format!("the `{kind}` booster is not sold"));
         }
         self.ensure_prices();
         let price = self.booster_price(set_code, kind);
@@ -791,17 +796,19 @@ impl Game {
         // Each card with the set it comes from: the booster's, or a crafted set's for a card
         // hiding in it (a Secret Lair card, drawn after the others, never changing them).
         let mut drawn: Vec<(String, DrawnCard)> = drawn.into_iter().map(|d| (set_code.to_string(), d)).collect();
+        drawn.extend(self.japanese_guest(set_code, kind)?);
         drawn.extend(self.crafted_guest(set_code, kind)?);
 
         let Self { sets, prices, economy, card_lang, print_runs, limited, image_quality, .. } = self;
-        // A Japanese booster's cards are shown in Japanese, as they come out of it.
+        // A Japanese booster's cards are shown in Japanese, as they come out of it, and so is a
+        // card of one hiding in an English booster.
         let japanese = booster_language(kind);
         let mut cards: Vec<OpenedCard> = drawn
             .into_iter()
             .map(|(code, d)| {
                 let set = &sets[&code];
                 let card = &set.file.cards[set.index[&d.uuid]];
-                let japanese = japanese.filter(|_| code == set_code);
+                let japanese = if d.sheet == JAPANESE_GUEST_SHEET { Some("ja") } else { japanese.filter(|_| code == set_code) };
                 let card_lang = japanese.unwrap_or(card_lang.as_str());
                 let own = |foil| market_price(prices.as_ref(), economy, limited, print_runs, &d.uuid, foil);
                 let unpriced = own(false).is_none() && own(true).is_none();
@@ -838,7 +845,9 @@ impl Game {
             card.sell_value_cents = card.price_cents.map_or(0, |p| self.sell_value_of(&card.uuid, card.foil, p));
         }
 
-        let drawn: Vec<(String, bool)> = cards.iter().map(|c| (c.uuid.clone(), c.foil)).collect();
+        // Bets are on the booster's own cards: a hiding card is a bonus beside them.
+        let drawn: Vec<(String, bool)> =
+            cards.iter().filter(|c| !is_guest_sheet(&c.sheet)).map(|c| (c.uuid.clone(), c.foil)).collect();
         let limited: Vec<bool> = cards.iter().map(|c| self.print_runs.contains_key(&c.uuid)).collect();
         let now = (self.clock)().now;
         let (settled, placed) = self.settle_bets(set_code, kind, &bets, &drawn)?;
@@ -872,6 +881,35 @@ impl Game {
         let (artifact, found) = self.find_artifact(set_code, kind);
         events.booster.extend(found);
         Ok((OpenedBooster { cards, bets: settled, skipped, artifact }, events))
+    }
+
+    /// Now and then, a card of Japan's booster of this kind that no English booster gives hides
+    /// in an English one (`japaneseGuestOneIn` of the economy): such a booster is drawn apart,
+    /// and its card of its own, if it has one, is kept. Never in a box topper nor in a Japanese
+    /// booster. Its sheet (`JAPANESE_GUEST_SHEET`) tells it, and it comes last.
+    fn japanese_guest(&mut self, set_code: &str, kind: &str) -> Result<Option<(String, DrawnCard)>, String> {
+        let one_in = self.economy.japanese_guest_one_in;
+        let file = &self.sets[set_code].file;
+        if one_in == 0 || file.is_topper(kind) || booster_language(kind).is_some() {
+            return Ok(None);
+        }
+        let Some(japanese) = file.boosters.keys().find(|k| booster_language(k).is_some() && usual_kind(k) == kind).cloned() else {
+            return Ok(None);
+        };
+        if self.rng.gen_range(0..one_in) != 0 {
+            return Ok(None);
+        }
+        let set = &self.sets[set_code];
+        let english: HashSet<&str> = set.file.boosters[kind]
+            .sheets
+            .values()
+            .flat_map(|sheet| sheet.cards.keys().map(String::as_str))
+            .collect();
+        let pack = open_booster(&set.file.boosters[&japanese], &set.colors, &mut self.rng).map_err(err)?;
+        let own: Vec<&DrawnCard> = pack.iter().filter(|d| !english.contains(d.uuid.as_str())).collect();
+        Ok(own
+            .choose(&mut self.rng)
+            .map(|card| (set_code.to_string(), DrawnCard { sheet: JAPANESE_GUEST_SHEET.to_string(), ..(*card).clone() })))
     }
 
     /// Now and then, a card of a set the game crafts a booster for (Secret Lair) hides in the
@@ -1053,6 +1091,14 @@ impl Game {
                 localized(&set.file.cards[i], japanese.unwrap_or(&self.card_lang), &self.image_quality, japanese.is_some()).image_id
             })
             .collect();
+        // The cards of Japan's booster of this kind that may hide in it (`japanese_guest`).
+        if booster_language(kind).is_none() && self.economy.japanese_guest_one_in > 0 {
+            let japanese = set.file.boosters.iter().filter(|(k, _)| booster_language(k).is_some() && usual_kind(k) == kind);
+            for (_, jp) in japanese {
+                let own = jp.sheets.values().flat_map(|sheet| sheet.cards.keys()).filter(|uuid| !cfg.sheets.values().any(|s| s.cards.contains_key(*uuid)));
+                ids.extend(own.filter_map(|uuid| set.index.get(uuid)).map(|&i| localized(&set.file.cards[i], "ja", &self.image_quality, true).image_id));
+            }
+        }
         ids.sort();
         ids.dedup();
         Ok(["large", "small", "normal"]
@@ -1784,6 +1830,16 @@ fn scryfall_image_face(scryfall_id: &str, version: &str, face: &str) -> String {
 /// interface announces it.
 const CRAFTED_GUEST_SHEET: &str = "craftedGuest";
 
+/// The sheet of a Japanese booster's own card found in an English one (`Game::japanese_guest`):
+/// the interface announces it.
+const JAPANESE_GUEST_SHEET: &str = "japaneseGuest";
+
+/// Whether a card hides in the booster, beside its own cards (`Game::crafted_guest`,
+/// `Game::japanese_guest`).
+fn is_guest_sheet(sheet: &str) -> bool {
+    sheet == CRAFTED_GUEST_SHEET || sheet == JAPANESE_GUEST_SHEET
+}
+
 /// Reveal order, as cards come in a real booster of each kind (MTGJSON gives none: each
 /// card's place is told by its rarity and the sheet it was drawn from). The token always
 /// comes last; cards of a same place keep their drawing order.
@@ -1803,8 +1859,8 @@ fn reveal_rank(kind: &str, card: &OpenedCard) -> u8 {
     if card.rarity == "token" {
         return 99;
     }
-    // A Secret Lair card hiding in the booster: the last surprise, before the token.
-    if card.sheet == CRAFTED_GUEST_SHEET {
+    // A card hiding in the booster (Secret Lair, Japanese): the last surprise, before the token.
+    if is_guest_sheet(&card.sheet) {
         return 97;
     }
     if card.rarity == ART_RARITY {
@@ -2858,12 +2914,51 @@ mod tests {
         assert!(!g.collection("TST").unwrap().cards[1].image_url.contains("ja0001"), "not for the binder in Japanese");
         g.set_card_language("en");
 
-        g.buy_boosters("TST", "jp", 1).unwrap();
+        // No longer sold, but those already bought still open.
+        assert!(g.buy_boosters("TST", "jp", 1).is_err());
+        g.store.buy_boosters("TST", "jp", 1, 0, 0).unwrap();
         let cards = g.open_booster("TST", "jp").unwrap();
         let shown: Vec<(&str, bool)> = cards.iter().map(|c| (c.name.as_str(), c.image_url.contains("ja0001"))).collect();
         assert_eq!(shown, [("コモン", true), ("Mythic", false)]);
         // The binder keeps the player's language.
         assert_eq!(g.collection("TST").unwrap().cards[1].name, "Common");
+    }
+
+    #[test]
+    fn a_japanese_boosters_own_card_hides_in_an_english_one() {
+        let mut g = game("japanese-guest");
+        // Japan's play booster gives a card of its own, which the English one never does.
+        let set = SET
+            .replace(
+                r#""name": "Not in boosters", "number": "3","#,
+                r#""name": "Not in boosters", "number": "3", "foreign": { "ja": { "name": "エクストラ", "scryfallId": "ja0300" } },"#,
+            )
+            .replace(
+                r#""sourceSetCodes": ["TST"] } } }"#,
+                r#""sourceSetCodes": ["TST"] },
+                  "play-jp": {
+                    "boosters": [ { "contents": { "own": 1 }, "weight": 1 } ],
+                    "boostersTotalWeight": 1,
+                    "sheets": { "own": { "cards": { "x1": 1 }, "foil": false, "totalWeight": 1 } },
+                    "sourceSetCodes": ["TST"] } } }"#,
+            );
+        fs::write(g.data_dir.join("sets/TST.json"), set).unwrap();
+        g.economy.japanese_guest_one_in = 1;
+
+        // The Boosterium does not sell it.
+        assert!(g.shop().unwrap().iter().all(|item| item.kind != "play-jp"));
+
+        g.buy_boosters("TST", "play", 1).unwrap();
+        let cards = g.open_booster("TST", "play").unwrap();
+        // The last card before the token, in Japanese.
+        let guest = cards.iter().find(|c| c.sheet == JAPANESE_GUEST_SHEET).expect("a Japanese card");
+        assert_eq!((guest.uuid.as_str(), guest.name.as_str()), ("x1", "エクストラ"));
+        assert!(cards.iter().skip_while(|c| c.sheet != JAPANESE_GUEST_SHEET).skip(1).all(|c| c.rarity == "token"));
+        assert_eq!(g.collection("TST").unwrap().extras_owned, 1);
+
+        // Never in a Japanese booster itself.
+        g.store.buy_boosters("TST", "play-jp", 1, 0, 0).unwrap();
+        assert!(g.open_booster("TST", "play-jp").unwrap().iter().all(|c| c.sheet != JAPANESE_GUEST_SHEET));
     }
 
     #[test]

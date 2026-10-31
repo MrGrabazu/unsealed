@@ -16,9 +16,12 @@ export function NewBadge({ card }: { card: OpenedCard }) {
 /** A Secret Lair card found in another set's booster (`CRAFTED_GUEST_SHEET` of game.rs). */
 export const isCraftedGuest = (card: OpenedCard) => card.sheet === "craftedGuest";
 
-/** Said as a card is revealed, if it is new to the collection, or a Secret Lair card hiding in
- * another set's booster: over the 3D scene or the pile. `card` is the card just shown (null
- * between two); keyed by `index`, so that each card comes with its own mention. */
+/** A Japanese booster's own card found in an English one (`JAPANESE_GUEST_SHEET` of game.rs). */
+const isJapaneseGuest = (card: OpenedCard) => card.sheet === "japaneseGuest";
+
+/** Said as a card is revealed, if it is new to the collection, or a card hiding in the booster
+ * (Secret Lair, or from Japan's booster): over the 3D scene or the pile. `card` is the card just
+ * shown (null between two); keyed by `index`, so that each card comes with its own mention. */
 export function RevealMention({ card, index }: { card: OpenedCard | null; index: number }) {
   const { t } = useI18n();
   // Gone a few seconds after the card shows: a mention, not a label.
@@ -33,6 +36,14 @@ export function RevealMention({ card, index }: { card: OpenedCard | null; index:
     return (
       <div key={index} className="reveal-mention crafted-guest" role="status">
         <span className="star">✦</span> {t("open.mentionSecretLair")}
+        {card.isNew && <em> · {t("open.new")}</em>}
+      </div>
+    );
+  }
+  if (isJapaneseGuest(card)) {
+    return (
+      <div key={index} className="reveal-mention japanese-guest" role="status">
+        <span className="star">✦</span> {t("open.mentionJapanese")}
         {card.isNew && <em> · {t("open.new")}</em>}
       </div>
     );

@@ -50,15 +50,17 @@ export const it: Messages = {
   "craftedNote.content":
     "5 carte e una pedina: 3 comuni, una foil di qualsiasi rarità, e una non comune, una rara o una mitica. Qui la rarità di una carta dipende dal suo prezzo di mercato, le più care sono mitiche. I drop si completano in Collezione › Insiemi.",
   "kind.japanese": "{kind} giapponese",
-  "jpNote.title": "Una busta venuta dal Giappone",
+  "jpNote.title": "Carte venute dal Giappone",
   "jpNote.why":
-    "Venduta solo in Giappone. Il gioco non propone buste per lingua, ma questa contiene carte che nessun'altra busta dà, perciò è proposta a parte. Le sue carte escono in giapponese; il raccoglitore mantiene la lingua delle carte scelta.",
+    "Le buste di questo set vendute in Giappone contengono carte che nessun'altra busta dà. Il gioco non vende buste per lingua, ma a volte una di queste carte si nasconde in questa, in giapponese; il raccoglitore mantiene la lingua delle carte scelta.",
+  "jpNote.sealed":
+    "Venduta solo in Giappone, questa busta dà le stesse carte della sua equivalente inglese, più alcune proprie: il Boosterium non la vende più, quelle carte ora si nascondono nelle buste inglesi. Quelle comprate prima si aprono ancora, con le carte in giapponese.",
   "jpNote.WAR":
-    "Ogni planeswalker del set può uscire in una versione con illustrazione alternativa di un artista giapponese (36 carte, tra cui Liliana di Yoshitaka Amano): circa una busta su due ne contiene una, a volte foil. Per riconoscerla: una stella ★ dopo il numero da collezione, un'illustrazione in stile manga e il nome dell'artista scritto in giapponese sulla carta.",
+    "Un planeswalker con illustrazione alternativa di un artista giapponese (36 carte, tra cui Liliana di Yoshitaka Amano), a volte foil: circa una busta draft su 20. Per riconoscerlo: una stella ★ dopo il numero da collezione, un'illustrazione in stile manga e il nome dell'artista scritto in giapponese sulla carta.",
   "jpNote.IKO":
-    "La serie Godzilla (carte n. 370-387) esce più spesso, con il nome giapponese dei mostri dei film: circa una busta draft su sette, una busta da collezione su quattro.",
+    "Una carta della serie Godzilla giapponese (n. 370-387), con il nome giapponese dei mostri dei film: circa una busta draft su 70, una busta da collezione su 40.",
   "jpNote.STX":
-    "La sua carta del Mystical Archive è la versione giapponese con illustrazione alternativa (STA n. 64-126), disegnata da artisti giapponesi, con il nome dell'artista in giapponese: circa una busta su due.",
+    "La versione giapponese con illustrazione alternativa di una carta del Mystical Archive (STA n. 64-126), disegnata da artisti giapponesi, con il nome dell'artista in giapponese: circa una busta su 20.",
   "kind.theme": "Busta tematica · {theme}",
   "theme.w": "Bianco",
   "theme.u": "Blu",
@@ -254,6 +256,7 @@ export const it: Messages = {
   "open.mentionNew": "Carta nuova",
   "open.mentionNewFoil": "Prima foil di questa carta",
   "open.mentionSecretLair": "In questa busta si nascondeva una carta Secret Lair!",
+  "open.mentionJapanese": "In questa busta si nascondeva una carta venuta dal Giappone!",
   "pack.tear": "Clicca sulla busta per strapparla",
   "scene.tearHint": "Scorri lungo la parte superiore della busta per strapparla, oppure cliccala e basta.",
   "scene.shakeHint": "Tieni premuta la busta e muovila per scuoterla.",

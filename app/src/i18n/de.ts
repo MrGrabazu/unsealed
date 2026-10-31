@@ -50,15 +50,17 @@ export const de: Messages = {
   "craftedNote.content":
     "5 Karten und ein Spielstein: 3 Commons, eine Foil beliebiger Seltenheit und eine Uncommon, Rare oder Mythic. Hier richtet sich die Seltenheit einer Karte nach ihrem Marktpreis, die teuersten sind Mythic. Die Drops vervollständigst du unter Sammlung › Gruppen.",
   "kind.japanese": "{kind} (Japan)",
-  "jpNote.title": "Ein Booster aus Japan",
+  "jpNote.title": "Karten aus Japan",
   "jpNote.why":
-    "Nur in Japan verkauft. Das Spiel bietet keine Booster nach Sprache an, aber dieser enthält Karten, die kein anderer Booster gibt, darum wird er gesondert angeboten. Seine Karten erscheinen auf Japanisch; das Sammelalbum behält die gewählte Kartensprache.",
+    "Die in Japan verkauften Booster dieses Sets enthalten Karten, die kein anderer Booster gibt. Das Spiel verkauft keine Booster nach Sprache, aber ab und zu versteckt sich eine dieser Karten in diesem hier, auf Japanisch; das Sammelalbum behält die gewählte Kartensprache.",
+  "jpNote.sealed":
+    "Nur in Japan verkauft, gibt dieser Booster dieselben Karten wie sein englisches Gegenstück, plus ein paar eigene: Das Boosterium verkauft ihn nicht mehr, diese Karten verstecken sich jetzt in den englischen Boostern. Bereits gekaufte lassen sich weiter öffnen, ihre Karten auf Japanisch.",
   "jpNote.WAR":
-    "Jeder Planeswalker des Sets kann in einer Version mit alternativer Illustration eines japanischen Künstlers erscheinen (36 Karten, darunter Liliana von Yoshitaka Amano): etwa jeder zweite Booster enthält eine, manchmal als Foil. Erkennbar an einem Stern ★ nach der Sammlernummer, einer Illustration im Manga-Stil und dem auf Japanisch geschriebenen Namen des Künstlers auf der Karte.",
+    "Ein Planeswalker mit alternativer Illustration eines japanischen Künstlers (36 Karten, darunter Liliana von Yoshitaka Amano), manchmal als Foil: etwa jeder 20. Draft-Booster. Erkennbar an einem Stern ★ nach der Sammlernummer, einer Illustration im Manga-Stil und dem auf Japanisch geschriebenen Namen des Künstlers auf der Karte.",
   "jpNote.IKO":
-    "Die Godzilla-Serie (Karten Nr. 370 bis 387) erscheint häufiger, ihre Karten tragen die japanischen Namen der Filmmonster: etwa jeder siebte Draft-Booster, jeder vierte Sammler-Booster.",
+    "Eine Karte der japanischen Godzilla-Serie (Nr. 370 bis 387) mit den japanischen Namen der Filmmonster: etwa jeder 70. Draft-Booster, jeder 40. Sammler-Booster.",
   "jpNote.STX":
-    "Seine Mystical-Archive-Karte ist die japanische Version mit alternativer Illustration (STA Nr. 64 bis 126), gezeichnet von japanischen Künstlern, mit dem Namen des Künstlers auf Japanisch: etwa jeder zweite Booster.",
+    "Die japanische Version mit alternativer Illustration einer Mystical-Archive-Karte (STA Nr. 64 bis 126), gezeichnet von japanischen Künstlern, mit dem Namen des Künstlers auf Japanisch: etwa jeder 20. Booster.",
   "kind.theme": "Themen-Booster · {theme}",
   "theme.w": "Weiß",
   "theme.u": "Blau",
@@ -254,6 +256,7 @@ export const de: Messages = {
   "open.mentionNew": "Neue Karte",
   "open.mentionNewFoil": "Erste Foil dieser Karte",
   "open.mentionSecretLair": "In diesem Booster versteckte sich eine Secret-Lair-Karte!",
+  "open.mentionJapanese": "In diesem Booster versteckte sich eine Karte aus Japan!",
   "pack.tear": "Klicke auf den Booster, um ihn aufzureißen",
   "scene.tearHint": "Fahre am oberen Rand des Boosters entlang, um ihn aufzureißen – oder klicke ihn einfach an.",
   "scene.shakeHint": "Halte den Booster gedrückt und bewege ihn, um ihn zu schütteln.",

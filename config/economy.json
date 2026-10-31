@@ -34,6 +34,7 @@
   "craftedGuests": {
     "SLD": { "oneIn": 1000, "collectorOneIn": 100 }
   },
+  "japaneseGuestOneIn": 10,
   "charity": {
     "amountCents": 2000,
     "maxClaimsPerDay": 1

@@ -207,6 +207,8 @@ impl Game {
                     .with("newFoil", c.new_foil)
                     // A Secret Lair card found in another set's booster.
                     .with("craftedGuest", c.sheet == super::CRAFTED_GUEST_SHEET)
+                    // A Japanese booster's own card found in an English one.
+                    .with("japaneseGuest", c.sheet == super::JAPANESE_GUEST_SHEET)
             })
             .collect();
         let mut booster = vec![Event::new("BoosterOpened")

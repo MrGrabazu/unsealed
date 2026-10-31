@@ -959,6 +959,9 @@ button.seen-card:hover:not(:disabled) { box-shadow: none; transform: translateX(
 .reveal-mention.new-foil .star { color: #7a3fd0; }
 /* A Secret Lair card hiding in another set's booster: deep violet, as the drops' badge. */
 .reveal-mention.crafted-guest { color: #f5d68a; background: linear-gradient(180deg, #5b3a86, #2c1747); box-shadow: 0 0 0 1px #f5d68a66, 0 0 22px #7d5aa8aa; }
+/* A Japanese booster's own card hiding in an English one: rice paper and a vermilion stamp. */
+.reveal-mention.japanese-guest { color: #9e1f17; background: linear-gradient(180deg, #fbf6ec, #e6dac3); box-shadow: 0 0 0 1px #c8382c88, 0 6px 18px #000b; }
+.reveal-mention.japanese-guest .star, .reveal-mention.japanese-guest em { color: #c8382c; }
 @keyframes mention-in { from { opacity: 0; transform: translate(-50%, -10px) scale(.92); } }
 @keyframes mention-out { to { opacity: 0; transform: translate(-50%, -6px); } }
 /* Under the classic pile: its room kept, so that nothing moves as it comes and goes. */

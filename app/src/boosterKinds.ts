@@ -36,7 +36,7 @@ export const kindRank = (kind: string): number => {
 /** A booster of Japan ("jp", the Japanese Draft Booster; "set-jp", "collector-jp"): its English
  * kind with a few cards of its own (catalog.rs, `usual_kind`). */
 export const isJapaneseKind = (kind: string) => kind === "jp" || kind.endsWith("-jp");
-const usualKind = (kind: string) => (kind === "jp" ? "draft" : kind.replace(/-jp$/, ""));
+export const usualKind = (kind: string) => (kind === "jp" ? "draft" : kind.replace(/-jp$/, ""));
 
 /** A collector booster, or one of its editions ("collector-special"). */
 const isCollectorKind = (kind: string) => kind === "collector" || kind.startsWith("collector-");

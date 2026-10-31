@@ -34,6 +34,13 @@ pub struct EconomyConfig {
     /// value: a rare bonus.
     #[serde(default)]
     pub crafted_guests: BTreeMap<String, CraftedGuest>,
+    /// The cards of Japan's boosters no English booster gives (War of the Spark's alternate-art
+    /// planeswalkers, Ikoria's Godzilla series…), which the Boosterium does not sell: a Japanese
+    /// booster of the same kind is drawn apart once in this many openings of an English one (0:
+    /// never), and its card of its own, if it has one, hides in it. Their real rate divided by
+    /// this. Not counted in the boosters' expected value.
+    #[serde(default)]
+    pub japanese_guest_one_in: u32,
 }
 
 /// How often a crafted set's card hides in another set's booster: one booster in this many (0:

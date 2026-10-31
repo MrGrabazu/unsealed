@@ -55,15 +55,17 @@ export const en = {
   "craftedNote.content":
     "5 cards and a token: 3 commons, a foil of any rarity, and an uncommon, a rare or a mythic. Here a card's rarity comes from its market price, the dearest being mythic. Complete the drops in Collection › Groups.",
   "kind.japanese": "{kind} (Japan)",
-  "jpNote.title": "A booster from Japan",
+  "jpNote.title": "Cards from Japan",
   "jpNote.why":
-    "Sold only in Japan. The game offers no booster per language, but this one holds cards found in no other booster, so it is offered apart. Its cards come out in Japanese; the binder keeps the card language chosen.",
+    "This set's boosters sold in Japan hold cards found in no other booster. The game sells no booster per language, but now and then one of those cards hides in this one, in Japanese; the binder keeps the card language chosen.",
+  "jpNote.sealed":
+    "Sold only in Japan, this booster gives the same cards as its English one, plus a few of its own: the Boosterium no longer sells it, those cards now hide in the English boosters. The ones bought before still open, their cards in Japanese.",
   "jpNote.WAR":
-    "Every planeswalker of the set may come in an alternate-art version drawn by a Japanese artist (36 cards, Liliana by Yoshitaka Amano among them): about one booster in two holds one, sometimes in foil. To tell it: a star ★ after its collector number, a manga-style illustration, and the artist's name written in Japanese on the card.",
+    "An alternate-art planeswalker drawn by a Japanese artist (36 cards, Liliana by Yoshitaka Amano among them), sometimes in foil: about one draft booster in 20. To tell it: a star ★ after its collector number, a manga-style illustration, and the artist's name written in Japanese on the card.",
   "jpNote.IKO":
-    "The Godzilla series (cards no. 370 to 387) comes more often, its cards bearing the Japanese names of the films' monsters: about one draft booster in seven, one collector booster in four.",
+    "A card of the Japanese Godzilla series (no. 370 to 387), bearing the Japanese names of the films' monsters: about one draft booster in 70, one collector booster in 40.",
   "jpNote.STX":
-    "Its Mystical Archive card is the Japanese alternate-art version (STA no. 64 to 126), drawn by Japanese artists, with the artist's name in Japanese: about one booster in two.",
+    "The Japanese alternate-art version of a Mystical Archive card (STA no. 64 to 126), drawn by Japanese artists, with the artist's name in Japanese: about one booster in 20.",
   // A theme booster ("theme-b", "theme-boros"…): {theme} is a color, a guild, a college…
   "kind.theme": "Theme booster · {theme}",
   "theme.w": "White",
@@ -262,6 +264,7 @@ export const en = {
   "open.mentionNew": "New card",
   "open.mentionNewFoil": "First foil of this card",
   "open.mentionSecretLair": "A Secret Lair card was hiding in this booster!",
+  "open.mentionJapanese": "A card from Japan was hiding in this booster!",
   "pack.tear": "Click the pack to tear it open",
   "scene.tearHint": "Slide along the top of the pack to tear it open — or just click it.",
   "scene.shakeHint": "Hold the pack and move it to give it a shake.",

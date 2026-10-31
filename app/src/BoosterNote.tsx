@@ -1,18 +1,19 @@
-import { isCraftedKind, isJapaneseKind } from "./boosterKinds";
+import { isCraftedKind, isJapaneseKind, usualKind } from "./boosterKinds";
 import { useI18n } from "./i18n";
 import type { MessageKey } from "./i18n/en";
 
-/** What each set's Japanese booster holds that its English one does not. */
-const NOTES: Record<string, MessageKey> = {
-  WAR: "jpNote.WAR",
-  IKO: "jpNote.IKO",
-  STX: "jpNote.STX",
+/** The sets whose Japanese boosters hold cards of their own, the English kinds those cards hide
+ * in (`japanese_guest` of game.rs), and what they are. */
+const NOTES: Record<string, { kinds: string[]; note: MessageKey }> = {
+  WAR: { kinds: ["draft"], note: "jpNote.WAR" },
+  IKO: { kinds: ["draft", "collector"], note: "jpNote.IKO" },
+  STX: { kinds: ["draft", "set"], note: "jpNote.STX" },
 };
 
 /** A word on the boosters that are not quite like the others, in the Boosterium and the
- * reserve: why a Japanese booster is offered (the game sells no booster per language) and what
- * it may give, with how to tell it; that a crafted booster (Secret Lair) does not exist, its
- * odds being the game's. */
+ * reserve: the cards of Japan's booster that may hide in this one, with how to tell them (a
+ * Japanese booster, no longer sold, still opens); that a crafted booster (Secret Lair) does not
+ * exist, its odds being the game's. */
 export function BoosterNote({ setCode, kind }: { setCode: string; kind: string }) {
   const { t } = useI18n();
   if (isCraftedKind(kind)) {
@@ -24,13 +25,14 @@ export function BoosterNote({ setCode, kind }: { setCode: string; kind: string }
       </div>
     );
   }
-  if (!isJapaneseKind(kind)) return null;
-  const note = NOTES[setCode];
+  const japanese = isJapaneseKind(kind);
+  const entry = NOTES[setCode];
+  if (!japanese && !entry?.kinds.includes(usualKind(kind))) return null;
   return (
     <div className="jp-note">
       <strong>{t("jpNote.title")}</strong>
-      <p>{t("jpNote.why")}</p>
-      {note && <p>{t(note)}</p>}
+      <p>{t(japanese ? "jpNote.sealed" : "jpNote.why")}</p>
+      {entry && <p>{t(entry.note)}</p>}
     </div>
   );
 }
