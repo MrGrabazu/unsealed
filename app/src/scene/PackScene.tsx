@@ -35,6 +35,12 @@ const SETTLED = CARDS_OUT + PACK_FALLS + PILE_TURNS;
  * card then takes about 65 % of the scene's height (the camera's field is vertical: whatever the
  * window), leaving room for its glow; at ×1.5 it took 80 %. */
 const CARD_ZOOM = 1.2;
+/** How many cards under the one on top have their face loaded ahead (a run passed goes fast). */
+const FACES_AHEAD = 3;
+/** The share of the scene's height the card on top takes, at most (see `CARD_ZOOM`). */
+const CARD_SCREEN_SHARE = 0.67;
+/** The height of Scryfall's "normal" image: a card shown no taller needs no "large" one. */
+const NORMAL_IMAGE_HEIGHT = 680;
 /** How long the last card stays before leaving (seconds). */
 const LAST_CARD_STAYS = 2.2;
 
@@ -68,6 +74,7 @@ const ease = (t: number) => 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
 function Pack({ look, onTorn, leaving, tearRequest }: { look: PackLook; onTorn: () => void; leaving: boolean; tearRequest: number }) {
   const camera = useThree((s) => s.camera);
   const dom = useThree((s) => s.gl.domElement);
+  const invalidate = useThree((s) => s.invalidate);
   const group = useRef<THREE.Group>(null);
   const stripMesh = useRef<THREE.Mesh>(null);
   const bodyMaterial = useRef<THREE.MeshStandardMaterial>(null);
@@ -126,6 +133,8 @@ function Pack({ look, onTorn, leaving, tearRequest }: { look: PackLook; onTorn: 
   const tear = useRef({ dir: 0, front: 0, offAt: null as number | null, auto: false, sounded: false });
   const clock = useRef(0);
   const leftAt = useRef<number | null>(null);
+  // The strip's ragged edge, written once before it is torn (it does not move until then).
+  const stripReady = useRef(false);
 
   /** A click (no drag) on the pack tears it open by itself, from the side clicked. */
   function autoTear(x: number) {
@@ -133,6 +142,7 @@ function Pack({ look, onTorn, leaving, tearRequest }: { look: PackLook; onTorn: 
     if (t.offAt !== null || t.auto) return;
     if (t.dir === 0) t.dir = x < 0 ? 1 : -1;
     t.auto = true;
+    invalidate();
   }
 
   // Asked from outside the scene (a button, a key): torn by itself, from the left.
@@ -185,18 +195,27 @@ function Pack({ look, onTorn, leaving, tearRequest }: { look: PackLook; onTorn: 
   }
 
   useFrame((state, delta) => {
-    clock.current += delta;
+    // The scene draws only while something moves (`frameloop="demand"`): the first frame after
+    // a rest would count the whole rest as one step.
+    clock.current += Math.min(delta, MAX_STEP);
     const g = group.current;
     if (!g) return;
     // Tilt towards the pointer.
-    g.rotation.y = THREE.MathUtils.lerp(g.rotation.y, state.pointer.x * 0.35, 0.08);
-    g.rotation.x = THREE.MathUtils.lerp(g.rotation.x, -state.pointer.y * 0.25, 0.08);
+    const tiltY = state.pointer.x * 0.35;
+    const tiltX = -state.pointer.y * 0.25;
+    g.rotation.y = THREE.MathUtils.lerp(g.rotation.y, tiltY, 0.08);
+    g.rotation.x = THREE.MathUtils.lerp(g.rotation.x, tiltX, 0.08);
     // Shake spring.
     const s = shake.current;
     s.vel.add(s.target.clone().sub(s.pos).multiplyScalar(0.18)).multiplyScalar(0.78);
     s.pos.add(s.vel);
     g.position.set(s.pos.x, s.pos.y, 0);
     g.rotation.z = -s.vel.x * 0.6;
+    let moving =
+      Math.abs(g.rotation.y - tiltY) > SETTLED_EPSILON ||
+      Math.abs(g.rotation.x - tiltX) > SETTLED_EPSILON ||
+      s.vel.lengthSq() > SETTLED_EPSILON ** 2 ||
+      s.target.distanceToSquared(s.pos) > SETTLED_EPSILON ** 2;
 
     // The strip: behind the tear front it peels back, curling more the further from the front.
     const t = tear.current;
@@ -210,25 +229,32 @@ function Pack({ look, onTorn, leaving, tearRequest }: { look: PackLook; onTorn: 
       t.offAt = clock.current;
       onTorn();
     }
-    const pos = stripGeometry.attributes.position;
-    const bottom = -STRIP_H / 2;
-    for (let i = 0; i < pos.count; i++) {
-      const x = stripBase[i * 3];
-      const y = stripBase[i * 3 + 1];
-      const along = t.dir >= 0 ? x + PACK_W / 2 : PACK_W / 2 - x;
-      const behind = t.dir === 0 ? 0 : Math.max(0, t.front - along);
-      const angle = Math.min(2.4, behind * 1.6);
-      const r = y - bottom;
-      pos.setXYZ(i, x, bottom + r * Math.cos(angle) + behind * 0.12, r * Math.sin(angle) + behind * 0.06);
-    }
-    pos.needsUpdate = true;
+    // Written only while the strip bends (once before, for its ragged edge).
     const sm = stripMesh.current;
+    const stripShown = !sm || sm.visible;
+    if ((t.dir !== 0 && stripShown) || !stripReady.current) {
+      stripReady.current = true;
+      const pos = stripGeometry.attributes.position;
+      const bottom = -STRIP_H / 2;
+      for (let i = 0; i < pos.count; i++) {
+        const x = stripBase[i * 3];
+        const y = stripBase[i * 3 + 1];
+        const along = t.dir >= 0 ? x + PACK_W / 2 : PACK_W / 2 - x;
+        const behind = t.dir === 0 ? 0 : Math.max(0, t.front - along);
+        const angle = Math.min(2.4, behind * 1.6);
+        const r = y - bottom;
+        pos.setXYZ(i, x, bottom + r * Math.cos(angle) + behind * 0.12, r * Math.sin(angle) + behind * 0.06);
+      }
+      pos.needsUpdate = true;
+    }
+    if (t.auto && t.offAt === null) moving = true;
     if (sm && t.offAt !== null) {
       // Torn off entirely: the strip falls away in one piece.
       const k = clock.current - t.offAt;
       sm.position.set(t.dir * k * 1.4, PACK_H / 2 + STRIP_H / 2 + k * 1.6 - k * k * 4, 0.05 + k * 1.5);
       sm.rotation.z = t.dir * k * 1.8;
       sm.visible = k < 1;
+      if (sm.visible) moving = true;
     }
 
     // Leaving: once the cards are out of it, the empty wrapper falls away.
@@ -238,7 +264,9 @@ function Pack({ look, onTorn, leaving, tearRequest }: { look: PackLook; onTorn: 
       g.position.y -= k * k * 6;
       g.rotation.z += k * k * 0.5;
       if (bodyMaterial.current) bodyMaterial.current.opacity = 1 - k * k;
+      if (k < 1) moving = true;
     }
+    if (moving) state.invalidate();
   });
 
   return (
@@ -370,6 +398,7 @@ function Cards({
 }) {
   const camera = useThree((s) => s.camera);
   const dom = useThree((s) => s.gl.domElement);
+  const invalidate = useThree((s) => s.invalidate);
   const back = useMemo(() => cardBackTexture(), []);
   const glow = useMemo(() => glowTexture(), []);
   const geometry = useMemo(() => createCardGeometry(CORNER), []);
@@ -402,26 +431,51 @@ function Cards({
   /** The pile is out of the wrapper and in place: its cards can be slid. */
   const settled = () => appearedAt.current != null && clock.current - appearedAt.current >= SETTLED;
 
-  // Card faces load in the background; the back shows until then.
+  // Card faces load in the background, along the pile: the card on top and the few under it
+  // (`FACES_AHEAD`), each face let go once its card is well gone. The back shows until then.
+  // Loading them all at once kept some 90 MB of textures for a 15-card booster. The "normal"
+  // image when the card on screen is no taller than it, the "large" one otherwise.
+  const faces = useRef({ live: true, asked: new Set<number>(), loaded: new Map<number, THREE.Texture>(), large: true });
+  const screenHeight = useThree((s) => s.size.height * s.viewport.dpr);
   useEffect(() => {
-    let live = true;
-    const loaded: THREE.Texture[] = [];
-    cards.forEach((card, i) => {
-      void loadCardTexture(largeImage(card.imageUrl))
-        .then((t) => {
-          if (!live) return t.dispose();
-          loaded.push(t);
-          materials[i].uniforms.uFront.value = t;
-          materials[i].uniforms.uHasFront.value = 1;
-        })
-        .catch(() => {});
-    });
+    const f = { live: true, asked: new Set<number>(), loaded: new Map<number, THREE.Texture>(), large: screenHeight * CARD_SCREEN_SHARE > NORMAL_IMAGE_HEIGHT };
+    faces.current = f;
+    loadFaces();
     return () => {
-      live = false;
-      loaded.forEach((t) => t.dispose());
+      f.live = false;
+      f.loaded.forEach((t) => t.dispose());
       materials.forEach((m) => m.dispose());
     };
+    // The image size is picked once per booster: a resize mid-opening keeps it.
   }, [cards, materials]);
+
+  /** Asks for the faces near the top of the pile, and lets go of those long gone. */
+  function loadFaces() {
+    const f = faces.current;
+    const top = Math.min(current.current, cards.length - 1);
+    for (let i = Math.max(0, top); i <= Math.min(cards.length - 1, top + FACES_AHEAD); i++) {
+      if (f.asked.has(i)) continue;
+      f.asked.add(i);
+      const url = cards[i].imageUrl;
+      void loadCardTexture(f.large ? largeImage(url) : url)
+        .then((t) => {
+          if (!f.live || i < current.current - 1) return t.dispose();
+          f.loaded.set(i, t);
+          materials[i].uniforms.uFront.value = t;
+          materials[i].uniforms.uHasFront.value = 1;
+          invalidate();
+        })
+        .catch(() => f.asked.delete(i));
+    }
+    for (const [i, t] of f.loaded) {
+      // The card before the one on top may still be sliding away.
+      if (i >= current.current - 1) continue;
+      materials[i].uniforms.uHasFront.value = 0;
+      materials[i].uniforms.uFront.value = null;
+      t.dispose();
+      f.loaded.delete(i);
+    }
+  }
   useEffect(
     () => () => [back, glow, geometry, alphaGeometry, sparkles.geometry, sparkles.material].forEach((r) => r.dispose()),
     [back, glow, geometry, alphaGeometry, sparkles],
@@ -433,6 +487,7 @@ function Cards({
 
   function animateTo(to: THREE.Vector2, duration: number, done: () => void) {
     slide.current = { kind: "animate", from: offset.current.clone(), to, start: clock.current, duration, done };
+    invalidate();
   }
 
   /** Sends the top card off the pile in `direction`. */
@@ -471,6 +526,7 @@ function Cards({
   // in place and idle (asked while a card leaves, the run goes on from the next one).
   useEffect(() => {
     if (passRequest) passTo.current = passRequest.to;
+    invalidate();
   }, [passRequest]);
 
   function grab(e: ThreeEvent<PointerEvent>, k: number) {
@@ -505,9 +561,13 @@ function Cards({
   }
 
   useFrame((state, delta) => {
-    clock.current += delta;
+    // See the pack's frame loop: one step at most after a rest.
+    clock.current += Math.min(delta, MAX_STEP);
     appearedAt.current ??= clock.current;
     const since = clock.current - appearedAt.current;
+    loadFaces();
+    // Out of the wrapper, in place and turned over: until then, every frame moves.
+    let moving = since < Math.max(SETTLED, CARDS_OUT + PACK_FALLS + PILE_TURNS) + 0.1;
     // The first card shows once the pile has settled.
     if (!firstShown.current && since >= SETTLED) {
       firstShown.current = true;
@@ -520,8 +580,11 @@ function Cards({
     const s = stack.current;
     if (s) {
       const inside = since < CARDS_OUT;
-      s.rotation.y = THREE.MathUtils.lerp(s.rotation.y, state.pointer.x * (inside ? 0.35 : 0.25), 0.08);
-      s.rotation.x = THREE.MathUtils.lerp(s.rotation.x, -state.pointer.y * (inside ? 0.25 : 0.18), 0.08);
+      const tiltY = state.pointer.x * (inside ? 0.35 : 0.25);
+      const tiltX = -state.pointer.y * (inside ? 0.25 : 0.18);
+      s.rotation.y = THREE.MathUtils.lerp(s.rotation.y, tiltY, 0.08);
+      s.rotation.x = THREE.MathUtils.lerp(s.rotation.x, tiltX, 0.08);
+      if (Math.abs(s.rotation.y - tiltY) > SETTLED_EPSILON || Math.abs(s.rotation.x - tiltX) > SETTLED_EPSILON) moving = true;
       // Brought closer as the empty wrapper falls away.
       s.scale.setScalar(1 + (CARD_ZOOM - 1) * ease((since - CARDS_OUT) / PACK_FALLS));
     }
@@ -603,6 +666,9 @@ function Cards({
       material.opacity = THREE.MathUtils.lerp(material.opacity, Math.min(target, shown), 0.15);
       const pulse = 1 + 0.04 * Math.sin(clock.current * 3);
       g.scale.set(pulse, pulse, 1);
+      // A pulsing glow keeps moving; a fading one, until it is gone.
+      if (target > 0 || material.opacity > 0.002) moving = true;
+      g.visible = material.opacity > 0.002 || target > 0;
     }
 
     // A foil shines: a halo shifting through the rainbow and sparkles along its rim, following
@@ -613,18 +679,27 @@ function Cards({
       const material = fg.material as THREE.MeshBasicMaterial;
       material.color.setHSL((clock.current * 0.12) % 1, 0.85, 0.6);
       material.opacity = THREE.MathUtils.lerp(material.opacity, foilOn * (0.5 + 0.12 * Math.sin(clock.current * 2.2)), 0.12);
+      fg.visible = material.opacity > 0.002 || foilOn > 0;
     }
+    // A foil on top shimmers (its shader, its halo, its sparkles) for as long as it is there.
+    if (foilOn > 0) moving = true;
     const sp = sparklePoints.current;
     if (sp) {
       sparkles.material.uniforms.uTime.value = clock.current;
       const opacity = sparkles.material.uniforms.uOpacity;
       opacity.value = THREE.MathUtils.lerp(opacity.value, foilOn, 0.15);
+      sp.visible = opacity.value > 0.002 || foilOn > 0;
+      if (sp.visible) moving = true;
       if (topMesh) {
         sp.position.copy(topMesh.position);
         sp.rotation.z = topMesh.rotation.z;
         fg?.position.set(topMesh.position.x, topMesh.position.y, -0.08);
       }
     }
+
+    // A card moving, cards to pass, the last one waiting to leave, a card's effects coming in.
+    if (slide.current.kind !== "idle" || passing() || (isLast && !finishing.current) || shown < 1) moving = true;
+    if (moving) state.invalidate();
   });
 
   return (
@@ -681,6 +756,27 @@ export interface PassRequest {
 /** Seconds a passed card takes to leave the pile. */
 const PASS_SLIDE = 0.14;
 
+/** The longest step of the scene's clock between two frames: it draws only while something
+ * moves, and the first frame after a rest must not jump ahead by the whole rest. */
+const MAX_STEP = 0.1;
+/** Below this, a movement easing towards its target counts as arrived. */
+const SETTLED_EPSILON = 1e-4;
+
+/** In a scene that draws only on demand: a frame at each move of the pointer (the wrapper,
+ * the pile and the light follow it; a drag goes on outside the canvas). */
+function WakeOnPointer() {
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => {
+    const wake = () => invalidate();
+    const events = ["pointermove", "pointerdown", "pointerup"] as const;
+    for (const type of events) window.addEventListener(type, wake, { passive: true });
+    return () => {
+      for (const type of events) window.removeEventListener(type, wake);
+    };
+  }, [invalidate]);
+  return null;
+}
+
 export function PackScene({ look, cards, top, onTorn, onNext, onFinished, onShown, slideRequest, passRequest, tearRequest }: Props) {
   // Once the cards are drawn they slide out of the wrapper, which then falls away.
   const [packGone, setPackGone] = useState(false);
@@ -693,7 +789,10 @@ export function PackScene({ look, cards, top, onTorn, onNext, onFinished, onShow
   return (
     // A wide enough view for the zoomed cards to keep a margin above and below (with the
     // frame's height, they show as large as before, the pack a little smaller).
-    <Canvas className="pack-scene" flat dpr={[1, 2]} camera={{ position: [0, 0, 9.5], fov: 40 }}>
+    // Drawn only when something moves (each frame loop asks for the next while it does): a
+    // pack waiting to be torn, or a plain card on the pile, costs nothing.
+    <Canvas className="pack-scene" flat dpr={[1, 2]} frameloop="demand" camera={{ position: [0, 0, 9.5], fov: 40 }}>
+      <WakeOnPointer />
       <ambientLight intensity={0.9} />
       <directionalLight position={[3, 4, 6]} intensity={1.6} />
       <PointerLight />

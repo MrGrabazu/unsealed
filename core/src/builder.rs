@@ -10,7 +10,7 @@ use crate::catalog::{
 };
 use crate::crafted::{craft_booster, CraftedBooster};
 use crate::import::{add_art_cards_from, add_art_slots, artist_index, box_toppers, crafted_set, guest_index, topper_cards, add_token_slots, add_tokens_from, art_set_code, compact_set, merge_foil_printings, merge_token_faces, ArtCardOdds, featured_card, token_set_code, prices_by_uuid, prices_from_scryfall_jsonl, read_all_printings, AllPrintings, RawSet};
-use crate::sim::expected_value_cents;
+use crate::sim::expected_values_cents;
 use crate::{simulate, ColorIndex};
 use flate2::read::GzDecoder;
 use rand::SeedableRng;
@@ -417,7 +417,6 @@ fn build_steps(opts: &BuildOptions, progress: Progress<'_>) -> Result<Manifest, 
     let kinds: Vec<&str> = opts.boosters.iter().map(String::as_str).collect();
     let mut manifest_sets = BTreeMap::new();
     let mut wanted = HashSet::new();
-    let mut all_cards = Vec::new();
     let mut built_boosters = Vec::new();
     let mut built_sets = Vec::new();
 
@@ -442,7 +441,6 @@ fn build_steps(opts: &BuildOptions, progress: Progress<'_>) -> Result<Manifest, 
             built_boosters.push((format!("{code}/{kind}"), cfg.clone()));
         }
         wanted.extend(set.cards.iter().flat_map(|c| [Some(c.scryfall_id.clone()), c.foil_scryfall_id.clone()]).flatten());
-        all_cards.extend(set.cards.iter().cloned());
         write_json(&sets_dir.join(set_file_name(code)), &set)?;
         manifest_sets.insert(
             code.clone(),
@@ -474,7 +472,6 @@ fn build_steps(opts: &BuildOptions, progress: Progress<'_>) -> Result<Manifest, 
         skipped.remove(code);
         let set = crafted_cards(raw, &all.meta.version, &all);
         wanted.extend(set.cards.iter().flat_map(|c| [Some(c.scryfall_id.clone()), c.foil_scryfall_id.clone()]).flatten());
-        all_cards.extend(set.cards.iter().cloned());
         crafted.push((set, recipe));
     }
     // The guest series, named while every set of MTGJSON is at hand.
@@ -514,7 +511,10 @@ fn build_steps(opts: &BuildOptions, progress: Progress<'_>) -> Result<Manifest, 
     progress("Reading prices", BULK_END);
     let reader = BufReader::new(GzDecoder::new(BufReader::new(File::open(&bulk_path)?)));
     let by_scryfall_id = prices_from_scryfall_jsonl(reader, &wanted)?;
-    let cards = prices_by_uuid(&by_scryfall_id, &all_cards);
+    let cards = prices_by_uuid(
+        &by_scryfall_id,
+        built_sets.iter().chain(crafted.iter().map(|(set, _)| set)).flat_map(|set| &set.cards),
+    );
     for (mut set, recipe) in crafted {
         let code = set.code.clone();
         if let Err(e) = finish_crafted_set(&mut set, recipe, &cards, opts, &mut validated, &mut skipped) {
@@ -556,16 +556,10 @@ fn build_steps(opts: &BuildOptions, progress: Progress<'_>) -> Result<Manifest, 
     // Expected market value of each booster: the game prices boosters from it.
     let mut boosters = BTreeMap::new();
     for (key, cfg) in &built_boosters {
-        let value = |pick: fn(&PriceSet, bool) -> Option<u32>| {
-            expected_value_cents(cfg, |uuid, foil| cards.get(uuid).and_then(|p| pick(p, foil))).round() as u32
-        };
-        boosters.insert(
-            key.clone(),
-            BoosterValue {
-                usd: value(|p, foil| if foil { p.usd_foil } else { p.usd }),
-                eur: value(|p, foil| if foil { p.eur_foil } else { p.eur }),
-            },
-        );
+        let usd = |uuid: &str, foil: bool| cards.get(uuid).and_then(|p| if foil { p.usd_foil } else { p.usd });
+        let eur = |uuid: &str, foil: bool| cards.get(uuid).and_then(|p| if foil { p.eur_foil } else { p.eur });
+        let [usd, eur] = expected_values_cents(cfg, [&usd, &eur]);
+        boosters.insert(key.clone(), BoosterValue { usd: usd.round() as u32, eur: eur.round() as u32 });
     }
     write_json(&opts.out.join("prices.json"), &PriceFile { updated_at: bulk.updated_at.clone(), cards, boosters })?;
     write_json(&opts.out.join(ARTISTS_FILE), &artist_index(&built_sets))?;

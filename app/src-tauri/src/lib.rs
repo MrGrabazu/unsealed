@@ -196,7 +196,9 @@ fn session<'a>(state: &'a State<'_, SessionState>) -> Result<std::sync::MutexGua
 fn with_game<T>(state: &State<'_, SessionState>, f: impl FnOnce(&mut Game) -> Result<T, String>) -> Result<T, String> {
     let mut session = session(state)?;
     let (_, game) = session.current.as_mut().ok_or("no game is loaded")?;
-    f(game)
+    let result = f(game);
+    game.trim_sets();
+    result
 }
 
 // ---- games and saves ----------------------------------------------------------------
@@ -304,6 +306,39 @@ fn retry_data_update(app: tauri::AppHandle, status: State<'_, SharedStatus>, ref
     updater::retry(app, status.inner().clone(), refresh.inner().clone());
 }
 
+/// While the window can't be seen (minimized, hidden), WebView2 is asked to use as little
+/// memory as it can (`MemoryUsageTargetLevel`: it trims its caches and decoded images, and
+/// takes them back when shown); `low: false` on return. Windows only: elsewhere, nothing.
+#[tauri::command]
+fn set_webview_memory_low(window: tauri::WebviewWindow, low: bool) -> Result<(), String> {
+    #[cfg(windows)]
+    window
+        .with_webview(move |webview| {
+            // SAFETY: the controller is the window's own, called on its thread by `with_webview`.
+            if let Err(e) = unsafe { webview_memory_target(&webview, low) } {
+                eprintln!("WebView2 memory target not set: {e}");
+            }
+        })
+        .map_err(|e| e.to_string())?;
+    #[cfg(not(windows))]
+    let _ = (window, low);
+    Ok(())
+}
+
+#[cfg(windows)]
+unsafe fn webview_memory_target(webview: &tauri::webview::PlatformWebview, low: bool) -> windows_core::Result<()> {
+    use webview2_com::Microsoft::Web::WebView2::Win32::{
+        ICoreWebView2_19, COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW, COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL,
+    };
+    use windows_core::Interface;
+    let core: ICoreWebView2_19 = webview.controller().CoreWebView2()?.cast()?;
+    core.SetMemoryUsageTargetLevel(if low {
+        COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW
+    } else {
+        COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL
+    })
+}
+
 #[tauri::command]
 async fn get_data_info(state: State<'_, SessionState>) -> Result<DataInfo, String> {
     game::data_info(&session(&state)?.data_dir)
@@ -339,8 +374,12 @@ async fn get_shop(state: State<'_, SessionState>) -> Result<Vec<ShopItem>, Strin
     with_game(&state, |g| g.shop())
 }
 
+// The actions the interface awaits before doing anything else (buying, opening, selling,
+// claiming, undoing) are async too: an opening can draw 100 000 boosters for its bets, and
+// on the main thread the window stopped answering meanwhile. Those it may send in a row
+// without waiting (cards turned over, settings kept) stay synchronous, in the order sent.
 #[tauri::command]
-fn sell_boosters(
+async fn sell_boosters(
     state: State<'_, SessionState>,
     set_code: String,
     kind: String,
@@ -350,13 +389,13 @@ fn sell_boosters(
 }
 
 #[tauri::command]
-fn buy_boosters(state: State<'_, SessionState>, set_code: String, kind: String, quantity: u32) -> Result<(), String> {
+async fn buy_boosters(state: State<'_, SessionState>, set_code: String, kind: String, quantity: u32) -> Result<(), String> {
     with_game(&state, |g| g.buy_boosters(&set_code, &kind, quantity))
 }
 
 /// `animated`: the player watches the opening (false for a quick opening).
 #[tauri::command]
-fn open_booster(
+async fn open_booster(
     state: State<'_, SessionState>,
     set_code: String,
     kind: String,
@@ -367,7 +406,7 @@ fn open_booster(
 }
 
 #[tauri::command]
-fn open_boosters(
+async fn open_boosters(
     state: State<'_, SessionState>,
     set_code: String,
     kind: String,
@@ -518,7 +557,7 @@ async fn get_artist_collection(state: State<'_, SessionState>, name: String) -> 
 }
 
 #[tauri::command]
-fn sell_cards(state: State<'_, SessionState>, requests: Vec<SaleRequest>) -> Result<SaleResult, String> {
+async fn sell_cards(state: State<'_, SessionState>, requests: Vec<SaleRequest>) -> Result<SaleResult, String> {
     with_game(&state, |g| g.sell_cards(&requests))
 }
 
@@ -545,7 +584,7 @@ async fn get_all_duplicates_value(state: State<'_, SessionState>) -> Result<Sale
 }
 
 #[tauri::command]
-fn claim_charity(state: State<'_, SessionState>) -> Result<(), String> {
+async fn claim_charity(state: State<'_, SessionState>) -> Result<(), String> {
     with_game(&state, |g| g.claim_charity())
 }
 
@@ -593,7 +632,7 @@ async fn get_artifacts(state: State<'_, SessionState>, lang: String) -> Result<V
 }
 
 #[tauri::command]
-fn buy_artifact(state: State<'_, SessionState>, id: String, lang: String) -> Result<game::ArtifactView, String> {
+async fn buy_artifact(state: State<'_, SessionState>, id: String, lang: String) -> Result<game::ArtifactView, String> {
     with_game(&state, |g| g.buy_artifact(&id, &lang))
 }
 
@@ -616,7 +655,7 @@ async fn get_history(state: State<'_, SessionState>, limit: u32, offset: u32) ->
 
 /// Undoes a sale (for a penalty) or a recent purchase; returns the money moved (signed).
 #[tauri::command]
-fn undo_transaction(state: State<'_, SessionState>, id: i64) -> Result<i64, String> {
+async fn undo_transaction(state: State<'_, SessionState>, id: i64) -> Result<i64, String> {
     with_game(&state, |g| g.undo_transaction(id))
 }
 
@@ -820,6 +859,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            set_webview_memory_low,
             save_share_image,
             list_saves,
             current_save,

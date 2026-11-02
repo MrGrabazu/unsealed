@@ -57,10 +57,17 @@ pub fn expected_rates(cfg: &BoosterConfig) -> BTreeMap<(String, bool), f64> {
 /// `price_of(uuid, foil)` gives a card's price in any unit; unpriced cards count for 0.
 /// Unlike `expected_rates`, color-balanced sheets are included (first-order estimate).
 pub fn expected_value_cents<F: Fn(&str, bool) -> Option<u32>>(cfg: &BoosterConfig, price_of: F) -> f64 {
-    rates(cfg, true)
-        .iter()
-        .map(|((uuid, foil), rate)| rate * f64::from(price_of(uuid, *foil).unwrap_or(0)))
-        .sum()
+    expected_values_cents(cfg, [&price_of])[0]
+}
+
+/// A card's price in some unit (see `expected_value_cents`).
+pub type PriceOf<'a> = &'a dyn Fn(&str, bool) -> Option<u32>;
+
+/// `expected_value_cents` for several prices at once (dollars and euros…): the rates, the
+/// costly part, are worked out once.
+pub fn expected_values_cents<const N: usize>(cfg: &BoosterConfig, prices: [PriceOf<'_>; N]) -> [f64; N] {
+    let rates = rates(cfg, true);
+    prices.map(|price_of| rates.iter().map(|((uuid, foil), rate)| rate * f64::from(price_of(uuid, *foil).unwrap_or(0))).sum())
 }
 
 fn rates(cfg: &BoosterConfig, include_balanced: bool) -> BTreeMap<(String, bool), f64> {
@@ -113,6 +120,26 @@ pub fn inclusion_probabilities(weights: &[u64], n: usize) -> Vec<f64> {
     let by_weight: BTreeMap<u64, f64> =
         distinct.iter().map(|&w| (w, inclusion_of_weight(&positive, w as f64, n))).collect();
     weights.iter().map(|w| by_weight.get(w).copied().unwrap_or(0.0)).collect()
+}
+
+/// Probability that the card of weight `weights[i]` is among `n` cards drawn as in
+/// `inclusion_probabilities`, the same value, worked out for that weight only.
+pub fn inclusion_probability(weights: &[u64], i: usize, n: usize) -> f64 {
+    let w = weights[i];
+    if w == 0 {
+        return 0.0;
+    }
+    let positive: Vec<f64> = weights.iter().filter(|&&w| w > 0).map(|&w| w as f64).collect();
+    if n >= positive.len() {
+        return 1.0;
+    }
+    if n == 1 {
+        return w as f64 / positive.iter().sum::<f64>();
+    }
+    if positive.iter().all(|&x| x == positive[0]) {
+        return n as f64 / positive.len() as f64;
+    }
+    inclusion_of_weight(&positive, w as f64, n)
 }
 
 /// Successive sampling is the same as giving each card an exponential arrival time of

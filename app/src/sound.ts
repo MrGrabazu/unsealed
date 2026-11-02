@@ -20,16 +20,39 @@ export const setVolume = (v: number) => localStorage.setItem(VOLUME, String(v));
 let audio: AudioContext | null = null;
 let master: GainNode | null = null;
 
+/** Whether the music plays (music.ts): the audio context then never rests. */
+let musicPlaying = false;
+let restTimer: number | undefined;
+/** Longer than any sound, its echoes included. */
+const REST_AFTER_MS = 6_000;
+
 /** The audio context shared by the sounds and the music, created on first use (browsers allow
  * it after a user gesture); null where Web Audio is missing. */
 export function sharedAudio(): AudioContext | null {
   try {
     audio ??= new AudioContext();
     if (audio.state === "suspended") void audio.resume();
+    restSoon();
     return audio;
   } catch {
     return null;
   }
+}
+
+/** A running audio context keeps its thread busy even in silence: once nothing plays, it is
+ * suspended, and resumed by the next sound. */
+function restSoon() {
+  window.clearTimeout(restTimer);
+  if (musicPlaying) return;
+  restTimer = window.setTimeout(() => {
+    if (!musicPlaying && audio?.state === "running") void audio.suspend();
+  }, REST_AFTER_MS);
+}
+
+/** Said by the music when it starts and once it has faded out. */
+export function setMusicPlaying(on: boolean) {
+  musicPlaying = on;
+  restSoon();
 }
 
 /** The audio context and the sounds' output, when the sounds are on. */
@@ -43,7 +66,6 @@ function context(): { ctx: AudioContext; out: GainNode } | null {
       master.connect(audio.destination);
     }
     master.gain.value = getVolume() * 0.8;
-    if (audio.state === "suspended") void audio.resume();
     return { ctx: audio, out: master };
   } catch {
     return null;

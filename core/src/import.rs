@@ -228,7 +228,9 @@ struct RawCard {
     #[serde(default)]
     artist: Option<String>,
     identifiers: RawIdentifiers,
-    #[serde(default)]
+    /// Only the languages of `FOREIGN_LANGUAGES`: MTGJSON lists ten or so, and the whole of
+    /// it is read at once during a build.
+    #[serde(default, deserialize_with = "kept_languages")]
     foreign_data: Vec<RawForeign>,
     #[serde(default)]
     promo_types: Vec<String>,
@@ -265,6 +267,27 @@ struct RawForeign {
     identifiers: RawIdentifiers,
 }
 
+/// The translated printings of a card in the languages kept, the others dropped as read.
+fn kept_languages<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Vec<RawForeign>, D::Error> {
+    struct Kept;
+    impl<'de> serde::de::Visitor<'de> for Kept {
+        type Value = Vec<RawForeign>;
+        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            f.write_str("a list of translated printings")
+        }
+        fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+            let mut kept = Vec::new();
+            while let Some(f) = seq.next_element::<RawForeign>()? {
+                if language_code(&f.language).is_some() {
+                    kept.push(f);
+                }
+            }
+            Ok(kept)
+        }
+    }
+    d.deserialize_seq(Kept)
+}
+
 /// The language code kept for an MTGJSON language name, if it is one of `FOREIGN_LANGUAGES`.
 fn language_code(name: &str) -> Option<&'static str> {
     FOREIGN_LANGUAGES.iter().find(|(n, _)| *n == name).map(|(_, code)| *code)
@@ -282,21 +305,21 @@ fn to_entry(c: &RawCard) -> Result<CardEntry, ConfigError> {
             Some((code.to_string(), ForeignCard { name: f.name.clone(), scryfall_id: f.identifiers.scryfall_id.clone() }))
         })
         .collect();
-    let c = c.clone();
+    // Field by field: cloning the whole card copied its translations and every other field.
     Ok(CardEntry {
         foil_kind: foil_kind(&c.promo_types, &c.finishes),
         foreign,
-        uuid: c.uuid,
-        set_code: c.set_code,
+        uuid: c.uuid.clone(),
+        set_code: c.set_code.clone(),
         scryfall_id,
-        name: c.name,
-        number: c.number,
-        rarity: c.rarity,
-        colors: c.colors,
-        finishes: c.finishes,
-        layout: c.layout,
-        side: c.side,
-        artist: c.artist,
+        name: c.name.clone(),
+        number: c.number.clone(),
+        rarity: c.rarity.clone(),
+        colors: c.colors.clone(),
+        finishes: c.finishes.clone(),
+        layout: c.layout.clone(),
+        side: c.side.clone(),
+        artist: c.artist.clone(),
         serialized: c.promo_types.iter().any(|p| p == "serialized"),
         token: false,
         art: false,
@@ -305,8 +328,8 @@ fn to_entry(c: &RawCard) -> Result<CardEntry, ConfigError> {
         special_frame: c.border_color.as_deref() == Some("borderless")
             || c.frame_effects.iter().any(|f| f == "showcase" || f == "extendedart"),
         types: c.supertypes.iter().chain(&c.types).map(|t| t.to_lowercase()).collect(),
-        color_identity: c.color_identity,
-        drop: c.subsets.into_iter().next(),
+        color_identity: c.color_identity.clone(),
+        drop: c.subsets.first().cloned(),
     })
 }
 
@@ -849,12 +872,12 @@ pub fn parse_cents(s: &str) -> Option<u32> {
 
 /// Re-keys prices by MTGJSON uuid, the key the client uses everywhere. A Scryfall id can
 /// match several uuids (the faces of a double-faced card): each one gets the same prices.
-pub fn prices_by_uuid(
+pub fn prices_by_uuid<'a>(
     by_scryfall_id: &BTreeMap<String, PriceSet>,
-    cards: &[CardEntry],
+    cards: impl IntoIterator<Item = &'a CardEntry>,
 ) -> BTreeMap<String, PriceSet> {
     cards
-        .iter()
+        .into_iter()
         .filter_map(|c| {
             let mut prices = by_scryfall_id.get(&c.scryfall_id).copied();
             // A foil version merged into the card (`merge_foil_printings`) gives its foil prices.

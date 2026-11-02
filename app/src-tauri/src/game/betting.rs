@@ -9,6 +9,7 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use unsealed_core::achievements::Event;
 use unsealed_core::betting::{chance, payout_cents, Bet, BetCard, Chance, SimulatedPacks};
 
@@ -131,7 +132,18 @@ pub(super) struct BetTable {
     cards: Vec<BetCard>,
     index: HashMap<String, usize>,
     packs: Option<SimulatedPacks>,
+    /// When its boosters were last used (`PACKS_CLOCK`): only the latest tables keep theirs.
+    packs_used: u64,
+    /// The chances already worked out, by bet (as JSON): the slip asks again at every change.
+    chances: HashMap<String, Chance>,
 }
+
+/// How many tables keep their simulated boosters (some 4 MB each): drawn again from the same
+/// seed, they are the same boosters, so dropping them only costs time.
+const KEPT_PACKS: usize = 2;
+
+/// Orders the uses of the tables' boosters.
+static PACKS_CLOCK: AtomicU64 = AtomicU64::new(0);
 
 /// The event an achievement can listen to.
 pub(super) fn bet_event(bet: &SettledBet) -> Event {
@@ -160,10 +172,18 @@ impl Game {
         let min = self.economy.betting.min_simulated_hits as usize;
         let exact = bet.is_exact();
         let key = self.prepare_bet_table(set_code, kind, !exact)?;
-        let table = &self.bet_tables[&key];
-        let cfg = &self.sets[set_code].file.boosters[kind];
-        let empty = SimulatedPacks::default();
-        let found = chance(bet, cfg, &table.cards, &table.index, table.packs.as_ref().unwrap_or(&empty));
+        let memo = serde_json::to_string(bet).map_err(err)?;
+        let found = match self.bet_tables[&key].chances.get(&memo) {
+            Some(&found) => found,
+            None => {
+                let table = &self.bet_tables[&key];
+                let cfg = &self.sets[set_code].file.boosters[kind];
+                let empty = SimulatedPacks::default();
+                let found = chance(bet, cfg, &table.cards, &table.index, table.packs.as_ref().unwrap_or(&empty));
+                self.bet_tables.get_mut(&key).expect("just prepared").chances.insert(memo, found);
+                found
+            }
+        };
         let (probability, unpriced) = match found {
             Chance::Exact(p) if p <= CERTAIN => (None, Some(Unpriced::Never)),
             Chance::Exact(p) if p >= 1.0 - CERTAIN => (None, Some(Unpriced::Always)),
@@ -303,9 +323,23 @@ impl Game {
                 })
                 .collect();
             let index = cards.iter().enumerate().map(|(i, c)| (c.uuid.clone(), i)).collect();
-            self.bet_tables.insert(key.clone(), BetTable { cards, index, packs: None });
+            self.bet_tables.insert(key.clone(), BetTable { cards, index, packs: None, packs_used: 0, chances: HashMap::new() });
+        }
+        if with_packs {
+            self.bet_tables.get_mut(&key).expect("just made").packs_used = PACKS_CLOCK.fetch_add(1, Ordering::Relaxed) + 1;
         }
         if with_packs && self.bet_tables[&key].packs.is_none() {
+            let mut holding: Vec<(u64, String)> = self
+                .bet_tables
+                .iter()
+                .filter(|(k, t)| t.packs.is_some() && **k != key)
+                .map(|(k, t)| (t.packs_used, k.clone()))
+                .collect();
+            holding.sort_unstable();
+            let extra = (holding.len() + 1).saturating_sub(KEPT_PACKS);
+            for (_, k) in holding.into_iter().take(extra) {
+                self.bet_tables.get_mut(&k).expect("listed").packs = None;
+            }
             let set = &self.sets[set_code];
             let mut rng = ChaCha8Rng::seed_from_u64(0xB37);
             let index = &self.bet_tables[&key].index;

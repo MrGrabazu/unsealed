@@ -17,3 +17,10 @@ opt-level = 3
 opt-level = 3
 [profile.dev.package.rand_chacha]
 opt-level = 3
+
+# The released game: a smaller and faster binary, for a longer build. Panics still unwind:
+# the background data refresh relies on it to never take the game down.
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = true

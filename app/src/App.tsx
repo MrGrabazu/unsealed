@@ -8,6 +8,7 @@ import { getFullscreen, isFullscreenKey, setFullscreen, toggleFullscreen } from 
 import { GameScreen } from "./GameScreen";
 import { Home } from "./Home";
 import { Options } from "./Options";
+import { watchIdle } from "./idle";
 
 type Screen = "home" | "game" | "options" | "about";
 
@@ -25,6 +26,8 @@ export function App() {
       .catch(() => setHasData(true));
   }, []);
   useEffect(checkData, [checkData]);
+  // Nobody looking: the animations rest (idle.ts).
+  useEffect(watchIdle, []);
   const dataStatus = useDataStatus(checkData);
 
   // The window opens in the display chosen; this keeps the app's copy of the choice in step

@@ -1,8 +1,9 @@
 import { useEffect, useState, type RefObject } from "react";
 
 /** How far outside its scrolling area an element counts as near: loaded ahead of the scroll,
- * and let go only well after it is out of sight (no flicker scrolling back and forth). */
-const MARGIN = "900px";
+ * and let go only after it is out of sight (no flicker scrolling back and forth). The images
+ * come from the disk cache, quick to show: 900 px kept two more screens of a grid decoded. */
+const MARGIN = "400px";
 
 type Listener = (near: boolean) => void;
 

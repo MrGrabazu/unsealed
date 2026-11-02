@@ -12,8 +12,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager};
 use unsealed_core::builder::{build, BuildOptions};
 use unsealed_core::catalog::Manifest;
-use unsealed_core::pack::fetch_pack;
-use unsealed_core::update::{refresh_reason, DataConfig};
+use unsealed_core::pack::{fetch_pack, PackFetch};
+use unsealed_core::update::{refresh_reason, DataConfig, RefreshReason};
 
 /// Event name the frontend listens to.
 pub const STATUS_EVENT: &str = "data-status";
@@ -74,41 +74,88 @@ pub fn retry(app: AppHandle, status: SharedStatus, refresh: Arc<Refresh>) {
     }
 }
 
+/// Lowers the priority of the calling thread: a local build keeps a core busy for minutes
+/// while the player plays, and the game's own threads should come first. (Windows only: on
+/// macOS, `nice` would lower the whole app.)
+#[cfg(windows)]
+fn lower_priority() {
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn GetCurrentThread() -> *mut std::ffi::c_void;
+        fn SetThreadPriority(thread: *mut std::ffi::c_void, priority: i32) -> i32;
+    }
+    const THREAD_PRIORITY_BELOW_NORMAL: i32 = -1;
+    // SAFETY: the pseudo-handle of the current thread is always valid.
+    unsafe {
+        SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
+    }
+}
+
+#[cfg(not(windows))]
+fn lower_priority() {}
+
 /// Starts the refresh check on its own thread. Never blocks the UI and never panics the app.
 pub fn spawn(app: AppHandle, status: SharedStatus, refresh: Arc<Refresh>) {
     std::thread::spawn(move || {
-        let Refresh { data_dir, cache_dir, cfg } = &*refresh;
+        lower_priority();
+        // The published pack is the data installed: looked for again later, the game playing
+        // on its data meanwhile.
+        while refresh_once(&app, &status, &refresh) {
+            std::thread::sleep(PACK_RETRY);
+        }
+    });
+}
+
+/// How long the game waits before looking for a newer pack, when the one published is the
+/// data installed (built twice a day: it comes within hours).
+const PACK_RETRY: std::time::Duration = std::time::Duration::from_secs(3600);
+
+/// Brings the data up to date: from the published pack, else built here. True when the data is
+/// stale but the pack published is already installed: to look again later.
+fn refresh_once(app: &AppHandle, status: &SharedStatus, refresh: &Refresh) -> bool {
+    {
+        let Refresh { data_dir, cache_dir, cfg } = refresh;
         let local = read_manifest(data_dir);
         let Some(reason) = refresh_reason(local.as_ref(), cfg, now_secs()) else {
-            set_status(&app, &status, DataStatus::UpToDate);
-            return;
+            set_status(app, status, DataStatus::UpToDate);
+            return false;
         };
         eprintln!("data refresh needed: {reason:?}");
-        set_status(&app, &status, DataStatus::Updating { message: "Starting".to_string(), percent: 0 });
+        // Data only stale waits quietly for the pack: no progress bar for a look at its manifest.
+        if reason != RefreshReason::Stale {
+            set_status(app, status, DataStatus::Updating { message: "Starting".to_string(), percent: 0 });
+        }
         let mut last: Option<DataStatus> = None;
         let mut report = |line: &str, fraction: f64| {
             let percent = (fraction.clamp(0.0, 1.0) * 100.0).round() as u8;
             let next = DataStatus::Updating { message: line.to_string(), percent };
-            // Downloads report every percent of each file: only forward actual changes.
-            if last.as_ref() != Some(&next) {
-                set_status(&app, &status, next.clone());
+            // Downloads report every percent of each file: only forward actual changes. The
+            // look for the pack says nothing while the data is only stale.
+            if last.as_ref() != Some(&next) && (reason != RefreshReason::Stale || fraction > 0.0) {
+                set_status(app, status, next.clone());
                 last = Some(next);
             }
         };
 
-        // The ready-made data first (a few MB, published every day); building it here, from
-        // MTGJSON and Scryfall, is the fallback: when the pack is of no use or cannot be had.
+        // The ready-made data first (a few MB, published twice a day); building it here, from
+        // MTGJSON and Scryfall, is the fallback: when no pack of use can be had. A pack that is
+        // the data installed, or itself over a day old once installed (the daily build failed),
+        // is waited on: building here takes minutes of a core for prices hours newer at best.
         match fetch_pack(cfg, local.as_ref(), now_secs(), data_dir, cache_dir, &mut report) {
-            Ok(Some(manifest)) if refresh_reason(Some(&manifest), cfg, now_secs()).is_none() => {
-                reload_session(&app);
-                set_status(&app, &status, DataStatus::UpToDate);
-                return;
+            Ok(PackFetch::Installed(manifest)) => {
+                reload_session(app);
+                set_status(app, status, DataStatus::UpToDate);
+                return refresh_reason(Some(&manifest), cfg, now_secs()).is_some();
             }
-            // Installed but already a day old (the daily build failed): built here as well.
-            Ok(Some(_)) => reload_session(&app),
-            Ok(None) => {}
+            Ok(PackFetch::Unchanged) => {
+                eprintln!("data stale, the pack published is installed: waiting for the next one");
+                set_status(app, status, DataStatus::UpToDate);
+                return true;
+            }
+            Ok(PackFetch::Unusable) => {}
             Err(e) => eprintln!("ready-made data unavailable: {e}"),
         }
+        set_status(app, status, DataStatus::Updating { message: "Starting".to_string(), percent: 0 });
 
         let opts = BuildOptions {
             sets: cfg.sets.clone(),
@@ -124,13 +171,14 @@ pub fn spawn(app: AppHandle, status: SharedStatus, refresh: Arc<Refresh>) {
         let result = build(&opts, &mut report);
         match result {
             Ok(_) => {
-                reload_session(&app);
-                set_status(&app, &status, DataStatus::UpToDate);
+                reload_session(app);
+                set_status(app, status, DataStatus::UpToDate);
             }
             Err(e) => {
                 eprintln!("data refresh failed: {e}");
-                set_status(&app, &status, DataStatus::Failed { message: e.to_string() });
+                set_status(app, status, DataStatus::Failed { message: e.to_string() });
             }
         }
-    });
+        false
+    }
 }

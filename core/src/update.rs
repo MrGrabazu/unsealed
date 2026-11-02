@@ -106,6 +106,16 @@ pub fn pack_is_of_use(remote: &Manifest, local: Option<&Manifest>, cfg: &DataCon
     compatible && newer
 }
 
+/// Whether the published data pack is the data installed: of this format, for these sets, and
+/// generated at the same time. The local data may be over a day old (the daily build is not
+/// out yet): building it here would take minutes of a core and hundreds of MB of downloads,
+/// for prices a few hours newer at best. The game waits for the next pack instead.
+pub fn pack_is_installed(remote: &Manifest, local: Option<&Manifest>, cfg: &DataConfig, now: i64) -> bool {
+    let compatible = matches!(refresh_reason(Some(remote), cfg, now), None | Some(RefreshReason::Stale));
+    compatible
+        && local.is_some_and(|local| local.format_version == DATA_FORMAT_VERSION && local.generated_at == remote.generated_at)
+}
+
 /// Whether the data must be rebuilt now. `now` is a Unix time in seconds.
 pub fn refresh_reason(local: Option<&Manifest>, cfg: &DataConfig, now: i64) -> Option<RefreshReason> {
     let Some(manifest) = local else { return Some(RefreshReason::NoData) };

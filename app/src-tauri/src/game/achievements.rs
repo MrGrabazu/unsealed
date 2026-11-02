@@ -100,7 +100,7 @@ impl Game {
     /// Every achievement, its texts in `lang` (English when not translated).
     pub fn achievements(&mut self, lang: &str) -> Result<AchievementsView, String> {
         self.ensure_prices();
-        let progress = self.store.load_progress().map_err(err)?;
+        let progress = self.saved_progress()?;
         let sets = self.list_sets().unwrap_or_default();
         let items: Vec<AchievementView> = self
             .engine
@@ -120,7 +120,7 @@ impl Game {
         if ids.is_empty() {
             return Vec::new();
         }
-        let progress = self.store.load_progress().unwrap_or_default();
+        let progress = self.saved_progress().unwrap_or_default();
         let sets = self.list_sets().unwrap_or_default();
         ids.iter()
             .filter_map(|id| {
@@ -151,8 +151,8 @@ impl Game {
     /// Returns the achievements just unlocked.
     fn try_emit(&mut self, events: Vec<Event>) -> Result<Vec<String>, String> {
         let now = (self.clock)().now;
-        let mut progress = self.store.load_progress().map_err(err)?;
-        let before = progress.clone();
+        let before = self.saved_progress()?;
+        let mut progress = before.clone();
         let mut unlocked: Vec<String> = Vec::new();
         for event in events {
             unlocked.extend(self.engine.handle(&mut progress, event, now).into_iter().map(|u| u.id));
@@ -160,12 +160,29 @@ impl Game {
         if progress == before {
             return Ok(Vec::new());
         }
-        self.ensure_prices();
-        let sets = self.list_sets().unwrap_or_default();
-        let rewards: Vec<GrantedReward> = unlocked.iter().filter_map(|id| self.resolve_reward(id, &sets)).collect();
-        self.store.save_progress(&progress, &rewards, now).map_err(err)?;
+        let rewards: Vec<GrantedReward> = if unlocked.is_empty() {
+            Vec::new()
+        } else {
+            self.ensure_prices();
+            let sets = self.list_sets().unwrap_or_default();
+            unlocked.iter().filter_map(|id| self.resolve_reward(id, &sets)).collect()
+        };
+        if let Err(e) = self.store.save_progress(&before, &progress, &rewards, now) {
+            self.progress = None; // read again from the save next time
+            return Err(err(e));
+        }
+        self.progress = Some(progress);
         self.notifications.extend(unlocked.iter().cloned());
         Ok(unlocked)
+    }
+
+    /// The achievement progress as saved, read from the save once per game: it is only ever
+    /// changed through `try_emit`.
+    fn saved_progress(&mut self) -> Result<Progress, String> {
+        if self.progress.is_none() {
+            self.progress = Some(self.store.load_progress().map_err(err)?);
+        }
+        Ok(self.progress.clone().expect("just loaded"))
     }
 
     /// A save edited outside the game was refused (see `seal`): its secret achievement, for
@@ -349,14 +366,10 @@ impl Game {
             sets.into_iter().filter(|s| s.release_date.starts_with(&year)).map(|s| s.code).collect();
         let mut completed = 0i64;
         for code in &same_year {
-            self.ensure_loaded(code).ok()?;
+            let target = self.completion_target(code).ok()?;
             let owned = self.store.owned_in_set(code).ok()?;
-            let set = &self.sets[code];
-            let complete = !set.obtainable.is_empty()
-                && set
-                    .obtainable
-                    .iter()
-                    .all(|&i| owned.get(&set.file.cards[i].uuid).is_some_and(|o| o.normal + o.foil > 0));
+            let complete =
+                !target.is_empty() && target.iter().all(|uuid| owned.get(uuid).is_some_and(|o| o.normal + o.foil > 0));
             completed += i64::from(complete);
         }
         let set_count = same_year.len() as i64;

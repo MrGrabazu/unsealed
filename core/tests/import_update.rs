@@ -9,7 +9,7 @@ use unsealed_core::import::{
 };
 use unsealed_core::catalog::PriceSet;
 use unsealed_core::{open_booster, ColorIndex};
-use unsealed_core::update::{pack_is_of_use, refresh_reason, DataConfig, RefreshReason};
+use unsealed_core::update::{pack_is_installed, pack_is_of_use, refresh_reason, DataConfig, RefreshReason};
 
 fn raw_set(sheet_card: &str, scryfall_id: &str) -> String {
     format!(
@@ -692,6 +692,26 @@ fn the_ready_made_data_is_taken_only_when_newer_and_made_for_this_game() {
     other.format_version += 1;
     assert!(!pack_is_of_use(&other, None, &cfg, 2_100));
     assert!(!pack_is_of_use(&manifest("2000", &["BLB"]), None, &cfg, 2_100));
+}
+
+#[test]
+fn stale_data_waits_for_the_next_pack_when_the_published_one_is_installed() {
+    let cfg = data_config();
+    let remote = manifest("2000", &["BLB", "DSK"]);
+    // Installed a day and more ago, nothing newer published: no rebuild here.
+    let installed = manifest("2000", &["BLB", "DSK"]);
+    let later = 2_000 + 30 * 3600;
+    assert_eq!(refresh_reason(Some(&installed), &cfg, later), Some(RefreshReason::Stale));
+    assert!(pack_is_installed(&remote, Some(&installed), &cfg, later));
+    // Other data installed (built here, older): not the pack.
+    assert!(!pack_is_installed(&remote, Some(&manifest("1000", &["BLB", "DSK"])), &cfg, later));
+    assert!(!pack_is_installed(&remote, None, &cfg, later));
+    // Of another format, or missing a wanted set: the game still builds its own.
+    let mut old = manifest("2000", &["BLB", "DSK"]);
+    old.format_version -= 1;
+    assert!(!pack_is_installed(&remote, Some(&old), &cfg, later));
+    let partial = manifest("2000", &["BLB"]);
+    assert!(!pack_is_installed(&partial, Some(&partial), &cfg, later));
 }
 
 #[test]

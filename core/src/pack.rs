@@ -9,7 +9,7 @@
 
 use crate::builder::{download, http_get, BuildError, Progress};
 use crate::catalog::{is_reserved, Manifest};
-use crate::update::{pack_is_of_use, DataConfig};
+use crate::update::{pack_is_installed, pack_is_of_use, DataConfig};
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
@@ -95,9 +95,19 @@ pub fn read_pack(reader: impl Read) -> io::Result<Vec<(String, Vec<u8>)>> {
     Ok(files)
 }
 
+/// What `fetch_pack` did.
+#[derive(Debug)]
+pub enum PackFetch {
+    /// The pack was installed: its manifest.
+    Installed(Manifest),
+    /// The pack published is the data installed (`pack_is_installed`): nothing newer yet.
+    Unchanged,
+    /// No pack, or one of no use to this game: the game builds its data itself.
+    Unusable,
+}
+
 /// Installs the published pack in `dir` when it is of use (`pack_is_of_use`): its manifest is
-/// read first (a few KB), then the pack downloaded into `cache` and installed. Returns the
-/// manifest installed, or None when the pack was of no use (the game builds its data itself).
+/// read first (a few KB), then the pack downloaded into `cache` and installed.
 pub fn fetch_pack(
     cfg: &DataConfig,
     local: Option<&Manifest>,
@@ -105,13 +115,16 @@ pub fn fetch_pack(
     dir: &Path,
     cache: &Path,
     progress: Progress<'_>,
-) -> Result<Option<Manifest>, BuildError> {
-    let Some(base) = cfg.pack_url.as_deref().filter(|u| !u.is_empty()) else { return Ok(None) };
+) -> Result<PackFetch, BuildError> {
+    let Some(base) = cfg.pack_url.as_deref().filter(|u| !u.is_empty()) else { return Ok(PackFetch::Unusable) };
     let base = base.trim_end_matches('/');
     progress("Looking for the ready-made game data", 0.0);
     let remote: Manifest = serde_json::from_reader(http_get(&format!("{base}/{MANIFEST}"))?.into_reader())?;
+    if pack_is_installed(&remote, local, cfg, now) {
+        return Ok(PackFetch::Unchanged);
+    }
     if !pack_is_of_use(&remote, local, cfg, now) {
-        return Ok(None);
+        return Ok(PackFetch::Unusable);
     }
     fs::create_dir_all(cache)?;
     let path = cache.join(PACK_FILE);
@@ -122,7 +135,7 @@ pub fn fetch_pack(
     let manifest: Manifest = serde_json::from_slice(&files.iter().find(|(name, _)| name == MANIFEST).expect("checked by read_pack").1)?;
     install_pack(&files, dir)?;
     let _ = fs::remove_file(&path);
-    Ok(Some(manifest))
+    Ok(PackFetch::Installed(manifest))
 }
 
 /// Installs a pack's files in a data directory: each written beside its place then renamed

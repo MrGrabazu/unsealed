@@ -38,8 +38,9 @@ export function packLookOf(setCode: string, set: SetSummary | undefined, kind: s
  * drawn anew at each opening (its fonts, its art, then the drawing), its print showed late. */
 const drawn = new Map<string, HTMLCanvasElement>();
 const drawing = new Map<string, Promise<HTMLCanvasElement>>();
-/** At most this many prints kept (some 1.7 MB each). */
-const KEPT = 16;
+/** At most this many prints kept (some 1.7 MB each): the boosters chosen last in the reserve,
+ * the one about to be opened among them. */
+const KEPT = 4;
 
 const keyOf = (look: PackLook) =>
   [look.setCode, look.setName, look.kindLabel, look.finish, look.hue, look.artUrl, look.iconUrl].join("|");

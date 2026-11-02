@@ -37,6 +37,24 @@ export function largeImage(url: string | null): string | null {
   return url == null ? null : resized(url, "large");
 }
 
+/** The width of the thumbnails the cache makes (`THUMB_WIDTH` of images.rs). */
+const THUMB_WIDTH = 320;
+/** The images the cache makes thumbnails of, by size: their width over their height. */
+const THUMBED: Record<string, number> = { normal: 488 / 680, large: 672 / 936, art_crop: 626 / 457 };
+
+/** The image to show in a box of `width` × `height` CSS pixels: its thumbnail (320 px wide,
+ * made by the cache, images.rs) when that covers the box on this screen, itself otherwise. A
+ * "normal" card image decoded weighs 1.3 MB, its thumbnail 0.6 MB. Only for the images the
+ * cache serves (never in the preview, outside the app). */
+export function fittedImage(url: string, width: number, height: number): string {
+  if (CACHE === CDN || !url.startsWith(CACHE)) return url;
+  const aspect = THUMBED[url.slice(CACHE.length).split("/", 1)[0]];
+  if (aspect == null) return url;
+  // An image covering its box (`object-fit: cover`) may need more than the box's width.
+  const needed = Math.max(width, height * aspect) * window.devicePixelRatio;
+  return needed > 0 && needed <= THUMB_WIDTH ? `${CACHE}thumb/${url.slice(CACHE.length)}` : url;
+}
+
 /** The small version of a card image URL, for a thumbnail under ~120 px wide. */
 export function smallImage(url: string): string;
 export function smallImage(url: string | null): string | null;

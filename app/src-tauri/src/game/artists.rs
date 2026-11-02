@@ -65,7 +65,9 @@ impl Game {
 
     /// Codes of the sets offered today (released ones).
     pub(super) fn offered_sets(&self) -> HashSet<String> {
-        self.list_sets().unwrap_or_default().into_iter().map(|s| s.code).collect()
+        let today = (self.clock)().day;
+        let Ok(Some(manifest)) = super::read_manifest(&self.data_dir) else { return HashSet::new() };
+        manifest.sets.iter().filter(|(_, s)| s.release_date.as_str() <= today.as_str()).map(|(code, _)| code.clone()).collect()
     }
 
     /// Every artist with cards in the sets offered, by name.
@@ -95,9 +97,18 @@ impl Game {
         let sources = self.store.owned_card_sources().map_err(err)?;
         let owned = self.owned_by_uuid()?;
         let mut cards = Vec::new();
+        // One answer per set code, not per card: thousands of cards share a few sets.
+        let mut labels: HashMap<String, Option<(String, String)>> = HashMap::new();
         for (uuid, card_set, booster_set) in sources {
             // A guest is listed under its series (Special Guests), its file still holding it.
-            let series = self.series_label(&card_set);
+            let series = match labels.get(&card_set) {
+                Some(label) => label.clone(),
+                None => {
+                    let label = self.series_label(&card_set);
+                    labels.insert(card_set.clone(), label.clone());
+                    label
+                }
+            };
             let parent = card_set.get(1..).map(str::to_string);
             let file = [booster_set, Some(card_set), parent]
                 .into_iter()

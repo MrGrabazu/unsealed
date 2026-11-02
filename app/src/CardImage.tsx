@@ -1,6 +1,30 @@
-import { useRef, useState, type CSSProperties, type ImgHTMLAttributes } from "react";
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ImgHTMLAttributes, type RefObject } from "react";
 import { useI18n } from "./i18n";
+import { fittedImage } from "./images";
 import { useNearScreen } from "./nearScreen";
+
+/** `url`, or its thumbnail when that is enough for the box the image is in (the parent of
+ * `marker`, measured before the first paint, and again when it grows: see `fittedImage`).
+ * Undefined until measured, so that no image is fetched before the right one is known. */
+function useFitted(url: string | null | undefined, marker: RefObject<HTMLElement | null>): string | undefined {
+  const [box, setBox] = useState<[number, number] | null>(null);
+  useLayoutEffect(() => {
+    const parent = marker.current?.parentElement;
+    if (!parent) return setBox([Infinity, Infinity]);
+    // Only ever larger: a box that shrinks keeps the image it has.
+    const measure = () =>
+      setBox((b) => {
+        const [w, h] = [parent.clientWidth, parent.clientHeight];
+        return b && b[0] >= w && b[1] >= h ? b : [Math.max(w, b?.[0] ?? 0), Math.max(h, b?.[1] ?? 0)];
+      });
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(parent);
+    return () => observer.disconnect();
+  }, [marker]);
+  if (url == null || box == null) return undefined;
+  return fittedImage(url, box[0], box[1]);
+}
 
 interface Props {
   front: string;
@@ -16,15 +40,29 @@ interface Props {
 /** The marker telling where a lazy image goes: never displayed, whatever the CSS around it. */
 const HIDDEN: CSSProperties = { display: "none" };
 
+/** An image from the cache, as its thumbnail when that is enough for its box (its parent,
+ * which keeps its size: see `fittedImage`). */
+export function FittedImage(props: ImgHTMLAttributes<HTMLImageElement>) {
+  const marker = useRef<HTMLSpanElement>(null);
+  const src = useFitted(props.src, marker);
+  return (
+    <>
+      <span ref={marker} style={HIDDEN} />
+      {src && <img decoding="async" draggable={false} {...props} src={src} />}
+    </>
+  );
+}
+
 /** An image of a long list (a set's art in the Boosterium…), only in the page near the screen
  * (see `CardImage`'s `lazy`): its parent keeps its place. */
 export function NearImage(props: ImgHTMLAttributes<HTMLImageElement>) {
   const marker = useRef<HTMLSpanElement>(null);
   const near = useNearScreen(marker, true, true);
+  const src = useFitted(props.src, marker);
   return (
     <>
       <span ref={marker} style={HIDDEN} />
-      {near && <img decoding="async" draggable={false} {...props} />}
+      {near && src && <img decoding="async" draggable={false} {...props} src={src} />}
     </>
   );
 }
@@ -42,14 +80,15 @@ export function CardImage({ front, back, alt, className, lazy = false, onTurned 
   const [turn, setTurn] = useState<Turn>("idle");
   const marker = useRef<HTMLSpanElement>(null);
   const near = useNearScreen(marker, lazy, true);
+  const src = useFitted(showBack && back ? back : front, marker);
   const turnClass = turn === "out" ? "turning-out" : turn === "in" ? "turning-in" : "";
   if (!near) return <span ref={marker} style={HIDDEN} />;
   return (
     <>
-      {lazy && <span ref={marker} style={HIDDEN} />}
+      <span ref={marker} style={HIDDEN} />
       <img
         className={`${className ?? ""} ${turnClass}`}
-        src={showBack && back ? back : front}
+        src={src}
         alt={alt}
         decoding="async"
         draggable={false}

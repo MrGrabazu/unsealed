@@ -51,9 +51,9 @@ impl Game {
                 .flatten()
                 .map(|m| {
                     m.sets
-                        .into_iter()
+                        .iter()
                         .filter(|(_, s)| !s.box_toppers.is_empty())
-                        .map(|(code, s)| (code, (s.name, s.box_toppers)))
+                        .map(|(code, s)| (code.clone(), (s.name.clone(), s.box_toppers.clone())))
                         .collect()
                 })
                 .unwrap_or_default();

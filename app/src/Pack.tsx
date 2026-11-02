@@ -68,6 +68,7 @@ export function Pack({ setCode, set, kind, torn, onTear, disabled }: Props) {
           transition={{ duration: 0.5, ease: "easeIn" }}
         />
         <span className="pack-body">
+          <span className="pack-prism" />
           <span className="pack-foil" />
           <span className="pack-header">
             <SetIcon url={set?.iconUrl ?? null} name={set?.name ?? setCode} />

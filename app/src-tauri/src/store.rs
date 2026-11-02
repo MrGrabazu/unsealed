@@ -131,6 +131,10 @@ const MIGRATIONS: &[&str] = &[
     ) WITHOUT ROWID;",
     // 14: the opening that gave a card, found by the card (every card owned, across the sets)
     "CREATE INDEX opening_cards_card ON opening_cards (card_uuid);",
+    // 15: the day's charity claims, read at each wallet view; the boosters of a set and kind
+    // opened, counted at each opening (box toppers)
+    "CREATE INDEX ledger_kind ON ledger (kind, details);
+    CREATE INDEX openings_kind ON openings (set_code, booster_kind);",
 ];
 
 /// Key of `save_meta`: the last day a lost bet's stake was given back (an artifact's effect).
@@ -329,6 +333,10 @@ impl Store {
     pub fn open(path: &Path) -> StoreResult<Self> {
         let conn = Connection::open(path)?;
         conn.pragma_update(None, "journal_mode", "WAL")?;
+        // With WAL, the database stays consistent; a power cut may lose the last seconds of play
+        // at most, where FULL forced a write to the disk at every action (each income payment,
+        // each card revealed). Per connection: set at each opening.
+        conn.pragma_update(None, "synchronous", "NORMAL")?;
         Self::init(conn)
     }
 
@@ -339,6 +347,9 @@ impl Store {
 
     fn init(mut conn: Connection) -> StoreResult<Self> {
         conn.pragma_update(None, "foreign_keys", true)?;
+        // Statements are compiled once and kept (`prepare_cached`): the same few run at
+        // every action.
+        conn.set_prepared_statement_cache_capacity(64);
         // Before anything is written: the seal's triggers call this function.
         seal::register(&conn)?;
         migrate(&mut conn)?;
@@ -449,17 +460,17 @@ impl Store {
 
     pub fn load_progress(&self) -> StoreResult<Progress> {
         let mut progress = Progress::default();
-        let mut stmt = self.conn.prepare("SELECT name, value FROM ach_metrics")?;
+        let mut stmt = self.conn.prepare_cached("SELECT name, value FROM ach_metrics")?;
         for row in stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)))? {
             let (name, value) = row?;
             progress.metrics.insert(name, value);
         }
-        let mut stmt = self.conn.prepare("SELECT metric, value FROM ach_seen")?;
+        let mut stmt = self.conn.prepare_cached("SELECT metric, value FROM ach_seen")?;
         for row in stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))? {
             let (metric, value) = row?;
             progress.seen.entry(metric).or_default().insert(value);
         }
-        let mut stmt = self.conn.prepare("SELECT id, unlocked_at FROM ach_unlocked")?;
+        let mut stmt = self.conn.prepare_cached("SELECT id, unlocked_at FROM ach_unlocked")?;
         for row in stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)))? {
             let (id, at) = row?;
             progress.unlocked.insert(id, at);
@@ -469,21 +480,35 @@ impl Store {
 
     /// Saves the achievement progress and pays the rewards of the achievements that are
     /// unlocked for the first time, atomically. A reward is paid once, whatever happens.
-    pub fn save_progress(&mut self, progress: &Progress, rewards: &[GrantedReward], now: i64) -> StoreResult<()> {
+    /// Only what changed since `before` (the progress as saved) is written: the values seen
+    /// by `distinct` metrics are thousands, and progress is saved at nearly every action.
+    pub fn save_progress(
+        &mut self,
+        before: &Progress,
+        progress: &Progress,
+        rewards: &[GrantedReward],
+        now: i64,
+    ) -> StoreResult<()> {
         let tx = self.conn.transaction()?;
-        for (name, value) in &progress.metrics {
-            tx.execute(
+        {
+            let mut upsert = tx.prepare_cached(
                 "INSERT INTO ach_metrics (name, value) VALUES (?1, ?2)
                  ON CONFLICT (name) DO UPDATE SET value = excluded.value",
-                params![name, value],
             )?;
-        }
-        for (metric, values) in &progress.seen {
-            for value in values {
-                tx.execute("INSERT OR IGNORE INTO ach_seen (metric, value) VALUES (?1, ?2)", params![metric, value])?;
+            for (name, value) in &progress.metrics {
+                if before.metrics.get(name) != Some(value) {
+                    upsert.execute(params![name, value])?;
+                }
+            }
+            let mut seen = tx.prepare_cached("INSERT OR IGNORE INTO ach_seen (metric, value) VALUES (?1, ?2)")?;
+            for (metric, values) in &progress.seen {
+                let old = before.seen.get(metric);
+                for value in values.iter().filter(|v| !old.is_some_and(|o| o.contains(*v))) {
+                    seen.execute(params![metric, value])?;
+                }
             }
         }
-        for (id, at) in &progress.unlocked {
+        for (id, at) in progress.unlocked.iter().filter(|(id, _)| !before.unlocked.contains_key(*id)) {
             let inserted =
                 tx.execute("INSERT OR IGNORE INTO ach_unlocked (id, unlocked_at) VALUES (?1, ?2)", params![id, at])?;
             let Some(reward) = rewards.iter().find(|r| r.achievement_id == *id).filter(|_| inserted == 1) else {
@@ -508,7 +533,7 @@ impl Store {
 
     /// How many boosters of each set and kind were opened, box toppers' own included.
     pub fn opened_by_kind(&self) -> StoreResult<Vec<(String, String, u32)>> {
-        let mut stmt = self.conn.prepare("SELECT set_code, booster_kind, COUNT(*) FROM openings GROUP BY set_code, booster_kind")?;
+        let mut stmt = self.conn.prepare_cached("SELECT set_code, booster_kind, COUNT(*) FROM openings GROUP BY set_code, booster_kind")?;
         let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
         Ok(rows.collect::<Result<_, _>>()?)
     }
@@ -627,7 +652,7 @@ impl Store {
 
     /// The latest `limit` recorded prices of a booster, oldest first.
     pub fn booster_price_history(&self, set_code: &str, kind: &str, limit: u32) -> StoreResult<Vec<u32>> {
-        let mut stmt = self.conn.prepare(
+        let mut stmt = self.conn.prepare_cached(
             "SELECT price_cents FROM (
                  SELECT price_cents, at, snapshot FROM price_history WHERE set_code = ?1 AND kind = ?2
                  ORDER BY at DESC, snapshot DESC LIMIT ?3
@@ -655,7 +680,7 @@ impl Store {
 
     /// Sum of the ledger by kind of movement ("booster_purchase", "card_sale"...).
     pub fn ledger_totals(&self) -> StoreResult<HashMap<String, i64>> {
-        let mut stmt = self.conn.prepare("SELECT kind, SUM(amount_cents) FROM ledger GROUP BY kind")?;
+        let mut stmt = self.conn.prepare_cached("SELECT kind, SUM(amount_cents) FROM ledger GROUP BY kind")?;
         let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
         Ok(rows.collect::<Result<_, _>>()?)
     }
@@ -694,7 +719,7 @@ impl Store {
 
     /// The most valuable cards ever pulled, at their price when pulled.
     pub fn best_pulls(&self, limit: u32) -> StoreResult<Vec<PullRow>> {
-        let mut stmt = self.conn.prepare(
+        let mut stmt = self.conn.prepare_cached(
             "SELECT c.card_uuid, c.foil, c.price_cents, o.opened_at, o.set_code
              FROM opening_cards c JOIN openings o ON o.id = c.opening_id
              WHERE c.price_cents IS NOT NULL
@@ -714,7 +739,7 @@ impl Store {
 
     /// Openings grouped by set and kind of booster, most opened first.
     pub fn openings_by_booster(&self) -> StoreResult<Vec<BoosterKindTotals>> {
-        let mut stmt = self.conn.prepare(
+        let mut stmt = self.conn.prepare_cached(
             "SELECT set_code, booster_kind, COUNT(*), SUM(value_cents), MAX(value_cents)
              FROM openings GROUP BY set_code, booster_kind ORDER BY COUNT(*) DESC, set_code, booster_kind",
         )?;
@@ -732,7 +757,7 @@ impl Store {
 
     /// Sealed boosters owned.
     pub fn sealed_stacks(&self) -> StoreResult<Vec<SealedRow>> {
-        let mut stmt = self.conn.prepare(
+        let mut stmt = self.conn.prepare_cached(
             "SELECT set_code, kind, quantity, cost_cents FROM sealed WHERE quantity > 0 ORDER BY set_code, kind",
         )?;
         let rows = stmt.query_map([], |r| {
@@ -872,7 +897,7 @@ impl Store {
 
     /// The artifacts owned: (id, when, how it was got), oldest first.
     pub fn artifacts(&self) -> StoreResult<Vec<(String, i64, String)>> {
-        let mut stmt = self.conn.prepare("SELECT id, acquired_at, source FROM artifacts ORDER BY acquired_at, id")?;
+        let mut stmt = self.conn.prepare_cached("SELECT id, acquired_at, source FROM artifacts ORDER BY acquired_at, id")?;
         let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
         Ok(rows.collect::<Result<_, _>>()?)
     }
@@ -899,7 +924,7 @@ impl Store {
 
     /// Copies ever pulled of each card of a limited print run, by uuid.
     pub fn limited_pulls(&self) -> StoreResult<HashMap<String, u32>> {
-        let mut stmt = self.conn.prepare("SELECT uuid, pulled FROM limited_pulls")?;
+        let mut stmt = self.conn.prepare_cached("SELECT uuid, pulled FROM limited_pulls")?;
         let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
         Ok(rows.collect::<Result<_, _>>()?)
     }
@@ -925,7 +950,7 @@ impl Store {
     /// Owned quantities of the cards belonging to a set, by card uuid.
     pub fn owned_in_set(&self, set_code: &str) -> StoreResult<HashMap<String, Owned>> {
         let mut stmt =
-            self.conn.prepare("SELECT card_uuid, foil, quantity FROM collection WHERE set_code = ?1")?;
+            self.conn.prepare_cached("SELECT card_uuid, foil, quantity FROM collection WHERE set_code = ?1")?;
         let rows = stmt.query_map([set_code], |r| Ok((r.get::<_, String>(0)?, r.get::<_, bool>(1)?, r.get::<_, u32>(2)?)))?;
         let mut owned: HashMap<String, Owned> = HashMap::new();
         for row in rows {
@@ -959,7 +984,7 @@ impl Store {
     }
 
     pub fn owned_card_sources(&self) -> StoreResult<Vec<(String, String, Option<String>)>> {
-        let mut stmt = self.conn.prepare(
+        let mut stmt = self.conn.prepare_cached(
             "SELECT c.card_uuid, MIN(c.set_code), MIN(o.set_code)
              FROM collection c
              LEFT JOIN opening_cards oc ON oc.card_uuid = c.card_uuid
@@ -973,13 +998,13 @@ impl Store {
 
     /// The sets the collection files the cards owned under.
     pub fn owned_set_codes(&self) -> StoreResult<Vec<String>> {
-        let mut stmt = self.conn.prepare("SELECT DISTINCT set_code FROM collection WHERE quantity > 0")?;
+        let mut stmt = self.conn.prepare_cached("SELECT DISTINCT set_code FROM collection WHERE quantity > 0")?;
         let rows = stmt.query_map([], |r| r.get(0))?;
         Ok(rows.collect::<Result<_, _>>()?)
     }
 
     pub fn owned_cards(&self) -> StoreResult<Vec<(String, bool, u32)>> {
-        let mut stmt = self.conn.prepare("SELECT card_uuid, foil, quantity FROM collection")?;
+        let mut stmt = self.conn.prepare_cached("SELECT card_uuid, foil, quantity FROM collection")?;
         let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
         Ok(rows.collect::<Result<_, _>>()?)
     }
@@ -999,7 +1024,7 @@ impl Store {
 
     /// The wallet's movements, newest first, with the detail of the purchases and sales.
     pub fn history(&self, limit: u32, offset: u32) -> StoreResult<Vec<HistoryRow>> {
-        let mut stmt = self.conn.prepare(
+        let mut stmt = self.conn.prepare_cached(
             "SELECT l.at, l.kind, l.amount_cents, l.details, t.id
              FROM ledger l LEFT JOIN transactions t ON t.ledger_id = l.id
              ORDER BY l.id DESC LIMIT ?1 OFFSET ?2",
@@ -1544,18 +1569,27 @@ mod tests {
             sealed: Some(("TST".into(), "play".into(), 2)),
         };
 
-        store.save_progress(&progress, std::slice::from_ref(&reward), 5).unwrap();
+        store.save_progress(&Progress::default(), &progress, std::slice::from_ref(&reward), 5).unwrap();
         assert_eq!(store.load_progress().unwrap(), progress);
         assert_eq!(store.balance().unwrap(), 10_500);
         let stacks = store.sealed_stacks().unwrap();
         assert_eq!((stacks[0].quantity, stacks[0].cost_cents), (2, 0));
 
-        // Saving again (even with the reward listed again) pays nothing more.
+        // Saving again (even with the reward listed again, from a stale `before`) pays
+        // nothing more.
         progress.metrics.insert("boosters_opened".into(), 11);
-        store.save_progress(&progress, &[reward], 6).unwrap();
+        store.save_progress(&Progress::default(), &progress, &[reward], 6).unwrap();
+        assert_eq!(store.balance().unwrap(), 10_500);
+
+        // Only what changed is written: a metric left as it was keeps its saved value.
+        let before = progress.clone();
+        progress.metrics.insert("boosters_opened".into(), 12);
+        progress.seen.entry("sets_opened".into()).or_default().insert("\"FDN\"".into());
+        store.save_progress(&before, &progress, &[], 7).unwrap();
+        assert_eq!(store.load_progress().unwrap(), progress);
         assert_eq!(store.balance().unwrap(), 10_500);
         assert_eq!(store.sealed_stacks().unwrap()[0].quantity, 2);
-        assert_eq!(store.load_progress().unwrap().metrics["boosters_opened"], 11);
+        assert_eq!(store.load_progress().unwrap().metrics["boosters_opened"], 12);
     }
 
     #[test]

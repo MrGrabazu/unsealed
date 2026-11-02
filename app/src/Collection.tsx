@@ -395,14 +395,15 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
     setCollectionLayout(next);
   }
 
-  /** A binder taken from the library's shelves: that set's collection, as a binder. */
-  function openBinder(code: string) {
+  /** A binder taken from the library's shelves: that set's collection, as a binder. The same
+   * function from one render to the next: the shelves' spines are drawn once (`memo`). */
+  const openBinder = useCallback((code: string) => {
     sounds.page();
     setSetCode(code);
     setBinderSection(0);
     setLayout("binder");
     setSource("sets");
-  }
+  }, []);
 
   function cardTile(c: CollectionCard) {
     const total = c.quantity + c.foilQuantity;

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { OpenedCard } from "./api";
-import { Card } from "./Card";
+import { Card, FlatCard } from "./Card";
 import { useI18n } from "./i18n";
 import { Money, useMoney } from "./money";
 import { smallImage } from "./images";
@@ -30,10 +30,23 @@ const RARITY_COUNTS: Record<string, "rarity.common" | "rarity.uncommon" | "rarit
 
 /** A booster of the batch already seen, in the list under the one opening (the latest first):
  * its number, value, news and cards, small, each opening its details. */
-function SeenBooster({ n, cards, onDetails }: { n: number; cards: OpenedCard[]; onDetails: (card: OpenedCard) => void }) {
+const SeenBooster = memo(function SeenBooster({
+  n,
+  cards,
+  onDetails,
+}: {
+  n: number;
+  cards: OpenedCard[];
+  onDetails: (card: OpenedCard) => void;
+}) {
   const { t } = useI18n();
   const value = cards.reduce((sum, c) => sum + (c.priceCents ?? 0), 0);
   const news = cards.filter((c) => c.isNew).length;
+  // Small images: these cards are a little over 100 px wide.
+  const small = useMemo(
+    () => cards.map((card) => ({ ...card, imageUrl: smallImage(card.imageUrl), backImageUrl: smallImage(card.backImageUrl) })),
+    [cards],
+  );
   return (
     <div className="batch-booster">
       <div className="batch-booster-head">
@@ -42,25 +55,23 @@ function SeenBooster({ n, cards, onDetails }: { n: number; cards: OpenedCard[]; 
         {news > 0 && <span className="hint">{t("batch.newCards", { count: news })}</span>}
       </div>
       <div className="cards batch-cards">
-        {cards.map((card, i) => (
+        {small.map((card, i) => (
           <div key={`${card.uuid}-${i}`} className={isBigCard(card) ? "big" : ""}>
-            <Card
-              card={{ ...card, imageUrl: smallImage(card.imageUrl), backImageUrl: smallImage(card.backImageUrl) }}
-              faceUp
-              clickable
-              onReveal={() => onDetails(card)}
-              lazy
-            />
+            <FlatCard card={card} onClick={() => onDetails(cards[i])} />
           </div>
         ))}
       </div>
     </div>
   );
-}
+});
 
 /** The boosters of the batch seen so far (up to `count`), the latest first. */
 function SeenBoosters({ boosters, count, onDetails }: { boosters: OpenedCard[][]; count: number; onDetails: (card: OpenedCard) => void }) {
   const { t } = useI18n();
+  // The same function from one render to the next, so each booster seen is drawn only once.
+  const latest = useRef(onDetails);
+  latest.current = onDetails;
+  const details = useCallback((card: OpenedCard) => latest.current(card), []);
   if (count <= 0) return null;
   const seen = boosters.slice(0, count).map((cards, i) => ({ n: i + 1, cards })).reverse();
   return (
@@ -68,7 +79,7 @@ function SeenBoosters({ boosters, count, onDetails }: { boosters: OpenedCard[][]
       <h3>{t("batch.openings")}</h3>
       <div className="batch-boosters">
         {seen.map(({ n, cards }) => (
-          <SeenBooster key={n} n={n} cards={cards} onDetails={onDetails} />
+          <SeenBooster key={n} n={n} cards={cards} onDetails={details} />
         ))}
       </div>
     </>

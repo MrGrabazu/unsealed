@@ -6,7 +6,7 @@
 
 use crate::booster::BoosterConfig;
 use crate::draw::{open_booster, ColorIndex, DrawError};
-use crate::sim::inclusion_probabilities;
+use crate::sim::inclusion_probability;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -281,10 +281,11 @@ impl Chance {
 }
 
 /// Boosters drawn ahead to count the chances of the bets: each one's cards (indices into the
-/// set's cards, with their finish), one after the other.
+/// set's cards, the top bit set for a foil), one after the other: 4 bytes a card, a table
+/// holding some 100 000 boosters.
 #[derive(Debug, Clone, Default)]
 pub struct SimulatedPacks {
-    cards: Vec<(u32, bool)>,
+    cards: Vec<u32>,
     /// Where each booster starts in `cards`.
     starts: Vec<u32>,
 }
@@ -297,15 +298,16 @@ impl SimulatedPacks {
         n: u32,
         rng: &mut R,
     ) -> Result<Self, DrawError> {
-        let mut packs = SimulatedPacks::default();
+        let mut packs = SimulatedPacks { cards: Vec::new(), starts: Vec::with_capacity(n as usize) };
         for _ in 0..n {
             packs.starts.push(packs.cards.len() as u32);
             for d in open_booster(cfg, colors, rng)? {
                 if let Some(&i) = index.get(&d.uuid) {
-                    packs.cards.push((i as u32, d.foil));
+                    packs.cards.push(i as u32 | if d.foil { FOIL_BIT } else { 0 });
                 }
             }
         }
+        packs.cards.shrink_to_fit();
         Ok(packs)
     }
 
@@ -319,9 +321,12 @@ impl SimulatedPacks {
 
     fn pack(&self, k: usize) -> impl Iterator<Item = (usize, bool)> + '_ {
         let end = self.starts.get(k + 1).map_or(self.cards.len(), |&e| e as usize);
-        self.cards[self.starts[k] as usize..end].iter().map(|&(i, foil)| (i as usize, foil))
+        self.cards[self.starts[k] as usize..end].iter().map(|&c| ((c & !FOIL_BIT) as usize, c & FOIL_BIT != 0))
     }
 }
+
+/// The bit of a card of `SimulatedPacks` that says it is a foil.
+const FOIL_BIT: u32 = 1 << 31;
 
 /// How likely a bet is, on a booster of config `cfg` whose cards are `cards` (`index`: by uuid).
 pub fn chance(bet: &Bet, cfg: &BoosterConfig, cards: &[BetCard], index: &HashMap<String, usize>, packs: &SimulatedPacks) -> Chance {
@@ -373,7 +378,7 @@ pub fn any_probability(cfg: &BoosterConfig, cards: &[BetCard], index: &HashMap<S
                 1.0 - (1.0 - group as f64 / sheet.total_weight as f64).powi(n as i32)
             } else {
                 others.push(group);
-                *inclusion_probabilities(&others, n as usize).last().expect("the group was just added")
+                inclusion_probability(&others, others.len() - 1, n as usize)
             };
             missed *= 1.0 - found;
         }

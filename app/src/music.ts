@@ -4,7 +4,8 @@
 // crackle now and then, all in a long reverb. On by default, its own volume in the options;
 // the header's sound button silences it with the rest.
 
-import { getSoundOn, sharedAudio } from "./sound";
+import { isElsewhere, onElsewhereChange } from "./idle";
+import { getSoundOn, setMusicPlaying, sharedAudio } from "./sound";
 
 const ENABLED = "unsealed.music";
 const VOLUME = "unsealed.musicVolume";
@@ -53,13 +54,23 @@ let playing: Playing | null = null;
 /** Whether a user gesture has happened yet (before one, browsers keep the audio suspended). */
 let unlocked = false;
 
+/** How long the reverb rings. Its cost grows with it, and runs as long as the music: past 3 s,
+ * its tail (decaying as the cube) is too faint to be told apart. */
+const REVERB_SECONDS = 3;
+
+/** Buffers made once, whatever the number of times the music starts again. */
+let impulse: AudioBuffer | null = null;
+let roomNoise: AudioBuffer | null = null;
+
 /** A long, dark reverb made from decaying noise. */
 function reverb(ctx: AudioContext, seconds: number): ConvolverNode {
-  const length = Math.ceil(ctx.sampleRate * seconds);
-  const impulse = ctx.createBuffer(2, length, ctx.sampleRate);
-  for (let channel = 0; channel < 2; channel++) {
-    const data = impulse.getChannelData(channel);
-    for (let i = 0; i < length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / length) ** 3;
+  if (!impulse || impulse.sampleRate !== ctx.sampleRate) {
+    const length = Math.ceil(ctx.sampleRate * seconds);
+    impulse = ctx.createBuffer(2, length, ctx.sampleRate);
+    for (let channel = 0; channel < 2; channel++) {
+      const data = impulse.getChannelData(channel);
+      for (let i = 0; i < length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / length) ** 3;
+    }
   }
   const node = ctx.createConvolver();
   node.buffer = impulse;
@@ -139,6 +150,13 @@ function bell(p: Playing) {
   const feedback = ctx.createGain();
   feedback.gain.value = 0.35;
   echo.connect(feedback).connect(echo);
+  // A loop never ends by itself: once the bell and its echoes have died away (each one at a
+  // third of the last), it is taken apart, or every bell would stay in the graph for good.
+  window.setTimeout(() => {
+    env.disconnect();
+    echo.disconnect();
+    feedback.disconnect();
+  }, 12_000);
   env.connect(echo);
   env.connect(p.wet);
   echo.connect(p.wet);
@@ -158,15 +176,17 @@ function bell(p: Playing) {
 /** The hush of the room: a faint, dark noise; and a candle's crackle now and then. */
 function room(p: Playing) {
   const { ctx } = p;
-  const buffer = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate);
-  const data = buffer.getChannelData(0);
-  let last = 0;
-  for (let i = 0; i < data.length; i++) {
-    last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02;
-    data[i] = last * 3.5;
+  if (!roomNoise || roomNoise.sampleRate !== ctx.sampleRate) {
+    roomNoise = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate);
+    const data = roomNoise.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < data.length; i++) {
+      last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02;
+      data[i] = last * 3.5;
+    }
   }
   const source = ctx.createBufferSource();
-  source.buffer = buffer;
+  source.buffer = roomNoise;
   source.loop = true;
   const filter = ctx.createBiquadFilter();
   filter.type = "lowpass";
@@ -221,9 +241,15 @@ function start() {
   out.connect(ctx.destination);
   const wet = ctx.createGain();
   wet.gain.value = 0.9;
-  wet.connect(reverb(ctx, 5)).connect(out);
+  const verb = reverb(ctx, REVERB_SECONDS);
+  wet.connect(verb).connect(out);
   const p: Playing = { ctx, out, wet, timers: [], stops: [] };
+  p.stops.push(() => {
+    wet.disconnect();
+    verb.disconnect();
+  });
   playing = p;
+  setMusicPlaying(true);
   drone(p);
   room(p);
   let index = 0;
@@ -256,12 +282,15 @@ function stop() {
       }
     });
     p.out.disconnect();
+    // Nothing to play any more (unless it started again meanwhile): the audio may rest.
+    if (!playing) setMusicPlaying(false);
   }, 1700);
 }
 
 /** Starts, stops or re-levels the music after a change of the settings (music, sound, volumes). */
 export function refreshMusic() {
-  const wanted = unlocked && getSoundOn() && getMusicOn() && getMusicVolume() > 0;
+  // Not while the window is minimized, hidden or without the focus: it fades in again on return.
+  const wanted = unlocked && !isElsewhere() && getSoundOn() && getMusicOn() && getMusicVolume() > 0;
   if (!wanted) return stop();
   if (!playing) return start();
   const now = playing.ctx.currentTime;
@@ -280,4 +309,5 @@ export function startMusicOnFirstGesture() {
   };
   window.addEventListener("pointerdown", go);
   window.addEventListener("keydown", go);
+  onElsewhereChange(refreshMusic);
 }

@@ -46,7 +46,14 @@ impl Game {
     /// given by the boosters of one.
     pub(super) fn is_guest_series(&mut self, code: &str) -> bool {
         let offered = self.offered_sets();
-        !offered.contains(code) && self.offered_series(code, &offered).is_some()
+        // As `offered_series(…).is_some()`, without copying the series (The List holds
+        // thousands of cards).
+        !offered.contains(code)
+            && self
+                .guest_index()
+                .series
+                .get(code)
+                .is_some_and(|s| s.cards.iter().any(|c| c.boosters.iter().any(|b| offered.contains(b))))
     }
 
     /// The guest series with a binder of their own, newest first (as `list_sets`, without

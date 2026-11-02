@@ -41,6 +41,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::SystemTime;
 use unsealed_core::achievements::{Engine, Event};
 use unsealed_core::catalog::{booster_language, is_collector_kind, set_file_name, usual_kind, CardEntry, Manifest, PriceFile, SetFile, FOREIGN_LANGUAGES};
@@ -371,7 +372,19 @@ pub fn system_clock() -> Clock {
     Clock { now: now.timestamp(), day: now.format("%Y-%m-%d").to_string() }
 }
 
+/// How many sets stay loaded between two commands (see `Game::trim_sets`): those of an
+/// opening's year, of the reserve and of the binders looked at.
+const MAX_LOADED_SETS: usize = 24;
+
+/// What the prices need of a card, its set let go or not (see `Game::card_facts`).
+struct CardFacts {
+    rarity: Box<str>,
+    set_code: Box<str>,
+}
+
 struct LoadedSet {
+    /// When it was last asked for (`Game::set_clock`): the least recently used go first.
+    used: u64,
     file: SetFile,
     colors: ColorIndex,
     index: HashMap<String, usize>,
@@ -401,12 +414,23 @@ pub struct Game {
     engine: Engine,
     /// Ids of the achievements unlocked and not yet shown to the player.
     notifications: Vec<String>,
+    /// The achievement progress as saved, read once (see `saved_progress`).
+    progress: Option<unsealed_core::achievements::Progress>,
     achievement_texts: AchievementTexts,
     /// See `set_card_language`.
     card_lang: String,
     /// The booster being revealed, whose achievement events wait (see `reveal_cards`).
     pending_reveal: Option<PendingReveal>,
+    /// The sets loaded, `MAX_LOADED_SETS` at most between two commands (see `trim_sets`).
     sets: HashMap<String, LoadedSet>,
+    /// Orders the uses of the loaded sets.
+    set_clock: u64,
+    /// What the prices need of every card ever loaded, kept when its set is let go: its
+    /// rarity and set code, by uuid.
+    card_facts: HashMap<String, CardFacts>,
+    /// The uuids of each set's cards that make it complete, kept when the set is let go: an
+    /// opening counts the complete sets of its year, a dozen sets or more.
+    completion_targets: HashMap<String, Arc<Vec<String>>>,
     /// See `set_limited`.
     limited: LimitedConfig,
     /// Print run of each limited card of the loaded sets, by uuid.
@@ -485,10 +509,14 @@ impl Game {
             economy,
             engine,
             notifications: Vec::new(),
+            progress: None,
             achievement_texts: AchievementTexts::default(),
             card_lang: "en".to_string(),
             pending_reveal: None,
             sets: HashMap::new(),
+            set_clock: 0,
+            card_facts: HashMap::new(),
+            completion_targets: HashMap::new(),
             limited: LimitedConfig::default(),
             print_runs: HashMap::new(),
             artists: None,
@@ -512,6 +540,8 @@ impl Game {
     /// Forgets everything loaded from the data directory; called after a background refresh.
     pub fn reload_data(&mut self) {
         self.sets.clear();
+        self.card_facts.clear();
+        self.completion_targets.clear();
         self.print_runs.clear();
         self.artists = None;
         self.guests = None;
@@ -718,12 +748,20 @@ impl Game {
         self.economy.charity.amount_cents.saturating_mul(self.bonuses().charity_factor)
     }
 
+    /// The cheapest booster the Boosterium sells (as `shop`, without building it: the
+    /// wallet asks after every card turned over).
+    fn cheapest_booster_price(&mut self) -> u32 {
+        self.ensure_prices();
+        let sets = self.list_sets().unwrap_or_default();
+        sets.iter()
+            .flat_map(|set| set.boosters.iter().filter(|k| booster_language(k).is_none()).map(move |k| (&set.code, k)))
+            .map(|(code, kind)| self.booster_price(code, kind))
+            .min()
+            .unwrap_or(self.economy.booster_prices.default_cents)
+    }
+
     fn charity_open(&mut self, balance: i64) -> Result<bool, String> {
-        let cheapest = self
-            .shop()
-            .ok()
-            .and_then(|items| items.iter().map(|i| i.price_cents).min())
-            .unwrap_or(self.economy.booster_prices.default_cents);
+        let cheapest = self.cheapest_booster_price();
         if balance >= i64::from(cheapest) {
             return Ok(false); // can still buy a booster: no need to look further
         }
@@ -931,8 +969,12 @@ impl Game {
             .filter(|&(_, one_in)| one_in > 0)
             .collect();
         for (code, one_in) in candidates {
-            // A set the data lacks (an old pack, a test) hides nothing, and draws no chance.
-            if self.ensure_loaded(&code).is_err() || self.rng.gen_range(0..one_in) != 0 {
+            // A set the data lacks (an old pack, a test) hides nothing, and draws no chance. The
+            // set (Secret Lair: thousands of cards) is only loaded when the chance falls.
+            let in_data = self.sets.contains_key(&code)
+                || (code.chars().all(|c| c.is_ascii_alphanumeric())
+                    && self.data_dir.join("sets").join(set_file_name(&code)).is_file());
+            if !in_data || self.rng.gen_range(0..one_in) != 0 || self.ensure_loaded(&code).is_err() {
                 continue;
             }
             let set = &self.sets[&code];
@@ -1476,7 +1518,7 @@ impl Game {
     /// economy) so it can be sold all the same.
     fn market_price(&self, uuid: &str, foil: bool) -> Option<u32> {
         if self.unpriced(uuid) {
-            let card = self.sets.values().find_map(|s| s.index.get(uuid).map(|&i| &s.file.cards[i]))?;
+            let card = self.card_facts.get(uuid)?;
             return self.economy.fallback_price_cents(&card.rarity, foil);
         }
         let own = |foil| market_price(self.prices.as_ref(), &self.economy, &self.limited, &self.print_runs, uuid, foil);
@@ -1503,11 +1545,11 @@ impl Game {
     /// What a copy of a card worth `market_cents` sells for: at the economy's rate, or an
     /// artifact's better one (by its rarity, finish and the release of its set).
     fn sell_value_of(&self, uuid: &str, foil: bool, market_cents: u32) -> u32 {
-        let card = self.sets.values().find_map(|s| s.index.get(uuid).map(|&i| &s.file.cards[i]));
+        let card = self.card_facts.get(uuid);
         let released = card
-            .and_then(|c| self.release_dates.as_ref().and_then(|d| d.get(&c.set_code)))
+            .and_then(|c| self.release_dates.as_ref().and_then(|d| d.get(&*c.set_code)))
             .map_or("", String::as_str);
-        let sold = SoldCard { rarity: card.map_or("", |c| c.rarity.as_str()), market_cents, foil, released };
+        let sold = SoldCard { rarity: card.map_or("", |c| &*c.rarity), market_cents, foil, released };
         let rate = self.bonuses().sell_rate(self.economy.sell_rate_percent, sold);
         EconomyConfig::sell_value_at(market_cents, rate)
     }
@@ -1519,7 +1561,9 @@ impl Game {
         if code.is_empty() || !code.chars().all(|c| c.is_ascii_alphanumeric()) {
             return Err(format!("invalid set code `{code}`"));
         }
-        if self.sets.contains_key(code) {
+        self.set_clock += 1;
+        if let Some(set) = self.sets.get_mut(code) {
+            set.used = self.set_clock;
             return Ok(());
         }
         let file: SetFile = read_json(&self.data_dir.join("sets").join(set_file_name(code)))?;
@@ -1540,12 +1584,46 @@ impl Game {
             if let Some(run) = self.limited.print_run_of(card) {
                 self.print_runs.insert(card.uuid.clone(), run);
             }
+            if !self.card_facts.contains_key(&card.uuid) {
+                let facts = CardFacts { rarity: card.rarity.as_str().into(), set_code: card.set_code.as_str().into() };
+                self.card_facts.insert(card.uuid.clone(), facts);
+            }
         }
+        let target = obtainable.iter().map(|&i| file.cards[i].uuid.clone()).collect();
+        self.completion_targets.insert(code.to_string(), Arc::new(target));
+        let used = self.set_clock;
         self.sets.insert(
             code.to_string(),
-            LoadedSet { file, colors, index, obtainable, extras, tokens, arts, guests, keeps_guests, toppers },
+            LoadedSet { used, file, colors, index, obtainable, extras, tokens, arts, guests, keeps_guests, toppers },
         );
         Ok(())
+    }
+
+    /// Lets the least recently used sets go, down to `MAX_LOADED_SETS`: between two commands
+    /// only: a command counts on the sets it loaded (an opening works out its achievement events
+    /// when drawn, so a reveal needs none). "All sets", the library or an artist load dozens,
+    /// each holding all its cards, their names in every language and its boosters' sheets.
+    /// Their bet tables go with them.
+    pub fn trim_sets(&mut self) {
+        if self.sets.len() <= MAX_LOADED_SETS {
+            return;
+        }
+        let mut by_use: Vec<(u64, String)> = self.sets.iter().map(|(code, s)| (s.used, code.clone())).collect();
+        by_use.sort_unstable();
+        let extra = self.sets.len() - MAX_LOADED_SETS;
+        for (_, code) in by_use.into_iter().take(extra) {
+            self.sets.remove(&code);
+            self.bet_tables.retain(|key, _| key.split('/').next() != Some(code.as_str()));
+        }
+    }
+
+    /// The uuids that make a set complete (see `completion_targets`), loading it if needed.
+    fn completion_target(&mut self, code: &str) -> Result<Arc<Vec<String>>, String> {
+        if let Some(target) = self.completion_targets.get(code) {
+            return Ok(target.clone());
+        }
+        self.ensure_loaded(code)?;
+        Ok(self.completion_targets[code].clone())
     }
 
     /// Loads the prices, and reloads them whenever the file changes (a daily update, or
@@ -1557,7 +1635,7 @@ impl Game {
             self.release_dates = read_manifest(&self.data_dir)
                 .ok()
                 .flatten()
-                .map(|m| m.sets.into_iter().map(|(code, s)| (code, s.release_date)).collect());
+                .map(|m| m.sets.iter().map(|(code, s)| (code.clone(), s.release_date.clone())).collect());
         }
         let path = self.data_dir.join("prices.json");
         let stamp = fs::metadata(&path).and_then(|m| m.modified()).ok();
@@ -1682,7 +1760,7 @@ fn number_key(number: &str) -> (u32, String) {
 /// set appears on its release day (`today`, "YYYY-MM-DD"): MTGJSON lists sets ahead of their
 /// release, with unsteady prices. Needs no game: the home screen and the options read it too.
 pub fn read_sets(data_dir: &Path, lang: &str, today: &str) -> Result<Vec<SetSummary>, String> {
-    let sets = read_manifest(data_dir)?.map(|m| sets_of(m, lang)).unwrap_or_default();
+    let sets = read_manifest(data_dir)?.map(|m| sets_of(&m, lang)).unwrap_or_default();
     Ok(sets.into_iter().filter(|s| s.release_date.as_str() <= today).collect())
 }
 
@@ -1713,31 +1791,46 @@ pub fn data_info(data_dir: &Path) -> Result<DataInfo, String> {
     })
 }
 
-/// `None` on first launch: the background download has not produced any data yet.
-fn read_manifest(data_dir: &Path) -> Result<Option<Manifest>, String> {
+/// The manifests read, by path, with the size and modification time of the file they were
+/// read from: most commands need the sets offered, and parsing the manifest each time cost
+/// more than the commands themselves.
+type ManifestCache = HashMap<PathBuf, (u64, Option<SystemTime>, std::sync::Arc<Manifest>)>;
+static MANIFESTS: std::sync::Mutex<Option<ManifestCache>> = std::sync::Mutex::new(None);
+
+/// `None` on first launch: the background download has not produced any data yet. Read
+/// again whenever the file changes (a data refresh).
+fn read_manifest(data_dir: &Path) -> Result<Option<std::sync::Arc<Manifest>>, String> {
     let path = data_dir.join("manifest.json");
-    if !path.exists() {
-        return Ok(None);
+    let Ok(meta) = fs::metadata(&path) else { return Ok(None) };
+    let stamp = (meta.len(), meta.modified().ok());
+    let mut cache = MANIFESTS.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let cache = cache.get_or_insert_with(HashMap::new);
+    if let Some((len, modified, manifest)) = cache.get(&path) {
+        if (*len, *modified) == stamp {
+            return Ok(Some(manifest.clone()));
+        }
     }
-    read_json(&path).map(Some)
+    let manifest = std::sync::Arc::new(read_json::<Manifest>(&path)?);
+    cache.insert(path, (stamp.0, stamp.1, manifest.clone()));
+    Ok(Some(manifest))
 }
 
-fn sets_of(manifest: Manifest, lang: &str) -> Vec<SetSummary> {
+fn sets_of(manifest: &Manifest, lang: &str) -> Vec<SetSummary> {
     let mut sets: Vec<SetSummary> = manifest
         .sets
-        .into_iter()
+        .iter()
         .map(|(code, s)| SetSummary {
-            code,
+            code: code.clone(),
             name: s.names.get(lang).unwrap_or(&s.name).clone(),
-            english_name: s.name,
-            release_date: s.release_date,
-            boosters: s.boosters,
-            art: s.featured.map(|f| SetArt {
+            english_name: s.name.clone(),
+            release_date: s.release_date.clone(),
+            boosters: s.boosters.clone(),
+            art: s.featured.as_ref().map(|f| SetArt {
                 image_url: art_crop_url(&f.scryfall_id),
-                card_name: f.name,
-                artist: f.artist,
+                card_name: f.name.clone(),
+                artist: f.artist.clone(),
             }),
-            icon_url: s.icon_svg_uri,
+            icon_url: s.icon_svg_uri.clone(),
         })
         .collect();
     sets.sort_by(|a, b| b.release_date.cmp(&a.release_date));

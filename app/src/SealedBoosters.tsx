@@ -3,6 +3,7 @@ import type { BoxProgress, SealedStack, SetSummary } from "./api";
 import { BackToTop } from "./BackToTop";
 import { kindLabel, wrapperFinish } from "./boosterKinds";
 import { BoosterNote } from "./BoosterNote";
+import { FittedImage } from "./CardImage";
 import { useI18n } from "./i18n";
 import { Icon } from "./icons";
 import { Money, useMoney } from "./money";
@@ -36,10 +37,11 @@ export function Wrapper({ stack, set, large = false }: { stack: SealedStack; set
   const style = { "--hue": hueOf(stack.setCode) } as CSSProperties;
   return (
     <span className={`wrapper finish-${wrapperFinish(stack.kind)} ${large ? "large" : ""}`} style={style} aria-hidden="true">
+      <span className="wrapper-prism" />
       <span className="wrapper-holo" />
       <span className="wrapper-name">{stack.setName}</span>
       <span className="wrapper-window">
-        {set?.art ? <img src={set.art.imageUrl} alt="" draggable={false} /> : <SetIcon url={set?.iconUrl ?? null} name={stack.setName} />}
+        {set?.art ? <FittedImage src={set.art.imageUrl} alt="" /> : <SetIcon url={set?.iconUrl ?? null} name={stack.setName} />}
       </span>
       <span className="wrapper-kind">{kindLabel(t, stack.kind)}</span>
       <span className="wrapper-seal">U</span>

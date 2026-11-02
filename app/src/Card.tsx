@@ -16,6 +16,27 @@ interface Props {
   lazy?: boolean;
 }
 
+/** A card already face up that will not turn: the same, without the 3D faces nor the
+ * animation (in a batch's list, hundreds of them: each 3D card took compositor layers of its
+ * own). */
+export function FlatCard({ card, onClick }: { card: OpenedCard; onClick: () => void }) {
+  return (
+    <div className="card-slot">
+      <div className={`card flat clickable ${cornersClass(card.setCode)}`} data-rarity={card.rarity} onClick={onClick}>
+        <div className="face front">
+          <CardImage front={card.imageUrl} back={card.backImageUrl} alt={card.name} lazy />
+          {card.foil && <FoilSheen rarity={card.rarity} kind={card.foilKind} />}
+          <NewBadge card={card} />
+        </div>
+      </div>
+      <div className="card-caption visible">
+        <span className="name">{card.name}</span>
+        <span className="price">{card.priceCents == null ? "—" : <Money cents={card.priceCents} estimated={card.priceEstimated} />}</span>
+      </div>
+    </div>
+  );
+}
+
 export function Card({ card, faceUp, clickable, onReveal, lazy = false }: Props) {
   return (
     <div className="card-slot">

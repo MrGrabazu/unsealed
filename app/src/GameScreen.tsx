@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { lazy, memo, Suspense, useCallback, useContext, useEffect, useRef, useState } from "react";
 import {
   buyArtifact,
   buyBoosters,
@@ -34,7 +34,7 @@ import {
   type WalletView,
 } from "./api";
 import { AchievementCard } from "./AchievementCard";
-import { Achievements } from "./Achievements";
+import { Achievements as AchievementsTab } from "./Achievements";
 import { BatchOpening } from "./BatchOpening";
 import { SellDuplicatesButton } from "./BoosterSale";
 import { packLookOf, preparePack } from "./scene/packArt";
@@ -48,17 +48,18 @@ import { getSoundOn, setSoundOn, sounds } from "./sound";
 import { PackOpening } from "./PackOpening";
 import { OpeningResult } from "./OpeningResult";
 import { canUseWebGL, getOpening3d } from "./settings";
+import { isAway, onAwayChange, useAway } from "./idle";
 
 // The 3D opening brings three.js along: loaded the first time a booster is opened.
 const PackOpening3D = lazy(() => import("./PackOpening3D").then((m) => ({ default: m.PackOpening3D })));
 import { Boosterium, CURIOS } from "./Boosterium";
-import { Collection } from "./Collection";
+import { Collection as CollectionTab } from "./Collection";
 import { forgetLibrary } from "./Library";
 import { isTopperKind, kindLabel, rewardText } from "./boosterKinds";
 import { DataPreparing, DataStatusBar, useDataStatus } from "./DataStatus";
 import { Ambience } from "./Ambience";
 import { BackToTop } from "./BackToTop";
-import { History } from "./History";
+import { History as HistoryTab } from "./History";
 import { useI18n } from "./i18n";
 import { Icon, type IconName } from "./icons";
 import { NoticeContext, type Notify } from "./notice";
@@ -69,9 +70,25 @@ import { errorText } from "./errors";
 import { BirthdayRibbon, EGG_FOUND, isMagicBirthday, nightOwl, useKonamiCode } from "./eggs";
 import { greetToday, SeasonalDecor, SeasonalRailFoot, useSeason } from "./seasons";
 import { SealedBoosters } from "./SealedBoosters";
-import { Stats } from "./Stats";
+import { Stats as StatsTab } from "./Stats";
 import { ArtifactReveal } from "./ArtifactReveal";
-import { Curiosities } from "./Curiosities";
+import { Curiosities as CuriositiesTab } from "./Curiosities";
+
+// The tabs, drawn again only when what they are given changes: not each time the game screen
+// is (the income, a toast…). What they are given is kept the same from one render to the next
+// (`useStable`).
+const Collection = memo(CollectionTab);
+const Achievements = memo(AchievementsTab);
+const Curiosities = memo(CuriositiesTab);
+const Stats = memo(StatsTab);
+const History = memo(HistoryTab);
+
+/** The same function from one render to the next, always calling the latest `fn`. */
+function useStable<A extends unknown[], R>(fn: (...args: A) => R): (...args: A) => R {
+  const latest = useRef(fn);
+  latest.current = fn;
+  return useCallback((...args: A) => latest.current(...args), []);
+}
 
 type Tab = "boosterium" | "open" | "collection" | "achievements" | "curiosities" | "stats" | "history";
 
@@ -93,11 +110,12 @@ interface Notice {
   error?: boolean;
 }
 
-/** The collection's income is paid about each time a whole Seal is earned, within these bounds. */
-const INCOME_MIN_MS = 1_000;
-const INCOME_MAX_MS = 60_000;
-/** How often the income also refreshes the whole wallet (and shows the achievements it unlocked). */
-const INCOME_REFRESH_MS = 60_000;
+/** The collection's income is paid by the game once a minute (each payment values the whole
+ * collection and saves it); in between, the balance shows it coming in about each time a
+ * whole Seal is earned, within these bounds (`Resources`). */
+const INCOME_PAY_MS = 60_000;
+const INCOME_TICK_MIN_MS = 1_000;
+const INCOME_TICK_MAX_MS = 60_000;
 /** How long a "+N" floats up from the balance. */
 const INCOME_FLOAT_MS = 1_400;
 
@@ -146,16 +164,48 @@ function AwayIncome({ away, onClose }: { away: IncomeView; onClose: () => void }
 /** How long the frame of what was earned away stays, unless closed before. */
 const AWAY_INCOME_MS = 20_000;
 
+/** What the collection is earning, shown coming in between two payments of the game: about
+ * each time a whole Seal is earned, a "+N" floats up and the balance grows. Kept here, so
+ * that only the strap is drawn again; set back to nothing at each real payment (`paidAt`),
+ * which covers the time since the previous one. Rests while the window can't be seen. */
+function useIncomeTicks(income: IncomeView | null, paidAt: number, sealsPerCent: number) {
+  const [ticked, setTicked] = useState(0);
+  const [floats, setFloats] = useState<IncomeFloat[]>([]);
+  const away = useAway();
+  useEffect(() => setTicked(0), [paidAt]);
+  const perMinuteCents = income?.perMinuteCents ?? 0;
+  useEffect(() => {
+    if (away || perMinuteCents <= 0) return;
+    const perMinuteSeals = perMinuteCents * sealsPerCent;
+    const delay = Math.min(Math.max(60_000 / perMinuteSeals, INCOME_TICK_MIN_MS), INCOME_TICK_MAX_MS);
+    const step = (perMinuteCents * delay) / 60_000;
+    let sinceStart = 0;
+    const timer = setInterval(() => {
+      // Never more than a minute ahead of the game's payments (a slow one, a long pause).
+      if (sinceStart + delay > INCOME_PAY_MS * 1.5) return;
+      sinceStart += delay;
+      setTicked((t) => t + step);
+      if (Math.round(step * sealsPerCent) < 1) return; // less than a Seal a minute
+      const id = ++floatSeq;
+      setFloats((current) => [...current, { id, cents: step }]);
+      setTimeout(() => setFloats((current) => current.filter((f) => f.id !== id)), INCOME_FLOAT_MS);
+    }, delay);
+    return () => clearInterval(timer);
+  }, [away, perMinuteCents, sealsPerCent, paidAt]);
+  return { ticked, floats };
+}
+let floatSeq = 0;
+
 function Resources({
   wallet,
   income,
-  floats,
+  paidAt,
   away,
   onAwayClosed,
 }: {
   wallet: WalletView;
   income: IncomeView | null;
-  floats: IncomeFloat[];
+  paidAt: number;
   away: IncomeView | null;
   onAwayClosed: () => void;
 }) {
@@ -163,6 +213,8 @@ function Resources({
   const { t, formatNumber } = useI18n();
   const toSeals = (cents: number) => Math.round(cents * wallet.currency.sealsPerCent);
   const perMinute = income ? income.perMinuteCents * wallet.currency.sealsPerCent : 0;
+  const { ticked, floats } = useIncomeTicks(income, paidAt, wallet.currency.sealsPerCent);
+  const shown = wallet.balanceCents + ticked;
   const sealed = wallet.sealed.reduce((n, s) => n + s.quantity, 0);
   return (
     <div className="resources">
@@ -172,9 +224,9 @@ function Resources({
         <span className="ico coin-ico">
           <Coin />
         </span>
-        {/* Keyed on the amount: it pulses each time it changes. */}
-        <span key={wallet.balanceCents} className="v wallet-amount">
-          {formatNumber(toSeals(wallet.balanceCents))}
+        {/* Keyed on the whole Seals shown: it pulses each time they change. */}
+        <span key={toSeals(shown)} className="v wallet-amount">
+          {formatNumber(toSeals(shown))}
         </span>
         {income && (
           <span
@@ -280,15 +332,14 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   // What the collection earns, and what it earned while the player was away.
   const [income, setIncome] = useState<IncomeView | null>(null);
   const [awayIncome, setAwayIncome] = useState<IncomeView | null>(null);
-  // The "+N" floating up from the balance, one per payment.
-  const [incomeFloats, setIncomeFloats] = useState<IncomeFloat[]>([]);
+  // Bumped at each payment of the income: the strap's own count of it starts again.
+  const [incomePaidAt, setIncomePaidAt] = useState(0);
   // An artifact found in the booster being opened: revealed once its result shows.
   const [foundArtifact, setFoundArtifact] = useState<ArtifactView | null>(null);
   // Artifacts to reveal, one after the other (found, or given by achievements).
   const [artifactQueue, setArtifactQueue] = useState<ArtifactView[]>([]);
   // Bumped when an artifact is got: the cabinet and the shop read them again.
   const [artifactCount, setArtifactCount] = useState(0);
-  const floatId = useRef(0);
   // A set to show open in the Boosterium (asked for from its collection).
   const [shopFocus, setShopFocus] = useState<{ setCode: string; at: number } | null>(null);
   // Bumped after each opening so the collection view reloads.
@@ -432,59 +483,72 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     return () => window.removeEventListener(EGG_FOUND, onEgg);
   }, [refreshWallet, setNotice, t]);
 
-  // The Seals per cent, for the income's pace (read from a ref: it must not restart the timer).
-  const sealsPerCent = useRef(currency.sealsPerCent);
-  sealsPerCent.current = currency.sealsPerCent;
-  // When the wallet was last fully refreshed by the income (the achievements it unlocked with it).
-  const incomeRefreshedAt = useRef(0);
-
-  /** Pays what the collection earned since the last time: a "+N" floats up from the balance,
-   * which grows at once. After a while away, a banner says how much it earned. */
+  /** Pays what the collection earned since the last time: the balance takes it (what the
+   * strap showed coming in since the last payment gives way to it), then the wallet and the
+   * achievements it unlocked are read again. On arrival, after a while away, a frame says how
+   * much it earned. */
   const payIncome = useCallback(
-    async (onArrival: boolean): Promise<IncomeView | null> => {
+    async (onArrival: boolean): Promise<void> => {
       try {
         const paid = await collectIncome();
-        setIncome(paid);
+        setIncome((current) =>
+          current &&
+          current.perMinuteCents === paid.perMinuteCents &&
+          current.collectionValueCents === paid.collectionValueCents &&
+          paid.earnedCents === 0
+            ? current
+            : paid,
+        );
         if (onArrival && paid.earnedCents > 0 && paid.minutes >= 5) setAwayIncome(paid);
         if (paid.earnedCents > 0) {
-          const id = ++floatId.current;
-          setIncomeFloats((current) => [...current, { id, cents: paid.earnedCents }]);
-          setTimeout(() => setIncomeFloats((current) => current.filter((f) => f.id !== id)), INCOME_FLOAT_MS);
-          // The balance follows at once; the full refresh (and its achievements) once a minute.
-          if (Date.now() - incomeRefreshedAt.current >= INCOME_REFRESH_MS) {
-            incomeRefreshedAt.current = Date.now();
-            await refreshWallet();
-          } else {
-            setWallet((w) => w && { ...w, balanceCents: w.balanceCents + paid.earnedCents });
-          }
+          setWallet((w) => w && { ...w, balanceCents: w.balanceCents + paid.earnedCents });
+          setIncomePaidAt((n) => n + 1);
+          await refreshWallet();
         }
-        return paid;
       } catch (e) {
         showError(e);
-        return null;
       }
     },
     [refreshWallet],
   );
 
-  // Paid about each time a whole Seal is earned (at most every second, at least every minute),
-  // so that it can be seen coming in; on arrival, for the time away.
+  // Paid once a minute (the strap shows it coming in meanwhile), and on arrival for the time
+  // away. Not while the window can't be seen: the game pays the time passed at the next
+  // payment, made as soon as the window is back.
   useEffect(() => {
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const tick = async (onArrival: boolean) => {
-      const paid = await payIncome(onArrival);
+      clearTimeout(timer);
+      if (!isAway()) await payIncome(onArrival);
       if (stopped) return;
-      const perMinute = paid ? paid.perMinuteCents * sealsPerCent.current : 0;
-      const delay = perMinute > 0 ? Math.min(Math.max(60_000 / perMinute, INCOME_MIN_MS), INCOME_MAX_MS) : INCOME_MAX_MS;
-      timer = setTimeout(() => void tick(false), delay);
+      clearTimeout(timer);
+      timer = setTimeout(() => void tick(false), INCOME_PAY_MS);
     };
+    const stopWatching = onAwayChange(() => {
+      if (!isAway()) void tick(false);
+    });
     void tick(true);
     return () => {
       stopped = true;
       clearTimeout(timer);
+      stopWatching();
     };
   }, [payIncome]);
+
+  // What the tabs are given, the same from one render to the next (see the memo'ed tabs).
+  const shopFromCollection = useStable((setCode: string) => {
+    setShopFocus({ setCode, at: Date.now() });
+    switchTab("boosterium");
+  });
+  const shopFromCuriosities = useStable(() => {
+    setShopFocus({ setCode: CURIOS, at: Date.now() });
+    switchTab("boosterium");
+  });
+  const historyChanged = useStable(() => {
+    setOpenings((n) => n + 1);
+    void refreshWallet();
+  });
 
   /** Cards of the pack were turned over: their achievements show up now. */
   async function reveal(count: number) {
@@ -789,7 +853,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
             <Resources
               wallet={wallet}
               income={income}
-              floats={incomeFloats}
+              paidAt={incomePaidAt}
               away={awayIncome}
               onAwayClosed={() => setAwayIncome(null)}
             />
@@ -1054,34 +1118,21 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
             onChanged={refreshWallet}
             duplicatesBonus={wallet?.artifactPerks.duplicatesPercent ?? 0}
             maxSellRate={wallet?.artifactPerks.maxSellRatePercent ?? 100}
-            onShop={(setCode) => {
-              setShopFocus({ setCode, at: Date.now() });
-              switchTab("boosterium");
-            }}
+            onShop={shopFromCollection}
           />
         )}
 
         {tab === "achievements" && <Achievements refreshKey={unlockCount} />}
 
         {tab === "curiosities" && (
-          <Curiosities
-            refreshKey={artifactCount}
-            onShop={() => {
-              setShopFocus({ setCode: CURIOS, at: Date.now() });
-              switchTab("boosterium");
-            }}
-          />
+          <Curiosities refreshKey={artifactCount} onShop={shopFromCuriosities} />
         )}
 
-        {tab === "stats" && <Stats refreshKey={`${openings}-${wallet?.balanceCents}`} />}
+        {/* Read again after an opening, and with each payment of the income (the worth). */}
+        {tab === "stats" && <Stats refreshKey={`${openings}-${incomePaidAt}`} />}
 
         {tab === "history" && (
-          <History
-            onChanged={() => {
-              setOpenings((n) => n + 1);
-              void refreshWallet();
-            }}
-          />
+          <History onChanged={historyChanged} />
         )}
         <BackToTop target={stage} />
         {/* Magic's birthday (August 5): a ribbon and confetti over each opening. */}
