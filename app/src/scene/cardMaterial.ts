@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { foilEffect, glintPath, STAR_FIELDS, STAR_TWINKLES } from "../foils";
+import { foilEffect, glintPath, STAR_FIELDS, STAR_TWINKLES, SURGE_VEINS } from "../foils";
 
 // The cards of the 3D opening: rigid pieces of cardboard with a thickness, rounded corners,
 // a face, a back and an edge. The face of a foil gets an iridescent sheen that shifts with
@@ -167,12 +167,16 @@ void main() {
             float n = noise(p * 2.2 + vec2(uTime * 0.05, 0.0)) + 0.5 * noise(p * 5.0);
             layer = mix(vec3(0.45), hue(fract(n * 0.8 + uTime / 12.0)), 0.9);
             strength = 0.55 + 0.3 * band;
-          } else if (kind == 3) {
-            // Surge: the usual strength, with fine bright waves rising up the card.
-            float wave = fract(length((p - vec2(${(CARD_W / 2).toFixed(3)}, ${(CARD_H * 1.3).toFixed(3)})) * vec2(0.42, 1.0)) / 0.09 + uTime / 1.6);
-            c.rgb += vec3(0.55) * (1.0 - smoothstep(0.0, 0.1, abs(wave - 0.5))) * (0.6 + 0.4 * band);
           }
           c.rgb = mix(c.rgb, softLight(c.rgb, layer), strength);
+          if (kind == 3) {
+            // Surge, as foils.css draws it: the veins (uStars here, from SURGE_VEINS), a rainbow
+            // sliding along them (bands at 124°, one period every 2.41 units, drifting back a
+            // period every 9 s), in "screen": faint everywhere, bright in the band of light.
+            float vein = texture2D(uStars, vUv).a;
+            vec3 tint = mix(hue(fract(dot(p, vec2(0.829, 0.559)) / 2.41 + uTime / 9.0)), vec3(1.0), 0.2);
+            c.rgb = 1.0 - (1.0 - c.rgb) * (1.0 - tint * vein * 0.7 * (0.19 + 0.81 * band));
+          }
           if (kind == 2) {
             // Galaxy, as foils.css draws it: a nebula (two soft-light glows, violet at the top
             // left, blue at the bottom right), then the same three fields of stars (uStars, one
@@ -267,6 +271,28 @@ function starsTexture(): THREE.CanvasTexture {
   return stars;
 }
 
+/** The surge foil's veins (SURGE_VEINS of foils.tsx, as in the lists), in the alpha channel.
+ * The SVG is drawn on a canvas once loaded (the texture is updated then); shared by every
+ * card, never disposed. */
+let veins: THREE.CanvasTexture | null = null;
+function veinsTexture(): THREE.CanvasTexture {
+  if (veins) return veins;
+  const canvas = document.createElement("canvas");
+  canvas.width = 630;
+  canvas.height = 880;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.generateMipmaps = false;
+  texture.minFilter = THREE.LinearFilter;
+  const image = new Image();
+  image.onload = () => {
+    canvas.getContext("2d")!.drawImage(image, 0, 0, 630, 880);
+    texture.needsUpdate = true;
+  };
+  image.src = `data:image/svg+xml,${encodeURIComponent(SURGE_VEINS)}`;
+  veins = texture;
+  return texture;
+}
+
 /** Materials of one card: [face and back, edge] (the geometry's groups 0 and 1). `corner`:
  * that of its geometry (corners.ts), for the border to cover the white of the image's own. */
 export function createCardMaterials(back: THREE.Texture, foil: boolean, foilKind: string | null | undefined, corner: number) {
@@ -274,8 +300,9 @@ export function createCardMaterials(back: THREE.Texture, foil: boolean, foilKind
   const uniforms: CardUniforms = {
     uFront: { value: null },
     uBack: { value: back },
-    // Only a galaxy foil reads it (the shader still wants a texture there: the back).
-    uStars: { value: foil && kind === KINDS.galaxy ? starsTexture() : back },
+    // A galaxy foil's stars, a surge foil's veins (the shader still wants a texture there for
+    // the others: the back).
+    uStars: { value: !foil ? back : kind === KINDS.galaxy ? starsTexture() : kind === KINDS.surge ? veinsTexture() : back },
     uHasFront: { value: 0 },
     uFoil: { value: foil ? 1 : 0 },
     uKind: { value: kind },

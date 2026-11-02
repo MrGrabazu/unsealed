@@ -4,10 +4,8 @@
    properties set by foils.tsx. The 3D opening has its own version (scene/cardMaterial.ts). */
 
 @property --foil-angle { syntax: "<angle>"; inherits: true; initial-value: 0deg; }
-@property --foil-wave { syntax: "<length>"; inherits: true; initial-value: 0px; }
 @property --foil-ripple { syntax: "<length>"; inherits: true; initial-value: 0px; }
 @keyframes foil-spin { to { --foil-angle: 360deg; } }
-@keyframes foil-rise { to { --foil-wave: -28px; } }
 @keyframes foil-ripple { to { --foil-ripple: 24px; } }
 @keyframes foil-twinkle { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
 @keyframes foil-pulse { 0%, 100% { opacity: 0.15; } 50% { opacity: 0.5; } }
@@ -39,16 +37,20 @@
 .foil-stars::before { background-image: var(--foil-stars-2); animation: foil-twinkle 3.4s ease-in-out -1.7s infinite; }
 .foil-stars::after { background-image: var(--foil-stars-3); animation: foil-twinkle 4.2s ease-in-out -0.8s infinite; }
 
-/* Surge: the rainbow as strong as the usual foil's, and fine waves rising up the card,
-   thin but bright (a white core, a faint glow). */
-.foil-sheen.fx-surge { opacity: 0.85;
-  background: repeating-linear-gradient(100deg, #ff5a5a calc(var(--foil-shift) + 0%), #ffd84a calc(var(--foil-shift) + 10%), #6aff7a calc(var(--foil-shift) + 20%),
-    #4ae8ff calc(var(--foil-shift) + 30%), #5a72ff calc(var(--foil-shift) + 40%), #ff5ae0 calc(var(--foil-shift) + 50%), #ff5a5a calc(var(--foil-shift) + 60%));
-  -webkit-mask-image: linear-gradient(100deg, #0009 calc(var(--foil-light) - 25%), #000 var(--foil-light), #0009 calc(var(--foil-light) + 25%));
-  mask-image: linear-gradient(100deg, #0009 calc(var(--foil-light) - 25%), #000 var(--foil-light), #0009 calc(var(--foil-light) + 25%));
-  animation: foil-drift 4s linear infinite, foil-light 4s ease-in-out infinite, foil-rise 1.6s linear infinite; }
-.foil-sheen.fx-surge::before { mix-blend-mode: screen;
-  background: repeating-radial-gradient(ellipse 140% 60% at 50% calc(130% + var(--foil-wave)), #fff0 0 10.2px, #ffffff30 10.6px, #ffffffee 11.2px, #ffffff30 11.8px, #fff0 12.2px 14px); }
+/* Surge (proposal B2 of .cache/da/v13.html, from a real card): the usual foil, under thin
+   irregular veins slanting across the card, like those of marble (.foil-veins, drawn by
+   foils.tsx from noise, `SURGE_VEINS`), a rainbow sliding along them; faint everywhere,
+   bright where the light passes. The veins are printed: only their colours and the light move.
+   The 3D opening has the same veins (cardMaterial.ts). */
+.foil-veins { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: screen;
+  -webkit-mask-image: linear-gradient(108deg, #00000030 calc(var(--foil-light) - 25%), #000 var(--foil-light), #00000030 calc(var(--foil-light) + 25%));
+  mask-image: linear-gradient(108deg, #00000030 calc(var(--foil-light) - 25%), #000 var(--foil-light), #00000030 calc(var(--foil-light) + 25%));
+  animation: foil-drift 9s linear infinite, foil-light 5.5s ease-in-out infinite; }
+.foil-veins::before { content: ""; position: absolute; inset: 0; opacity: 0.7;
+  background: repeating-linear-gradient(124deg, #ff5a5a calc(var(--foil-shift) * -1 + 0%), #ffd84a calc(var(--foil-shift) * -1 + 10%), #6aff7a calc(var(--foil-shift) * -1 + 20%),
+    #4ae8ff calc(var(--foil-shift) * -1 + 30%), #5a72ff calc(var(--foil-shift) * -1 + 40%), #ff5ae0 calc(var(--foil-shift) * -1 + 50%), #ff5a5a calc(var(--foil-shift) * -1 + 60%));
+  -webkit-mask-image: var(--foil-veins); -webkit-mask-size: 100% 100%;
+  mask-image: var(--foil-veins); mask-size: 100% 100%; }
 
 /* Double rainbow: two rainbows crossing, more saturated. */
 .foil-sheen.fx-rainbow { opacity: 0.8;
@@ -153,5 +155,5 @@
 .badge-foil.b-ripple { background: linear-gradient(90deg, #7bd0ff, #c8f0ff); }
 
 @media (prefers-reduced-motion: reduce) {
-  .foil-stars, .foil-stars::before, .foil-stars::after, .foil-sheen::before { animation: none; }
+  .foil-stars, .foil-stars::before, .foil-stars::after, .foil-sheen::before, .foil-veins { animation: none; }
 }

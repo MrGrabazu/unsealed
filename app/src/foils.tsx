@@ -53,6 +53,7 @@ export function FoilSheen({ rarity, kind, badge = true }: { rarity: string; kind
     <>
       <span className={`foil-sheen fx-${fx}`} />
       {fx === "galaxy" && <span className="foil-stars" />}
+      {fx === "surge" && <span className="foil-veins" />}
       {badge && label && <span className={`badge-foil b-${fx}`}>{label}</span>}
     </>
   );
@@ -74,6 +75,7 @@ function ensureArt() {
   --foil-shards: ${svgUrl(shards())};
   --foil-relief: ${svgUrl(RELIEF)};
   --foil-oil: ${svgUrl(OIL)};
+  --foil-veins: ${svgUrl(SURGE_VEINS)};
 }`;
   document.head.appendChild(style);
 }
@@ -149,6 +151,21 @@ function shards(): string {
 /** A textured foil's relief: noise, lit from the top left. */
 const RELIEF =
   "<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='f'><feTurbulence type='fractalNoise' baseFrequency='0.045' numOctaves='3' seed='4'/><feDiffuseLighting lighting-color='white' surfaceScale='3'><feDistantLight azimuth='225' elevation='45'/></feDiffuseLighting></filter><rect width='100%' height='100%' filter='url(#f)'/></svg>";
+
+/** A surge foil's veins, on a 630 × 880 card, white with their alpha: noise stretched along a
+ * slant, kept only where it crosses its middle (thin, branching, irregular lines, like those
+ * of marble). The same in the lists (a mask, foils.css `.foil-veins`) and in the 3D opening
+ * (a texture, cardMaterial.ts). Proposal B2 of .cache/da/v13.html. */
+export const SURGE_VEINS = (() => {
+  const zeros = Array(9).fill(0).join(" ");
+  return (
+    "<svg xmlns='http://www.w3.org/2000/svg' width='630' height='880' viewBox='0 0 630 880' preserveAspectRatio='none'>" +
+    "<filter id='m' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='0.003 0.0135' numOctaves='3' seed='12'/>" +
+    `<feComponentTransfer><feFuncR type='table' tableValues='${zeros} 0.15 1 0.15 ${zeros}'/></feComponentTransfer>` +
+    "<feColorMatrix type='matrix' values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  1 0 0 0 0'/></filter>" +
+    "<g transform='rotate(-34 315 440)'><rect x='-400' y='-400' width='1430' height='1680' filter='url(#m)'/></g></svg>"
+  );
+})();
 
 /** An oil slick: coloured swirls, their hues turning slowly. */
 const OIL =
