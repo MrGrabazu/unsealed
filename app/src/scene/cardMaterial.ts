@@ -97,16 +97,17 @@ void main() {
       // Scryfall's images have their own rounded corners, cut out of white: a pixel or two of
       // it shows along the arc. There, the card's own border, taken a little further in on the
       // same line from the corner's centre, covers it: black, white, silver, gold or the grey
-      // of the Un-sets alike.
+      // of the Un-sets alike. Kept as thin as the white is (a card is 2.5 units for 63 mm, a pixel
+      // of the image about 0.004 to 0.005): on a full art, a wider band showed the copied pixels.
       vec2 at = vUv * vec2(${CARD_W.toFixed(3)}, ${CARD_H.toFixed(3)});
       float radius = uCorner * ${CARD_W.toFixed(3)};
       vec2 centre = clamp(at, vec2(radius), vec2(${CARD_W.toFixed(3)} - radius, ${CARD_H.toFixed(3)} - radius));
       vec2 out0 = at - centre;
       float dist = length(out0);
-      if (out0.x != 0.0 && out0.y != 0.0 && dist > radius - 0.03) {
-        vec2 inside = centre + out0 / dist * (radius - 0.045);
+      if (out0.x != 0.0 && out0.y != 0.0 && dist > radius - 0.013) {
+        vec2 inside = centre + out0 / dist * (radius - 0.018);
         vec4 border = texture2D(uFront, inside / vec2(${CARD_W.toFixed(3)}, ${CARD_H.toFixed(3)}));
-        c = mix(c, border, smoothstep(radius - 0.03, radius - 0.012, dist));
+        c = mix(c, border, smoothstep(radius - 0.013, radius - 0.006, dist));
       }
       if (uFoil > 0.5) {
         // The same foil as the CSS one (.foil-sheen): a faint rainbow (bands 18° off the

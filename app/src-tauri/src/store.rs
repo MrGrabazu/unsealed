@@ -996,6 +996,19 @@ impl Store {
         Ok(rows.collect::<Result<_, _>>()?)
     }
 
+    /// The sets that may hold a card in their file: the one the collection files it under (a
+    /// row stays after its copies are sold), then those of the boosters it came from.
+    pub fn card_set_codes(&self, uuid: &str) -> StoreResult<Vec<String>> {
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT set_code FROM collection WHERE card_uuid = ?1
+             UNION ALL
+             SELECT DISTINCT o.set_code FROM opening_cards oc JOIN openings o ON o.id = oc.opening_id
+             WHERE oc.card_uuid = ?1",
+        )?;
+        let rows = stmt.query_map([uuid], |r| r.get(0))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
     /// The sets the collection files the cards owned under.
     pub fn owned_set_codes(&self) -> StoreResult<Vec<String>> {
         let mut stmt = self.conn.prepare_cached("SELECT DISTINCT set_code FROM collection WHERE quantity > 0")?;

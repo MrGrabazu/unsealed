@@ -2180,6 +2180,9 @@ mod tests {
         assert_eq!((guest.uuid.as_str(), guest.set_code.as_str()), ("s1", "SLD"));
         assert!(cards.iter().skip_while(|c| c.sheet != CRAFTED_GUEST_SHEET).skip(1).all(|c| c.rarity == "token"));
         assert_eq!(g.collection("SLD").unwrap().owned_count, 1);
+        // Its details, asked from the booster it came out of, are found in its own set's file.
+        let (details, _) = g.card_details_local("TST", "s1").unwrap();
+        assert_eq!((details.name.as_str(), details.owned), ("Lair Card", 1));
 
         // Never in a booster of its own set.
         g.buy_boosters("SLD", "secret-lair", 1).unwrap();

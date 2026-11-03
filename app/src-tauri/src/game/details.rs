@@ -1,7 +1,7 @@
 //! A card's detail view: what the game knows locally (images, prices, copies owned), then
 //! what Scryfall adds when it can be reached (rules text of each face, every printing).
 
-use super::{localized, Game};
+use super::{err, localized, Game};
 use serde::Serialize;
 use std::collections::HashMap;
 use unsealed_core::import::parse_cents;
@@ -102,12 +102,16 @@ pub struct DetailsQuery {
 
 impl Game {
     /// The local part of a card's details, and what to ask Scryfall to complete them.
+    /// `set_code` is where the card was seen (the booster opened, the binder): when its file
+    /// does not hold the card (a Secret Lair or Japanese card hidden in that booster), the card
+    /// is looked for in the sets the game knows it from.
     pub fn card_details_local(&mut self, set_code: &str, uuid: &str) -> Result<(CardDetailsView, DetailsQuery), String> {
-        self.ensure_loaded(set_code)?;
+        let file = self.file_holding(set_code, uuid)?;
+        let set_code = file.as_str();
         self.ensure_prices();
         let owned = self.owned_with_tokens(set_code)?;
         let set = &self.sets[set_code];
-        let card = &set.file.cards[*set.index.get(uuid).ok_or_else(|| format!("card {uuid} not in {set_code}"))?];
+        let card = &set.file.cards[set.index[uuid]];
         let shown = localized(card, &self.card_lang, &self.image_quality, false);
         let have = owned.get(uuid).copied().unwrap_or_default();
         let query = DetailsQuery {
@@ -141,6 +145,22 @@ impl Game {
             online: false,
         };
         Ok((view, query))
+    }
+
+    /// The loaded set whose file holds a card: `seen_in` first, then the sets the collection and
+    /// the openings know it from (and their parents: "TLTR" → "LTR").
+    fn file_holding(&mut self, seen_in: &str, uuid: &str) -> Result<String, String> {
+        self.ensure_loaded(seen_in)?;
+        if self.sets[seen_in].index.contains_key(uuid) {
+            return Ok(seen_in.to_string());
+        }
+        let known = self.store.card_set_codes(uuid).map_err(err)?;
+        let parents: Vec<String> = known.iter().filter_map(|c| c.get(1..).map(str::to_string)).collect();
+        known
+            .into_iter()
+            .chain(parents)
+            .find(|code| self.ensure_loaded(code).is_ok() && self.sets[code].index.contains_key(uuid))
+            .ok_or_else(|| format!("card {uuid} not in {seen_in}"))
     }
 
     /// Completes the details with Scryfall's data: the faces' text (as printed in the card

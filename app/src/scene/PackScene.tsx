@@ -465,7 +465,12 @@ function Cards({
           materials[i].uniforms.uHasFront.value = 1;
           invalidate();
         })
-        .catch(() => f.asked.delete(i));
+        .catch(() => {
+          // Asked again a moment later: the scene only draws when something moves, so the next
+          // frame (where it would be asked again) might not come before the pointer moves.
+          f.asked.delete(i);
+          setTimeout(() => f.live && invalidate(), FACE_RETRY_MS);
+        });
     }
     for (const [i, t] of f.loaded) {
       // The card before the one on top may still be sliding away.
@@ -607,10 +612,13 @@ function Cards({
     }
     const turn = Math.PI * (1 - ease((since - turnStart) / PILE_TURNS));
 
-    // Cards being passed leave one after the other.
+    // Cards being passed leave one after the other, each once its face is there (a passed card
+    // went off showing its back when its image was slower than the run), or after a while.
     if (passing() && slide.current.kind === "idle" && settled()) {
-      if (isLast) finishing.current = true;
-      sendOff(new THREE.Vector2(1, 0.35), PASS_SLIDE);
+      if (faces.current.loaded.has(top) || clock.current - topSince.current > PASS_FACE_WAIT) {
+        if (isLast) finishing.current = true;
+        sendOff(new THREE.Vector2(1, 0.35), PASS_SLIDE);
+      } else moving = true;
     }
 
     // The last card stays a moment, then leaves on its own.
@@ -755,6 +763,10 @@ export interface PassRequest {
 
 /** Seconds a passed card takes to leave the pile. */
 const PASS_SLIDE = 0.14;
+/** How long a passed card waits for its face before leaving anyway (seconds). */
+const PASS_FACE_WAIT = 1;
+/** A card face that failed to load is asked again after this delay (milliseconds). */
+const FACE_RETRY_MS = 1000;
 
 /** The longest step of the scene's clock between two frames: it draws only while something
  * moves, and the first frame after a rest must not jump ahead by the whole rest. */
