@@ -17,6 +17,14 @@ opt-level = 3
 opt-level = 3
 [profile.dev.package.rand_chacha]
 opt-level = 3
+# The image cache's thumbnails (decoding, resizing, encoding a JPEG): unoptimized, each one took
+# long enough for the cards of an opening's summary to stay black a while.
+[profile.dev.package.image]
+opt-level = 3
+[profile.dev.package.zune-jpeg]
+opt-level = 3
+[profile.dev.package.zune-core]
+opt-level = 3
 
 # The released game: a smaller and faster binary, for a longer build. Panics still unwind:
 # the background data refresh relies on it to never take the game down.

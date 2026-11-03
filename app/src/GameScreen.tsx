@@ -1,4 +1,5 @@
 import { lazy, memo, Suspense, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { loadAhead } from "./images";
 import {
   buyArtifact,
   buyBoosters,
@@ -708,6 +709,8 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     setBusy(true);
     try {
       const opened = await openBooster(pack.setCode, pack.kind, true, activeBets(slip));
+      // The summary's cards, made ready while the booster is unwrapped.
+      loadAhead(opened.cards.flatMap((c) => [c.imageUrl, c.backImageUrl]));
       setCards(opened.cards);
       setFoundArtifact(opened.artifact);
       setBetResults(opened.bets);

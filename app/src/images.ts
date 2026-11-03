@@ -55,6 +55,29 @@ export function fittedImage(url: string, width: number, height: number): string 
   return needed > 0 && needed <= THUMB_WIDTH ? `${CACHE}thumb/${url.slice(CACHE.length)}` : url;
 }
 
+/** How long images loaded ahead are held decoded, at most (milliseconds). */
+const AHEAD_HELD_MS = 3 * 60_000;
+/** The images loaded ahead, held so the WebView keeps them decoded until they are shown. */
+let heldAhead: HTMLImageElement[] = [];
+let releaseAhead: ReturnType<typeof setTimeout> | undefined;
+
+/** Loads and decodes, ahead of time, card images about to be shown in a list (an opening's
+ * summary, while the booster is unwrapped): each in "normal" and as its thumbnail, the one
+ * shown depending on the size of its box, which does not exist yet (`fittedImage`). Asked
+ * only when shown, the cache could still be downloading an image or making its thumbnail, and
+ * the cards stayed black a while. The images of the previous call are let go. */
+export function loadAhead(urls: (string | null | undefined)[]): void {
+  const shown = urls.filter((url): url is string => url != null);
+  heldAhead = [...new Set(shown.flatMap((url) => [url, fittedImage(url, 1, 1)]))].map((src) => {
+    const image = new Image();
+    image.src = src;
+    void image.decode().catch(() => {});
+    return image;
+  });
+  clearTimeout(releaseAhead);
+  releaseAhead = setTimeout(() => (heldAhead.length = 0), AHEAD_HELD_MS);
+}
+
 /** The small version of a card image URL, for a thumbnail under ~120 px wide. */
 export function smallImage(url: string): string;
 export function smallImage(url: string | null): string | null;

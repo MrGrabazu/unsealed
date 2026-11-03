@@ -84,6 +84,7 @@ import { CardDetails } from "./CardDetails";
 import { CardImage } from "./CardImage";
 import { cornersClass } from "./corners";
 import { CyclesList, CyclesPanel } from "./Cycles";
+import { FitText } from "./FitText";
 import { ScenesGallery, ScenesPanel } from "./Scenes";
 import { AssembliesList, AssembliesPanel } from "./Assemblies";
 import { useI18n } from "./i18n";
@@ -850,7 +851,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
             <span className="medallion lg">
               {byArtist ? <span className="initials">{initials}</span> : <SetIcon url={set?.iconUrl ?? null} name={panelName} />}
             </span>
-            {panelName}
+            <FitText>{panelName}</FitText>
           </h2>
           <div className="meta">
             {years
