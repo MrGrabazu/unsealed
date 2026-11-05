@@ -757,6 +757,8 @@ export const de: Messages = {
   "open.tally": "Bilanz",
   "open.tallyValue": "Wert des Boosters",
   "open.tallyGain": "{amount} mehr als sein Preis ({price})",
+  "open.runningLoss": "Gezogene Karten: {value} von {price} · es fehlen {gap} bis zum Preis des Boosters",
+  "open.runningGain": "Gezogene Karten: {value} für {price} · Gewinn {gap}",
   "open.tallyLoss": "{amount} weniger als sein Preis ({price})",
   "open.tallyNew": "Neue Karten",
   "open.tallyNewFoils": "Neue Foils",

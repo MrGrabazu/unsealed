@@ -149,30 +149,30 @@ code { background: var(--panel); padding: 2px 6px; border-radius: 4px; }
    foil holds still until hovered: its gradients, mask and halo animate custom properties,
    which the browser repaints at every frame, foil by foil; on a large screen full of foils,
    WebKit (macOS) lagged. Held a third into its light's way, so its band shows on the card. */
-:is(.collection-card, .pocket, .seen-card, .sale-thumb.thumb) :is(.foil-sheen, .foil-stars, .foil-veins),
-:is(.collection-card, .pocket, .seen-card, .sale-thumb.thumb) :is(.foil-sheen, .foil-stars, .foil-veins)::before,
-:is(.collection-card, .pocket, .seen-card, .sale-thumb.thumb) :is(.foil-sheen, .foil-stars, .foil-veins)::after { animation-delay: -1.4s; }
+:is(.collection-card, .pocket, .seen-card, .sale-thumb.thumb) :is(.foil-sheen, .foil-stars, .foil-veins, .foil-relief),
+:is(.collection-card, .pocket, .seen-card, .sale-thumb.thumb) :is(.foil-sheen, .foil-stars, .foil-veins, .foil-relief)::before,
+:is(.collection-card, .pocket, .seen-card, .sale-thumb.thumb) :is(.foil-sheen, .foil-stars, .foil-veins, .foil-relief)::after { animation-delay: -1.4s; }
 :is(.collection-card, .pocket, .seen-card):not(:hover) .thumb,
-:is(.collection-card, .pocket, .seen-card):not(:hover) :is(.foil-sheen, .foil-stars, .foil-veins),
-:is(.collection-card, .pocket, .seen-card):not(:hover) :is(.foil-sheen, .foil-stars, .foil-veins)::before,
-:is(.collection-card, .pocket, .seen-card):not(:hover) :is(.foil-sheen, .foil-stars, .foil-veins)::after,
-.sale-thumb.thumb, .sale-thumb.thumb :is(.foil-sheen, .foil-stars, .foil-veins),
-.sale-thumb.thumb :is(.foil-sheen, .foil-stars, .foil-veins)::before, .sale-thumb.thumb :is(.foil-sheen, .foil-stars, .foil-veins)::after {
+:is(.collection-card, .pocket, .seen-card):not(:hover) :is(.foil-sheen, .foil-stars, .foil-veins, .foil-relief),
+:is(.collection-card, .pocket, .seen-card):not(:hover) :is(.foil-sheen, .foil-stars, .foil-veins, .foil-relief)::before,
+:is(.collection-card, .pocket, .seen-card):not(:hover) :is(.foil-sheen, .foil-stars, .foil-veins, .foil-relief)::after,
+.sale-thumb.thumb, .sale-thumb.thumb :is(.foil-sheen, .foil-stars, .foil-veins, .foil-relief),
+.sale-thumb.thumb :is(.foil-sheen, .foil-stars, .foil-veins, .foil-relief)::before, .sale-thumb.thumb :is(.foil-sheen, .foil-stars, .foil-veins, .foil-relief)::after {
   animation-play-state: paused;
 }
 /* The same for the hand of an opening's result (often left on screen for long), the cards of
    a batch (hundreds of them) and the best pulls of the statistics; and the "New foil" ribbon
    of those cards, whose rainbow slides by repainting. */
-:is(.revealed-card, .batch-cards .card, .pull-thumb) :is(.foil-sheen, .foil-stars, .foil-veins),
-:is(.revealed-card, .batch-cards .card, .pull-thumb) :is(.foil-sheen, .foil-stars, .foil-veins)::before,
-:is(.revealed-card, .batch-cards .card, .pull-thumb) :is(.foil-sheen, .foil-stars, .foil-veins)::after { animation-delay: -1.4s; }
-:is(.revealed-card, .batch-cards .card):not(:hover) :is(.thumb, .front, .foil-sheen, .foil-stars, .foil-veins),
+:is(.revealed-card, .batch-cards .card, .pull-thumb) :is(.foil-sheen, .foil-stars, .foil-veins, .foil-relief),
+:is(.revealed-card, .batch-cards .card, .pull-thumb) :is(.foil-sheen, .foil-stars, .foil-veins, .foil-relief)::before,
+:is(.revealed-card, .batch-cards .card, .pull-thumb) :is(.foil-sheen, .foil-stars, .foil-veins, .foil-relief)::after { animation-delay: -1.4s; }
+:is(.revealed-card, .batch-cards .card):not(:hover) :is(.thumb, .front, .foil-sheen, .foil-stars, .foil-veins, .foil-relief),
 :is(.revealed-card, .batch-cards .card):not(:hover) .badge-new::before,
-:is(.revealed-card, .batch-cards .card):not(:hover) :is(.foil-sheen, .foil-stars, .foil-veins)::before,
-:is(.revealed-card, .batch-cards .card):not(:hover) :is(.foil-sheen, .foil-stars, .foil-veins)::after,
+:is(.revealed-card, .batch-cards .card):not(:hover) :is(.foil-sheen, .foil-stars, .foil-veins, .foil-relief)::before,
+:is(.revealed-card, .batch-cards .card):not(:hover) :is(.foil-sheen, .foil-stars, .foil-veins, .foil-relief)::after,
 :is(.collection-card, .pocket, .seen-card):not(:hover) .badge-new::before,
-.pull-thumb:not(:hover), .pull-thumb:not(:hover) :is(.foil-sheen, .foil-stars, .foil-veins),
-.pull-thumb:not(:hover) :is(.foil-sheen, .foil-stars, .foil-veins)::before, .pull-thumb:not(:hover) :is(.foil-sheen, .foil-stars, .foil-veins)::after {
+.pull-thumb:not(:hover), .pull-thumb:not(:hover) :is(.foil-sheen, .foil-stars, .foil-veins, .foil-relief),
+.pull-thumb:not(:hover) :is(.foil-sheen, .foil-stars, .foil-veins, .foil-relief)::before, .pull-thumb:not(:hover) :is(.foil-sheen, .foil-stars, .foil-veins, .foil-relief)::after {
   animation-play-state: paused;
 }
 

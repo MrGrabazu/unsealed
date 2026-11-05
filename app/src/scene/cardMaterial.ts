@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { foilEffect, glintPath, STAR_FIELDS, STAR_TWINKLES, SURGE_VEINS } from "../foils";
+import { foilEffect, glintPath, STAR_FIELDS, STAR_TWINKLES, SURGE_VEINS, TEXTURED_CUT } from "../foils";
 
 // The cards of the 3D opening: rigid pieces of cardboard with a thickness, rounded corners,
 // a face, a back and an edge. The face of a foil gets an iridescent sheen that shifts with
@@ -47,6 +47,9 @@ void main() {
 }
 `;
 
+/** The size of a textured foil's height map (reliefTexture). */
+const RELIEF_W = 630, RELIEF_H = 880;
+
 const FRAGMENT = /* glsl */ `
 uniform sampler2D uFront;
 uniform sampler2D uBack;
@@ -57,6 +60,8 @@ uniform float uKind;
 uniform float uTime;
 uniform vec2 uLight;
 uniform float uCorner;
+// 1 once a textured foil's height map is in uStars.
+uniform float uRelief;
 varying vec2 vUv;
 varying float vFacing;
 
@@ -193,8 +198,22 @@ void main() {
             float star = min(1.0, dot(field, twinkle));
             c.rgb = 1.0 - (1.0 - c.rgb) * (1.0 - star * vec3(0.95, 0.96, 1.0));
           } else if (kind == 12) {
-            // Textured: a relief catching the light.
-            c.rgb += vec3(0.22) * (noise(p * 18.0) - 0.5) * (0.4 + band);
+            // Textured, as foils.css draws it: the card's light parts raised (uStars here, its
+            // height map, from reliefTexture), lit from the top left like the SVG lighting of
+            // the lists: the light and shade in "overlay", faint everywhere and stronger in the
+            // band of light, the highlights in "screen" in the band alone.
+            if (uRelief > 0.5) {
+              vec2 tx = vec2(${(1 / RELIEF_W).toFixed(6)}, ${(1 / RELIEF_H).toFixed(6)});
+              // The slope across, and down the image (vUv.y goes up).
+              float dx = texture2D(uStars, vUv + vec2(tx.x, 0.0)).r - texture2D(uStars, vUv - vec2(tx.x, 0.0)).r;
+              float dy = texture2D(uStars, vUv - vec2(0.0, tx.y)).r - texture2D(uStars, vUv + vec2(0.0, tx.y)).r;
+              vec3 n = normalize(vec3(-6.5 * dx, -6.5 * dy, 1.0));
+              float diffuse = clamp(dot(n, vec3(-0.612, -0.612, 0.5)), 0.0, 1.0);
+              vec3 over = mix(2.0 * c.rgb * diffuse, 1.0 - 2.0 * (1.0 - c.rgb) * (1.0 - diffuse), step(0.5, c.rgb));
+              c.rgb = mix(c.rgb, over, 0.6 * (0.44 + 0.56 * band));
+              float spec = min(1.0, 1.1 * pow(max(dot(n, normalize(vec3(-0.542, -0.542, 1.643))), 0.0), 20.0));
+              c.rgb = 1.0 - (1.0 - c.rgb) * (1.0 - spec * 0.75 * band);
+            }
           } else if (kind == 13) {
             // Neon ink: neon glows pulsing.
             float pulse = 0.5 + 0.5 * sin(uTime * 2.8);
@@ -227,6 +246,7 @@ export interface CardUniforms {
   uTime: THREE.IUniform<number>;
   uLight: THREE.IUniform<THREE.Vector2>;
   uCorner: THREE.IUniform<number>;
+  uRelief: THREE.IUniform<number>;
 }
 
 /** The shader's number for each look of foils.tsx (`foilEffect`); 0 is the usual foil. */
@@ -294,6 +314,65 @@ function veinsTexture(): THREE.CanvasTexture {
   return texture;
 }
 
+/** A box blur of `radius` pixels, across then down, in place. */
+function boxBlur(v: Float32Array, w: number, h: number, radius: number) {
+  const tmp = new Float32Array(v.length);
+  const span = radius * 2 + 1;
+  for (let y = 0; y < h; y++) {
+    let sum = 0;
+    for (let x = -radius; x <= radius; x++) sum += v[y * w + Math.min(w - 1, Math.max(0, x))];
+    for (let x = 0; x < w; x++) {
+      tmp[y * w + x] = sum / span;
+      sum += v[y * w + Math.min(w - 1, x + radius + 1)] - v[y * w + Math.max(0, x - radius)];
+    }
+  }
+  for (let x = 0; x < w; x++) {
+    let sum = 0;
+    for (let y = -radius; y <= radius; y++) sum += tmp[Math.min(h - 1, Math.max(0, y)) * w + x];
+    for (let y = 0; y < h; y++) {
+      v[y * w + x] = sum / span;
+      sum += tmp[Math.min(h - 1, y + radius + 1) * w + x] - tmp[Math.max(0, y - radius) * w + x];
+    }
+  }
+}
+
+/** A textured foil's height map, read on its face as `.foil-relief` of foils.css does
+ * (TEXTURED_RELIEF of foils.tsx): its light parts (luminance past TEXTURED_CUT) raised as
+ * plateaus with soft edges, in the red channel. Null if the image cannot be read. */
+function reliefTexture(image: CanvasImageSource): THREE.CanvasTexture | null {
+  const canvas = document.createElement("canvas");
+  canvas.width = RELIEF_W;
+  canvas.height = RELIEF_H;
+  const g = canvas.getContext("2d", { willReadFrequently: true });
+  if (!g) return null;
+  try {
+    g.drawImage(image, 0, 0, RELIEF_W, RELIEF_H);
+    const data = g.getImageData(0, 0, RELIEF_W, RELIEF_H);
+    const px = data.data;
+    const height = new Float32Array(RELIEF_W * RELIEF_H);
+    for (let i = 0; i < height.length; i++) {
+      const luma = (0.3 * px[i * 4] + 0.59 * px[i * 4 + 1] + 0.11 * px[i * 4 + 2]) / 255;
+      height[i] = luma >= TEXTURED_CUT ? 1 : 0;
+    }
+    // Two box blurs: about the Gaussian blur of the lists, at this size.
+    boxBlur(height, RELIEF_W, RELIEF_H, 2);
+    boxBlur(height, RELIEF_W, RELIEF_H, 2);
+    for (let i = 0; i < height.length; i++) {
+      const v = Math.round(height[i] * 255);
+      px[i * 4] = px[i * 4 + 1] = px[i * 4 + 2] = v;
+      px[i * 4 + 3] = 255;
+    }
+    g.putImageData(data, 0, 0);
+  } catch {
+    // A tainted image (no CORS): no relief.
+    return null;
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.generateMipmaps = false;
+  texture.minFilter = THREE.LinearFilter;
+  return texture;
+}
+
 /** Materials of one card: [face and back, edge] (the geometry's groups 0 and 1). `corner`:
  * that of its geometry (corners.ts), for the border to cover the white of the image's own. */
 export function createCardMaterials(back: THREE.Texture, foil: boolean, foilKind: string | null | undefined, corner: number) {
@@ -301,8 +380,8 @@ export function createCardMaterials(back: THREE.Texture, foil: boolean, foilKind
   const uniforms: CardUniforms = {
     uFront: { value: null },
     uBack: { value: back },
-    // A galaxy foil's stars, a surge foil's veins (the shader still wants a texture there for
-    // the others: the back).
+    // A galaxy foil's stars, a surge foil's veins, a textured foil's height map once its face
+    // is loaded (setFace; the shader still wants a texture there for the others: the back).
     uStars: { value: !foil ? back : kind === KINDS.galaxy ? starsTexture() : kind === KINDS.surge ? veinsTexture() : back },
     uHasFront: { value: 0 },
     uFoil: { value: foil ? 1 : 0 },
@@ -310,9 +389,20 @@ export function createCardMaterials(back: THREE.Texture, foil: boolean, foilKind
     uTime: { value: 0 },
     uLight: { value: new THREE.Vector2() },
     uCorner: { value: corner },
+    uRelief: { value: 0 },
   };
   const faces = new THREE.ShaderMaterial({ uniforms, vertexShader: VERTEX, fragmentShader: FRAGMENT });
   // The edge of the cardboard: off-white, like a real card's.
   const edge = new THREE.MeshStandardMaterial({ color: "#d9d4c7", roughness: 0.9 });
-  return { faces, edge, uniforms, dispose: () => (faces.dispose(), edge.dispose()) };
+  /** A textured foil's relief, read on its face once loaded (its own texture, freed with it). */
+  let relief: THREE.Texture | null = null;
+  const setFace = (image: CanvasImageSource) => {
+    if (!foil || kind !== KINDS.textured || relief) return;
+    relief = reliefTexture(image);
+    if (relief) {
+      uniforms.uStars.value = relief;
+      uniforms.uRelief.value = 1;
+    }
+  };
+  return { faces, edge, uniforms, setFace, dispose: () => (faces.dispose(), edge.dispose(), relief?.dispose()) };
 }

@@ -61,10 +61,23 @@
     #4ae8ff calc(90% - var(--foil-shift)), #5a72ff calc(100% - var(--foil-shift)), #ff5ae0 calc(110% - var(--foil-shift)), #ff5a5a calc(120% - var(--foil-shift))); }
 .foil-sheen.fx-rainbow::after { background: linear-gradient(108deg, transparent calc(var(--foil-light) - 16%), #ffffff50 var(--foil-light), transparent calc(var(--foil-light) + 16%)); }
 
-/* Textured: a relief on the surface, catching the light as it goes by. */
-.foil-sheen.fx-textured::before { mix-blend-mode: overlay; opacity: 0.6; background: var(--foil-relief) 0 0 / 160px 160px;
-  -webkit-mask-image: linear-gradient(108deg, #0006 calc(var(--foil-light) - 30%), #000 var(--foil-light), #0006 calc(var(--foil-light) + 30%));
-  mask-image: linear-gradient(108deg, #0006 calc(var(--foil-light) - 30%), #000 var(--foil-light), #0006 calc(var(--foil-light) + 30%)); }
+/* Textured (proposal B of .cache/da/v16.html): the usual foil, and the card's light parts
+   raised (TexturedRelief of foils.tsx: SVG lighting on a copy of the card's image): their light
+   and shade in "overlay" (.relief-shade), faint everywhere and stronger in the band of light,
+   their highlights in "screen" (.relief-glint), only where the light passes. The 3D opening has
+   the same relief (cardMaterial.ts). .foil-relief itself must not isolate (no opacity, filter
+   or containment): its parts blend with the card under it. */
+.foil-relief { position: absolute; inset: 0; pointer-events: none; animation: foil-light 5.5s ease-in-out infinite; }
+.foil-relief > span { position: absolute; inset: 0; }
+.foil-relief img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.relief-shade { mix-blend-mode: overlay; opacity: 0.6;
+  -webkit-mask-image: linear-gradient(108deg, #0007 calc(var(--foil-light) - 35%), #000 var(--foil-light), #0007 calc(var(--foil-light) + 35%));
+  mask-image: linear-gradient(108deg, #0007 calc(var(--foil-light) - 35%), #000 var(--foil-light), #0007 calc(var(--foil-light) + 35%)); }
+.relief-shade img { filter: url(#textured-shade); }
+.relief-glint { mix-blend-mode: screen; opacity: 0.75;
+  -webkit-mask-image: linear-gradient(108deg, #0000 calc(var(--foil-light) - 22%), #000 var(--foil-light), #0000 calc(var(--foil-light) + 22%));
+  mask-image: linear-gradient(108deg, #0000 calc(var(--foil-light) - 22%), #000 var(--foil-light), #0000 calc(var(--foil-light) + 22%)); }
+.relief-glint img { filter: url(#textured-glint); }
 
 /* Fracture: the foil broken into shards, whose fine edges catch the light. */
 .foil-sheen.fx-fracture { opacity: 0.95; }
@@ -155,5 +168,5 @@
 .badge-foil.b-ripple { background: linear-gradient(90deg, #7bd0ff, #c8f0ff); }
 
 @media (prefers-reduced-motion: reduce) {
-  .foil-stars, .foil-stars::before, .foil-stars::after, .foil-sheen::before, .foil-veins { animation: none; }
+  .foil-stars, .foil-stars::before, .foil-stars::after, .foil-sheen::before, .foil-veins, .foil-relief { animation: none; }
 }

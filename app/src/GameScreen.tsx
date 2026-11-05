@@ -977,6 +977,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
                         onSold={refreshWallet}
                         onFinished={() => setResultShown(true)}
                         tearRequest={tearRequest}
+                        priceCents={packShop?.priceCents ?? null}
                       />
                     </Suspense>
                   ) : (

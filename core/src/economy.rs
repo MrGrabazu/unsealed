@@ -323,8 +323,11 @@ impl EconomyConfig {
     }
 
     /// What a card worth `market_cents` sells for at `rate_percent` (an artifact's better rate).
+    /// Never less than 1 for a card that has a price: rounded down, a 1-cent foil sold for
+    /// nothing and could not be sold at all (nor its duplicates).
     pub fn sell_value_at(market_cents: u32, rate_percent: u32) -> u32 {
-        (u64::from(market_cents) * u64::from(rate_percent) / 100) as u32
+        let value = (u64::from(market_cents) * u64::from(rate_percent) / 100) as u32;
+        if market_cents > 0 && rate_percent > 0 { value.max(1) } else { value }
     }
 }
 

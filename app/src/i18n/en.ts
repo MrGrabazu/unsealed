@@ -766,6 +766,8 @@ export const en = {
   "open.tallyValue": "The booster's value",
   "open.tallyGain": "{amount} more than its price ({price})",
   "open.tallyLoss": "{amount} less than its price ({price})",
+  "open.runningLoss": "Cards drawn: {value} of {price} · {gap} short of the booster's price",
+  "open.runningGain": "Cards drawn: {value} for {price} · profit {gap}",
   "open.tallyNew": "New cards",
   "open.tallyNewFoils": "New foils",
   "open.tallyBest": "Best card",

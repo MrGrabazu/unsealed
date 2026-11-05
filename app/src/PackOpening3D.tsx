@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { OpenedCard, SetSummary } from "./api";
 import { SellBoosterButton, useBoosterSale } from "./BoosterSale";
 import { useI18n } from "./i18n";
@@ -43,12 +43,14 @@ interface Props {
   onFinished?: () => void;
   /** Bumped to tear the pack open without touching it. */
   tearRequest?: number;
+  /** The booster's price today (none for a box topper): the cards revealed are weighed against it. */
+  priceCents?: number | null;
 }
 
 /** Opening one booster in the 3D scene: tear the pack, then slide the cards off the pile one
  * by one. Once the last card has left, the scene gives way to the list of the cards, and a
  * click on one shows its details. */
-export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onDetails, onSold, onFinished, tearRequest = 0 }: Props) {
+export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onDetails, onSold, onFinished, tearRequest = 0, priceCents = null }: Props) {
   const { t, tx } = useI18n();
   const money = useMoney();
   const sale = useBoosterSale(cards, onSold);
@@ -60,6 +62,11 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
   const [attempt, setAttempt] = useState(0);
   // The card seen on top of the pile, for its mention (none while one leaves).
   const [shown, setShown] = useState<number | null>(null);
+  // How many cards have been discovered: each counts as it shows face up on the pile (or as it
+  // goes by, passed in a run, never shown), and only then.
+  const [discovered, setDiscovered] = useState(0);
+  // The price under the card on top, placed by the scene at the card's foot.
+  const footAnchor = useRef<HTMLDivElement>(null);
 
   const look = useMemo(() => packLookOf(setCode, set, kind, t), [setCode, set, kind, t]);
 
@@ -69,6 +76,7 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
     setSlideRequest(0);
     setTearing(false);
     setShown(null);
+    setDiscovered(0);
     setPassRequest(null);
   }, [setCode, kind, cards]);
 
@@ -131,6 +139,20 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
 
   const seen = cards ? cards.slice(0, finished ? total : top) : [];
   const value = seen.reduce((sum, c) => sum + (c.priceCents ?? 0), 0);
+  // The cards discovered so far weighed against the booster's price: red while they are worth
+  // less, green with the profit once above it. It changes when a card shows face up on the pile,
+  // never again as it leaves (a passed card counts as it goes).
+  const count = cards ? Math.min(total, Math.max(discovered, finished ? total : top)) : 0;
+  const drawn = cards ? cards.slice(0, count).reduce((sum, c) => sum + (c.priceCents ?? 0), 0) : 0;
+  // The price of the card face up on the pile, just under it.
+  const face = cards && shown != null ? cards[shown] : null;
+  const tally = cards && count > 0 && priceCents != null && priceCents > 0 ? (
+    <p className={`pack-tally ${drawn >= priceCents ? "gain" : "loss"}`}>
+      {drawn >= priceCents
+        ? tx("open.runningGain", { value: money(drawn), price: money(priceCents), gap: money(drawn - priceCents) })
+        : tx("open.runningLoss", { value: money(drawn), price: money(priceCents), gap: money(priceCents - drawn) })}
+    </p>
+  ) : null;
 
   return (
     <section className={`pack-opening ${finished ? "" : "scene-live"}`}>
@@ -167,7 +189,11 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
               tearRequest={tearRequest}
               onNext={() => setTop((n) => Math.min(n + 1, total - 1))}
               onFinished={() => setFinished(true)}
-              onShown={setShown}
+              footAnchor={footAnchor}
+              onShown={(i) => {
+                setShown(i);
+                if (i != null) setDiscovered((n) => Math.max(n, i + 1));
+              }}
               onTorn={() => {
                 if (tearing) return;
                 setTearing(true);
@@ -195,6 +221,11 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
             </div>
           )}
           </div>
+          {/* Kept in place while no card shows: the scene moves it with the foot of the card. */}
+          <div ref={footAnchor} className="pile-price">
+            {face && <span key={shown}>{face.priceCents == null ? "—" : <Money cents={face.priceCents} estimated={face.priceEstimated} />}</span>}
+          </div>
+          {tally}
           <p className="hint scene-hint">{!cards ? t("scene.shakeHint") : t("scene.peelHint")}</p>
           {set?.art && !cards && (
             <p className="shop-credit">{t("art.credit", { card: set.art.cardName, artist: set.art.artist })}</p>

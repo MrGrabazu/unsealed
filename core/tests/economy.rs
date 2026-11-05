@@ -63,7 +63,9 @@ fn sell_value_is_a_rounded_down_share_of_the_market_price() {
     let c = config();
     assert_eq!(c.sell_value_cents(1_000), 800);
     assert_eq!(c.sell_value_cents(5), 4);
-    assert_eq!(c.sell_value_cents(1), 0);
+    // Never nothing for a card that has a price: a 1-cent foil still sells.
+    assert_eq!(c.sell_value_cents(1), 1);
+    assert_eq!(c.sell_value_cents(0), 0);
     assert_eq!(c.sell_value_cents(u32::MAX), (u64::from(u32::MAX) * 80 / 100) as u32);
 }
 

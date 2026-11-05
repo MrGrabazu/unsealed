@@ -2,6 +2,7 @@
 // comes from the game (`foilKind`, from MTGJSON's promo types and finishes); the effects are
 // in foils.css, validated on the mockup .cache/da/v9.html. They are layers over the card,
 // never a change to its image.
+import { useEffect, useRef, useState } from "react";
 
 /** How each kind is shown: its effect (`fx-*` of foils.css; "plain" = the usual foil) and
  * its name on the badge. The names stay in English, as the cards and the players say them. */
@@ -54,9 +55,70 @@ export function FoilSheen({ rarity, kind, badge = true }: { rarity: string; kind
       <span className={`foil-sheen fx-${fx}`} />
       {fx === "galaxy" && <span className="foil-stars" />}
       {fx === "surge" && <span className="foil-veins" />}
+      {fx === "textured" && <TexturedRelief />}
       {badge && label && <span className={`badge-foil b-${fx}`}>{label}</span>}
     </>
   );
+}
+
+/** The luminance (0..1) past which a textured foil's card is raised. */
+export const TEXTURED_CUT = 0.55;
+
+/** A textured foil's relief (proposal B of .cache/da/v16.html): the card's own image in black
+ * and white, its light parts (past TEXTURED_CUT) raised as plateaus with soft edges, lit from
+ * the top left by SVG lighting: its light and shade, its highlights (`#textured-shade`,
+ * `#textured-glint`, filters on a copy of the image shown beside it: the card's `img` in the
+ * same parent, followed as it changes, a double-faced card turned over or a lazy image put in
+ * late). The 3D opening reads the same relief on its face (reliefTexture of cardMaterial.ts). */
+function TexturedRelief() {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    const own = ref.current;
+    const parent = own?.parentElement;
+    if (!own || !parent) return;
+    const read = () => {
+      const image = Array.from(parent.querySelectorAll("img")).find((i) => !own.contains(i));
+      setSrc(image ? image.currentSrc || image.src || null : null);
+    };
+    read();
+    const watch = new MutationObserver(read);
+    watch.observe(parent, { childList: true, subtree: true, attributes: true, attributeFilter: ["src"] });
+    parent.addEventListener("load", read, true);
+    return () => (watch.disconnect(), parent.removeEventListener("load", read, true));
+  }, []);
+  ensureReliefFilters();
+  return (
+    <span ref={ref} className="foil-relief">
+      {src && (
+        <>
+          <span className="relief-shade"><img src={src} alt="" draggable={false} /></span>
+          <span className="relief-glint"><img src={src} alt="" draggable={false} /></span>
+        </>
+      )}
+    </span>
+  );
+}
+
+/** The SVG filters of TexturedRelief, put in the page once. Their sizes are in CSS pixels. */
+let reliefFilters = false;
+function ensureReliefFilters() {
+  if (reliefFilters || typeof document === "undefined") return;
+  reliefFilters = true;
+  const steps = 20;
+  const cut = Array.from({ length: steps }, (_, i) => (i / steps >= TEXTURED_CUT ? 1 : 0)).join(" ");
+  const height = `<feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.3 0.59 0.11 0 0"/><feComponentTransfer><feFuncA type="discrete" tableValues="${cut}"/></feComponentTransfer><feGaussianBlur stdDeviation="1.1"/>`;
+  const filter = (id: string, light: string) =>
+    `<filter id="${id}" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">${height}${light}</filter>`;
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("width", "0");
+  svg.setAttribute("height", "0");
+  svg.setAttribute("aria-hidden", "true");
+  svg.style.position = "absolute";
+  svg.innerHTML =
+    filter("textured-shade", `<feDiffuseLighting surfaceScale="3" diffuseConstant="1" lighting-color="white"><feDistantLight azimuth="225" elevation="30"/></feDiffuseLighting>`) +
+    filter("textured-glint", `<feSpecularLighting surfaceScale="3" specularConstant="1.1" specularExponent="20" lighting-color="white"><feDistantLight azimuth="225" elevation="40"/></feSpecularLighting>`);
+  document.body.appendChild(svg);
 }
 
 // ---- the drawn parts of the effects: star fields, shards, relief, oil (SVG, seeded, so
@@ -73,7 +135,6 @@ function ensureArt() {
   --foil-stars-2: ${svgUrl(stars(STAR_FIELDS[1]))};
   --foil-stars-3: ${svgUrl(stars(STAR_FIELDS[2]))};
   --foil-shards: ${svgUrl(shards())};
-  --foil-relief: ${svgUrl(RELIEF)};
   --foil-oil: ${svgUrl(OIL)};
   --foil-veins: ${svgUrl(SURGE_VEINS)};
 }`;
@@ -147,10 +208,6 @@ function shards(): string {
   const all = lines.join("");
   return `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 63 88' preserveAspectRatio='none'><filter id='b'><feGaussianBlur stdDeviation='0.35'/></filter><g stroke='white' fill='none'><g stroke-width='1' stroke-opacity='0.5' filter='url(#b)'>${all}</g><g stroke-width='0.3'>${all}</g></g></svg>`;
 }
-
-/** A textured foil's relief: noise, lit from the top left. */
-const RELIEF =
-  "<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='f'><feTurbulence type='fractalNoise' baseFrequency='0.045' numOctaves='3' seed='4'/><feDiffuseLighting lighting-color='white' surfaceScale='3'><feDistantLight azimuth='225' elevation='45'/></feDiffuseLighting></filter><rect width='100%' height='100%' filter='url(#f)'/></svg>";
 
 /** A surge foil's veins, on a 630 × 880 card, white with their alpha: noise stretched along a
  * slant, kept only where it crosses its middle (thin, branching, irregular lines, like those

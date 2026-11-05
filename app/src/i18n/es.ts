@@ -757,6 +757,8 @@ export const es: Messages = {
   "open.tally": "Balance",
   "open.tallyValue": "Valor del sobre",
   "open.tallyGain": "{amount} más que su precio ({price})",
+  "open.runningLoss": "Cartas sacadas: {value} de {price} · faltan {gap} para cubrir el precio del sobre",
+  "open.runningGain": "Cartas sacadas: {value} por {price} · beneficio {gap}",
   "open.tallyLoss": "{amount} menos que su precio ({price})",
   "open.tallyNew": "Cartas nuevas",
   "open.tallyNewFoils": "Foils nuevas",

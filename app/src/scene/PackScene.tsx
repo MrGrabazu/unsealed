@@ -1,5 +1,5 @@
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import * as THREE from "three";
 import type { OpenedCard } from "../api";
 import { isBigCard } from "../BatchOpening";
@@ -382,7 +382,10 @@ function Cards({
   onShown,
   slideRequest,
   passRequest,
+  footAnchor,
 }: {
+  /** Placed just under the foot of the card on top, at rest (its price). */
+  footAnchor?: RefObject<HTMLElement | null>;
   cards: OpenedCard[];
   top: number;
   /** The top card has left the pile. */
@@ -463,6 +466,8 @@ function Cards({
           f.loaded.set(i, t);
           materials[i].uniforms.uFront.value = t;
           materials[i].uniforms.uHasFront.value = 1;
+          // A textured foil's relief, read on its face.
+          materials[i].setFace(t.image as CanvasImageSource);
           invalidate();
         })
         .catch(() => {
@@ -637,6 +642,7 @@ function Cards({
     const settle = ease((since - CARDS_OUT) / PACK_FALLS);
     const depth = (k: number) => THREE.MathUtils.lerp(-0.2 - 0.01 * k, stackZ(k), settle);
     const middle = (depth(0) + depth(cards.length - 1)) / 2;
+    const rest: { top: THREE.Vector3 | null } = { top: null };
     meshes.current.forEach((mesh, k) => {
       if (!mesh) return;
       mesh.visible = k >= top;
@@ -649,6 +655,7 @@ function Cards({
         middle + dz * Math.cos(turn),
       );
       mesh.rotation.y = turn;
+      if (k === top) rest.top = base;
       if (k === top) {
         mesh.position.set(base.x + offset.current.x, base.y + offset.current.y, base.z + Math.min(0.3, offset.current.length() * 0.1));
         mesh.rotation.z = -offset.current.x * 0.08;
@@ -705,6 +712,20 @@ function Cards({
       }
     }
 
+    // The foot of the card on top, at rest (neither slid nor tilted): the pile thins as cards
+    // leave, the top one goes back and looks smaller, and its price must keep the same gap.
+    const anchor = footAnchor?.current;
+    if (anchor && s && rest.top) {
+      const foot = rest.top.clone().setY(rest.top.y - CARD_H / 2).multiplyScalar(s.scale.x).add(s.position).project(camera);
+      const box = dom.getBoundingClientRect();
+      const parent = anchor.offsetParent?.getBoundingClientRect();
+      const y = Math.round(((1 - foot.y) / 2) * box.height + box.top - (parent?.top ?? box.top));
+      if (anchor.dataset.y !== String(y)) {
+        anchor.dataset.y = String(y);
+        anchor.style.top = `${y}px`;
+      }
+    }
+
     // A card moving, cards to pass, the last one waiting to leave, a card's effects coming in.
     if (slide.current.kind !== "idle" || passing() || (isLast && !finishing.current) || shown < 1) moving = true;
     if (moving) state.invalidate();
@@ -754,6 +775,8 @@ interface Props {
   passRequest?: PassRequest | null;
   /** Bumped to tear the pack open without touching it. */
   tearRequest: number;
+  /** Placed (its `top`, in its offset parent) at the foot of the card on top: its price. */
+  footAnchor?: RefObject<HTMLElement | null>;
 }
 
 /** Passes the cards from the top of the pile up to `to` (excluded); a new object each time. */
@@ -789,7 +812,7 @@ function WakeOnPointer() {
   return null;
 }
 
-export function PackScene({ look, cards, top, onTorn, onNext, onFinished, onShown, slideRequest, passRequest, tearRequest }: Props) {
+export function PackScene({ look, cards, top, onTorn, onNext, onFinished, onShown, slideRequest, passRequest, tearRequest, footAnchor }: Props) {
   // Once the cards are drawn they slide out of the wrapper, which then falls away.
   const [packGone, setPackGone] = useState(false);
   useEffect(() => {
@@ -816,6 +839,7 @@ export function PackScene({ look, cards, top, onTorn, onNext, onFinished, onShow
           onNext={onNext}
           onFinished={onFinished}
           onShown={onShown}
+          footAnchor={footAnchor}
           slideRequest={slideRequest}
           passRequest={passRequest}
         />

@@ -938,6 +938,19 @@ button.curios-slot { display: block; width: 100%; height: 96px; margin-bottom: 1
 .pack-opening.scene-live .scene-frame { margin: 0; height: auto; align-self: stretch; }
 .pack-opening.scene-live > .scene-hint { position: absolute; z-index: 4; left: 0; right: 0; bottom: 0; margin: 0; pointer-events: none; }
 .pack-opening.scene-live > .shop-credit { position: absolute; z-index: 4; left: 0; right: 0; bottom: 24px; margin: 0; text-align: center; pointer-events: none; }
+/* The cards revealed weighed against the booster's price, under the pile, above the hint: red
+   while below it, green with the profit once above (not the theme's gold `.gain`). */
+.pack-opening.scene-live > .pack-tally { position: absolute; z-index: 4; left: 0; right: 0; bottom: 26px; margin: 0; text-align: center; pointer-events: none;
+  font-family: var(--font-title); font-size: 15px; letter-spacing: .02em; text-shadow: 0 1px 3px #000, 0 0 10px #000; transition: color .4s; }
+/* The price of the card face up on the pile, just under it: the scene sets its `top` to the
+   card's foot at each frame (the pile thins as cards leave: the top card goes back and looks
+   smaller); about 79 % of the scene's height until then. */
+.pack-opening.scene-live > .pile-price { position: absolute; z-index: 4; left: 0; right: 0; top: 79%; margin: 8px 0 0; text-align: center; pointer-events: none;
+  font-family: var(--font-title); font-size: 18px; color: var(--gold-hi); text-shadow: 0 1px 3px #000, 0 0 10px #000; }
+.pack-opening.scene-live > .pile-price > span { display: inline-block; animation: pile-price-in .35s ease-out; }
+@keyframes pile-price-in { from { opacity: 0; transform: translateY(-4px); } }
+.pack-opening.scene-live > .pack-tally.loss { color: #ff7a7a; }
+.pack-opening.scene-live > .pack-tally.gain { color: #6fcf7f; }
 /* Below the bar, not under it. */
 .pack-opening.scene-live .reveal-mention { top: 48px; }
 .pack-opening.scene-live .seen-strip { top: 44px; }
