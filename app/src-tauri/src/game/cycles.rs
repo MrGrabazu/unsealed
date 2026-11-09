@@ -134,12 +134,13 @@ impl Game {
     fn cycle_state<'a>(&'a self, set_code: &str, cycle: &Cycle, owned: &HashMap<String, Owned>) -> Option<CycleState<'a>> {
         let set = self.sets.get(set_code)?;
         // Tokens may bear the set's own code and the same numbers as its cards (FRA, LTR):
-        // a cycle's numbers are those of the cards.
+        // a cycle's numbers are those of the cards. A split or double-faced card is listed once
+        // per face under one number (Duskmourn's Rooms): its second face is never the one owned.
         let by_number: HashMap<&str, &CardEntry> = set
             .file
             .cards
             .iter()
-            .filter(|c| c.set_code == set_code && !c.token && !c.art)
+            .filter(|c| c.set_code == set_code && !c.token && !c.art && c.side.as_deref() != Some("b"))
             .map(|c| (c.number.as_str(), c))
             .collect();
         let mut slots = Vec::with_capacity(cycle.slots.len());

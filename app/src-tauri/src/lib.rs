@@ -625,6 +625,13 @@ async fn get_assemblies(state: State<'_, SessionState>, set_code: String) -> Res
     with_game(&state, |g| g.assemblies(&set_code))
 }
 
+/// A set's history: its boosters opened, the latest first, with their cards, and the same pulls
+/// card by card.
+#[tauri::command]
+async fn get_set_history(state: State<'_, SessionState>, set_code: String) -> Result<game::SetHistoryView, String> {
+    with_game(&state, |g| g.set_history(&set_code))
+}
+
 /// The cabinet of curiosities: every artifact, owned, on sale or still hidden.
 #[tauri::command]
 async fn get_artifacts(state: State<'_, SessionState>, lang: String) -> Result<Vec<game::ArtifactView>, String> {
@@ -910,6 +917,7 @@ pub fn run() {
             get_cycles,
             get_scenes,
             get_assemblies,
+            get_set_history,
             get_artifacts,
             buy_artifact,
             take_given_artifacts,

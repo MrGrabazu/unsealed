@@ -13,6 +13,7 @@ mod history;
 mod income;
 mod library;
 mod scenes;
+mod set_history;
 mod toppers;
 #[cfg(test)]
 mod pace;
@@ -25,6 +26,7 @@ pub use toppers::ToppersGiven;
 pub use cycles::CyclesView;
 pub use scenes::ScenesView;
 pub use assemblies::AssembliesView;
+pub use set_history::SetHistoryView;
 pub use library::LibraryBinder;
 
 pub use achievements::{AchievementTexts, AchievementView, AchievementsView};
@@ -3096,6 +3098,37 @@ mod tests {
                 best_value_cents: 1_200,
             }]
         );
+    }
+
+    #[test]
+    fn a_sets_history_tells_its_boosters_and_their_cards() {
+        let mut g = game("set-history");
+        assert!(g.set_history("TST").unwrap().openings.is_empty());
+
+        g.buy_boosters("TST", "play", 2).unwrap();
+        g.open_booster("TST", "play").unwrap();
+        g.open_booster("TST", "play").unwrap();
+        g.reveal_cards(usize::MAX);
+
+        let h = g.set_history("TST").unwrap();
+        // The latest first; each booster cost 400 and held the $10.00 mythic and two $1.00 commons.
+        assert_eq!(h.openings.len(), 2);
+        assert!(h.openings[0].id > h.openings[1].id);
+        assert_eq!(h.openings.iter().map(|o| (o.value_cents, o.cost_cents)).collect::<Vec<_>>(), [(1_200, Some(400)); 2]);
+        // Only the first copy of each card is new, the oldest booster holding them.
+        let news = |o: &set_history::SetOpeningView| o.pulls.iter().filter(|p| p.is_new).count();
+        assert_eq!((news(&h.openings[1]), news(&h.openings[0])), (2, 0));
+        assert_eq!(h.cards.len(), 2);
+        // Card by card, in collector number order: the common pulled twice per booster.
+        let ledger: Vec<(&str, u32)> = h.ledger.iter().map(|e| (h.cards[&e.uuid].name.as_str(), e.pulls)).collect();
+        assert_eq!(ledger, [("Mythic", 2), ("Common", 4)]);
+        assert!(h.ledger.iter().all(|e| e.first_at <= e.last_at));
+        let s = &h.summary;
+        assert_eq!((s.boosters, s.cards_pulled, s.distinct_cards), (2, 6, 2));
+        assert_eq!((s.value_cents, s.spent_cents, s.value_of_paid_cents), (2_400, 800, 2_400));
+        assert_eq!(s.best_pull.as_ref().and_then(|p| p.price_cents), Some(1_000));
+        // Equal pulls: the latest booster's.
+        assert_eq!(s.best_pull_opening, Some(h.openings[0].id));
     }
 
     #[test]

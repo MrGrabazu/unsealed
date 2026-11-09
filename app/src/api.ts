@@ -159,6 +159,60 @@ export interface AssembliesView {
   total: number;
 }
 
+/** A card of a booster opened, priced when it was pulled. */
+export interface HistoryPull {
+  uuid: string;
+  foil: boolean;
+  priceCents: number | null;
+  /** The first copy ever pulled of this card. */
+  isNew: boolean;
+  /** The first foil of a card pulled before only in non-foil. */
+  newFoil: boolean;
+}
+
+/** A booster of a set opened. */
+export interface HistoryOpening {
+  id: number;
+  openedAt: number;
+  kind: string;
+  valueCents: number;
+  /** What it had cost (0 for a booster given); null for the openings before costs were kept. */
+  costCents: number | null;
+  pulls: HistoryPull[];
+}
+
+/** A card of a set pulled, over the whole history. */
+export interface CardPulls {
+  uuid: string;
+  firstAt: number;
+  lastAt: number;
+  pulls: number;
+  foils: number;
+  bestPriceCents: number | null;
+}
+
+/** A set's history: its boosters opened (the latest first), the same pulls card by card, and
+ * what the set has given so far. */
+export interface SetHistoryView {
+  setCode: string;
+  /** The cards pulled, once each, drawn as a foil (`foilKind` applies to a foil pull only). */
+  cards: Record<string, OpenedCard>;
+  openings: HistoryOpening[];
+  ledger: CardPulls[];
+  summary: {
+    boosters: number;
+    cardsPulled: number;
+    distinctCards: number;
+    firstOpenedAt: number | null;
+    valueCents: number;
+    spentCents: number;
+    valueOfPaidCents: number;
+    bestPull: HistoryPull | null;
+    bestPullOpening: number | null;
+    bestOpening: number | null;
+  };
+}
+
 /** In a set's completion panel: a guest series its boosters give, with its own binder. */
 export interface GuestLink {
   code: string;
@@ -733,6 +787,8 @@ export const getCycles = (setCode: string, lang: string) => invoke<CyclesView>("
 /** A set's scenes, as far as the player is, their names in `lang`. */
 export const getScenes = (setCode: string, lang: string) => invoke<ScenesView>("get_scenes", { setCode, lang });
 export const getAssemblies = (setCode: string) => invoke<AssembliesView>("get_assemblies", { setCode });
+/** A set's history: its boosters opened and their cards. */
+export const getSetHistory = (setCode: string) => invoke<SetHistoryView>("get_set_history", { setCode });
 export const listArtists = () => invoke<ArtistSummary[]>("list_artists");
 /** The guest series with a binder of their own (no boosters, no art). */
 export const listGuestSeries = () => invoke<SetSummary[]>("list_guest_series");

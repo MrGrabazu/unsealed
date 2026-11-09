@@ -7,6 +7,7 @@ import {
   getCycles,
   getScenes,
   getAssemblies,
+  getSetHistory,
   getOwnedCards,
   listArtists,
   listGuestSeries,
@@ -21,6 +22,7 @@ import {
   type CyclesView,
   type ScenesView,
   type AssembliesView,
+  type SetHistoryView,
   type SetSummary,
 } from "./api";
 
@@ -87,6 +89,7 @@ import { CyclesList, CyclesPanel } from "./Cycles";
 import { FitText } from "./FitText";
 import { ScenesGallery, ScenesPanel } from "./Scenes";
 import { AssembliesList, AssembliesPanel } from "./Assemblies";
+import { SetHistoryList, SetHistoryPanel } from "./SetHistory";
 import { useI18n } from "./i18n";
 import { Library } from "./Library";
 import { Loading } from "./Loading";
@@ -135,7 +138,9 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
   const [cycles, setCycles] = useState<CyclesView | null>(null);
   const [scenes, setScenes] = useState<ScenesView | null>(null);
   const [assemblies, setAssemblies] = useState<AssembliesView | null>(null);
-  const [extra, setExtra] = useState<"cycles" | "scenes" | "assemblies" | null>(null);
+  // The set's boosters opened and their cards.
+  const [history, setHistory] = useState<SetHistoryView | null>(null);
+  const [extra, setExtra] = useState<"cycles" | "scenes" | "assemblies" | "history" | null>(null);
   // The painting looked at in the gallery of scenes.
   const [sceneAt, setSceneAt] = useState(0);
   useEffect(() => setSceneAt(0), [setCode]);
@@ -209,12 +214,14 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
         setCycles(await getCycles(setCode, lang).catch(() => null));
         setScenes(await getScenes(setCode, lang).catch(() => null));
         setAssemblies(await getAssemblies(setCode).catch(() => null));
+        setHistory(await getSetHistory(setCode).catch(() => null));
         // Translated images: shown once known as good scans (checked once per card).
         if ((await checkSetImages(setCode).catch(() => 0)) > 0) {
           setView(await getCollection(setCode));
           setCycles(await getCycles(setCode, lang).catch(() => null));
           setScenes(await getScenes(setCode, lang).catch(() => null));
           setAssemblies(await getAssemblies(setCode).catch(() => null));
+          setHistory(await getSetHistory(setCode).catch(() => null));
         }
       }
       setError(null);
@@ -484,7 +491,10 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
   // Its assemblies (Unstable's augments over its hosts), likewise.
   const hasAssemblies = oneSet && !!assemblies && assemblies.setCode === view?.setCode && assemblies.total > 0;
   const assembliesShown = hasAssemblies && extra === "assemblies";
-  const extraShown = cyclesShown || scenesShown || assembliesShown;
+  // Its history, once one of its boosters has been opened.
+  const hasHistory = oneSet && !!history && history.setCode === view?.setCode && history.openings.length > 0;
+  const historyShown = hasHistory && extra === "history";
+  const extraShown = cyclesShown || scenesShown || assembliesShown || historyShown;
 
   const bar = (
     <>
@@ -596,6 +606,11 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
                   {t("collection.layoutAssemblies")}
                 </button>
               )}
+              {hasHistory && (
+                <button className={historyShown ? "active" : ""} onClick={() => setExtra("history")}>
+                  {t("collection.layoutHistory")}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -642,6 +657,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
       )}
       {cyclesShown && cycles && <CyclesList view={cycles} onOpen={setDetailsOf} />}
       {assembliesShown && assemblies && <AssembliesList view={assemblies} onOpen={setDetailsOf} />}
+      {historyShown && history && <SetHistoryList key={history.setCode} view={history} onOpen={setDetailsOf} />}
       {scenesShown && scenes && <ScenesGallery view={scenes} at={sceneAt} onAt={setSceneAt} onOpen={setDetailsOf} active={!detailsOf} />}
       {source === "sets" && !allSets && view && !extraShown && (
         <>
@@ -843,6 +859,8 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
         <ScenesPanel view={scenes} onShop={view && !ofSeries ? () => onShop(view.setCode) : undefined} onShow={setSceneAt} />
       ) : assembliesShown && assemblies ? (
         <AssembliesPanel view={assemblies} onShop={view && !ofSeries ? () => onShop(view.setCode) : undefined} onOpen={setDetailsOf} />
+      ) : historyShown && history ? (
+        <SetHistoryPanel view={history} onShop={view && !ofSeries ? () => onShop(view.setCode) : undefined} onOpen={setDetailsOf} />
       ) : (
       <aside className="frame set-side">
         <div className="cartouche">{t("collection.completion")}</div>

@@ -1052,6 +1052,36 @@ button.seen-card:hover:not(:disabled) { box-shadow: none; transform: translateX(
 .cards.batch-cards { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
 .cards.batch-cards .card.clickable { cursor: zoom-in; }
 
+/* A set's history (Collection, "History"): its boosters day by day, or its cards in a table. */
+.set-history .history-mode { margin-bottom: 12px; }
+.history-boosters { display: grid; gap: 10px; }
+.history-day { margin: 8px 0 0; }
+.history-booster .batch-booster-head { align-items: center; }
+.history-booster .grow { flex: 1; }
+.history-kind { padding: 1px 10px; border-radius: 9px; font: 700 11px var(--font-title); letter-spacing: .06em; color: var(--gold-hi); background: #3d2b1b; border: 1px solid #6b4d2a; }
+.history-gap { font-family: var(--font-title); font-weight: 700; white-space: nowrap; }
+.history-up { color: #6fcf7f; }
+.history-down { color: #ff7a7a; }
+.history-given { padding: 1px 9px; border-radius: 9px; font: 700 11px var(--font-title); color: #1a0d03; background: linear-gradient(180deg, #fbe7ac, #d9a441); }
+.history-more { display: block; margin: 14px auto 4px; }
+.history-ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
+.history-ledger th { padding: 6px 8px; text-align: left; font: 700 11px var(--font-title); letter-spacing: .08em; text-transform: uppercase; color: #d9a441; border-bottom: 1px solid var(--edge); white-space: nowrap; }
+.history-ledger th.sortable { cursor: pointer; }
+.history-ledger th.sorted { color: var(--gold-hi); text-decoration: underline; text-underline-offset: 4px; }
+.history-ledger td { padding: 4px 8px; border-bottom: 1px solid #2c1f15; vertical-align: middle; white-space: nowrap; }
+.history-ledger tbody tr { cursor: zoom-in; }
+.history-ledger tbody tr:hover td { background: #3a241655; }
+.history-ledger .history-name { white-space: normal; color: var(--gold-hi); }
+.history-ledger .history-count { font-family: var(--font-title); font-weight: 700; color: var(--gold-hi); }
+.history-thumb { width: 46px; }
+.history-thumb > img, .history-thumb:empty { display: block; width: 32px; aspect-ratio: 63 / 88; border-radius: var(--card-radius); object-fit: cover; }
+.history-rarity { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font: 800 10px var(--font-title); color: #1a0d03; background: #8a8a8a; }
+.history-rarity.uncommon { background: #b9c6d0; }
+.history-rarity.rare { background: #e2c26b; }
+.history-rarity.mythic { background: #e8723a; }
+.history-best .cards.batch-cards { grid-template-columns: minmax(0, 150px); justify-content: center; }
+.history-best .hint { text-align: center; margin: 6px 0 0; }
+
 /* Where a kept bet applies: a chip beside the pin, this set's code (wax) or all sets (gold). */
 .bet-keep-ctl { display: inline-flex; align-items: center; gap: 6px; }
 .bet-scope { padding: 1px 8px; min-height: 0; font-size: 11px; line-height: 1.5; border-radius: 9px; letter-spacing: .04em; white-space: nowrap;

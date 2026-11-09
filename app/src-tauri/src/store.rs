@@ -135,6 +135,9 @@ const MIGRATIONS: &[&str] = &[
     // opened, counted at each opening (box toppers)
     "CREATE INDEX ledger_kind ON ledger (kind, details);
     CREATE INDEX openings_kind ON openings (set_code, booster_kind);",
+    // 16: what each booster opened had cost (a set's history: gain or loss per booster); none
+    // for the openings before
+    "ALTER TABLE openings ADD COLUMN cost_cents INTEGER;",
 ];
 
 /// Key of `save_meta`: the last day a lost bet's stake was given back (an artifact's effect).
@@ -313,6 +316,30 @@ pub struct BoosterKindTotals {
     pub boosters: u32,
     pub value_cents: i64,
     pub best_value_cents: i64,
+}
+
+/// A booster of a set opened, with its cards (`Store::set_openings`).
+#[derive(Debug, PartialEq, Eq)]
+pub struct SetOpeningRow {
+    pub id: i64,
+    pub opened_at: i64,
+    pub kind: String,
+    pub value_cents: i64,
+    /// What it had cost; none for the openings recorded before costs were.
+    pub cost_cents: Option<i64>,
+    pub cards: Vec<SetPullRow>,
+}
+
+/// A card of a set's opening, priced when it was pulled.
+#[derive(Debug, PartialEq, Eq)]
+pub struct SetPullRow {
+    pub uuid: String,
+    pub foil: bool,
+    pub price_cents: Option<u32>,
+    /// The first copy ever pulled of this card.
+    pub is_new: bool,
+    /// The first foil of a card pulled before only in non-foil.
+    pub new_foil: bool,
 }
 
 /// Which openings to list.
@@ -755,6 +782,51 @@ impl Store {
         Ok(rows.collect::<Result<_, _>>()?)
     }
 
+    /// Every booster of a set opened, the latest first, with its cards in the order they came:
+    /// each card marked when it was the first copy ever pulled of that card (any finish), or the
+    /// first foil of a card pulled before only in non-foil.
+    pub fn set_openings(&self, set_code: &str) -> StoreResult<Vec<SetOpeningRow>> {
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT o.id, o.opened_at, o.booster_kind, o.value_cents, o.cost_cents,
+                    c.card_uuid, c.foil, c.price_cents,
+                    NOT EXISTS (SELECT 1 FROM opening_cards b WHERE b.card_uuid = c.card_uuid
+                        AND (b.opening_id < c.opening_id OR (b.opening_id = c.opening_id AND b.position < c.position))),
+                    c.foil AND NOT EXISTS (SELECT 1 FROM opening_cards b WHERE b.card_uuid = c.card_uuid AND b.foil = 1
+                        AND (b.opening_id < c.opening_id OR (b.opening_id = c.opening_id AND b.position < c.position)))
+             FROM openings o JOIN opening_cards c ON c.opening_id = o.id
+             WHERE o.set_code = ?1
+             ORDER BY o.id DESC, c.position",
+        )?;
+        let mut rows = stmt.query([set_code])?;
+        let mut openings: Vec<SetOpeningRow> = Vec::new();
+        while let Some(r) = rows.next()? {
+            let id: i64 = r.get(0)?;
+            if openings.last().is_none_or(|o| o.id != id) {
+                openings.push(SetOpeningRow {
+                    id,
+                    opened_at: r.get(1)?,
+                    kind: r.get(2)?,
+                    value_cents: r.get(3)?,
+                    cost_cents: r.get(4)?,
+                    cards: Vec::new(),
+                });
+            }
+            let first: bool = r.get(8)?;
+            let first_foil: bool = r.get(9)?;
+            let card = SetPullRow {
+                uuid: r.get(5)?,
+                foil: r.get(6)?,
+                price_cents: r.get(7)?,
+                is_new: first,
+                new_foil: first_foil && !first,
+            };
+            if let Some(last) = openings.last_mut() {
+                last.cards.push(card);
+            }
+        }
+        Ok(openings)
+    }
+
     /// Sealed boosters owned.
     pub fn sealed_stacks(&self) -> StoreResult<Vec<SealedRow>> {
         let mut stmt = self.conn.prepare_cached(
@@ -798,8 +870,8 @@ impl Store {
         let cost_cents = take_sealed(&tx, set_code, booster_kind, 1)?;
         let value: i64 = cards.iter().map(|c| i64::from(c.price_cents.unwrap_or(0))).sum();
         tx.execute(
-            "INSERT INTO openings (opened_at, set_code, booster_kind, value_cents) VALUES (?1, ?2, ?3, ?4)",
-            params![now, set_code, booster_kind, value],
+            "INSERT INTO openings (opened_at, set_code, booster_kind, value_cents, cost_cents) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![now, set_code, booster_kind, value, cost_cents],
         )?;
         let opening_id = tx.last_insert_rowid();
 
