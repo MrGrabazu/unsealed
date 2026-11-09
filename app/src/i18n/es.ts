@@ -257,6 +257,7 @@ export const es: Messages = {
   "open.mentionNewFoil": "Primera foil de esta carta",
   "open.mentionSecretLair": "¡Una carta Secret Lair se escondía en este sobre!",
   "open.mentionJapanese": "¡Una carta venida de Japón se escondía en este sobre!",
+  "open.mentionMasterpiece": "¡Una Masterpiece se escondía en este sobre!",
   "pack.tear": "Haz clic en el sobre para rasgarlo",
   "scene.tearHint": "Desliza a lo largo de la parte superior del sobre para rasgarlo, o simplemente haz clic en él.",
   "scene.shakeHint": "Mantén pulsado el sobre y muévelo para agitarlo.",

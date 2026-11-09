@@ -19,6 +19,17 @@ export const isCraftedGuest = (card: OpenedCard) => card.sheet === "craftedGuest
 /** A Japanese booster's own card found in an English one (`JAPANESE_GUEST_SHEET` of game.rs). */
 const isJapaneseGuest = (card: OpenedCard) => card.sheet === "japaneseGuest";
 
+/** The Masterpiece Series: rare premium foils hiding in the boosters of a few sets, by set code
+ * (named in English, as the cards). The other bonus series MTGJSON also calls "masterpiece"
+ * (Mystical Archive, Special Guests, Retro Artifacts…) come far too often for a mention. */
+const MASTERPIECES: Record<string, string> = {
+  EXP: "Zendikar Expeditions",
+  MPS: "Kaladesh Inventions",
+  MP2: "Amonkhet Invocations",
+  MED: "Mythic Edition",
+  ZNE: "Zendikar Rising Expeditions",
+};
+
 /** Said as a card is revealed, if it is new to the collection, or a card hiding in the booster
  * (Secret Lair, or from Japan's booster): over the 3D scene or the pile. `card` is the card just
  * shown (null between two); keyed by `index`, so that each card comes with its own mention. */
@@ -44,6 +55,15 @@ export function RevealMention({ card, index }: { card: OpenedCard | null; index:
     return (
       <div key={index} className="reveal-mention japanese-guest" role="status">
         <span className="star">✦</span> {t("open.mentionJapanese")}
+        {card.isNew && <em> · {t("open.new")}</em>}
+      </div>
+    );
+  }
+  const series = MASTERPIECES[card.setCode];
+  if (series) {
+    return (
+      <div key={index} className="reveal-mention masterpiece" role="status">
+        <span className="star">✦</span> {t("open.mentionMasterpiece")} <em>· {series}</em>
         {card.isNew && <em> · {t("open.new")}</em>}
       </div>
     );

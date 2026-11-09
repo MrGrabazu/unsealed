@@ -257,6 +257,7 @@ export const de: Messages = {
   "open.mentionNewFoil": "Erste Foil dieser Karte",
   "open.mentionSecretLair": "In diesem Booster versteckte sich eine Secret-Lair-Karte!",
   "open.mentionJapanese": "In diesem Booster versteckte sich eine Karte aus Japan!",
+  "open.mentionMasterpiece": "In diesem Booster versteckte sich eine Masterpiece!",
   "pack.tear": "Klicke auf den Booster, um ihn aufzureißen",
   "scene.tearHint": "Fahre am oberen Rand des Boosters entlang, um ihn aufzureißen – oder klicke ihn einfach an.",
   "scene.shakeHint": "Halte den Booster gedrückt und bewege ihn, um ihn zu schütteln.",

@@ -629,6 +629,78 @@ pub fn add_art_slots(set: &mut SetFile, odds: &ArtCardOdds) {
     }
 }
 
+/// A Masterpiece series the game slips into boosters MTGJSON does not put it in (the Mythic
+/// Edition planeswalkers, sold in a box of their own, into Guilds of Ravnica, Ravnica
+/// Allegiance and War of the Spark): the way the real series were, in place of the foil.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AddedMasterpieces {
+    /// Set code -> the collector number prefix of its cards in the series ("GRN" -> "GR").
+    pub sets: BTreeMap<String, String>,
+    /// Booster kinds that get them.
+    pub kinds: Vec<String>,
+    /// One booster in this many holds one.
+    pub one_in: u64,
+}
+
+/// The foil sheet a series is added to.
+const FOIL_SHEET: &str = "foil";
+
+fn gcd(a: u128, b: u128) -> u128 {
+    if b == 0 { a } else { gcd(b, a % b) }
+}
+
+/// Adds the cards of a Masterpiece series numbered `prefix` + digits ("GR1"…) to the set's
+/// boosters of the `added` kinds, in their foil sheet (the real series were drawn like that:
+/// `foilOrMasterpiece1In144` for Kaladesh), weighted so that one booster in `one_in` holds one,
+/// each card as likely as the others. The cards join the set's file (another set's: a guest
+/// series of its own). A booster without a foil sheet, or that could not hold them that often,
+/// is left as it is; the simulation then checks the rates like any other.
+pub fn add_masterpieces(set: &mut SetFile, series: &RawSet, prefix: &str, added: &AddedMasterpieces) {
+    let cards: Vec<CardEntry> = series
+        .cards
+        .iter()
+        .filter(|c| c.number.strip_prefix(prefix).is_some_and(|n| !n.is_empty() && n.chars().all(|ch| ch.is_ascii_digit())))
+        .filter_map(|c| to_entry(c).ok())
+        .collect();
+    if cards.is_empty() || added.one_in == 0 {
+        return;
+    }
+    let mut used = false;
+    for (_, cfg) in set.boosters.iter_mut().filter(|(kind, _)| added.kinds.iter().any(|k| k == *kind)) {
+        // The share of the packs with a foil, and the share of the foil sheet the series must
+        // take for one pack in `one_in` to hold one: p = total / (one_in × with_foil) = n / d.
+        let with_foil: u64 = cfg.boosters.iter().filter(|b| b.contents.contains_key(FOIL_SHEET)).map(|b| b.weight).sum();
+        let Some(sheet) = cfg.sheets.get_mut(FOIL_SHEET) else { continue };
+        let (n, d) = (u128::from(cfg.boosters_total_weight), u128::from(added.one_in) * u128::from(with_foil));
+        if with_foil == 0 || n >= d {
+            continue;
+        }
+        // With m cards of weight b among the sheet's (total t, each weight × a):
+        // m·b / (a·t + m·b) = n / d  <=>  a = m·(d − n), b = n·t.
+        let (m, t) = (cards.len() as u128, u128::from(sheet.total_weight));
+        let (mut a, mut b) = (m * (d - n), n * t);
+        let g = gcd(a, b).max(1);
+        (a, b) = (a / g, b / g);
+        let total = t * a + m * b;
+        if total > u128::from(u64::MAX) {
+            continue;
+        }
+        for w in sheet.cards.values_mut() {
+            *w = (u128::from(*w) * a) as u64;
+        }
+        for card in &cards {
+            sheet.cards.insert(card.uuid.clone(), b as u64);
+        }
+        sheet.total_weight = total as u64;
+        used = true;
+    }
+    if used {
+        let known: HashSet<String> = set.cards.iter().map(|c| c.uuid.clone()).collect();
+        set.cards.extend(cards.into_iter().filter(|c| !known.contains(&c.uuid)));
+    }
+}
+
 /// The set's chase card: its most valuable own card from its main boosters (the
 /// non-foil price, else the foil one), which illustrates the set. Cards without an
 /// artist cannot be credited and are skipped; with no price at all, the first mythic

@@ -4,7 +4,7 @@
 
 use crate::catalog::{Manifest, SetSelection, DATA_FORMAT_VERSION};
 use crate::crafted::CraftedBooster;
-pub use crate::import::ArtCardOdds;
+pub use crate::import::{AddedMasterpieces, ArtCardOdds};
 use serde::Deserialize;
 use std::collections::BTreeMap;
 
@@ -40,6 +40,10 @@ pub struct DataConfig {
     /// The boosters the game crafts for sets sold without any, by set code (Secret Lair).
     #[serde(default)]
     pub crafted_boosters: BTreeMap<String, CraftedBooster>,
+    /// Masterpiece series the game slips into boosters MTGJSON does not put them in, by
+    /// series code (the Mythic Edition: "MED").
+    #[serde(default)]
+    pub added_masterpieces: BTreeMap<String, AddedMasterpieces>,
 }
 
 pub fn default_token_foil_one_in() -> u64 {

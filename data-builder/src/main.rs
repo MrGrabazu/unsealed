@@ -32,6 +32,7 @@ fn parse_args() -> Result<(BuildOptions, Option<PathBuf>), String> {
         token_foil_one_in: defaults.token_foil_one_in,
         art_cards: defaults.art_cards,
         crafted_boosters: defaults.crafted_boosters,
+        added_masterpieces: defaults.added_masterpieces,
     };
     let mut pack = None;
     let mut args = std::env::args().skip(1);

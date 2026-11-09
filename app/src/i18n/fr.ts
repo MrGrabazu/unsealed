@@ -257,6 +257,7 @@ export const fr: Messages = {
   "open.mentionNewFoil": "Première foil de cette carte",
   "open.mentionSecretLair": "Une carte Secret Lair se cachait dans ce booster !",
   "open.mentionJapanese": "Une carte venue du Japon se cachait dans ce booster !",
+  "open.mentionMasterpiece": "Une Masterpiece se cachait dans ce booster !",
   "pack.tear": "Cliquez sur le booster pour le déchirer",
   "scene.tearHint": "Glissez le long du haut du booster pour le déchirer — ou cliquez simplement dessus.",
   "scene.shakeHint": "Maintenez le booster et bougez pour le secouer.",

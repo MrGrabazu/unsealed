@@ -4,7 +4,7 @@ use unsealed_core::catalog::{foil_kind, set_code_of_file, set_file_name, AllSets
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use unsealed_core::import::{
-    add_art_cards_from, add_art_slots, add_token_slots, artist_index, add_tokens_from, merge_foil_printings, merge_token_faces, parse_cents,
+    add_art_cards_from, add_art_slots, add_masterpieces, add_token_slots, AddedMasterpieces, artist_index, add_tokens_from, merge_foil_printings, merge_token_faces, parse_cents,
     prices_by_uuid, prices_from_scryfall_jsonl, read_all_printings, set_from_mtgjson, ArtCardOdds,
 };
 use unsealed_core::catalog::PriceSet;
@@ -245,6 +245,57 @@ fn art_cards_join_the_set_and_the_boosters_of_their_time() {
     };
     assert_eq!((share("unsealedArt"), share("unsealedArtSigned")), (45, 5));
     assert_eq!(collector.sheets["unsealedArtSigned"].cards.keys().collect::<Vec<_>>(), ["a1"]);
+}
+
+#[test]
+fn a_masterpiece_series_takes_its_share_of_the_foil_sheet() {
+    // A draft booster with a foil in 9 packs out of 40 (as GRN's), and a series of two cards
+    // of this set ("TS1", "TS2") and one of another ("XX1", left out).
+    let raw = r#"{ "meta": { "version": "v" }, "data": {
+      "code": "TST", "name": "Test Set", "releaseDate": "2026-01-01", "type": "expansion",
+      "cards": [
+        { "uuid": "u1", "setCode": "TST", "name": "A", "number": "1", "rarity": "common",
+          "finishes": ["nonfoil", "foil"], "layout": "normal", "identifiers": { "scryfallId": "s1" } },
+        { "uuid": "u2", "setCode": "TST", "name": "B", "number": "2", "rarity": "rare",
+          "finishes": ["nonfoil", "foil"], "layout": "normal", "identifiers": { "scryfallId": "s2" } } ],
+      "booster": { "draft": {
+        "boosters": [ { "contents": { "common": 1 }, "weight": 31 }, { "contents": { "foil": 1 }, "weight": 9 } ],
+        "boostersTotalWeight": 40,
+        "sheets": {
+          "common": { "cards": { "u1": 1 }, "foil": false, "totalWeight": 1 },
+          "foil": { "cards": { "u1": 3, "u2": 1 }, "foil": true, "totalWeight": 4 } },
+        "sourceSetCodes": ["TST"] } } } }"#;
+    let series = read_all_printings(
+        r#"{ "meta": { "version": "v" }, "data": { "MSR": {
+          "code": "MSR", "name": "Masterpiece Series", "releaseDate": "2026-01-01", "type": "masterpiece",
+          "cards": [
+            { "uuid": "m1", "setCode": "MSR", "name": "M1", "number": "TS1", "rarity": "mythic",
+              "finishes": ["foil"], "layout": "normal", "identifiers": { "scryfallId": "sm1" } },
+            { "uuid": "m2", "setCode": "MSR", "name": "M2", "number": "TS2", "rarity": "mythic",
+              "finishes": ["foil"], "layout": "normal", "identifiers": { "scryfallId": "sm2" } },
+            { "uuid": "m3", "setCode": "MSR", "name": "M3", "number": "XX1", "rarity": "mythic",
+              "finishes": ["foil"], "layout": "normal", "identifiers": { "scryfallId": "sm3" } } ] } } }"#
+            .as_bytes(),
+    )
+    .unwrap();
+    let mut set = set_from_mtgjson(raw, &["draft"], &[]).unwrap();
+    let added = AddedMasterpieces { sets: BTreeMap::from([("TST".into(), "TS".into())]), kinds: vec!["draft".into()], one_in: 144 };
+    add_masterpieces(&mut set, &series.data["MSR"], "TS", &added);
+
+    let draft = &set.boosters["draft"];
+    draft.validate().unwrap();
+    let foil = &draft.sheets["foil"];
+    assert_eq!(foil.cards.values().sum::<u64>(), foil.total_weight);
+    // The two cards, equally likely; the others keep their odds between them.
+    assert_eq!(foil.cards["m1"], foil.cards["m2"]);
+    assert_eq!(foil.cards["u1"], 3 * foil.cards["u2"]);
+    assert!(!foil.cards.contains_key("m3"));
+    // One pack in 144 holds one: 9/40 × share of the sheet = 1/144, exactly.
+    let series_weight = u128::from(foil.cards["m1"] + foil.cards["m2"]);
+    assert_eq!(9 * series_weight * 144, 40 * u128::from(foil.total_weight));
+    // They join the set's file, under their own set code (a guest series).
+    let codes: Vec<&str> = set.cards.iter().filter(|c| c.uuid.starts_with('m')).map(|c| c.set_code.as_str()).collect();
+    assert_eq!(codes, ["MSR", "MSR"]);
 }
 
 #[test]

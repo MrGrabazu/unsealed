@@ -9,7 +9,7 @@ use crate::catalog::{
     is_collector_kind, kind_wanted, ARTISTS_FILE, COLLECTOR_KIND, DATA_FORMAT_VERSION, GUESTS_FILE,
 };
 use crate::crafted::{craft_booster, CraftedBooster};
-use crate::import::{add_art_cards_from, add_art_slots, artist_index, box_toppers, crafted_set, guest_index, topper_cards, add_token_slots, add_tokens_from, art_set_code, compact_set, merge_foil_printings, merge_token_faces, ArtCardOdds, featured_card, token_set_code, prices_by_uuid, prices_from_scryfall_jsonl, read_all_printings, AllPrintings, RawSet};
+use crate::import::{add_art_cards_from, add_art_slots, add_masterpieces, AddedMasterpieces, artist_index, box_toppers, crafted_set, guest_index, topper_cards, add_token_slots, add_tokens_from, art_set_code, compact_set, merge_foil_printings, merge_token_faces, ArtCardOdds, featured_card, token_set_code, prices_by_uuid, prices_from_scryfall_jsonl, read_all_printings, AllPrintings, RawSet};
 use crate::sim::expected_values_cents;
 use crate::{simulate, ColorIndex};
 use flate2::read::GzDecoder;
@@ -64,6 +64,8 @@ pub struct BuildOptions {
     pub art_cards: ArtCardOdds,
     /// See `DataConfig::crafted_boosters`.
     pub crafted_boosters: BTreeMap<String, CraftedBooster>,
+    /// See `DataConfig::added_masterpieces`.
+    pub added_masterpieces: BTreeMap<String, AddedMasterpieces>,
 }
 
 /// A GET with the headers Scryfall and MTGJSON ask for (shared with `scryfall`).
@@ -249,6 +251,12 @@ fn build_set(
     if let Some(art_set) = all.data.get(&art_set_code(code)) {
         add_art_cards_from(&mut set, art_set);
         add_art_slots(&mut set, &extra.art_cards);
+    }
+    // Masterpiece series slipped into its boosters (the Mythic Edition's planeswalkers).
+    for (series_code, added) in &extra.added_masterpieces {
+        if let (Some(prefix), Some(series)) = (added.sets.get(code), all.data.get(series_code)) {
+            add_masterpieces(&mut set, series, prefix, added);
+        }
     }
     // The box toppers of its booster boxes (kept kinds only), and the cards they draw.
     let kept: Vec<&str> = set.boosters.keys().map(String::as_str).collect();

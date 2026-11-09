@@ -265,6 +265,7 @@ export const en = {
   "open.mentionNewFoil": "First foil of this card",
   "open.mentionSecretLair": "A Secret Lair card was hiding in this booster!",
   "open.mentionJapanese": "A card from Japan was hiding in this booster!",
+  "open.mentionMasterpiece": "A Masterpiece was hiding in this booster!",
   "pack.tear": "Click the pack to tear it open",
   "scene.tearHint": "Slide along the top of the pack to tear it open — or just click it.",
   "scene.shakeHint": "Hold the pack and move it to give it a shake.",

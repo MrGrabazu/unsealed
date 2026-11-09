@@ -167,6 +167,7 @@ fn refresh_once(app: &AppHandle, status: &SharedStatus, refresh: &Refresh) -> bo
             token_foil_one_in: cfg.token_foil_one_in,
             art_cards: cfg.art_cards.clone(),
             crafted_boosters: cfg.crafted_boosters.clone(),
+            added_masterpieces: cfg.added_masterpieces.clone(),
         };
         let result = build(&opts, &mut report);
         match result {

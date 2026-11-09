@@ -257,6 +257,7 @@ export const it: Messages = {
   "open.mentionNewFoil": "Prima foil di questa carta",
   "open.mentionSecretLair": "In questa busta si nascondeva una carta Secret Lair!",
   "open.mentionJapanese": "In questa busta si nascondeva una carta venuta dal Giappone!",
+  "open.mentionMasterpiece": "In questa busta si nascondeva una Masterpiece!",
   "pack.tear": "Clicca sulla busta per strapparla",
   "scene.tearHint": "Scorri lungo la parte superiore della busta per strapparla, oppure cliccala e basta.",
   "scene.shakeHint": "Tieni premuta la busta e muovila per scuoterla.",
