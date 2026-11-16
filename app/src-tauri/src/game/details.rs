@@ -24,6 +24,9 @@ pub struct CardDetailsView {
     /// How its image (front) is turned to be read, when printed sideways (see `reading_turn`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reading: Option<&'static str>,
+    /// Shown turned when opened (an art card, by `ArtTurns`), its button turning it back as
+    /// printed.
+    pub turned_at_first: bool,
     pub artist: Option<String>,
     pub can_be_foil: bool,
     pub can_be_nonfoil: bool,
@@ -128,7 +131,9 @@ impl Game {
             rarity: card.rarity.clone(),
             image_url: shown.image_url,
             back_image_url: shown.back_image_url,
-            reading: reading_turn(&card.layout, &card.types),
+            // An art card is shown turned at once: it is seen that way, not read.
+            reading: if card.art { self.art_turn("art", &card.set_code, &card.number) } else { reading_turn(&card.layout, &card.types) },
+            turned_at_first: card.art,
             artist: card.artist.clone(),
             can_be_foil: card.finishes.iter().any(|f| f == "foil" || f == "etched"),
             can_be_nonfoil: card.finishes.iter().any(|f| f == "nonfoil"),

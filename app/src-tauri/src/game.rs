@@ -12,6 +12,7 @@ mod guests;
 mod history;
 mod income;
 mod library;
+mod lore;
 mod scenes;
 mod set_history;
 mod toppers;
@@ -25,6 +26,7 @@ pub use betting::{BetChance, BetContext, BetRequest, KeptBet, OpenedBooster};
 pub use toppers::ToppersGiven;
 pub use cycles::CyclesView;
 pub use scenes::ScenesView;
+pub use lore::LoreView;
 pub use assemblies::AssembliesView;
 pub use set_history::SetHistoryView;
 pub use library::LibraryBinder;
@@ -111,6 +113,10 @@ pub struct OpenedCard {
     pub is_new: bool,
     /// A foil of a card the player only owned in non-foil until now.
     pub new_foil: bool,
+    /// An art card not seen upright: how it is turned once revealed ("right", "left", "flip";
+    /// see `Game::art_turn`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub art_turn: Option<&'static str>,
 }
 
 #[derive(Debug, Serialize)]
@@ -141,6 +147,9 @@ pub struct CollectionCard {
     /// whose boosters give it (the first one's file holds it). Empty otherwise.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub boosters: Vec<String>,
+    /// An art card not seen upright (see `OpenedCard::art_turn`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub art_turn: Option<&'static str>,
 }
 
 #[derive(Debug, Serialize)]
@@ -451,6 +460,11 @@ pub struct Game {
     cycles: Option<std::sync::Arc<unsealed_core::cycles::Cycles>>,
     /// The sets' scenes (see `scenes`), shared by the games of a session.
     scenes: Option<std::sync::Arc<unsealed_core::scenes::Scenes>>,
+    /// The sets' lore (see `lore`), shared by the games of a session.
+    lore: Option<std::sync::Arc<unsealed_core::lore::Lore>>,
+    /// How the art cards are turned to be seen (see `unsealed_core::art_turns`), shared by
+    /// the games of a session.
+    art_turns: Option<std::sync::Arc<unsealed_core::art_turns::ArtTurns>>,
     /// Release date of each set offered, read when first needed (booster discounts).
     release_dates: Option<HashMap<String, String>>,
     /// The box toppers (see `toppers`): the sets' boxes, read when first needed, and those
@@ -528,6 +542,8 @@ impl Game {
             library_cache: None,
             cycles: None,
             scenes: None,
+            lore: None,
+            art_turns: None,
             release_dates: None,
             box_toppers: toppers::BoxToppers::default(),
             image_quality,
@@ -876,6 +892,7 @@ impl Game {
                     sell_value_cents: price.map_or(0, |p| economy.sell_value_cents(p)),
                     is_new: false,
                     new_foil: false,
+                    art_turn: None,
                 }
             })
             .collect();
@@ -883,6 +900,7 @@ impl Game {
         // As `Game::sale_value` reckons it: an artifact's better rate, if any.
         for card in &mut cards {
             card.sell_value_cents = card.price_cents.map_or(0, |p| self.sell_value_of(&card.uuid, card.foil, p));
+            card.art_turn = self.art_turn(&card.rarity, &card.set_code, &card.number);
         }
 
         // Bets are on the booster's own cards: a hiding card is a bonus beside them.
@@ -1189,7 +1207,21 @@ impl Game {
             sell_value_cents: self.sale_value(&c.uuid, false),
             foil_sell_value_cents: self.sale_value(&c.uuid, true),
             boosters: Vec::new(),
+            art_turn: if c.art { self.art_turn("art", &c.set_code, &c.number) } else { None },
         }
+    }
+
+    /// How the art cards are turned to be seen (shared by the games of a session).
+    pub fn set_art_turns(&mut self, turns: std::sync::Arc<unsealed_core::art_turns::ArtTurns>) {
+        self.art_turns = Some(turns);
+    }
+
+    /// How an art card is turned to be seen, `None` for any other card or one upright.
+    pub fn art_turn(&self, rarity: &str, set_code: &str, number: &str) -> Option<&'static str> {
+        if rarity != "art" {
+            return None;
+        }
+        self.art_turns.as_ref()?.turn(set_code, number)
     }
 
     /// Sells cards at the Boosterium's price. Nothing is sold if any request is invalid.
@@ -1505,6 +1537,7 @@ impl Game {
             sell_value_cents: 0,
             is_new: false,
             new_foil: false,
+            art_turn: self.art_turn(&card.rarity, &card.set_code, &card.number),
         })
     }
 
@@ -2327,6 +2360,47 @@ mod tests {
     }
 
     #[test]
+    fn a_sets_lore_opens_chapter_after_chapter_as_its_key_cards_are_owned() {
+        let (mut g, _) = game_with("lore", PRICES);
+        let all = |s: &str| format!(r#"{{"en":"{s}","fr":"{s} (fr)","de":"{s}","es":"{s}","it":"{s}"}}"#);
+        let text = |s: &str| format!(r#"{{"en":["{s}"],"fr":["{s} (fr)"],"de":["{s}"],"es":["{s}"],"it":["{s}"]}}"#);
+        let chapter = |title: &str, keys: &str| {
+            format!(r#"{{"title":{},"illustration":"2","keys":[{keys}],"text":{}}}"#, all(title), text(title))
+        };
+        let json = format!(
+            r#"{{"sets":{{"TST":{{"plane":{p},"illustration":"10","summary":{s},
+               "characters":[{{"card":"10","name":{n},"role":{r}}},{{"card":"999","name":{n},"role":{r}}}],
+               "chapters":[{c1},{c2},{c3}]}}}}}}"#,
+            p = all("Plane"),
+            s = all("Summary"),
+            n = all("Hero"),
+            r = all("Role"),
+            c1 = chapter("Open", ""),
+            c2 = chapter("Pair", r#""2","10""#),
+            c3 = chapter("Rare", r#""3""#),
+        );
+        g.set_lore(Arc::new(unsealed_core::lore::Lore::from_json(&json).unwrap()));
+        assert!(g.lore("NOPE", "en").unwrap().is_none());
+        assert_eq!(g.lore_summary("TST", "fr").as_deref(), Some("Summary (fr)"));
+
+        let before = g.lore("TST", "fr").unwrap().unwrap();
+        // The character whose card is not in the set's file is left out.
+        assert_eq!((before.unlocked, before.total, before.characters.len()), (1, 3, 1));
+        assert_eq!(before.chapters[0].paragraphs, ["Open (fr)"]);
+        // A sealed chapter tells its title and keys, never its text.
+        assert!(!before.chapters[1].unlocked && before.chapters[1].paragraphs.is_empty());
+        assert_eq!(before.chapters[1].keys.len(), 2);
+
+        g.buy_boosters("TST", "play", 1).unwrap();
+        g.open_booster("TST", "play").unwrap(); // the mythic and two commons
+        g.reveal_cards(usize::MAX);
+        let after = g.lore("TST", "en").unwrap().unwrap();
+        assert_eq!(after.unlocked, 2);
+        assert_eq!(after.chapters[1].paragraphs, ["Pair"]);
+        assert!(after.characters[0].owned && !after.chapters[2].unlocked);
+    }
+
+    #[test]
     fn an_augment_and_a_host_owned_assemble_a_creature() {
         let engine = Engine::from_json(
             r#"{ "metrics": { "assembled": { "event": "AssembliesProgress", "op": "max", "field": "assembled" } },
@@ -2530,6 +2604,7 @@ mod tests {
             sell_value_cents: 0,
             is_new: false,
             new_foil: false,
+            art_turn: None,
         };
         let order =|kind: &str, mut cards: Vec<OpenedCard>| {
             cards.sort_by_key(|c| reveal_rank(kind, c));

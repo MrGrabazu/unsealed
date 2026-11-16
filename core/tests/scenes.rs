@@ -23,6 +23,11 @@ fn the_shipped_scenes_are_valid_and_named_in_every_language() {
     assert_eq!(hulks.cells[0], SceneCell { number: "328".into(), back: true });
     let bbq = scenes.of_set("MSH").iter().find(|s| s.id == "avengers-balcony-bbq").unwrap();
     assert_eq!(bbq.cells[0], SceneCell { number: "328".into(), back: false });
+    assert!(!bbq.art);
+    // The Clue art cards of Murders at Karlov Manor, a row of five.
+    let clues = scenes.of_set("MKM").iter().find(|s| s.id == "crime-scene").unwrap();
+    assert!(clues.art);
+    assert_eq!((clues.columns, clues.rows()), (5, 1));
 }
 
 fn scenes_name(names: &std::collections::BTreeMap<String, String>, lang: &str) -> bool {

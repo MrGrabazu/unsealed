@@ -1,5 +1,5 @@
 import { invoke as tauriInvoke, type InvokeArgs } from "@tauri-apps/api/core";
-import { withCachedImages } from "./images";
+import { withCachedImages, type ArtTurn } from "./images";
 
 /** A command of the game; the card images of its answer come through the cache on disk. */
 const invoke = <T>(command: string, args?: InvokeArgs) => tauriInvoke<T>(command, args).then(withCachedImages);
@@ -44,6 +44,8 @@ export interface OpenedCard {
   isNew: boolean;
   /** A foil of a card the player only owned in non-foil until now. */
   newFoil: boolean;
+  /** An art card not seen upright: how it is turned once revealed (config/art-orientation.json). */
+  artTurn?: ArtTurn;
 }
 
 export interface CollectionCard {
@@ -69,6 +71,8 @@ export interface CollectionCard {
   /** A guest's (or a card from other sets' boosters): the sets whose boosters give it, the
    * first one's file holding it. */
   boosters?: string[];
+  /** An art card not seen upright (see `OpenedCard`). */
+  artTurn?: ArtTurn;
 }
 
 /** A card of a cycle: the best copy owned of its printings, else its regular printing. */
@@ -139,6 +143,42 @@ export interface ScenesView {
   cardsOwned: number;
   cardsTotal: number;
   scenes: SceneView[];
+}
+
+/** A card whose art illustrates a set's lore, with its artist (credited beside it). */
+export interface LoreArt {
+  card: CollectionCard;
+  artist: string | null;
+}
+
+/** A character of a set's story, shown by a card of the set. */
+export interface LoreCharacter {
+  card: CollectionCard;
+  /** Owned through any printing of the card in the set. */
+  owned: boolean;
+  name: string;
+  role: string;
+}
+
+/** A chapter of a set's story: open once every key card is owned, its text sent only then. */
+export interface LoreChapter {
+  title: string;
+  unlocked: boolean;
+  paragraphs: string[];
+  illustration: LoreArt | null;
+  keys: { card: CollectionCard; owned: boolean }[];
+}
+
+/** A set's lore, as far as the player has unlocked it. */
+export interface LoreView {
+  setCode: string;
+  plane: string;
+  summary: string;
+  illustration: LoreArt | null;
+  characters: LoreCharacter[];
+  chapters: LoreChapter[];
+  unlocked: number;
+  total: number;
 }
 
 /** An augment or a host of a set (Unstable), as far as the player is. */
@@ -615,6 +655,8 @@ export interface CardDetailsView {
    * ("right": split cards and Rooms, planes, battles), anticlockwise ("left": aftermath), or
    * half a turn ("flip": Kamigawa flip cards). */
   reading?: Reading;
+  /** Shown turned when opened (an art card, see config/art-orientation.json). */
+  turnedAtFirst: boolean;
   artist: string | null;
   canBeFoil: boolean;
   canBeNonfoil: boolean;
@@ -786,6 +828,10 @@ export const getCycles = (setCode: string, lang: string) => invoke<CyclesView>("
 
 /** A set's scenes, as far as the player is, their names in `lang`. */
 export const getScenes = (setCode: string, lang: string) => invoke<ScenesView>("get_scenes", { setCode, lang });
+/** A set's lore (null when it is not written yet). */
+export const getLore = (setCode: string, lang: string) => invoke<LoreView | null>("get_lore", { setCode, lang });
+/** A few lines on a set's world, for the Boosterium (null when its lore is not written). */
+export const getLoreSummary = (setCode: string, lang: string) => invoke<string | null>("get_lore_summary", { setCode, lang });
 export const getAssemblies = (setCode: string) => invoke<AssembliesView>("get_assemblies", { setCode });
 /** A set's history: its boosters opened and their cards. */
 export const getSetHistory = (setCode: string) => invoke<SetHistoryView>("get_set_history", { setCode });

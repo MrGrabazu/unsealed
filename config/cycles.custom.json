@@ -16,6 +16,15 @@
           ["338", "729"],
           ["339", "730"]
         ]
+      },
+      {
+        "id": "great-eagles",
+        "name": { "en": "The Great Eagles", "fr": "Les Grands Aigles", "de": "Die Großen Adler", "es": "Las Grandes Águilas", "it": "Le Grandi Aquile" },
+        "slots": [
+          ["210", "661"],
+          ["21", "472"],
+          ["62", "513"]
+        ]
       }
     ],
     "UMA": [
@@ -36,6 +45,132 @@
           "it": "Le quattro stagioni dello Zombie"
         },
         "slots": [["54a"], ["54b"], ["54c"], ["54d"]]
+      },
+      {
+        "id": "amateur-auteur",
+        "name": {
+          "en": "Amateur Auteur: all four",
+          "fr": "Amateur Auteur : les quatre versions",
+          "de": "Amateur Auteur: alle vier Versionen",
+          "es": "Amateur Auteur: las cuatro versiones",
+          "it": "Amateur Auteur: tutte e quattro le versioni"
+        },
+        "slots": [["3a"], ["3b"], ["3c"], ["3d"]]
+      },
+      {
+        "id": "knight-of-the-kitchen-sink",
+        "name": {
+          "en": "Knight of the Kitchen Sink: all six",
+          "fr": "Knight of the Kitchen Sink : les six versions",
+          "de": "Knight of the Kitchen Sink: alle sechs Versionen",
+          "es": "Knight of the Kitchen Sink: las seis versiones",
+          "it": "Knight of the Kitchen Sink: tutte e sei le versioni"
+        },
+        "slots": [["12a"], ["12b"], ["12c"], ["12d"], ["12e"], ["12f"]]
+      },
+      {
+        "id": "novellamental",
+        "name": {
+          "en": "Novellamental: all four",
+          "fr": "Novellamental : les quatre versions",
+          "de": "Novellamental: alle vier Versionen",
+          "es": "Novellamental: las cuatro versiones",
+          "it": "Novellamental: tutte e quattro le versioni"
+        },
+        "slots": [["41a"], ["41b"], ["41c"], ["41d"]]
+      },
+      {
+        "id": "very-cryptic-command",
+        "name": {
+          "en": "Very Cryptic Command: all six",
+          "fr": "Very Cryptic Command : les six versions",
+          "de": "Very Cryptic Command: alle sechs Versionen",
+          "es": "Very Cryptic Command: las seis versiones",
+          "it": "Very Cryptic Command: tutte e sei le versioni"
+        },
+        "slots": [["49a"], ["49b"], ["49c"], ["49d"], ["49e"], ["49f"]]
+      },
+      {
+        "id": "sly-spy",
+        "name": {
+          "en": "Sly Spy: all six",
+          "fr": "Sly Spy : les six versions",
+          "de": "Sly Spy: alle sechs Versionen",
+          "es": "Sly Spy: las seis versiones",
+          "it": "Sly Spy: tutte e sei le versioni"
+        },
+        "slots": [["67a"], ["67b"], ["67c"], ["67d"], ["67e"], ["67f"]]
+      },
+      {
+        "id": "garbage-elemental",
+        "name": {
+          "en": "Garbage Elemental: all six",
+          "fr": "Garbage Elemental : les six versions",
+          "de": "Garbage Elemental: alle sechs Versionen",
+          "es": "Garbage Elemental: las seis versiones",
+          "it": "Garbage Elemental: tutte e sei le versioni"
+        },
+        "slots": [["82a"], ["82b"], ["82c"], ["82d"], ["82e"], ["82f"]]
+      },
+      {
+        "id": "target-minotaur",
+        "name": {
+          "en": "Target Minotaur: all four",
+          "fr": "Target Minotaur : les quatre versions",
+          "de": "Target Minotaur: alle vier Versionen",
+          "es": "Target Minotaur: las cuatro versiones",
+          "it": "Target Minotaur: tutte e quattro le versioni"
+        },
+        "slots": [["98a"], ["98b"], ["98c"], ["98d"]]
+      },
+      {
+        "id": "beast-in-show",
+        "name": {
+          "en": "Beast in Show: all four",
+          "fr": "Beast in Show : les quatre versions",
+          "de": "Beast in Show: alle vier Versionen",
+          "es": "Beast in Show: las cuatro versiones",
+          "it": "Beast in Show: tutte e quattro le versioni"
+        },
+        "slots": [["103a"], ["103b"], ["103c"], ["103d"]]
+      },
+      {
+        "id": "ineffable-blessing",
+        "name": {
+          "en": "Ineffable Blessing: all six",
+          "fr": "Ineffable Blessing : les six versions",
+          "de": "Ineffable Blessing: alle sechs Versionen",
+          "es": "Ineffable Blessing: las seis versiones",
+          "it": "Ineffable Blessing: tutte e sei le versioni"
+        },
+        "slots": [["113a"], ["113b"], ["113c"], ["113d"], ["113e"], ["113f"]]
+      },
+      {
+        "id": "everythingamajig",
+        "name": {
+          "en": "Everythingamajig: all six",
+          "fr": "Everythingamajig : les six versions",
+          "de": "Everythingamajig: alle sechs Versionen",
+          "es": "Everythingamajig: las seis versiones",
+          "it": "Everythingamajig: tutte e sei le versioni"
+        },
+        "slots": [["147a"], ["147b"], ["147c"], ["147d"], ["147e"], ["147f"]]
+      },
+      {
+        "id": "killbots",
+        "name": { "en": "The Killbots", "fr": "Les Killbots", "de": "Die Killbots", "es": "Los Killbots", "it": "I Killbot" },
+        "slots": [["145a"], ["145b"], ["145c"], ["145d"]]
+      },
+      {
+        "id": "secret-base",
+        "name": {
+          "en": "Secret Base: all five",
+          "fr": "Secret Base : les cinq versions",
+          "de": "Secret Base: alle fünf Versionen",
+          "es": "Secret Base: las cinco versiones",
+          "it": "Secret Base: tutte e cinque le versioni"
+        },
+        "slots": [["165a"], ["165b"], ["165c"], ["165d"], ["165e"]]
       }
     ],
     "WHO": [

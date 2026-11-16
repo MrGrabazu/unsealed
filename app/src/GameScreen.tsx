@@ -343,6 +343,8 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   const [artifactCount, setArtifactCount] = useState(0);
   // A set to show open in the Boosterium (asked for from its collection).
   const [shopFocus, setShopFocus] = useState<{ setCode: string; at: number } | null>(null);
+  // A set whose chronicle the collection shows on arrival (from the Boosterium).
+  const [loreFocus, setLoreFocus] = useState<{ setCode: string; at: number } | null>(null);
   // Bumped after each opening so the collection view reloads.
   const [openings, setOpenings] = useState(0);
   // Bets: those kept from one opening to the next, those on the pack about to be torn, and
@@ -541,6 +543,10 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   const shopFromCollection = useStable((setCode: string) => {
     setShopFocus({ setCode, at: Date.now() });
     switchTab("boosterium");
+  });
+  const loreFromShop = useStable((setCode: string) => {
+    setLoreFocus({ setCode, at: Date.now() });
+    switchTab("collection");
   });
   const shopFromCuriosities = useStable(() => {
     setShopFocus({ setCode: CURIOS, at: Date.now() });
@@ -931,6 +937,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
             focus={shopFocus}
             artifactsKey={artifactCount}
             onBuyArtifact={(id) => void buyCurio(id)}
+            onLore={loreFromShop}
           />
         )}
 
@@ -1123,6 +1130,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
             duplicatesBonus={wallet?.artifactPerks.duplicatesPercent ?? 0}
             maxSellRate={wallet?.artifactPerks.maxSellRatePercent ?? 100}
             onShop={shopFromCollection}
+            loreFocus={loreFocus}
           />
         )}
 

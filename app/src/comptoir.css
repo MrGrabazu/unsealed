@@ -250,6 +250,12 @@ button.share-round { height: 46px; padding: 0 20px; border-radius: 23px; display
 .jp-note strong { display: block; margin-bottom: 4px; font-family: var(--font-title); font-size: 13px; color: var(--gold-hi); letter-spacing: 0.04em; }
 .jp-note p { margin: 0 0 6px; }
 .jp-note p:last-child { margin-bottom: 0; }
+/* The chosen set's world, in a few lines, and the way to its chronicle (Lore.tsx). */
+.shop-world { margin: 14px 4px 4px; padding: 10px 12px; border-radius: 6px; background: linear-gradient(180deg, #2a1d14cc, #1d140ecc); box-shadow: inset 0 0 0 1px #d9a4411f; }
+.shop-world h3 { margin: 0 0 6px; }
+.shop-world p { margin: 0 0 8px; font-size: 13px; line-height: 1.45; color: #e6d6b8; }
+.shop-world button { padding: 0; border: none; background: none; font: 700 11px var(--font-title); letter-spacing: .06em; color: var(--gold-hi); cursor: pointer; }
+.shop-world button:hover { text-decoration: underline; }
 /* Toasts rise from the bottom of the window, centred: in the bottom right corner, they covered
    the action buttons, and a second click meant for the button closed the toast unread. */
 .game .toasts { left: 50%; right: auto; bottom: 16px; transform: translateX(-50%); align-items: center; }
@@ -296,7 +302,7 @@ button.share-round { height: 46px; padding: 0 20px; border-radius: 23px; display
 /* A card printed sideways, turned to be read: lying, at the same scale (its short side keeps
    the column's width), the text beside it narrower; or upside down, in place. */
 .modal.details .details-layout:is(.turned-right, .turned-left) { grid-template-columns: min(475px, calc(100vh - 96px)) minmax(0, 1fr); }
-.details-layout:is(.turned-right, .turned-left) .details-image { aspect-ratio: 88 / 63; }
+.details-layout:is(.turned-right, .turned-left) .details-image { aspect-ratio: 88 / 63; border-radius: var(--card-radius-lying); }
 .details-layout:is(.turned-right, .turned-left) .details-image > img:not(.mana) {
   position: absolute; top: 50%; left: 50%; width: calc(100% * 63 / 88); height: calc(100% * 88 / 63); transform: translate(-50%, -50%) rotate(90deg); }
 .details-layout.turned-left .details-image > img:not(.mana) { transform: translate(-50%, -50%) rotate(-90deg); }
@@ -744,6 +750,97 @@ button.curios-slot { display: block; width: 100%; height: 96px; margin-bottom: 1
 .cycle-slot.best .thumb { box-shadow: 0 0 0 1px #f5d68a, 0 0 10px #f5b84a88, 0 3px 6px #000b; }
 .cycle-best { position: absolute; right: 4px; top: 4px; z-index: 2; width: 18px; height: 18px; display: grid; place-items: center; border-radius: 50%; font-size: 11px;
   color: #1a0d03; background: radial-gradient(circle at 35% 30%, #fff6d8, #d9a441 65%); box-shadow: 0 1px 3px #000a; }
+/* ---- A set's chronicle (Lore.tsx, maquette A of .cache/da/v19.html): an open book of a fixed
+   height; the chapter flows in two columns, one per page (the padding on each side is half the gap,
+   so the gutter falls in the middle), and every column past them is a further spread, slid into
+   view; a sealed chapter shows a wax seal instead of its text and art (the art is never dimmed nor
+   greyed: Scryfall's terms). */
+.lore { display: flex; flex-direction: column; align-items: center; padding: 4px 18px 10px; }
+.lore-tabs { display: flex; gap: 4px; margin-bottom: -2px; z-index: 1; }
+.lore-tabs button { min-width: 38px; padding: 3px 12px 6px; border: none; border-radius: 6px 6px 0 0; font: 700 12px var(--font-title); color: #cdbb9b; background: #3a2618; box-shadow: inset 0 0 0 1px #6b4d2a; cursor: pointer; }
+.lore-tabs button.sealed { color: #8f7d63; }
+.lore-tabs button.sealed::after { content: ""; display: inline-block; width: 7px; height: 7px; margin-left: 5px; border-radius: 50%; vertical-align: 1px; background: radial-gradient(circle at 35% 30%, #c0463a, #7a1c16 70%); }
+.lore-tabs button.active { color: #3a2108; background: #e9d9b4; box-shadow: none; }
+.lore-book { position: relative; width: 100%; max-width: 1000px; height: clamp(460px, calc(100vh - 250px), 720px); padding: 10px; border-radius: 8px;
+  background: linear-gradient(90deg, #4a2c18, #2b180d 49%, #1a0e07 50%, #2b180d 51%, #4a2c18); box-shadow: 0 14px 30px #000c; }
+.lore-spread { position: relative; height: 100%; border-radius: 4px; perspective: 2400px; }
+/* A chapter's pages: one sheet of paper the size of the open book (the spine's shadow drawn on
+   it), its columns slid to the spread shown. */
+.lore-sheet { position: absolute; top: 0; bottom: 0; left: 0; width: 100%; overflow: hidden; border-radius: 4px;
+  background: linear-gradient(90deg, #e9dbb8, #f3e8cc 25%, #ddc9a0 calc(50% - 3px), #2b180d calc(50% - 3px) calc(50% + 3px), #ddc9a0 calc(50% + 3px), #f3e8cc 75%, #e9dbb8); }
+.lore-sheet::after { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 70px; transform: translateX(-50%); pointer-events: none;
+  background: linear-gradient(90deg, transparent, #6b4d2a40 40%, #2b180d70 50%, #6b4d2a40 60%, transparent); }
+.lore-flow { height: 100%; padding: 28px 38px 42px; column-count: 2; column-gap: 76px; column-fill: auto; color: #2e2012; }
+/* While a page turns: each page is half of a sheet (`.lore-clip`, the sheet twice its width,
+   shifted for a right page), two under the leaf and one on each face of it. */
+.lore-turning { position: absolute; inset: 0; pointer-events: none; }
+.lore-clip { position: absolute; top: 0; bottom: 0; width: 50%; overflow: hidden; }
+.lore-clip > .lore-sheet { width: 200%; }
+.lore-clip.show-left > .lore-sheet { border-radius: 4px 0 0 4px; }
+.lore-clip.show-right > .lore-sheet { left: -100%; border-radius: 0 4px 4px 0; }
+.lore-clip.at-left { left: 0; } .lore-clip.at-right { left: 50%; }
+/* The turning leaf, printed on both sides: going forward its front is the right page being left
+   and its back the next left page; it swings around the spine and lands on the other side. */
+.lore-leaf { position: absolute; top: 0; bottom: 0; z-index: 3; width: 50%; transform-style: preserve-3d;
+  animation-timing-function: cubic-bezier(.45, .05, .35, 1); animation-fill-mode: forwards; }
+.lore-leaf.next { left: 50%; transform-origin: left center; animation-name: lore-turn-next; }
+.lore-leaf.prev { left: 0; transform-origin: right center; animation-name: lore-turn-prev; }
+.lore-leaf .lore-clip { left: 0; width: 100%; backface-visibility: hidden; }
+.lore-leaf .lore-clip.back { transform: rotateY(180deg); }
+/* Its shade: darker as it stands up, gone as it lies down again (no jump when it lands). */
+.lore-leaf .lore-clip::after { content: ""; position: absolute; inset: 0; opacity: 0; animation-duration: inherit; animation-timing-function: inherit; animation-fill-mode: forwards; }
+.lore-leaf.next .lore-clip.front::after { background: linear-gradient(90deg, #2b180d, transparent 70%); animation-name: lore-leaf-rise; }
+.lore-leaf.next .lore-clip.back::after { background: linear-gradient(270deg, #2b180d, transparent 70%); animation-name: lore-leaf-fall; }
+.lore-leaf.prev .lore-clip.front::after { background: linear-gradient(270deg, #2b180d, transparent 70%); animation-name: lore-leaf-rise; }
+.lore-leaf.prev .lore-clip.back::after { background: linear-gradient(90deg, #2b180d, transparent 70%); animation-name: lore-leaf-fall; }
+@keyframes lore-turn-next { from { transform: rotateY(0); } to { transform: rotateY(-180deg); } }
+@keyframes lore-turn-prev { from { transform: rotateY(0); } to { transform: rotateY(180deg); } }
+@keyframes lore-leaf-rise { 0% { opacity: 0; } 50% { opacity: .45; } 100% { opacity: .45; } }
+@keyframes lore-leaf-fall { 0% { opacity: .45; } 50% { opacity: .45; } 100% { opacity: 0; } }
+.lore-flow p { margin: 0 0 10px; font-size: 16px; line-height: 1.55; }
+.lore-flow .lore-plate, .lore-flow .lore-seal, .lore-endkeys { break-inside: avoid; }
+.lore-flow .lore-plate { margin-bottom: 12px; }
+.lore-endkeys { margin-top: 12px; padding-top: 2px; border-top: 1px dashed #b89a6a; }
+.lore-endkeys .lore-keys { justify-content: start; }
+.lore-end { display: block; height: 0; }
+.lore-kicker { margin: 0 !important; font: 700 11px var(--font-title) !important; letter-spacing: .3em; text-transform: uppercase; color: #8e5a2a; }
+.lore-title { margin: 4px 0 6px; font: 700 24px var(--font-title); color: #3a2108; }
+.lore-rule { height: 1px; margin: 4px 0 14px; background: linear-gradient(90deg, #8e5a2a, transparent); }
+.lore-drop::first-letter { float: left; margin: 4px 8px 0 0; font: 700 46px/0.9 var(--font-title); color: #8e2a2a; }
+.lore-see { margin: 8px 0 8px !important; font: 700 11px var(--font-title) !important; letter-spacing: .2em; text-transform: uppercase; color: #8e5a2a; }
+.lore-folio { position: absolute; bottom: 12px; font: 700 12px var(--font-title); color: #8e5a2a; }
+.lore-folio.left { left: 25%; } .lore-folio.right { left: 75%; }
+.lore-seal { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 14px 0 10px; text-align: center; }
+.lore-seal p { margin: 0; font-style: italic; color: #6b4d2a; }
+.lore-missing { font-style: normal !important; font-size: 14px !important; color: #3a2108 !important; }
+.lore-wax { display: grid; place-items: center; flex: none; width: 46px; height: 46px; border-radius: 50%; font: 700 20px var(--font-title); color: #f3c9a8;
+  background: radial-gradient(circle at 35% 30%, #c0463a, #7a1c16 70%); box-shadow: 0 2px 5px #0008, inset 0 0 0 3px #00000022; }
+.lore-wax.big { width: 72px; height: 72px; font-size: 30px; }
+.lore-plate { width: 100%; margin: 0; }
+.lore-plate-art { display: block; width: 100%; aspect-ratio: 626 / 457; padding: 8px; border: none; border-radius: 3px; background: #2b180d; box-shadow: 0 4px 10px #0006; cursor: pointer; }
+.lore-plate-art img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.lore-plate figcaption { margin-top: 6px; text-align: center; font-size: 12px; font-style: italic; color: #6b4d2a; }
+.lore-plate.sealed { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; aspect-ratio: 626 / 457; border-radius: 3px;
+  background: radial-gradient(ellipse at 50% 40%, #3a2618, #1a0e07); box-shadow: 0 4px 10px #0006, inset 0 0 0 8px #2b180d; }
+.lore-plate.sealed b { font: 700 13px var(--font-title); letter-spacing: .2em; text-transform: uppercase; color: #d9a441; }
+.lore-keys { display: grid; grid-template-columns: repeat(var(--keys), minmax(0, 74px)); justify-content: center; gap: 8px; width: 100%; }
+.lore-slot { width: 100%; cursor: pointer; }
+.lore-slot .thumb { box-shadow: 0 3px 6px #0008; }
+.lore-turn { position: absolute; top: 50%; z-index: 2; width: 34px; height: 60px; margin-top: -30px; border: none; border-radius: 6px; font: 700 30px var(--font-title); color: #3a2108;
+  background: linear-gradient(180deg, #fbe7ac, #d9a441); cursor: pointer; }
+.lore-turn:disabled { opacity: .35; cursor: default; }
+.lore-turn.left { left: -18px; } .lore-turn.right { right: -18px; }
+.lore-turn:not(:disabled):hover { background: linear-gradient(180deg, #fff1c7, #e8b85a); }
+.lore-pages { margin: 10px 0 0; font-size: 13px; color: #a8957a; }
+.lore-side .lore-plate figcaption { color: #a8957a; }
+.lore-side .lore-plate-art { padding: 0; background: none; box-shadow: 0 0 0 1px #d9a44166; }
+.lore-gauge { height: 6px; margin: 4px 0 10px; border-radius: 3px; background: #1a110a; box-shadow: inset 0 0 0 1px #3d2b1b; }
+.lore-gauge span { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, #a8742a, #fbe7ac); }
+.lore-cast { display: grid; gap: 6px; }
+.lore-who { display: grid; grid-template-columns: 34px 1fr; align-items: center; gap: 10px; font-size: 13px; }
+.lore-who b { display: block; font: 700 12px var(--font-title); color: #fff1c7; }
+.lore-who em { color: #a8957a; font-size: 12px; }
+.lore-who.off b { color: #a8957a; }
 /* ---- The gallery of scenes (Scenes.tsx, maquette .cache/scenes/museum.html): a museum wall,
    one painting at a time in its own frame, under a lamp, a brass label below. ---- */
 .museum { position: relative; height: clamp(460px, calc(100vh - 210px), 1000px); overflow: hidden; border-radius: 4px;

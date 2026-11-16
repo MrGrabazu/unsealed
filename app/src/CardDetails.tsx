@@ -59,7 +59,11 @@ export function CardDetails({ setCode, uuid, foil, onClose }: Props) {
     setTurned(false);
     setBackShown(false);
     getCardDetails(setCode, uuid)
-      .then(setDetails)
+      .then((d) => {
+        setDetails(d);
+        // An art card opens seen the right way, its button showing it as printed.
+        setTurned(d.turnedAtFirst && d.reading != null);
+      })
       .catch((e) => setError(String(e)));
   }, [setCode, uuid]);
 
@@ -109,6 +113,7 @@ export function CardDetails({ setCode, uuid, foil, onClose }: Props) {
                 front={largeImage(details.imageUrl)}
                 back={largeImage(details.backImageUrl)}
                 alt={details.name}
+                asPrinted
                 onTurned={(back) => {
                   setBackShown(back);
                   setTurned(false);

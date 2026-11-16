@@ -3,6 +3,7 @@
 //! compact catalog files and update planning.
 
 pub mod achievements;
+pub mod art_turns;
 pub mod artifacts;
 pub mod betting;
 pub mod booster;
@@ -14,6 +15,7 @@ pub mod draw;
 pub mod economy;
 pub mod import;
 pub mod limited;
+pub mod lore;
 pub mod pack;
 pub mod scenes;
 pub mod scryfall;

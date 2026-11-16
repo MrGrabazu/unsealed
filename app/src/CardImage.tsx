@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState, type CSSProperties, type ImgHTMLAttributes, type RefObject } from "react";
 import { useI18n } from "./i18n";
-import { fittedImage } from "./images";
+import { artTurnOf, fittedImage } from "./images";
 import { useNearScreen } from "./nearScreen";
 
 /** `url`, or its thumbnail when that is enough for the box the image is in (the parent of
@@ -35,6 +35,9 @@ interface Props {
   lazy?: boolean;
   /** Told the face shown after each turn over (true: the back). */
   onTurned?: (back: boolean) => void;
+  /** Shown as printed, even an art card printed upside down (the card details turn it
+   * themselves). */
+  asPrinted?: boolean;
 }
 
 /** The marker telling where a lazy image goes: never displayed, whatever the CSS around it. */
@@ -74,7 +77,7 @@ type Turn = "idle" | "out" | "in";
  * `lazy` (long lists): the image is only in the page while its place (the parent element,
  * which keeps the card's size) is on screen or close to it, so that its memory is given back
  * once scrolled far away. */
-export function CardImage({ front, back, alt, className, lazy = false, onTurned }: Props) {
+export function CardImage({ front, back, alt, className, lazy = false, onTurned, asPrinted = false }: Props) {
   const { t } = useI18n();
   const [showBack, setShowBack] = useState(false);
   const [turn, setTurn] = useState<Turn>("idle");
@@ -82,12 +85,15 @@ export function CardImage({ front, back, alt, className, lazy = false, onTurned 
   const near = useNearScreen(marker, lazy, true);
   const src = useFitted(showBack && back ? back : front, marker);
   const turnClass = turn === "out" ? "turning-out" : turn === "in" ? "turning-in" : "";
+  // An art card printed upside down stands the right way up: a quarter turn would not fit the
+  // card's place, those stay as printed in the lists.
+  const upsideDown = !asPrinted && !showBack && artTurnOf(front) === "flip" ? "art-upside-down" : "";
   if (!near) return <span ref={marker} style={HIDDEN} />;
   return (
     <>
       <span ref={marker} style={HIDDEN} />
       <img
-        className={`${className ?? ""} ${turnClass}`}
+        className={`${className ?? ""} ${turnClass} ${upsideDown}`}
         src={src}
         alt={alt}
         decoding="async"

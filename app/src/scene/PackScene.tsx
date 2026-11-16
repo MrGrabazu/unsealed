@@ -43,6 +43,12 @@ const CARD_SCREEN_SHARE = 0.67;
 const NORMAL_IMAGE_HEIGHT = 680;
 /** How long the last card stays before leaving (seconds). */
 const LAST_CARD_STAYS = 2.2;
+/** An art card not seen upright, revealed as it lies in the booster, waits a moment, then
+ * turns about its middle to be seen the right way (seconds; angles about the card's normal:
+ * negative is clockwise on screen). */
+const ART_TURN_WAIT = 0.45;
+const ART_TURN_TIME = 0.6;
+const ART_TURNS = { right: -Math.PI / 2, left: Math.PI / 2, flip: Math.PI } as const;
 
 const raycaster = new THREE.Raycaster();
 const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
@@ -643,6 +649,12 @@ function Cards({
     const depth = (k: number) => THREE.MathUtils.lerp(-0.2 - 0.01 * k, stackZ(k), settle);
     const middle = (depth(0) + depth(cards.length - 1)) / 2;
     const rest: { top: THREE.Vector3 | null } = { top: null };
+    // An art card not seen upright turns about its middle once revealed, to be seen the right
+    // way (a passed one goes as it is); a card leaving keeps its turn.
+    const artTurn = cards[top]?.artTurn;
+    const artAngle =
+      artTurn && !passing() ? ART_TURNS[artTurn] * ease((clock.current - topSince.current - ART_TURN_WAIT) / ART_TURN_TIME) : 0;
+    if (artTurn && clock.current - topSince.current < ART_TURN_WAIT + ART_TURN_TIME + 0.1) moving = true;
     meshes.current.forEach((mesh, k) => {
       if (!mesh) return;
       mesh.visible = k >= top;
@@ -658,7 +670,7 @@ function Cards({
       if (k === top) rest.top = base;
       if (k === top) {
         mesh.position.set(base.x + offset.current.x, base.y + offset.current.y, base.z + Math.min(0.3, offset.current.length() * 0.1));
-        mesh.rotation.z = -offset.current.x * 0.08;
+        mesh.rotation.z = artAngle - offset.current.x * 0.08;
       } else {
         mesh.position.copy(base);
         mesh.rotation.z = 0;
@@ -716,7 +728,9 @@ function Cards({
     // leave, the top one goes back and looks smaller, and its price must keep the same gap.
     const anchor = footAnchor?.current;
     if (anchor && s && rest.top) {
-      const foot = rest.top.clone().setY(rest.top.y - CARD_H / 2).multiplyScalar(s.scale.x).add(s.position).project(camera);
+      // A card turned a quarter (an art card seen landscape) has its foot higher.
+      const half = THREE.MathUtils.lerp(CARD_H / 2, CARD_W / 2, Math.abs(Math.sin(artAngle)));
+      const foot = rest.top.clone().setY(rest.top.y - half).multiplyScalar(s.scale.x).add(s.position).project(camera);
       const box = dom.getBoundingClientRect();
       const parent = anchor.offsetParent?.getBoundingClientRect();
       const y = Math.round(((1 - foot.y) / 2) * box.height + box.top - (parent?.top ?? box.top));

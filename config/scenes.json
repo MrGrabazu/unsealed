@@ -1,5 +1,5 @@
 {
-  "about": "Scenes: one artwork spread over several borderless cards of a set, which form it laid edge to edge. Neither MTGJSON nor Scryfall tells them apart: names and grids come from the MTG Wiki, the cards and their places were checked on the images (node .cache/scene-sheet.js). `cells` lists the collector numbers row by row (\"328:back\": the back face of a double-faced card), `columns` cards a row.",
+  "about": "Scenes: one artwork spread over several borderless cards of a set, which form it laid edge to edge. Neither MTGJSON nor Scryfall tells them apart: names and grids come from the MTG Wiki, the cards and their places were checked on the images (node .cache/scene-sheet.js). `cells` lists the collector numbers row by row (\"328:back\": the back face of a double-faced card), `columns` cards a row; `art`: the cells are the numbers of the set's art cards (the Clue cards of Murders at Karlov Manor).",
   "sets": {
     "UGL": [
       { "id": "big-furry-monster", "columns": 2, "cells": ["28", "29"],
@@ -45,7 +45,11 @@
         "cells": ["334", "335", "336", "337", "338", "339", "340", "341", "342", "343", "344", "345:back", "346:back", "347", "348", "349", "350:back", "351"],
         "name": { "en": "Clash for the Cosmic Cube", "fr": "La bataille du Cube cosmique", "de": "Kampf um den Kosmischen Würfel", "es": "Choque por el Cubo Cósmico", "it": "Scontro per il Cubo Cosmico" } },
       { "id": "avengers-balcony-bbq", "columns": 5, "cells": ["328", "345", "346", "350", "331"],
-        "name": { "en": "Avengers Balcony BBQ", "fr": "Barbecue sur le balcon des Avengers", "de": "Avengers-Grillparty auf dem Balkon", "es": "Barbacoa en el balcón de los Vengadores", "it": "Grigliata sul balcone degli Avengers" } }
+        "name": { "en": "Avengers Balcony BBQ", "fr": "Barbecue sur le balcon des Avengers", "de": "Avengers-Grillparty auf dem Balkon", "es": "Barbacoa en el balcón de los Vengadores", "it": "Grigliata sul balcone degli Avengers" } },
+      { "id": "avengers-and-foes", "art": true, "columns": 3, "cells": ["1b", "2b", "3b", "4b", "5b", "6b", "7b", "8b", "9b"],
+        "name": { "en": "The Avengers and Their Foes", "fr": "Les Avengers et leurs ennemis", "de": "Die Avengers und ihre Feinde", "es": "Los Vengadores y sus enemigos", "it": "Gli Avengers e i loro nemici" } },
+      { "id": "the-mad-titan", "art": true, "columns": 3, "cells": ["1c", "2c", "3c", "4c", "5c", "6c", "7c", "8c", "9c"],
+        "name": { "en": "The Mad Titan", "fr": "Le Titan fou", "de": "Der wahnsinnige Titan", "es": "El Titán Loco", "it": "Il Titano Folle" } }
     ],
     "SPM": [
       { "id": "spider-man-showcase", "columns": 3, "cells": ["199", "200:back", "201", "202:back", "203", "204", "205", "206", "207"],
@@ -80,6 +84,16 @@
         "name": { "en": "Mountains Tower", "fr": "La tour des montagnes", "de": "Der Gebirgsturm", "es": "La torre de las montañas", "it": "La torre delle montagne" } },
       { "id": "forests-tower", "columns": 1, "cells": ["394", "395", "396"],
         "name": { "en": "Forests Tower", "fr": "La tour des forêts", "de": "Der Waldturm", "es": "La torre de los bosques", "it": "La torre delle foreste" } }
+    ],
+    "MKM": [
+      { "id": "crime-scene", "art": true, "columns": 5, "cells": ["41", "42", "43", "44", "45"],
+        "name": { "en": "The Crime Scene", "fr": "La scène du crime", "de": "Der Tatort", "es": "La escena del crimen", "it": "La scena del crimine" } }
+    ],
+    "TLE": [
+      { "id": "day-of-black-sun", "art": true, "columns": 3, "cells": ["1", "2", "3", "4", "5", "6"],
+        "name": { "en": "The Day of Black Sun", "fr": "Le jour du Soleil noir", "de": "Der Tag der Schwarzen Sonne", "es": "El día del Sol Negro", "it": "Il giorno del Sole Nero" } },
+      { "id": "jasmine-dragon-reunion", "art": true, "columns": 3, "cells": ["7", "8", "9", "10", "11", "12"],
+        "name": { "en": "Reunion at the Jasmine Dragon", "fr": "Retrouvailles au Dragon de Jasmin", "de": "Wiedersehen im Jasmindrachen", "es": "Reencuentro en el Dragón de Jazmín", "it": "Riunione al Drago di Gelsomino" } }
     ]
   }
 }

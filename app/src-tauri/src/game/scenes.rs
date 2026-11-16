@@ -61,11 +61,13 @@ impl Game {
         let set = self.sets.get(set_code)?;
         // Tokens may bear the set's own code and the same numbers as its cards (LTR); a split or
         // double-faced card is listed once per face under one number, its second face never owned.
+        // The art cards of a set bear the code of its art series ("AMKM").
         let by_number: HashMap<&str, &CardEntry> = set
             .file
             .cards
             .iter()
-            .filter(|c| c.set_code == set_code && !c.token && !c.art && c.side.as_deref() != Some("b"))
+            .filter(|c| if scene.art { c.art } else { c.set_code == set_code && !c.token && !c.art })
+            .filter(|c| c.side.as_deref() != Some("b"))
             .map(|c| (c.number.as_str(), c))
             .collect();
         scene.cells.iter().map(|cell| by_number.get(cell.number.as_str()).copied()).collect()

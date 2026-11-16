@@ -152,6 +152,7 @@ export function Library({ sets, refreshKey, onOpen }: Props) {
   if (!binders) return <LibraryReading />;
 
   const totalValue = binders.reduce((sum, b) => sum + b.valueCents, 0);
+  const totalCopies = binders.reduce((sum, b) => sum + b.copies, 0);
   return (
     <div className="library">
       <p className="progress-label">
@@ -159,7 +160,8 @@ export function Library({ sets, refreshKey, onOpen }: Props) {
           t("library.empty")
         ) : (
           <>
-            {plural("library.summary", binders.length)} · <Money cents={totalValue} />
+            {plural("library.summary", binders.length)} · {plural("library.cardCount", totalCopies)} ·{" "}
+            <Money cents={totalValue} />
           </>
         )}
       </p>

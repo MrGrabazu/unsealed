@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { getArtifacts, getPinnedSets, setPinnedSets, type ArtifactView, type SetSummary, type ShopItem, type WalletView } from "./api";
+import { getArtifacts, getLoreSummary, getPinnedSets, setPinnedSets, type ArtifactView, type SetSummary, type ShopItem, type WalletView } from "./api";
 import { ArtifactGlyph, artifactMetal } from "./ArtifactGlyph";
 import { BackToTop } from "./BackToTop";
 import { NearImage } from "./CardImage";
@@ -25,6 +25,8 @@ interface Props {
   /** Bumped when an artifact is got: the curios on sale are read again. */
   artifactsKey: number;
   onBuyArtifact: (id: string) => void;
+  /** Takes the player to a set's chronicle, in the collection. */
+  onLore: (setCode: string) => void;
 }
 
 /** The curios' entry in the list (in place of a set code). */
@@ -45,7 +47,7 @@ interface SetGroup {
 
 /** The shop, laid out like a game's: every set as an illustrated slot (the favourites
  * first), and the chosen one beside them with its boosters and a single way to buy. */
-export function Boosterium({ shop, sets, wallet, onBuy, onClaimCharity, busy, focus, artifactsKey, onBuyArtifact }: Props) {
+export function Boosterium({ shop, sets, wallet, onBuy, onClaimCharity, busy, focus, artifactsKey, onBuyArtifact, onLore }: Props) {
   const money = useMoney();
   const moneyText = useMoneyText();
   const { t, tx, lang, plural } = useI18n();
@@ -124,6 +126,20 @@ export function Boosterium({ shop, sets, wallet, onBuy, onClaimCharity, busy, fo
   const total = item ? item.priceCents * quantity : 0;
   const affordable = !!item && wallet.balanceCents >= total;
   const buy = () => item && affordable && !busy && onBuy(item, quantity, openNow);
+
+  // A few lines on the chosen set's world, once its chronicle is written.
+  const [world, setWorld] = useState<{ setCode: string; text: string } | null>(null);
+  const currentCode = current?.set.code ?? null;
+  useEffect(() => {
+    if (!currentCode) return;
+    let live = true;
+    getLoreSummary(currentCode, lang)
+      .then((text) => live && setWorld(text ? { setCode: currentCode, text } : null))
+      .catch(() => live && setWorld(null));
+    return () => {
+      live = false;
+    };
+  }, [currentCode, lang]);
 
   // Enter buys; + and − change the quantity; F makes the set a favourite (not while typing).
   useEffect(() => {
@@ -331,6 +347,15 @@ export function Boosterium({ shop, sets, wallet, onBuy, onClaimCharity, busy, fo
             {/* The chosen kind's box holds a box topper: how far the next one is. */}
             {item.boxProgress && <BoxGauge progress={item.boxProgress} />}
             <BoosterNote setCode={item.setCode} kind={item.kind} />
+            {world && world.setCode === current.set.code && (
+              <div className="shop-world">
+                <h3>{t("lore.world")}</h3>
+                <p>{world.text}</p>
+                <button className="linkish" onClick={() => onLore(current.set.code)}>
+                  {t("lore.readMore")}
+                </button>
+              </div>
+            )}
             </div>
             <div className="buy-bar">
               <div className="buy-row">

@@ -23,6 +23,8 @@ use tauri::{Manager, State};
 use unsealed_core::achievements::Engine;
 use unsealed_core::artifacts::{ArtifactTranslations, ArtifactsConfig};
 use unsealed_core::cycles::Cycles;
+use unsealed_core::lore::Lore;
+use unsealed_core::art_turns::ArtTurns;
 use unsealed_core::scenes::Scenes;
 use unsealed_core::economy::EconomyConfig;
 use unsealed_core::limited::LimitedConfig;
@@ -71,6 +73,8 @@ const CYCLE_TRANSLATIONS: &[(&str, &str)] = &[
     ("it", include_str!("../../../config/cycles.it.json")),
 ];
 const DEFAULT_SCENES: &str = include_str!("../../../config/scenes.json");
+const DEFAULT_LORE: &str = include_str!("../../../config/lore.json");
+const DEFAULT_ART_TURNS: &str = include_str!("../../../config/art-orientation.json");
 
 /// What is running: the saves, and the game being played, if any (none on the home screen
 /// at launch).
@@ -84,6 +88,10 @@ pub(crate) struct Session {
     cycles: Arc<Cycles>,
     /// The sets' scenes, read once and shared by the games.
     scenes: Arc<Scenes>,
+    /// The sets' lore, read once and shared by the games.
+    lore: Arc<Lore>,
+    /// How the art cards are turned to be seen, read once and shared by the games.
+    art_turns: Arc<ArtTurns>,
     /// Little secrets found on the home screen, for the next game played.
     pending_eggs: Vec<String>,
 }
@@ -107,6 +115,8 @@ impl Session {
         game.set_artifact_texts(load_artifact_texts(&self.data_dir).map_err(|e| e.to_string())?);
         game.set_cycles(self.cycles.clone());
         game.set_scenes(self.scenes.clone());
+        game.set_lore(self.lore.clone());
+        game.set_art_turns(self.art_turns.clone());
         game.set_card_language(&self.card_lang);
         // A save edited by hand was refused: the game played now has a word for it.
         if self.saves.take_caught() {
@@ -619,6 +629,18 @@ async fn get_scenes(state: State<'_, SessionState>, set_code: String, lang: Stri
     with_game(&state, |g| g.scenes(&set_code, &lang))
 }
 
+/// A set's lore, as far as the player has unlocked it, in `lang`; none when it is not written.
+#[tauri::command]
+async fn get_lore(state: State<'_, SessionState>, set_code: String, lang: String) -> Result<Option<game::LoreView>, String> {
+    with_game(&state, |g| g.lore(&set_code, &lang))
+}
+
+/// A few lines on a set's world in `lang`, for the Boosterium; none when its lore is not written.
+#[tauri::command]
+async fn get_lore_summary(state: State<'_, SessionState>, set_code: String, lang: String) -> Result<Option<String>, String> {
+    with_game(&state, |g| Ok(g.lore_summary(&set_code, &lang)))
+}
+
 /// A set's assemblies (Unstable's augments over its hosts), as far as the player is.
 #[tauri::command]
 async fn get_assemblies(state: State<'_, SessionState>, set_code: String) -> Result<game::AssembliesView, String> {
@@ -788,6 +810,19 @@ fn load_scenes(data_dir: &Path) -> Result<Scenes, Box<dyn Error>> {
     Ok(Scenes::from_json(&json)?)
 }
 
+/// The sets' lore. A file of the same name in the data directory replaces the shipped one.
+fn load_lore(data_dir: &Path) -> Result<Lore, Box<dyn Error>> {
+    let json = fs::read_to_string(data_dir.join("lore.json")).unwrap_or_else(|_| DEFAULT_LORE.to_string());
+    Ok(Lore::from_json(&json)?)
+}
+
+/// How the art cards are turned to be seen. A file of the same name in the data directory
+/// replaces the shipped one.
+fn load_art_turns(data_dir: &Path) -> Result<ArtTurns, Box<dyn Error>> {
+    let json = fs::read_to_string(data_dir.join("art-orientation.json")).unwrap_or_else(|_| DEFAULT_ART_TURNS.to_string());
+    Ok(ArtTurns::from_json(&json)?)
+}
+
 fn load_data_config(data_dir: &Path) -> Result<DataConfig, Box<dyn Error>> {
     let json = fs::read_to_string(data_dir.join("data.json")).unwrap_or_else(|_| DEFAULT_DATA.to_string());
     Ok(DataConfig::from_json(&json)?)
@@ -849,6 +884,8 @@ pub fn run() {
                 card_lang: "en".to_string(),
                 cycles: Arc::new(load_cycles(&data_dir)?),
                 scenes: Arc::new(load_scenes(&data_dir)?),
+                lore: Arc::new(load_lore(&data_dir)?),
+                art_turns: Arc::new(load_art_turns(&data_dir)?),
                 pending_eggs: Vec::new(),
             }));
 
@@ -916,6 +953,8 @@ pub fn run() {
             take_box_toppers,
             get_cycles,
             get_scenes,
+            get_lore,
+            get_lore_summary,
             get_assemblies,
             get_set_history,
             get_artifacts,

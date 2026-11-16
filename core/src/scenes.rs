@@ -22,6 +22,8 @@ struct RawScene {
     columns: u32,
     /// Collector numbers row by row, "328:back" for the back face of a double-faced card.
     cells: Vec<String>,
+    #[serde(default)]
+    art: bool,
 }
 
 /// A card of a scene, at its place.
@@ -40,6 +42,8 @@ pub struct Scene {
     pub columns: u32,
     /// Row by row.
     pub cells: Vec<SceneCell>,
+    /// Made of the set's art cards (their own art series code, "AMKM"), not of its cards.
+    pub art: bool,
 }
 
 impl Scene {
@@ -89,7 +93,7 @@ impl Scenes {
                     }
                     cells.push(SceneCell { number: number.to_string(), back });
                 }
-                scenes.push(Scene { id: s.id, names: s.name, columns: s.columns, cells });
+                scenes.push(Scene { id: s.id, names: s.name, columns: s.columns, cells, art: s.art });
             }
             if !scenes.is_empty() {
                 by_set.insert(code, scenes);

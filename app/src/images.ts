@@ -21,9 +21,31 @@ export function withCachedImages<T>(value: T): T {
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value)) out[k] = withCachedImages(v);
+    const { artTurn, imageUrl } = out as { artTurn?: unknown; imageUrl?: unknown };
+    if (typeof artTurn === "string" && typeof imageUrl === "string") rememberArtTurn(imageUrl, artTurn as ArtTurn);
     return out as T;
   }
   return value;
+}
+
+/** How an art card is turned to be seen (`artTurn` of the game's cards, from
+ * config/art-orientation.json): a quarter turn clockwise, anticlockwise, or half a turn. */
+export type ArtTurn = "right" | "left" | "flip";
+
+/** The turn of each art card met in the game's answers, by its Scryfall id (in every size of
+ * its image), so that any image of it knows it. */
+const artTurns = new Map<string, ArtTurn>();
+const scryfallIdOf = (url: string) => url.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/)?.[0];
+
+function rememberArtTurn(url: string, turn: ArtTurn) {
+  const id = scryfallIdOf(url);
+  if (id) artTurns.set(id, turn);
+}
+
+/** How the card of this image is turned to be seen, if it is an art card not seen upright. */
+export function artTurnOf(url: string | null | undefined): ArtTurn | undefined {
+  const id = url ? scryfallIdOf(url) : undefined;
+  return id ? artTurns.get(id) : undefined;
 }
 
 /** The same image in another size (`url` from the CDN or the cache; unchanged if it is not
@@ -35,6 +57,12 @@ export function largeImage(url: string): string;
 export function largeImage(url: string | null): string | null;
 export function largeImage(url: string | null): string | null {
   return url == null ? null : resized(url, "large");
+}
+
+/** The art crop of a card image URL (its illustration alone; its artist must be credited beside
+ * it, Scryfall's terms). */
+export function artCrop(url: string): string {
+  return resized(url, "art_crop");
 }
 
 /** The width of the thumbnails the cache makes (`THUMB_WIDTH` of images.rs). */

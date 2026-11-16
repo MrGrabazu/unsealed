@@ -8,6 +8,7 @@ import {
   getScenes,
   getAssemblies,
   getSetHistory,
+  getLore,
   getOwnedCards,
   listArtists,
   listGuestSeries,
@@ -23,6 +24,7 @@ import {
   type ScenesView,
   type AssembliesView,
   type SetHistoryView,
+  type LoreView,
   type SetSummary,
 } from "./api";
 
@@ -31,6 +33,9 @@ type Source = "library" | "sets" | "artists";
 
 /** In the set list: every card owned, across the sets (a grid to sort, to pick what to sell). */
 const ALL_SETS = "*";
+
+/** How long a request to show a set's chronicle holds (milliseconds): the tab's switch. */
+const LORE_FOCUS_MS = 3000;
 
 type Sort = "priceDesc" | "priceAsc" | "rarity" | "name" | "set" | "quantity";
 
@@ -90,6 +95,7 @@ import { FitText } from "./FitText";
 import { ScenesGallery, ScenesPanel } from "./Scenes";
 import { AssembliesList, AssembliesPanel } from "./Assemblies";
 import { SetHistoryList, SetHistoryPanel } from "./SetHistory";
+import { LoreBook, LorePanel } from "./Lore";
 import { useI18n } from "./i18n";
 import { Library } from "./Library";
 import { Loading } from "./Loading";
@@ -112,6 +118,8 @@ interface Props {
   onChanged: () => void;
   /** Takes the player to the Boosterium, on a set's boosters. */
   onShop: (setCode: string) => void;
+  /** A set whose chronicle to show on arrival (from the Boosterium); `at` tells two requests apart. */
+  loreFocus?: { setCode: string; at: number } | null;
   /** Selling a binder's duplicates pays this much more, in percent (an artifact's). */
   duplicatesBonus: number;
   /** The best share of a card's market price a sale can reach, that bonus included. */
@@ -119,7 +127,7 @@ interface Props {
 }
 
 /** Collection of one set: completion progress, missing cards greyed out, selling. */
-export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonus, maxSellRate }: Props) {
+export function Collection({ sets, refreshKey, onChanged, onShop, loreFocus, duplicatesBonus, maxSellRate }: Props) {
   // A binder's duplicates, at the price `sell_duplicates` pays (the artifact's bonus on top,
   // never above the best rate on the market price: `Bonuses::duplicate_value`).
   const binderDuplicates = (cards: CollectionCard[]): SoldLine[] =>
@@ -140,10 +148,16 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
   const [assemblies, setAssemblies] = useState<AssembliesView | null>(null);
   // The set's boosters opened and their cards.
   const [history, setHistory] = useState<SetHistoryView | null>(null);
-  const [extra, setExtra] = useState<"cycles" | "scenes" | "assemblies" | "history" | null>(null);
-  // The painting looked at in the gallery of scenes.
+  // The set's story, chapter after chapter (null when not written yet).
+  const [lore, setLore] = useState<LoreView | null>(null);
+  const [extra, setExtra] = useState<"cycles" | "scenes" | "assemblies" | "history" | "lore" | null>(null);
+  // The painting looked at in the gallery of scenes, and the chapter open in the chronicle.
   const [sceneAt, setSceneAt] = useState(0);
-  useEffect(() => setSceneAt(0), [setCode]);
+  const [chapterAt, setChapterAt] = useState(0);
+  useEffect(() => {
+    setSceneAt(0);
+    setChapterAt(0);
+  }, [setCode]);
   const [filter, setFilter] = useState<Filter>("all");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -183,6 +197,15 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
     if (!setCode && sets.length > 0) setSetCode(sets[0].code);
   }, [sets, setCode]);
 
+  // Arriving from the Boosterium for a set's chronicle (after the default set above, so it
+  // wins). Only a fresh request: the collection, shown again later, opens as usual.
+  useEffect(() => {
+    if (!loreFocus || Date.now() - loreFocus.at > LORE_FOCUS_MS) return;
+    setSource("sets");
+    setSetCode(loreFocus.setCode);
+    setExtra("lore");
+  }, [loreFocus]);
+
   useEffect(() => {
     listGuestSeries()
       .then(setSeries)
@@ -215,6 +238,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
         setScenes(await getScenes(setCode, lang).catch(() => null));
         setAssemblies(await getAssemblies(setCode).catch(() => null));
         setHistory(await getSetHistory(setCode).catch(() => null));
+        setLore(await getLore(setCode, lang).catch(() => null));
         // Translated images: shown once known as good scans (checked once per card).
         if ((await checkSetImages(setCode).catch(() => 0)) > 0) {
           setView(await getCollection(setCode));
@@ -222,6 +246,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
           setScenes(await getScenes(setCode, lang).catch(() => null));
           setAssemblies(await getAssemblies(setCode).catch(() => null));
           setHistory(await getSetHistory(setCode).catch(() => null));
+          setLore(await getLore(setCode, lang).catch(() => null));
         }
       }
       setError(null);
@@ -494,7 +519,10 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
   // Its history, once one of its boosters has been opened.
   const hasHistory = oneSet && !!history && history.setCode === view?.setCode && history.openings.length > 0;
   const historyShown = hasHistory && extra === "history";
-  const extraShown = cyclesShown || scenesShown || assembliesShown || historyShown;
+  // Its chronicle, once written.
+  const hasLore = oneSet && !!lore && lore.setCode === view?.setCode && lore.total > 0;
+  const loreShown = hasLore && extra === "lore";
+  const extraShown = cyclesShown || scenesShown || assembliesShown || historyShown || loreShown;
 
   const bar = (
     <>
@@ -611,6 +639,11 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
                   {t("collection.layoutHistory")}
                 </button>
               )}
+              {hasLore && (
+                <button className={loreShown ? "active" : ""} onClick={() => setExtra("lore")}>
+                  {t("collection.layoutLore")}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -658,6 +691,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
       {cyclesShown && cycles && <CyclesList view={cycles} onOpen={setDetailsOf} />}
       {assembliesShown && assemblies && <AssembliesList view={assemblies} onOpen={setDetailsOf} />}
       {historyShown && history && <SetHistoryList key={history.setCode} view={history} onOpen={setDetailsOf} />}
+      {loreShown && lore && <LoreBook view={lore} at={chapterAt} onAt={setChapterAt} onOpen={setDetailsOf} active={!detailsOf} />}
       {scenesShown && scenes && <ScenesGallery view={scenes} at={sceneAt} onAt={setSceneAt} onOpen={setDetailsOf} active={!detailsOf} />}
       {source === "sets" && !allSets && view && !extraShown && (
         <>
@@ -861,6 +895,13 @@ export function Collection({ sets, refreshKey, onChanged, onShop, duplicatesBonu
         <AssembliesPanel view={assemblies} onShop={view && !ofSeries ? () => onShop(view.setCode) : undefined} onOpen={setDetailsOf} />
       ) : historyShown && history ? (
         <SetHistoryPanel view={history} onShop={view && !ofSeries ? () => onShop(view.setCode) : undefined} onOpen={setDetailsOf} />
+      ) : loreShown && lore ? (
+        <LorePanel
+          view={lore}
+          year={set ? set.releaseDate.slice(0, 4) : null}
+          onShop={view && !ofSeries ? () => onShop(view.setCode) : undefined}
+          onOpen={setDetailsOf}
+        />
       ) : (
       <aside className="frame set-side">
         <div className="cartouche">{t("collection.completion")}</div>
