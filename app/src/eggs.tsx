@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { foundEasterEgg } from "./api";
+import { foundEasterEgg, getAchievements } from "./api";
 import { useI18n } from "./i18n";
 import { viaCache } from "./images";
 import { sounds } from "./sound";
@@ -11,10 +11,27 @@ import { sounds } from "./sound";
  * it brings (`detail.card`). */
 export const EGG_FOUND = "unsealed-egg-found";
 
+/** Whether the open game already caught the shining speck (Ambience.tsx): it no longer shows. */
+let speckCaught = false;
+export const isSpeckCaught = () => speckCaught;
+
+/** Reads, for the game just opened, whether its speck was caught (its achievement unlocked). */
+export function readSpeckCaught(lang: string) {
+  speckCaught = false;
+  getAchievements(lang)
+    .then((view) => {
+      speckCaught = view.items.some((a) => a.id === "egg-speck" && a.unlocked);
+    })
+    .catch(() => {});
+}
+
 /** Reports a secret found; never fails (a secret must not get in the way). */
 export function findEgg(egg: string) {
   foundEasterEgg(egg)
-    .then((found) => window.dispatchEvent(new CustomEvent(EGG_FOUND, { detail: { egg, card: found.card } })))
+    .then((found) => {
+      if (egg === "speck") speckCaught = true;
+      window.dispatchEvent(new CustomEvent(EGG_FOUND, { detail: { egg, card: found.card } }));
+    })
     .catch(() => {});
 }
 

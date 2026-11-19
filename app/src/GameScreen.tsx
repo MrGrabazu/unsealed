@@ -68,7 +68,7 @@ import { FULLSCREEN_KEY } from "./fullscreen";
 import { Loading } from "./Loading";
 import { Coin, CurrencyContext, DEFAULT_CURRENCY, useMoneyText } from "./money";
 import { errorText } from "./errors";
-import { BirthdayRibbon, EGG_FOUND, isMagicBirthday, nightOwl, useKonamiCode } from "./eggs";
+import { BirthdayRibbon, EGG_FOUND, isMagicBirthday, nightOwl, readSpeckCaught, useKonamiCode } from "./eggs";
 import { greetToday, SeasonalDecor, SeasonalRailFoot, useSeason } from "./seasons";
 import { SealedBoosters } from "./SealedBoosters";
 import { Stats as StatsTab } from "./Stats";
@@ -476,6 +476,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   // The little secrets (eggs.tsx): the oldest code of all, and what a secret found brings (its
   // achievement, and the code's card).
   useKonamiCode();
+  useEffect(() => readSpeckCaught(lang), []);
   useEffect(() => {
     const onEgg = (e: Event) => {
       const { egg, card } = (e as CustomEvent<{ egg: string; card: string | null }>).detail;

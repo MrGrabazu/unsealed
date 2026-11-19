@@ -94,6 +94,16 @@
         "name": { "en": "The Day of Black Sun", "fr": "Le jour du Soleil noir", "de": "Der Tag der Schwarzen Sonne", "es": "El día del Sol Negro", "it": "Il giorno del Sole Nero" } },
       { "id": "jasmine-dragon-reunion", "art": true, "columns": 3, "cells": ["7", "8", "9", "10", "11", "12"],
         "name": { "en": "Reunion at the Jasmine Dragon", "fr": "Retrouvailles au Dragon de Jasmin", "de": "Wiedersehen im Jasmindrachen", "es": "Reencuentro en el Dragón de Jazmín", "it": "Riunione al Drago di Gelsomino" } }
+    ],
+    "TRK": [
+      { "id": "voyager", "columns": 2, "cells": ["338", "339", "340", "341", "342", "343"],
+        "name": { "en": "Voyager and the Borg", "fr": "Voyager et les Borgs", "de": "Voyager und die Borg", "es": "Voyager y los borg", "it": "Voyager e i Borg" } },
+      { "id": "deep-space-nine", "columns": 3, "cells": ["344", "345", "346", "347", "348", "349", "350", "351", "352"],
+        "name": { "en": "Aboard Deep Space Nine", "fr": "À bord de Deep Space Nine", "de": "An Bord von Deep Space Nine", "es": "A bordo de Deep Space Nine", "it": "A bordo di Deep Space Nine" } },
+      { "id": "mirror-universe", "columns": 3, "cells": ["353", "354", "355", "356", "357", "358"],
+        "name": { "en": "The Mirror Universe", "fr": "L’univers miroir", "de": "Das Spiegeluniversum", "es": "El universo espejo", "it": "L’universo dello specchio" } },
+      { "id": "data-and-locutus", "columns": 2, "cells": ["359", "360", "361", "362"],
+        "name": { "en": "Data and Locutus", "fr": "Data et Locutus", "de": "Data und Locutus", "es": "Data y Locutus", "it": "Data e Locutus" } }
     ]
   }
 }
