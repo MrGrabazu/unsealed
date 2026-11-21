@@ -221,6 +221,8 @@ export const de: Messages = {
   "open.sellOne": "Einen verkaufen ({amount})",
   "open.back": "← Zurück zu meinen Boostern",
   "open.next": "Nächsten öffnen (noch {count})",
+  "open.nextBatch": "Die nächsten {count} öffnen (noch {left})",
+  "open.nextQuick": "⚡ Nächsten schnell öffnen (noch {count})",
   "open.soldBooster": "1 {set}-Booster für {amount} verkauft (Gewinn {profit}).",
   "open.soldBoosterLoss": "1 {set}-Booster für {amount} verkauft (Verlust {loss}).",
   "shop.bought": "Kauf abgeschlossen",

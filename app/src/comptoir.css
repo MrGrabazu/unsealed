@@ -1148,6 +1148,10 @@ button.seen-card:hover:not(:disabled) { box-shadow: none; transform: translateX(
 .batch-booster-head b { font-family: var(--font-title); color: var(--gold-hi); }
 .cards.batch-cards { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
 .cards.batch-cards .card.clickable { cursor: zoom-in; }
+/* A batch's new cards and new foils, folded at first (BatchOpening.tsx). */
+.batch-news { margin: 12px 0; padding: 8px 12px; border: 1px solid var(--edge); border-radius: 8px; background: #0000002a; }
+.batch-news > summary { cursor: pointer; font: 700 15px var(--font-title); color: var(--gold-hi); letter-spacing: .04em; }
+.batch-news[open] > summary { margin-bottom: 10px; }
 
 /* A set's history (Collection, "History"): its boosters day by day, or its cards in a table. */
 .set-history .history-mode { margin-bottom: 12px; }

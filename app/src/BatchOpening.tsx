@@ -135,11 +135,28 @@ export function BatchOpening({
     const rarities: Record<string, number> = {};
     for (const c of all) rarities[c.rarity] = (rarities[c.rarity] ?? 0) + 1;
     const priced = [...all].sort((a, b) => (b.priceCents ?? 0) - (a.priceCents ?? 0));
+    // Each new card once (two copies in a booster are both new), the most valuable first, in
+    // small images (they are a little over 100 px wide).
+    const once = (cards: OpenedCard[]) => {
+      const seen = new Set<string>();
+      return cards
+        .filter((c) => {
+          const key = `${c.uuid}:${c.foil}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .map((card) => ({ card, shown: { ...card, imageUrl: smallImage(card.imageUrl), backImageUrl: smallImage(card.backImageUrl) } }));
+    };
+    const newCards = once(priced.filter((c) => c.isNew));
+    const newFoils = once(priced.filter((c) => c.newFoil));
     return {
       cardCount: all.length,
       value: all.reduce((sum, c) => sum + (c.priceCents ?? 0), 0),
-      newCount: all.filter((c) => c.isNew).length,
-      newFoilCount: all.filter((c) => c.newFoil).length,
+      newCount: newCards.length,
+      newFoilCount: newFoils.length,
+      newCards,
+      newFoils,
       rarities,
       best: priced.slice(0, BEST_PULLS_SHOWN),
     };
@@ -185,6 +202,28 @@ export function BatchOpening({
           <Card key={`${card.uuid}-${i}`} card={card} faceUp clickable onReveal={() => onDetails(card)} />
         ))}
       </div>
+      {/* Everything new in the batch at a glance, without looking through each booster. */}
+      {/* Folded at first (a batch of 100 can hold hundreds): unfolded with a click. */}
+      {summary.newCards.length > 0 && (
+        <details className="batch-news">
+          <summary>{t("batch.newCards", { count: summary.newCount })}</summary>
+          <div className="cards batch-cards">
+            {summary.newCards.map(({ card, shown }) => (
+              <FlatCard key={`${card.uuid}:${card.foil}`} card={shown} onClick={() => onDetails(card)} />
+            ))}
+          </div>
+        </details>
+      )}
+      {summary.newFoils.length > 0 && (
+        <details className="batch-news">
+          <summary>{t("batch.newFoils", { count: summary.newFoilCount })}</summary>
+          <div className="cards batch-cards">
+            {summary.newFoils.map(({ card, shown }) => (
+              <FlatCard key={`${card.uuid}:${card.foil}`} card={shown} onClick={() => onDetails(card)} />
+            ))}
+          </div>
+        </details>
+      )}
       <SeenBoosters boosters={boosters} count={boosters.length} onDetails={onDetails} />
     </section>
   );

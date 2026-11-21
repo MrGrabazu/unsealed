@@ -229,6 +229,8 @@ export const en = {
   "open.sellOne": "Sell one ({amount})",
   "open.back": "← Back to my boosters",
   "open.next": "Open the next one ({count} left)",
+  "open.nextBatch": "Open the next {count} ({left} left)",
+  "open.nextQuick": "⚡ Quick open the next one ({count} left)",
   "open.soldBooster": "Sold 1 {set} booster for {amount} (profit {profit}).",
   "open.soldBoosterLoss": "Sold 1 {set} booster for {amount} (loss {loss}).",
   "shop.bought": "Purchase made",

@@ -315,6 +315,8 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   const [wallet, setWallet] = useState<WalletView | null>(null);
   const [cards, setCards] = useState<OpenedCard[] | null>(null);
   const [batch, setBatch] = useState<OpenedCard[][] | null>(null);
+  /** The size asked for the batch on screen (×10, ×100): the next batch is the same. */
+  const [batchSize, setBatchSize] = useState(0);
   // The pack being opened: shown sealed until torn (then `cards` holds what it gave).
   const [pack, setPack] = useState<{ setCode: string; kind: string; quick: boolean } | null>(null);
   // The card whose details are open.
@@ -644,6 +646,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     resetBets();
     const opened = await openBoosters(setCode, kind, quantity, activeBets(keptFor(kept, setCode)));
     setBatch(opened.map((b) => b.cards));
+    setBatchSize(quantity);
     const found = opened.flatMap((b) => (b.artifact ? [b.artifact] : []));
     if (found.length > 0) {
       setArtifactQueue((queue) => [...queue, ...found]);
@@ -1056,21 +1059,25 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
                 </div>
                 <div className="controls">
                   <button onClick={closeOpening}>{t("open.back")}</button>
-                  {/* Once a batch is open: the next one of the same kind, if any is left (a single
-                      booster offers it in its result). */}
-                  {remaining && batch && (
+                  {/* Once a batch is open, the player stays in a fast mode: the next batch of the
+                      same size, or, with fewer boosters left, the next one opened quickly (a single
+                      booster offers its next one in its result). */}
+                  {remaining && batch && remaining.quantity >= batchSize && (
                     <button
                       className="primary"
                       disabled={busy}
-                      onClick={() =>
-                        pack?.quick ? void openQuick(remaining.setCode, remaining.kind) : open(remaining.setCode, remaining.kind)
-                      }
+                      onClick={() => run(() => openMany(remaining.setCode, remaining.kind, batchSize))}
                     >
-                      {t("open.next", { count: remaining.quantity })}
+                      {t("open.nextBatch", { count: batchSize, left: remaining.quantity })}
+                    </button>
+                  )}
+                  {remaining && batch && remaining.quantity < batchSize && (
+                    <button className="primary" disabled={busy} onClick={() => void openQuick(remaining.setCode, remaining.kind)}>
+                      {t("open.nextQuick", { count: remaining.quantity })}
                     </button>
                   )}
                   {/* The quick way, for the impatient, right from an opening. */}
-                  {remaining && batch && (
+                  {remaining && batch && remaining.quantity >= batchSize && (
                     <button disabled={busy} onClick={() => void openQuick(remaining.setCode, remaining.kind)}>
                       {t("open.quick")}
                     </button>
