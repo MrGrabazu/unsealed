@@ -386,10 +386,14 @@ button.sell.confirm { background: #7a1d1d; border-color: #c24040; color: #fff; }
 /* Only the batch's cards (`.big` also names the large gilded buttons, which it made pulse
    too), and by the opacity of a glow behind the card: an animated filter repainted each card
    at every frame (WebKit, on macOS, lagged). */
-.cards > .big { position: relative; isolation: isolate; border-radius: 6px; }
-.cards > .big::before { content: ""; position: absolute; z-index: -1; inset: 0; border-radius: 6px; pointer-events: none;
+/* Around the card only, not its caption below: the card's own height (its width × 88 / 63). */
+.cards > .big { position: relative; isolation: isolate; }
+.cards > .big::before { content: ""; position: absolute; z-index: -1; inset: 0 0 auto 0; aspect-ratio: 63 / 88; border-radius: var(--card-radius); pointer-events: none;
   box-shadow: 0 0 16px 2px var(--accent); animation: big-pulse 0.9s ease-in-out infinite alternate; }
 @keyframes big-pulse { from { opacity: .25; } to { opacity: 1; } }
+/* A card being turned (Card.tsx, 0.55 s): no glow around it until it is face up. */
+.cards > .big.turning::before { animation: big-wait 0.6s step-end, big-pulse 0.9s ease-in-out 0.6s infinite alternate; }
+@keyframes big-wait { from, to { opacity: 0; } }
 
 .trend { display: inline-flex; align-items: center; gap: 8px; font-size: 0.85rem; white-space: nowrap; }
 .trend svg { color: var(--muted); }

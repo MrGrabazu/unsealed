@@ -155,7 +155,8 @@ export function BatchOpening({
         </div>
         <div className="cards compact" key={index}>
           {cards.map((card, i) => (
-            <div key={`${card.uuid}-${i}`} className={isBigCard(card) ? "big" : ""}>
+            // Its glow only once it is turned (`.turning`: after the flip, with its caption).
+            <div key={`${card.uuid}-${i}`} className={faceUp && isBigCard(card) ? "big turning" : ""}>
               <Card card={card} faceUp={faceUp} clickable={false} onReveal={noop} />
             </div>
           ))}

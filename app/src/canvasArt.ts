@@ -159,7 +159,10 @@ export const cardBackReady: Promise<HTMLCanvasElement> = document.fonts
     return cardBackCanvas;
   });
 
-/** The cards' back as an image (the classic opening). */
+let backUrl: Promise<string> | null = null;
+/** The cards' back as an image (the classic and batch openings), encoded once: a batch shows
+ * a dozen cards at a time. */
 export function cardBackUrl(): Promise<string> {
-  return cardBackReady.then((canvas) => canvas.toDataURL("image/jpeg", 0.9));
+  backUrl ??= cardBackReady.then((canvas) => canvas.toDataURL("image/jpeg", 0.9));
+  return backUrl;
 }

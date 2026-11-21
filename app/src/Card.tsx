@@ -1,5 +1,7 @@
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 import type { OpenedCard } from "./api";
+import { cardBackUrl } from "./canvasArt";
 import { CardImage } from "./CardImage";
 import { cornersClass } from "./corners";
 import { Money } from "./money";
@@ -37,7 +39,21 @@ export function FlatCard({ card, onClick }: { card: OpenedCard; onClick: () => v
   );
 }
 
+/** The cards' back (drawn once, see `canvasArt.ts`), as an image URL once ready. */
+export function useCardBack(): string | null {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    void cardBackUrl().then((u) => live && setUrl(u));
+    return () => {
+      live = false;
+    };
+  }, []);
+  return url;
+}
+
 export function Card({ card, faceUp, clickable, onReveal, lazy = false }: Props) {
+  const backUrl = useCardBack();
   return (
     <div className="card-slot">
       <motion.div
@@ -47,9 +63,7 @@ export function Card({ card, faceUp, clickable, onReveal, lazy = false }: Props)
         transition={{ duration: 0.55, ease: "easeInOut" }}
         onClick={clickable ? onReveal : undefined}
       >
-        <div className="face back">
-          <span>U</span>
-        </div>
+        <div className="face back" style={backUrl ? { backgroundImage: `url(${backUrl})` } : undefined} />
         <div className="face front">
           {/* Only a revealed card can be turned over: before that, a click reveals it. */}
           <CardImage front={card.imageUrl} back={faceUp ? card.backImageUrl : null} alt={card.name} lazy={lazy} />

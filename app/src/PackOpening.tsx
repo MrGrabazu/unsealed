@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import type { OpenedCard, SetSummary } from "./api";
 import { isBigCard } from "./BatchOpening";
 import { SellBoosterButton, SellCardButton, useBoosterSale } from "./BoosterSale";
-import { cardBackUrl } from "./canvasArt";
+import { useCardBack } from "./Card";
 import { CardImage } from "./CardImage";
 import { cornersClass } from "./corners";
 import { useI18n } from "./i18n";
@@ -39,19 +39,6 @@ const RESULT_AFTER_MS = 900;
 /** How dramatic a card's reveal is. */
 const hitOf = (card: OpenedCard) =>
   card.rarity === "mythic" ? "hit-mythic" : isBigCard(card) ? "hit-rare" : card.foil ? "hit-foil" : "";
-
-/** The cards' back (drawn once, see `canvasArt.ts`), as an image URL once ready. */
-function useCardBack(): string | null {
-  const [url, setUrl] = useState<string | null>(null);
-  useEffect(() => {
-    let live = true;
-    void cardBackUrl().then((u) => live && setUrl(u));
-    return () => {
-      live = false;
-    };
-  }, []);
-  return url;
-}
 
 /** A card that can be face down (its back) or face up. */
 function FlipCard({ card, faceUp }: { card: OpenedCard; faceUp: boolean }) {
