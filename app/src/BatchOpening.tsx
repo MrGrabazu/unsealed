@@ -1,24 +1,49 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { OpenedCard } from "./api";
-import { Card, FlatCard } from "./Card";
+import { FlatCard } from "./Card";
 import { useI18n } from "./i18n";
 import { Money, useMoney } from "./money";
-import { smallImage } from "./images";
+import { fittedImage, smallImage } from "./images";
+import { getBatchDelay, setBatchDelay } from "./settings";
 
-/** Time each ordinary booster stays on screen. */
-const FAST_MS = 450;
-/** Time a booster holding a big card stays on screen: the only place the animation slows down. */
-const SLOW_MS = 2400;
+/** Time a booster takes to appear: its cards dealt one after the other, like a quick opening's
+ * hand (each 0.35 s, 30 ms after the one before: `.batch-deal` of comptoir.css), before the
+ * chosen pause. */
+const dealMs = (cards: number) => 350 + Math.max(0, cards - 1) * 30;
+/** The longest a booster waits for its images before showing anyway. */
+const FACE_WAIT_MS = 1000;
+/** The pause between two boosters, chosen with the slider: 0 to 5 s, by half-seconds. */
+const DELAY_MAX_S = 5;
+const DELAY_STEP_S = 0.5;
 /** Cards at or above this market price count as big. */
 const BIG_PRICE_CENTS = 500;
-/** Delay before the cards of a new booster flip, so the flip is visible. */
-const FLIP_DELAY_MS = 80;
 const BEST_PULLS_SHOWN = 8;
 
 export const isBigCard = (c: OpenedCard) =>
   c.rarity === "mythic" || (c.priceCents ?? 0) >= BIG_PRICE_CENTS || (c.foil && c.rarity === "rare");
 
-const noop = () => {};
+/** A batch being opened: how many boosters were asked, and how to open the next one (its
+ * cards, or null when none is left or the opening failed). */
+export interface BatchRun {
+  id: number;
+  total: number;
+  next: () => Promise<OpenedCard[] | null>;
+}
+
+/** Loads and decodes a booster's images (both sizes a card may show), `FACE_WAIT_MS` at most. */
+function preload(cards: OpenedCard[]): Promise<void> {
+  const urls = [...new Set(cards.flatMap((c) => (c.imageUrl ? [c.imageUrl, fittedImage(c.imageUrl, 1, 1)] : [])))];
+  const decoded = Promise.all(
+    urls.map((src) => {
+      const image = new Image();
+      image.src = src;
+      return image.decode().catch(() => {});
+    }),
+  );
+  return Promise.race([decoded.then(() => {}), new Promise<void>((resolve) => setTimeout(resolve, FACE_WAIT_MS))]);
+}
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /** Plural texts counting the cards of each rarity. */
 const RARITY_COUNTS: Record<string, "rarity.common" | "rarity.uncommon" | "rarity.rare" | "rarity.mythic"> = {
@@ -86,49 +111,86 @@ function SeenBoosters({ boosters, count, onDetails }: { boosters: OpenedCard[][]
   );
 }
 
-/** Plays an accelerated opening of many boosters, then shows a summary of the haul. The
- * boosters already seen pile up under the one opening (the latest first), and stay under the
- * summary, to look at each draw. */
+/** Opens a batch the way a quick opening does, one booster after the other: each booster is
+ * drawn (the next one already while this one shows, its images loaded ahead), dealt face up,
+ * then stays the chosen pause (slider, 0 to 5 s); the player can pause between two boosters, or
+ * open the rest at once. The boosters already seen pile up under the one showing (the latest
+ * first), and stay under the summary at the end, to look at each draw. */
 export function BatchOpening({
+  run,
   boosters,
+  held = false,
+  onShown,
   onFinished,
   onDetails,
 }: {
+  run: BatchRun;
+  /** Something is shown over the batch (a card's details): it waits, like a pause. */
+  held?: boolean;
+  /** The boosters shown so far, in order (kept by the parent: a sale needs them). */
   boosters: OpenedCard[][];
-  onFinished: () => void;
+  onShown: (cards: OpenedCard[]) => void;
+  /** Once, when the batch is over: how many boosters were opened. */
+  onFinished: (opened: number) => void;
   onDetails: (card: OpenedCard) => void;
 }) {
   const money = useMoney();
   const { t, tx, plural } = useI18n();
-  const [index, setIndex] = useState(0);
-  const [faceUp, setFaceUp] = useState(false);
-  const [skipped, setSkipped] = useState(false);
-  const playing = !skipped && index < boosters.length;
+  const [playing, setPlaying] = useState(true);
+  const [paused, setPaused] = useState(false);
+  const [rushing, setRushing] = useState(false);
+  const [delay, setDelay] = useState(getBatchDelay);
+  // Read by the loop at each step, so the controls act at once.
+  const control = useRef({ paused, rushing, delay, held });
+  control.current = { paused, rushing, delay, held };
+  const latest = useRef({ onShown, onFinished });
+  latest.current = { onShown, onFinished };
 
-  // The summary is on screen: the achievements unlocked by the batch can show up.
+  // The loop opens boosters: it must run once per batch, even when React mounts the component
+  // twice in development (StrictMode), and stop when the player leaves the batch.
+  const mounted = useRef(true);
   useEffect(() => {
-    if (!playing) onFinished();
-  }, [playing, onFinished]);
-
-  // A new batch starts from the beginning.
-  useEffect(() => {
-    setIndex(0);
-    setSkipped(false);
-  }, [boosters]);
-
-  useEffect(() => {
-    if (!playing) return;
-    setFaceUp(false);
-    const flip = setTimeout(() => setFaceUp(true), FLIP_DELAY_MS);
-    const next = setTimeout(
-      () => setIndex((i) => i + 1),
-      boosters[index].some(isBigCard) ? SLOW_MS : FAST_MS,
-    );
+    mounted.current = true;
     return () => {
-      clearTimeout(flip);
-      clearTimeout(next);
+      mounted.current = false;
     };
-  }, [index, playing, boosters]);
+  }, []);
+  const started = useRef<number | null>(null);
+  useEffect(() => {
+    if (started.current === run.id) return;
+    started.current = run.id;
+    const live = () => mounted.current;
+    void (async () => {
+      let opened = 0;
+      let ahead: Promise<OpenedCard[] | null> = run.next();
+      for (let i = 0; i < run.total; i++) {
+        const cards = await ahead;
+        if (!live() || !cards) break;
+        // The next booster is drawn while this one shows.
+        ahead = i + 1 < run.total ? run.next() : Promise.resolve(null);
+        if (!control.current.rushing) await preload(cards);
+        if (!live()) return;
+        latest.current.onShown(cards);
+        opened++;
+        if (control.current.rushing) continue;
+        await sleep(dealMs(cards.length) + control.current.delay * 1000);
+        // Paused, or a card's details open over the batch: the next booster waits.
+        while (live() && (control.current.paused || control.current.held) && !control.current.rushing) await sleep(100);
+        if (!live()) return;
+      }
+      // Leaving the batch midway: a booster already drawn ahead stays opened (its cards are in
+      // the collection, like any opening), only not shown.
+      if (live()) {
+        setPlaying(false);
+        latest.current.onFinished(opened);
+      }
+    })();
+  }, [run]);
+
+  const changeDelay = (seconds: number) => {
+    setDelay(seconds);
+    setBatchDelay(seconds);
+  };
 
   const summary = useMemo(() => {
     const all = boosters.flat();
@@ -163,22 +225,43 @@ export function BatchOpening({
   }, [boosters]);
 
   if (playing) {
-    const cards = boosters[index];
+    const shown = boosters.length;
+    const cards = shown > 0 ? boosters[shown - 1] : null;
     return (
       <section className="opening">
-        <div className="opening-bar">
-          <span>{t("batch.progress", { current: index + 1, total: boosters.length })}</span>
-          <button onClick={() => setSkipped(true)}>{t("batch.skip")}</button>
+        <div className="opening-bar batch-bar">
+          <span>{t("batch.progress", { current: Math.max(shown, 1), total: run.total })}</span>
+          <span className="batch-progress" role="progressbar" aria-valuemin={0} aria-valuemax={run.total} aria-valuenow={shown}>
+            <span style={{ width: `${(100 * shown) / Math.max(run.total, 1)}%` }} />
+          </span>
+          <label className="batch-delay">
+            <span>{t("batch.delay", { seconds: delay.toLocaleString(undefined, { minimumFractionDigits: 1 }) })}</span>
+            <input
+              type="range"
+              min={0}
+              max={DELAY_MAX_S}
+              step={DELAY_STEP_S}
+              value={delay}
+              onChange={(e) => changeDelay(Number(e.target.value))}
+            />
+          </label>
+          <button disabled={rushing} onClick={() => setPaused((p) => !p)}>
+            {paused ? t("batch.resume") : t("batch.pause")}
+          </button>
+          <button disabled={rushing} onClick={() => setRushing(true)}>{t("batch.skip")}</button>
         </div>
-        <div className="cards compact" key={index}>
-          {cards.map((card, i) => (
-            // Its glow only once it is turned (`.turning`: after the flip, with its caption).
-            <div key={`${card.uuid}-${i}`} className={faceUp && isBigCard(card) ? "big turning" : ""}>
-              <Card card={card} faceUp={faceUp} clickable={false} onReveal={noop} />
-            </div>
-          ))}
-        </div>
-        <SeenBoosters boosters={boosters} count={index} onDetails={onDetails} />
+        {/* Dealt face up at once, like a quick opening (a click opens a card's details: handy
+            while paused). */}
+        {cards && (
+          <div className="cards compact batch-deal" key={shown}>
+            {cards.map((card, i) => (
+              <div key={`${card.uuid}-${i}`} className={isBigCard(card) ? "big" : ""} style={{ "--i": i } as CSSProperties}>
+                <FlatCard card={card} lazy={false} onClick={() => onDetails(card)} />
+              </div>
+            ))}
+          </div>
+        )}
+        <SeenBoosters boosters={boosters} count={Math.max(0, shown - 1)} onDetails={onDetails} />
       </section>
     );
   }
@@ -199,7 +282,7 @@ export function BatchOpening({
       <h3>{t("batch.bestPulls")}</h3>
       <div className="cards compact">
         {summary.best.map((card, i) => (
-          <Card key={`${card.uuid}-${i}`} card={card} faceUp clickable onReveal={() => onDetails(card)} />
+          <FlatCard key={`${card.uuid}-${i}`} card={card} lazy={false} onClick={() => onDetails(card)} />
         ))}
       </div>
       {/* Everything new in the batch at a glance, without looking through each booster. */}

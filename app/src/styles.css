@@ -91,6 +91,8 @@ code { background: var(--panel); padding: 2px 6px; border-radius: 4px; }
 .front { transform: rotateY(180deg); background: #000; }
 /* A card that never turns (Card.tsx `FlatCard`): only its face, flat. */
 .card.flat { transform-style: flat; }
+/* Already face up, a click opens its details: not the golden ring of a card waiting to be turned. */
+.card.flat.clickable { box-shadow: none; cursor: zoom-in; }
 .card.flat .front { transform: none; backface-visibility: visible; -webkit-backface-visibility: visible; }
 /* Never crop the image: the artist and copyright line must stay visible. */
 .front img { width: 100%; height: 100%; object-fit: contain; display: block; user-select: none; }

@@ -12,6 +12,26 @@ const SEASONAL = "unsealed.seasonal";
 export const getSeasonalOn = () => localStorage.getItem(SEASONAL) !== "off";
 export const setSeasonalOn = (on: boolean) => localStorage.setItem(SEASONAL, on ? "on" : "off");
 
+const BATCH_DELAY = "unsealed.batchDelay";
+
+/** The pause between two boosters of a batch opening, in seconds (0 to 5 by halves; 0.5 by
+ * default). */
+export function getBatchDelay(): number {
+  try {
+    const seconds = Number(localStorage.getItem(BATCH_DELAY));
+    return localStorage.getItem(BATCH_DELAY) != null && seconds >= 0 && seconds <= 5 ? seconds : 0.5;
+  } catch {
+    return 0.5;
+  }
+}
+export function setBatchDelay(seconds: number) {
+  try {
+    localStorage.setItem(BATCH_DELAY, String(seconds));
+  } catch {
+    // A preference only: the default comes back next time.
+  }
+}
+
 const COLLECTION_VIEW = "unsealed.collectionView";
 
 /** How the collection shows a set: a binder of 9-card pages (the default), or a grid. */

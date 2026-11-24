@@ -21,12 +21,12 @@ interface Props {
 /** A card already face up that will not turn: the same, without the 3D faces nor the
  * animation (in a batch's list, hundreds of them: each 3D card took compositor layers of its
  * own). */
-export function FlatCard({ card, onClick }: { card: OpenedCard; onClick: () => void }) {
+export function FlatCard({ card, onClick, lazy = true }: { card: OpenedCard; onClick: () => void; lazy?: boolean }) {
   return (
     <div className="card-slot">
       <div className={`card flat clickable ${cornersClass(card.setCode)}`} data-rarity={card.rarity} onClick={onClick}>
         <div className="face front">
-          <CardImage front={card.imageUrl} back={card.backImageUrl} alt={card.name} lazy />
+          <CardImage front={card.imageUrl} back={card.backImageUrl} alt={card.name} lazy={lazy} />
           {card.foil && <FoilSheen rarity={card.rarity} kind={card.foilKind} />}
           <NewBadge card={card} />
         </div>

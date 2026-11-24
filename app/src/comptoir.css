@@ -1148,6 +1148,17 @@ button.seen-card:hover:not(:disabled) { box-shadow: none; transform: translateX(
 .batch-booster-head b { font-family: var(--font-title); color: var(--gold-hi); }
 .cards.batch-cards { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
 .cards.batch-cards .card.clickable { cursor: zoom-in; }
+/* A batch being opened: progress, the pause between boosters, pause and skip; each booster
+   dealt face up at once (BatchOpening.tsx). */
+.opening-bar.batch-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+/* How far the batch is: a thin golden gauge beside "Booster N / T". */
+.batch-progress { flex: 0 1 220px; min-width: 80px; height: 8px; border-radius: 4px; overflow: hidden; background: #120b07; box-shadow: inset 0 1px 3px #000, 0 0 0 1px #6b4d2a; }
+.batch-progress > span { display: block; height: 100%; border-radius: 4px; background: linear-gradient(180deg, #fbe39c, #dca94b 55%, #a8752a); transition: width 0.3s ease-out; }
+.batch-delay { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; font-size: 13px; color: var(--muted); }
+.batch-delay input { width: 150px; accent-color: var(--gold-hi); }
+/* Dealt one after the other, like a quick opening's hand (`.revealed-row.final`, `card-in`). */
+.batch-deal > div { animation: card-in 0.35s ease-out backwards; animation-delay: calc(var(--i, 0) * 30ms); }
+@media (prefers-reduced-motion: reduce) { .batch-deal > div { animation: none; } }
 /* A batch's new cards and new foils, folded at first (BatchOpening.tsx). */
 .batch-news { margin: 12px 0; padding: 8px 12px; border: 1px solid var(--edge); border-radius: 8px; background: #0000002a; }
 .batch-news > summary { cursor: pointer; font: 700 15px var(--font-title); color: var(--gold-hi); letter-spacing: .04em; }

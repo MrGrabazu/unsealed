@@ -36,7 +36,7 @@ import {
 } from "./api";
 import { AchievementCard } from "./AchievementCard";
 import { Achievements as AchievementsTab } from "./Achievements";
-import { BatchOpening } from "./BatchOpening";
+import { BatchOpening, type BatchRun } from "./BatchOpening";
 import { SellDuplicatesButton } from "./BoosterSale";
 import { packLookOf, preparePack } from "./scene/packArt";
 import { BetResults } from "./BetResults";
@@ -317,6 +317,11 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
   const [batch, setBatch] = useState<OpenedCard[][] | null>(null);
   /** The size asked for the batch on screen (×10, ×100): the next batch is the same. */
   const [batchSize, setBatchSize] = useState(0);
+  /** The batch being opened, booster after booster (BatchOpening drives it). */
+  const [batchRun, setBatchRun] = useState<BatchRun | null>(null);
+  const batchRunId = useRef(0);
+  // Curiosities found during a batch wait for its summary, like the achievements.
+  const heldArtifacts = useRef<ArtifactView[]>([]);
   // The pack being opened: shown sealed until torn (then `cards` holds what it gave).
   const [pack, setPack] = useState<{ setCode: string; kind: string; quick: boolean } | null>(null);
   // The card whose details are open.
@@ -639,27 +644,39 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
     setResultShown(false);
   }
 
+  /** A batch (×10, ×100): opened one booster after the other, each like a quick opening, by
+   * BatchOpening, which shows each as it comes. */
   async function openMany(setCode: string, kind: string, quantity: number) {
     holdingToasts.current = true;
+    heldArtifacts.current = [];
     setPack(null);
     setCards(null);
     resetBets();
-    const opened = await openBoosters(setCode, kind, quantity, activeBets(keptFor(kept, setCode)));
-    setBatch(opened.map((b) => b.cards));
-    setBatchSize(quantity);
-    const found = opened.flatMap((b) => (b.artifact ? [b.artifact] : []));
-    if (found.length > 0) {
-      setArtifactQueue((queue) => [...queue, ...found]);
-      setArtifactCount((n) => n + 1);
-    }
-    setBetResults(opened.flatMap((b) => b.bets));
+    const bets = activeBets(keptFor(kept, setCode));
     // The same bets on every booster: those left out of any booster, once each.
-    const skipped = new Map(opened.flatMap((b) => b.skipped).map((s) => [`${JSON.stringify(s.bet)}:${s.reason}`, s]));
-    setBetSkipped([...skipped.values()]);
+    const skipped = new Map<string, SkippedBet>();
+    setBatch([]);
+    setBatchSize(quantity);
     setLast({ setCode, kind });
-    setOpenings((n) => n + 1);
-    if (opened.length > 0) nightOwl();
     setTab("open");
+    setBatchRun({
+      id: ++batchRunId.current,
+      total: quantity,
+      next: async () => {
+        try {
+          const [opened] = await openBoosters(setCode, kind, 1, bets);
+          if (!opened) return null;
+          if (opened.artifact) heldArtifacts.current.push(opened.artifact);
+          setBetResults((results) => [...results, ...opened.bets]);
+          for (const s of opened.skipped) skipped.set(`${JSON.stringify(s.bet)}:${s.reason}`, s);
+          setBetSkipped([...skipped.values()]);
+          return opened.cards;
+        } catch (e) {
+          showError(e);
+          return null;
+        }
+      },
+    });
   }
 
   /** Shows the sealed pack. Nothing is opened (or used up) until the player tears it. */
@@ -754,6 +771,13 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
       setArtifactQueue((queue) => [...queue, foundArtifact]);
       setArtifactCount((n) => n + 1);
       setFoundArtifact(null);
+    }
+    // A batch left midway (it stops there): the curiosities it found come now.
+    if (heldArtifacts.current.length > 0) {
+      const found = heldArtifacts.current;
+      heldArtifacts.current = [];
+      setArtifactQueue((queue) => [...queue, ...found]);
+      setArtifactCount((n) => n + 1);
     }
     releaseToasts();
     setDetailsOf(null);
@@ -1062,7 +1086,7 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
                   {/* Once a batch is open, the player stays in a fast mode: the next batch of the
                       same size, or, with fewer boosters left, the next one opened quickly (a single
                       booster offers its next one in its result). */}
-                  {remaining && batch && remaining.quantity >= batchSize && (
+                  {remaining && batch && allSeen && remaining.quantity >= batchSize && (
                     <button
                       className="primary"
                       disabled={busy}
@@ -1071,13 +1095,13 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
                       {t("open.nextBatch", { count: batchSize, left: remaining.quantity })}
                     </button>
                   )}
-                  {remaining && batch && remaining.quantity < batchSize && (
+                  {remaining && batch && allSeen && remaining.quantity < batchSize && (
                     <button className="primary" disabled={busy} onClick={() => void openQuick(remaining.setCode, remaining.kind)}>
                       {t("open.nextQuick", { count: remaining.quantity })}
                     </button>
                   )}
                   {/* The quick way, for the impatient, right from an opening. */}
-                  {remaining && batch && remaining.quantity >= batchSize && (
+                  {remaining && batch && allSeen && remaining.quantity >= batchSize && (
                     <button disabled={busy} onClick={() => void openQuick(remaining.setCode, remaining.kind)}>
                       {t("open.quick")}
                     </button>
@@ -1087,13 +1111,28 @@ export function GameScreen({ save, onMenu }: { save: SaveInfo; onMenu: () => voi
                 {batch && allSeen && <BetResults bets={betResults} skipped={betSkipped} cardName={betCardName} />}
                 {/* A quick opening shows its result as soon as it is drawn. */}
                 {pack?.quick && <Loading />}
-                {batch && (
+                {batch && batchRun && (
                   <BatchOpening
+                    key={batchRun.id}
+                    run={batchRun}
                     boosters={batch}
+                    held={detailsOf != null}
+                    onShown={(shown) => setBatch((current) => [...(current ?? []), shown])}
                     onDetails={(card) => last && setDetailsOf({ setCode: last.setCode, uuid: card.uuid, foil: card.foil })}
-                    onFinished={() => {
+                    onFinished={(opened) => {
                       releaseToasts();
                       setAllSeen(true);
+                      if (heldArtifacts.current.length > 0) {
+                        const found = heldArtifacts.current;
+                        heldArtifacts.current = [];
+                        setArtifactQueue((queue) => [...queue, ...found]);
+                        setArtifactCount((n) => n + 1);
+                      }
+                      if (opened > 0) {
+                        setOpenings((n) => n + 1);
+                        nightOwl();
+                      }
+                      void refreshWallet();
                     }}
                   />
                 )}
