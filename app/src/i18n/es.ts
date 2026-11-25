@@ -480,6 +480,7 @@ export const es: Messages = {
   "library.value": "Valor de mercado",
   "library.sellValue": "El Boosterium paga",
   "library.best": "Mejor carta:",
+  "library.perfect": "Completo al 100 %: nada más que coleccionar",
   "library.open": "Haz clic para abrir la carpeta",
   "collection.bySet": "Por edición",
   "collection.byArtist": "Por artista",
@@ -661,6 +662,9 @@ export const es: Messages = {
   "about.gameTitle": "El juego",
   "about.community": "La comunidad de jugadores: comparte tus mejores aperturas, ideas y opiniones.",
   "about.joinDiscord": "Únete a nosotros en Discord",
+  "about.guideTitle": "La guía del juego",
+  "about.guide": "Cómo funciona todo: economía, aperturas, apuestas, colección, logros… una página por tema (en inglés).",
+  "about.openGuide": "Leer la guía",
   "about.viewGithub": "Código fuente en GitHub",
   "about.game1":
     "Unsealed recrea la emoción de abrir sobres de cartas coleccionables sin gastar ni un céntimo. Compra sobres virtuales en el Boosterium, ábrelos carta a carta, construye tu colección, completa ediciones y desbloquea logros.",

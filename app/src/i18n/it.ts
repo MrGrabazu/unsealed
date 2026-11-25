@@ -480,6 +480,7 @@ export const it: Messages = {
   "library.value": "Valore di mercato",
   "library.sellValue": "Il Boosterium paga",
   "library.best": "Carta migliore:",
+  "library.perfect": "Completo al 100 %: nient'altro da collezionare",
   "library.open": "Clicca per aprire il raccoglitore",
   "collection.bySet": "Per set",
   "collection.byArtist": "Per artista",
@@ -661,6 +662,9 @@ export const it: Messages = {
   "about.gameTitle": "Il gioco",
   "about.community": "La community dei giocatori: condividi le tue migliori aperture, idee e opinioni.",
   "about.joinDiscord": "Unisciti a noi su Discord",
+  "about.guideTitle": "La guida del gioco",
+  "about.guide": "Come funziona tutto: economia, aperture, scommesse, collezione, obiettivi… una pagina per argomento (in inglese).",
+  "about.openGuide": "Leggi la guida",
   "about.viewGithub": "Codice sorgente su GitHub",
   "about.game1":
     "Unsealed ricrea l'emozione di aprire buste di carte collezionabili, senza spendere un centesimo. Compra buste virtuali al Boosterium, aprile carta per carta, costruisci la tua collezione, completa le espansioni e sblocca gli obiettivi.",

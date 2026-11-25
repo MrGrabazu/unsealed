@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { getDataInfo, type SaveInfo } from "./api";
 import { About } from "./About";
 import { BackToTop } from "./BackToTop";
+import { Tooltips } from "./Tooltips";
 import { useDataStatus } from "./DataStatus";
 import { Preparing } from "./Preparing";
 import { getFullscreen, isFullscreenKey, setFullscreen, toggleFullscreen } from "./fullscreen";
@@ -71,6 +72,7 @@ export function App() {
       )}
       {/* Whatever the screen, a long page can be scrolled back up at once. */}
       <BackToTop />
+      <Tooltips />
     </>
   );
 }

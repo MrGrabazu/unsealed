@@ -36,8 +36,9 @@ function widthOf(b: LibraryBinder): number {
   return Math.round(Math.max(34, Math.min(110, 26 + pages * 0.9)));
 }
 
-/** Room along a spine's label for its name (px), and Cinzel's mean capital width (em). */
-const LABEL_LENGTH = 138;
+/** Room along a spine's label for its name (px), the crown's slot under the set icon taken
+ * out, and Cinzel's mean capital width (em). */
+const LABEL_LENGTH = 108;
 const CHAR_WIDTH = 0.74;
 
 /** The name fills its label: smaller when long, and on up to three lines when the spine is
@@ -322,6 +323,14 @@ const Spine = memo(function Spine({
       <span className="spine-icon">
         {set?.iconUrl ? <SetIcon url={set.iconUrl} name={name} /> : <span className="spine-star">✦</span>}
       </span>
+      <span className="spine-crown" aria-hidden="true">
+        {binder.perfect && (
+          <>
+            <span className="spine-rays" />
+            <span className="crown">♛</span>
+          </>
+        )}
+      </span>
       <span className="spine-label">
         <span className="spine-name" style={nameStyle(name, book.width)}>
           {name}
@@ -376,6 +385,7 @@ const BinderTooltip = forwardRef<HTMLDivElement, { book: Book }>(function Binder
           percent: b.completionPercent.toFixed(1),
         })}
       </p>
+      {b.perfect && <p className="library-tooltip-perfect">♛ {t("library.perfect")}</p>}
       <dl>
         {rows.map(([label, value]) => (
           <div key={label}>

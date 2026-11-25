@@ -37,7 +37,7 @@ export function RevealedCards({
           style={{ "--i": index } as React.CSSProperties}
           onClick={() => onDetails(card)}
           onKeyDown={(e) => e.key === "Enter" && onDetails(card)}
-          title={t("details.open")}
+          aria-label={t("details.open")}
         >
           <div className={`thumb ${cornersClass(card.setCode)}`}>
             <CardImage front={card.imageUrl} back={card.backImageUrl} alt={card.name} />

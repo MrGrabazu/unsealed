@@ -109,9 +109,10 @@ export function PackOpening3D({ setCode, set, kind, cards, onTear, onReveal, onD
     if (!cards || finished) return null;
     const rarity = passableRarity(cards[top]);
     if (!rarity) return null;
+    // Never the last card: it stays on the pile to be looked at (sent off by the player).
     let to = top;
-    while (to < total && passableRarity(cards[to]) === rarity) to++;
-    return { rarity, to };
+    while (to < total - 1 && passableRarity(cards[to]) === rarity) to++;
+    return to > top ? { rarity, to } : null;
   }, [cards, top, finished, total]);
   // Hidden while its cards are being passed.
   const passingRun = passRequest != null && top < passRequest.to;

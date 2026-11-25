@@ -405,6 +405,19 @@ button.library-spine:hover:not(:disabled), button.library-spine:focus-visible { 
 /* A set completed: a gilded band across the top of its spine. */
 .library-spine.complete::after { content: ""; position: absolute; left: 0; right: 0; top: 4px; height: 3px;
   background: linear-gradient(90deg, var(--gold-lo), var(--gold-hi), var(--gold-lo)); box-shadow: 0 0 6px #f5d68a88; }
+/* Every spine keeps an empty slot under its set icon; a binder at 100 % (every card, in foil
+   whenever it can be) wears a gold crown there, a few short rays turning slowly behind it. */
+.spine-crown { position: relative; flex: none; height: 22px; width: 100%; display: grid; place-items: center; }
+.spine-crown .crown { position: relative; font-size: 18px; line-height: 1;
+  background: linear-gradient(180deg, #fff6c8, #f0c35a 50%, #a8752a); -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; filter: drop-shadow(0 1px 0 #3a2208) drop-shadow(0 0 2px #f5d68a99); }
+.spine-rays { position: absolute; left: 50%; top: 50%; width: 32px; height: 32px; margin: -16px 0 0 -16px; border-radius: 50%;
+  pointer-events: none; background: repeating-conic-gradient(#f5d68a4d 0 7deg, transparent 7deg 30deg);
+  -webkit-mask: radial-gradient(circle, #000 30%, transparent 68%); mask: radial-gradient(circle, #000 30%, transparent 68%);
+  animation: spine-rays 16s linear infinite; }
+@keyframes spine-rays { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spine-rays { animation: none; } }
+.library-tooltip-perfect { margin: 4px 0 0; font-family: var(--font-title); font-weight: 700; letter-spacing: 0.06em; color: var(--gold-hi); }
 
 /* What a binder holds, following the mouse: moved by a transform (Library.tsx), on a layer of
    its own, so nothing under it is repainted. */

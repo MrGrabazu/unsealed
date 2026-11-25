@@ -41,8 +41,6 @@ const FACES_AHEAD = 3;
 const CARD_SCREEN_SHARE = 0.67;
 /** The height of Scryfall's "normal" image: a card shown no taller needs no "large" one. */
 const NORMAL_IMAGE_HEIGHT = 680;
-/** How long the last card stays before leaving (seconds). */
-const LAST_CARD_STAYS = 2.2;
 /** An art card not seen upright, revealed as it lies in the booster, waits a moment, then
  * turns about its middle to be seen the right way (seconds; angles about the card's normal:
  * negative is clockwise on screen). */
@@ -632,11 +630,8 @@ function Cards({
       } else moving = true;
     }
 
-    // The last card stays a moment, then leaves on its own.
-    if (isLast && !finishing.current && slide.current.kind === "idle" && clock.current - topSince.current > LAST_CARD_STAYS) {
-      finishing.current = true;
-      sendOff(new THREE.Vector2(0, 1), 0.6);
-    }
+    // The last card stays until the player sends it off, like the others (with old boosters it
+    // is often the one that matters: it left on its own after 2 s, too soon to look at it).
 
     materials.forEach(({ uniforms }) => {
       uniforms.uTime.value = clock.current;
@@ -740,8 +735,8 @@ function Cards({
       }
     }
 
-    // A card moving, cards to pass, the last one waiting to leave, a card's effects coming in.
-    if (slide.current.kind !== "idle" || passing() || (isLast && !finishing.current) || shown < 1) moving = true;
+    // A card moving, cards to pass, a card's effects coming in.
+    if (slide.current.kind !== "idle" || passing() || shown < 1) moving = true;
     if (moving) state.invalidate();
   });
 

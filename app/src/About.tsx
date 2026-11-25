@@ -8,6 +8,8 @@ import { FAN_CONTENT_NOTICE } from "./legal";
 const DISCORD_URL = "https://discord.gg/YVRdaBGWvb";
 /** The game's source code. */
 const GITHUB_URL = "https://github.com/MrGrabazu/unsealed";
+/** The game's guide for players: how everything works, one page per topic. */
+const WIKI_URL = "https://github.com/MrGrabazu/unsealed/wiki";
 /** The licenses: this file says what each one covers, and holds the Creative Commons text. */
 const LICENSE_URL = "https://github.com/MrGrabazu/unsealed/blob/main/LICENSE-ASSETS";
 
@@ -54,6 +56,16 @@ export function About({ onBack }: { onBack: () => void }) {
         <button className="primary brand-link" onClick={() => void openUrl(DISCORD_URL)}>
           <BrandIcon path={DISCORD_ICON} />
           {t("about.joinDiscord")}
+        </button>
+      </div>
+
+      <div className="community">
+        <div>
+          <strong>{t("about.guideTitle")}</strong>
+          <p className="hint">{t("about.guide")}</p>
+        </div>
+        <button className="primary" onClick={() => void openUrl(WIKI_URL)}>
+          📖 {t("about.openGuide")}
         </button>
       </div>
 

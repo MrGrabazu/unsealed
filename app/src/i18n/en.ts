@@ -488,6 +488,7 @@ export const en = {
   "library.value": "Market value",
   "library.sellValue": "Boosterium buys for",
   "library.best": "Best card:",
+  "library.perfect": "100% complete: nothing left to collect",
   "library.open": "Click to open the binder",
   "collection.bySet": "By set",
   "collection.byArtist": "By artist",
@@ -669,6 +670,9 @@ export const en = {
   "about.gameTitle": "The game",
   "about.community": "The players' community: share your best pulls, ideas and feedback.",
   "about.joinDiscord": "Join us on Discord",
+  "about.guideTitle": "The game guide",
+  "about.guide": "How everything works: economy, openings, bets, collection, achievements… one page per topic.",
+  "about.openGuide": "Read the guide",
   "about.viewGithub": "Source code on GitHub",
   "about.game1":
     "Unsealed recreates the thrill of opening trading card boosters, without spending a cent. Buy virtual boosters in the Boosterium, crack them open card by card, build your collection, complete sets and unlock achievements.",

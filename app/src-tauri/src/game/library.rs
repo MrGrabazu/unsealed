@@ -51,6 +51,10 @@ pub struct LibraryBinder {
     /// The most valuable card owned, at the price of its finest finish owned.
     pub best_card: Option<BestCard>,
     pub boosters_opened: u32,
+    /// Nothing more to gain in this binder: every card of every section (collector extras,
+    /// tokens, art cards, box toppers, guests included) is owned, in foil whenever it is printed
+    /// in foil (a signed art card counts as its foil). Its spine wears a radiant crown.
+    pub perfect: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -59,6 +63,19 @@ pub struct BestCard {
     pub name: String,
     pub foil: bool,
     pub price_cents: u32,
+}
+
+/// Every card of these sections owned, each in foil when it can be (see `LibraryBinder::perfect`).
+fn is_perfect<'a>(sections: impl Iterator<Item = &'a Vec<CollectionCard>>) -> bool {
+    let mut any = false;
+    for card in sections.flatten() {
+        any = true;
+        let done = if card.can_be_foil { card.foil_quantity > 0 } else { card.quantity + card.foil_quantity > 0 };
+        if !done {
+            return false;
+        }
+    }
+    any
 }
 
 impl Game {
@@ -160,6 +177,7 @@ impl Game {
                     .sum(),
                 best_card,
                 boosters_opened: opened.get(&code).copied().unwrap_or(0),
+                perfect: is_perfect(sections.iter().copied().chain([&view.toppers])),
                 set_code: code,
             });
         }

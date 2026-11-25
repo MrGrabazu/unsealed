@@ -447,7 +447,7 @@ export function Collection({ sets, refreshKey, onChanged, onShop, loreFocus, dup
           className={`thumb clickable-thumb ${cornersClass("setCode" in c ? (c as ArtistCard).setCode : view?.setCode)}`}
           role="button"
           tabIndex={0}
-          title={t("details.open")}
+          aria-label={t("details.open")}
           onClick={() => setDetailsOf(c.uuid)}
           onKeyDown={(e) => e.key === "Enter" && setDetailsOf(c.uuid)}
         >

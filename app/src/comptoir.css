@@ -306,7 +306,10 @@ button.share-round { height: 46px; padding: 0 20px; border-radius: 23px; display
 .details-layout:is(.turned-right, .turned-left) .details-image > img:not(.mana) {
   position: absolute; top: 50%; left: 50%; width: calc(100% * 63 / 88); height: calc(100% * 88 / 63); transform: translate(-50%, -50%) rotate(90deg); }
 .details-layout.turned-left .details-image > img:not(.mana) { transform: translate(-50%, -50%) rotate(-90deg); }
-.details-image > img:not(.mana) { transition: transform .35s ease; }
+/* The image rounds its own corners (always a card standing up, turned by `transform`): a
+   transformed image is drawn on a layer of its own, which the box's rounded clip did not cut,
+   and the white of Scryfall's corners showed. */
+.details-image > img:not(.mana) { transition: transform .35s ease; border-radius: var(--card-radius); }
 .details-layout.turned-flip .details-image > img:not(.mana) { transform: rotate(180deg); }
 .rotate-button { position: absolute; right: 8px; bottom: 8px; z-index: 3; width: 30px; height: 30px; padding: 0; border-radius: 50%; background: #000b; border-color: #fff6; font-size: 16px; line-height: 1; }
 .rotate-button:hover, .rotate-button.active { background: var(--gold-hi); color: #1a1405; }
@@ -1148,6 +1151,16 @@ button.seen-card:hover:not(:disabled) { box-shadow: none; transform: translateX(
 .batch-booster-head b { font-family: var(--font-title); color: var(--gold-hi); }
 .cards.batch-cards { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
 .cards.batch-cards .card.clickable { cursor: zoom-in; }
+/* The game's tooltips (Tooltips.tsx): every `title`, at once, in a small leather frame with a
+   golden edge, its arrow pointing at what it explains. Never takes the mouse. */
+.game-tip { position: fixed; left: 0; top: 0; z-index: 1000; max-width: 300px; padding: 7px 11px; pointer-events: none;
+  font: 400 14px/1.35 var(--font-text); color: #f3e6c8; white-space: pre-line; text-align: left;
+  background: linear-gradient(180deg, #2c1d12, #1b120b); border: 1px solid #8a6a36; border-radius: 6px;
+  box-shadow: 0 0 0 1px #000, inset 0 1px 0 #ffffff14, 0 8px 20px #000c; }
+.game-tip::after { content: ""; position: absolute; left: var(--arrow-x, 50%); width: 9px; height: 9px; margin-left: -5px;
+  background: inherit; border: inherit; border-width: 0 1px 1px 0; transform: rotate(45deg); }
+.game-tip[data-side="above"]::after { bottom: -6px; background: #1b120b; }
+.game-tip[data-side="below"]::after { top: -6px; background: #2c1d12; border-width: 1px 0 0 1px; }
 /* A batch being opened: progress, the pause between boosters, pause and skip; each booster
    dealt face up at once (BatchOpening.tsx). */
 .opening-bar.batch-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }

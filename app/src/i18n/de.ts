@@ -480,6 +480,7 @@ export const de: Messages = {
   "library.value": "Marktwert",
   "library.sellValue": "Ankauf im Boosterium",
   "library.best": "Beste Karte:",
+  "library.perfect": "Zu 100 % vollständig: nichts mehr zu sammeln",
   "library.open": "Klicken, um den Ordner zu öffnen",
   "collection.bySet": "Nach Set",
   "collection.byArtist": "Nach Künstler",
@@ -661,6 +662,9 @@ export const de: Messages = {
   "about.gameTitle": "Das Spiel",
   "about.community": "Die Community der Spieler: Teile deine besten Ziehungen, Ideen und Rückmeldungen.",
   "about.joinDiscord": "Komm zu uns auf Discord",
+  "about.guideTitle": "Die Spielanleitung",
+  "about.guide": "Wie alles funktioniert: Wirtschaft, Öffnen, Wetten, Sammlung, Erfolge … eine Seite pro Thema (auf Englisch).",
+  "about.openGuide": "Anleitung lesen",
   "about.viewGithub": "Quellcode auf GitHub",
   "about.game1":
     "Unsealed lässt dich den Nervenkitzel beim Öffnen von Sammelkarten-Boostern erleben, ohne einen Cent auszugeben. Kaufe virtuelle Booster im Boosterium, öffne sie Karte für Karte, baue deine Sammlung auf, vervollständige Sets und schalte Erfolge frei.",

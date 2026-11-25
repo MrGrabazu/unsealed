@@ -465,6 +465,8 @@ export interface LibraryBinder {
   /** The most valuable card owned (finest finish owned). */
   bestCard: { name: string; foil: boolean; priceCents: number } | null;
   boostersOpened: number;
+  /** Every card of every section owned, in foil whenever it can be: the spine wears a crown. */
+  perfect: boolean;
 }
 
 /** An artist with cards in the sets offered. */
